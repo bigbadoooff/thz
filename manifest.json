@@ -1,0 +1,9 @@
+{
+  "domain": "thz",
+  "name": "Stiebel Eltron LWZ Home Assistant Integration",
+  "version": "0.0.1",
+  "documentation": "https://github.com/bigbadoooff/thz-home-assistant",
+  "dependencies": [],
+  "codeowners": ["@bigbadoooff"],
+  "requirements": ["pyserial"]
+}

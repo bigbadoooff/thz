@@ -1,0 +1,50 @@
+from homeassistant.components.select import SelectEntity
+
+SELECT_MAP = {
+    "OpMode":     {"1":"standby", "11":"automatic", "3":"DAYmode", "4":"setback", "5":"DHWmode", "14":"manual", "0":"emergency"},   
+    "OpModeHC":   {"1":"normal", "2":"setback", "3":"standby", "4":"restart", "5":"restart"},
+    "OpMode2":    {"0" :"manual", "1" : "automatic"},
+    "SomWinMode": {"01" :"winter", "02" : "summer"},
+    "weekday":    {"0" :"Monday", "1" : "Tuesday", "2" :"Wednesday", "3" : "Thursday", "4" : "Friday", "5" :"Saturday", "6" : "Sunday" },
+    "faultmap":   { "0" :"n.a.", "1" : "F01_AnodeFault", "2" : "F02_SafetyTempDelimiterEngaged", "3" : "F03_HighPreasureGuardFault", "4" : "F04_LowPreasureGuardFault", "5" : "F05_OutletFanFault", "6" : "F06_InletFanFault", "7" : "F07_MainOutputFanFault", "11" : "F11_LowPreasureSensorFault", "12": "F12_HighPreasureSensorFault", "15" : "F15_DHW_TemperatureFault",  "17" : "F17_DefrostingDurationExceeded", "20" : "F20_SolarSensorFault", "21" : "F21_OutsideTemperatureSensorFault", "22" : "F22_HotGasTemperatureFault", "23" : "F23_CondenserTemperatureSensorFault", "24" : "F24_EvaporatorTemperatureSensorFault", "26" : "F26_ReturnTemperatureSensorFault", "28" : "F28_FlowTemperatureSensorFault", "29" : "F29_DHW_TemperatureSensorFault", "30" : "F30_SoftwareVersionFault", "31" : "F31_RAMfault", "32" : "F32_EEPromFault", "33" : "F33_ExtractAirHumiditySensor", "34" : "F34_FlowSensor", "35" : "F35_minFlowCooling", "36" : "F36_MinFlowRate", "37" : "F37_MinWaterPressure", "40" : "F40_FloatSwitch", "50" : "F50_SensorHeatPumpReturn", "51" : "F51_SensorHeatPumpFlow",  "52" : "F52_SensorCondenserOutlet" },
+}
+
+class THZSelect(SelectEntity):
+    _attr_should_poll = True
+
+    def __init__(self, name: str, command, min_value, max_value, step, unit, device_class, decode_type: str, device, icon=None, unique_id=None,  options=None):
+        self._attr_name = name
+        self._command = command
+        self._device = device
+        self._attr_icon = icon or "mdi:eye"
+        self._attr_unique_id = unique_id or f"thz_set_{command.lower()}_{name.lower().replace(' ', '_')}"
+        self._decode_type = decode_type
+
+        if decode_type in SELECT_MAP:
+            self._attr_options = list(SELECT_MAP[decode_type].values())
+
+        self._attr_current_option = None
+
+    @property
+    def current_option(self):
+        return self._attr_current_option
+
+    def update(self):
+        # Read the value from the device and map it to an option
+        value_bytes = self._device.read_value(bytes.fromhex(self._command), "get", 4, 2)
+        value = int.from_bytes(value_bytes, byteorder='big', signed=False)
+        # Map value to option string (you must define this mapping)
+        if self._decode_type in SELECT_MAP:
+            value_str = str(value).zfill(2) if self._decode_type == "SomWinMode" else str(value)
+            self._attr_current_option = SELECT_MAP[self._decode_type].get(value_str, None)
+        else:
+            self._attr_current_option = None
+
+    def select_option(self, option: str):
+        # Map option string back to value
+        if self._decode_type in SELECT_MAP:
+            reverse_map = {v: int(k) for k, v in SELECT_MAP[self._decode_type].items()}
+            if option in reverse_map:
+                value_int = reverse_map[option]
+                self._device.write_value(bytes.fromhex(self._command), value_int)
+                self._attr_current_option = option
