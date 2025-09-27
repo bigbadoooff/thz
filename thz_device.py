@@ -189,8 +189,9 @@ class THZDevice:
         Returns: byte value read from the device
         """
         response = self.read_write_register(addr_bytes, get_or_set)
-
+        _LOGGER.debug(f"Antwort von Wärmepumpe: {response.hex()}")
         value_raw = response[offset: offset + length]
+        _LOGGER.debug(f"Gelesener Wert (Offset {offset}, Length {length}): {value_raw.hex()}")
         return value_raw
     
     def read_block(self, addr_bytes: bytes, get_or_set: str) -> bytes:

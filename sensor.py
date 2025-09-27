@@ -7,6 +7,7 @@ from .sensor_meta import SENSOR_META
 from .number import THZNumber
 from .switch import THZSwitch
 from .select import THZSelect
+from .time import THZTime
 from .const import SERIAL_PORT
 
 _LOGGER = logging.getLogger(__name__)
@@ -98,6 +99,17 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                 device=device,
                 icon=entry.get("icon"),
                 decode_type=entry.get("decode_type"),
+                unique_id=f"thz_{name.lower().replace(' ', '_')}",
+            )
+            entities.append(entity)
+
+        elif entry["type"] == "time":
+            _LOGGER.debug(f"Creating select for {name} with command {entry['command']}")
+            entity = THZTime(
+                name=name,
+                command=entry["command"],
+                device=device,
+                icon=entry.get("icon"),
                 unique_id=f"thz_{name.lower().replace(' ', '_')}",
             )
             entities.append(entity)

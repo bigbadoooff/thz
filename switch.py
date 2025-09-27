@@ -1,4 +1,7 @@
 from homeassistant.components.switch import SwitchEntity
+import logging
+
+_LOGGER = logging.getLogger(__name__)
 
 class THZSwitch(SwitchEntity):
     _attr_should_poll = True
@@ -15,8 +18,9 @@ class THZSwitch(SwitchEntity):
     def is_on(self):
         return self._is_on
 
-    def update(self):
+    async def async_update(self):
         # Read the value from the device and interpret as on/off
+        _LOGGER.debug(f"Updating switch {self._attr_name} with command {self._command}")
         value_bytes = self._device.read_value(bytes.fromhex(self._command), "get", 4, 2)
         value = int.from_bytes(value_bytes, byteorder='big', signed=False)
         self._is_on = bool(value)
