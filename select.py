@@ -1,4 +1,10 @@
 from homeassistant.components.select import SelectEntity
+from .register_maps.register_map_manager import RegisterMapManager_Write
+from .thz_device import THZDevice
+
+import logging
+
+_LOGGER = logging.getLogger(__name__)
 
 SELECT_MAP = {
     "OpMode":     {"1":"standby", "11":"automatic", "3":"DAYmode", "4":"setback", "5":"DHWmode", "14":"manual", "0":"emergency"},   
@@ -48,3 +54,30 @@ class THZSelect(SelectEntity):
                 value_int = reverse_map[option]
                 self._device.write_value(bytes.fromhex(self._command), value_int)
                 self._attr_current_option = option
+
+    async def async_setup_entry(hass, config_entry, async_add_entities):
+    # ... create THZSelect entities ...
+        entities = []
+        write_manager: RegisterMapManager_Write = hass.data["thz"]["write_manager"]
+        device: THZDevice = hass.data["thz"]["device"]
+        write_registers = write_manager.get_all_registers()
+        _LOGGER.debug(f"write_registers: {write_registers}")
+        for name, entry in write_registers.items():
+            if entry["type"] == "select":
+                _LOGGER.debug(f"Creating Select for {name} with command {entry['command']}")
+                entity = THZSelect(
+                    name=name,
+                    command=entry["command"],
+                    min_value=entry["min"],
+                    max_value=entry["max"],
+                    step=entry.get("step", 1),
+                    unit=entry.get("unit", ""),
+                    device_class=entry.get("device_class"),
+                    device=device,
+                    icon=entry.get("icon"),
+                    decode_type=entry.get("decode_type"),
+                    unique_id=f"thz_{name.lower().replace(' ', '_')}",
+                )
+                entities.append(entity)
+
+            async_add_entities(entities)

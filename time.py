@@ -1,5 +1,7 @@
 from homeassistant.components.time import TimeEntity
 from datetime import time
+from .register_maps.register_map_manager import RegisterMapManager_Write
+from .thz_device import THZDevice
 
 import logging
 _LOGGER = logging.getLogger(__name__)
@@ -41,4 +43,24 @@ class THZTime(TimeEntity):
         num = time_to_quarters(value)
         self._device.write_value(bytes.fromhex(self._command), num)
         self._attr_native_value = value
+
+    async def async_setup_entry(hass, config_entry, async_add_entities):
+        entities = []
+        write_manager: RegisterMapManager_Write = hass.data["thz"]["write_manager"]
+        device: THZDevice = hass.data["thz"]["device"]
+        write_registers = write_manager.get_all_registers()
+        _LOGGER.debug(f"write_registers: {write_registers}")
+        for name, entry in write_registers.items():
+            if entry["type"] == "time":
+                _LOGGER.debug(f"Creating Time for {name} with command {entry['command']}")
+                entity = THZTime(
+                    name=name,
+                    command=entry["command"],
+                    device=device,
+                    icon=entry.get("icon"),
+                    unique_id=f"thz_{name.lower().replace(' ', '_')}",
+                )
+                entities.append(entity)
+
+        async_add_entities(entities, True)
 

@@ -43,14 +43,14 @@ class THZDevice:
 
     def send_request(self, telegram: bytes) -> bytes:
         # 1. Send greeting
-        self.ser.write(const.STX)
+        self.ser.write(const.STARTOFTEXT)
         self.ser.flush()
         _LOGGER.debug("Greeting gesendet: 02")
 
         # 2. Wait for 0x10 response
         response = self.ser.read(1)
         _LOGGER.debug(f"Greeting Antwort: {response.hex()}")
-        if response != const.DLE:
+        if response != const.DATALINKESCAPE:
             raise ValueError("Handshake Schritt 1 fehlgeschlagen: keine 0x10 Antwort")
 
         # 3. Send request telegram
@@ -63,11 +63,11 @@ class THZDevice:
         # 4. Wait for 0x10 0x02 response
         response = self.ser.read(2)
         _LOGGER.debug(f"Antwort nach Request: {response.hex()}")
-        if response != const.DLE + const.STX:
+        if response != const.DATALINKESCAPE + const.STARTOFTEXT:
             raise ValueError("Handshake Schritt 2 fehlgeschlagen: keine 0x10 0x02 Antwort")
 
         # 5. Send confirmation 0x10
-        self.ser.write(const.DLE)
+        self.ser.write(const.DATALINKESCAPE)
         self.ser.flush()
         _LOGGER.debug("Bestätigung gesendet: 10")
 
@@ -80,17 +80,17 @@ class THZDevice:
                 chunk = self.ser.read(self.ser.in_waiting)
                 data.extend(chunk)
                 # Check for footer (0x10 0x03) and minimum length
-                if len(data) >= 8 and data[-2:] == const.DLE + const.ETX:
+                if len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT:
                     break
             else:
                 time.sleep(0.01)
         _LOGGER.debug(f"Empfangene Rohdaten: {data.hex()}")
 
-        if not (len(data) >= 8 and data[-2:] == const.DLE + const.ETX):
+        if not (len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT):
             raise ValueError("Keine gültige Antwort nach Datenanfrage erhalten")
         
         # 7. End of communication
-        self.ser.write(const.STX)
+        self.ser.write(const.STARTOFTEXT)
         self.ser.flush()
         _LOGGER.debug("Greeting gesendet: 02")
 
@@ -100,7 +100,7 @@ class THZDevice:
 
     def unescape(self, data: bytes) -> bytes:
         # 0x10 0x10 -> 0x10
-        data = data.replace(const.DLE+const.DLE, const.DLE)
+        data = data.replace(const.DATALINKESCAPE+const.DATALINKESCAPE, const.DATALINKESCAPE)
         # 0x2B 0x18 -> 0x2B
         data = data.replace(b'\x2B\x18', b'\x2B')
         return data
@@ -143,7 +143,7 @@ class THZDevice:
     def read_write_register(self, addr_bytes: bytes, get_or_set: str = "get") -> bytes:
         """Register lesen, z.B. "\xFB" für global status."""
         header = b'\x01\x00' if get_or_set == "get" else b'\x01\x80'  # Standard Header für "get" und "set"
-        footer = const.DLE+const.ETX  # Standard Footer
+        footer = const.DATALINKESCAPE+const.ENDOFTEXT  # Standard Footer
 
         checksum = self.thz_checksum(header + b'\x00' + addr_bytes)  # xx = Platzhalter für die Checksumme
         telegram = self.construct_telegram(addr_bytes, header, footer, checksum)

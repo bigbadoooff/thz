@@ -1,4 +1,6 @@
 from homeassistant.components.number import NumberEntity
+from .register_maps.register_map_manager import RegisterMapManager_Write
+from .thz_device import THZDevice
 
 import logging
 
@@ -36,4 +38,26 @@ class THZNumber(NumberEntity):
 
     async def async_setup_entry(hass, config_entry, async_add_entities):
     # ... create THZNumber entities ...
-        async_add_entities(entities)
+        entities = []
+        write_manager: RegisterMapManager_Write = hass.data["thz"]["write_manager"]
+        device: THZDevice = hass.data["thz"]["device"]
+        write_registers = write_manager.get_all_registers()
+        _LOGGER.debug(f"write_registers: {write_registers}")
+        for name, entry in write_registers.items():
+            if entry["type"] == "number":
+                _LOGGER.debug(f"Creating THZNumber for {name} with command {entry['command']}")
+                entity = THZNumber(
+                    name=name,
+                    command=entry["command"],
+                    min_value=entry["min"],
+                    max_value=entry["max"],
+                    step=entry.get("step", 1),
+                    unit=entry.get("unit", ""),
+                    device_class=entry.get("device_class"),
+                    device=device,
+                    icon=entry.get("icon"),
+                    unique_id=f"thz_{name.lower().replace(' ', '_')}",
+                )
+                entities.append(entity)
+            
+            async_add_entities(entities)

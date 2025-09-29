@@ -4,29 +4,17 @@ from homeassistant.helpers.entity import Entity
 from .thz_device import THZDevice
 from .register_maps.register_map_manager import RegisterMapManager, RegisterMapManager_Write
 from .sensor_meta import SENSOR_META
-from .number import THZNumber
-from .switch import THZSwitch
-from .select import THZSelect
-from .time import THZTime
-from .const import SERIAL_PORT
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
-    # 1. Device "roh" initialisieren
-    device = THZDevice(SERIAL_PORT)
 
-    # 2. Firmware abfragen
-    firmware_version = device.firmware_version  # z.B. "206"
-
-    # 3. Mapping laden
-    register_manager = RegisterMapManager(firmware_version)
-    write_manager = RegisterMapManager_Write(firmware_version)
 
     # 4. Mapping setzen
-    device.register_map_manager=register_manager
-    device.write_register_map_manager=write_manager
+    register_manager: RegisterMapManager = hass.data["thz"]["register_manager"]
+    write_manager: RegisterMapManager_Write = hass.data["thz"]["write_manager"]
+    device: THZDevice = hass.data["thz"]["device"]
 
     # 5. Sensoren anlegen
     sensors = []
@@ -50,73 +38,6 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
             sensors.append(THZGenericSensor(entry=entry, block=block_bytes, device=device)
                            )         
     add_entities(sensors, True)
-
-    # 6. Write-Register anlegen
-    entities = []
-    write_registers = write_manager.get_all_registers()
-    _LOGGER.debug(f"write_registers: {write_registers}")
-    for name, entry in write_registers.items():
-        if entry["type"] == "number":
-            _LOGGER.debug(f"Creating THZNumber for {name} with command {entry['command']}")
-            entity = THZNumber(
-                name=name,
-                command=entry["command"],
-                min_value=entry["min"],
-                max_value=entry["max"],
-                step=entry.get("step", 1),
-                unit=entry.get("unit", ""),
-                device_class=entry.get("device_class"),
-                device=device,
-                icon=entry.get("icon"),
-                unique_id=f"thz_{name.lower().replace(' ', '_')}",
-            )
-            entities.append(entity)
-        elif entry["type"] == "switch":
-            _LOGGER.debug(f"Creating switch for {name} with command {entry['command']}")
-            entity = THZSwitch(
-                name=name,
-                command=entry["command"],
-                min_value=entry["min"],
-                max_value=entry["max"],
-                step=entry.get("step", 1),
-                unit=entry.get("unit", ""),
-                device_class=entry.get("device_class"),
-                device=device,
-                icon=entry.get("icon"),
-                unique_id=f"thz_{name.lower().replace(' ', '_')}",
-            )
-            entities.append(entity)
-        elif entry["type"] == "select":
-            _LOGGER.debug(f"Creating select for {name} with command {entry['command']}")
-            entity = THZSelect(
-                name=name,
-                command=entry["command"],
-                min_value=entry["min"],
-                max_value=entry["max"],
-                step=entry.get("step", 1),
-                unit=entry.get("unit", ""),
-                device_class=entry.get("device_class"),
-                device=device,
-                icon=entry.get("icon"),
-                decode_type=entry.get("decode_type"),
-                unique_id=f"thz_{name.lower().replace(' ', '_')}",
-            )
-            entities.append(entity)
-
-        elif entry["type"] == "time":
-            _LOGGER.debug(f"Creating select for {name} with command {entry['command']}")
-            entity = THZTime(
-                name=name,
-                command=entry["command"],
-                device=device,
-                icon=entry.get("icon"),
-                unique_id=f"thz_{name.lower().replace(' ', '_')}",
-            )
-            entities.append(entity)
-        else:
-            _LOGGER.warning(f"Unsupported write register type: {entry['type']} for {name}")
-        
-    add_entities(entities, True)
 
 
 def decode_value(raw: bytes, decode_type: str, factor: float = 1.0):
