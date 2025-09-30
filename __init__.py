@@ -1,5 +1,5 @@
-from const import DOMAIN, SERIAL_PORT
-from thz_device import THZDevice
+from .const import DOMAIN, SERIAL_PORT
+from .thz_device import THZDevice
 from .register_maps.register_map_manager import RegisterMapManager, RegisterMapManager_Write
 
 async def async_setup(hass, config_entry):
