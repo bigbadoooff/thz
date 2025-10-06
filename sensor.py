@@ -8,8 +8,7 @@ from .sensor_meta import SENSOR_META
 _LOGGER = logging.getLogger(__name__)
 
 
-def setup_platform(hass, config, add_entities, discovery_info=None):
-
+async def async_setup_entry(hass, config_entry, async_add_entities):
 
     # 4. Mapping setzen
     register_manager: RegisterMapManager = hass.data["thz"]["register_manager"]
@@ -37,7 +36,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
             }
             sensors.append(THZGenericSensor(entry=entry, block=block_bytes, device=device)
                            )         
-    add_entities(sensors, True)
+    async_add_entities(sensors, True)
 
 
 def decode_value(raw: bytes, decode_type: str, factor: float = 1.0):
