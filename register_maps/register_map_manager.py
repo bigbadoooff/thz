@@ -1,6 +1,7 @@
-import importlib
+import sys
 from copy import deepcopy
 from typing import Dict, List, Tuple
+from . import *
 
 RegisterEntry = Tuple[str, int, int, str, int]  # (name, offset, length, type, factor)
 
@@ -14,12 +15,12 @@ class RegisterMapManager:
         self._merged_map = self._merge_maps(self._base_map, self._command_map)
 
     def _load_register_map(self, module_name: str) -> Dict[str, List[RegisterEntry]]:
-        try:
-            mod = importlib.import_module(f"custom_components.thz.register_maps.{module_name}")
+        mod = sys.modules.get(module_name)
+        if mod is not None:
             full_map = deepcopy(mod.REGISTER_MAP)
             # Filter raus, was keine Liste ist → z.B. "firmware": "206"
             return {k: v for k, v in full_map.items() if isinstance(v, list)}
-        except ModuleNotFoundError:
+        else:
             return {}
 
     def _merge_maps(
@@ -54,12 +55,12 @@ class RegisterMapManager_Write:
         self._merged_map = self._merge_maps(self._base_map, self._command_map)
 
     def _load_register_map(self, module_name: str) -> Dict[str, dict]:
-        try:
-            mod = importlib.import_module(f"custom_components.thz.register_maps.{module_name}")
+        mod = sys.modules.get(module_name)
+        if mod is not None:
             full_map = deepcopy(mod.WRITE_MAP)
             # Filter raus, was kein dict ist
             return {k: v for k, v in full_map.items() if isinstance(v, dict)}
-        except ModuleNotFoundError:
+        else:
             return {}
 
     def _merge_maps(
