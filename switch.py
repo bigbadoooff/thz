@@ -6,6 +6,30 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
+async def async_setup_entry(hass, config_entry, async_add_entities):
+    entities = []
+    write_manager: RegisterMapManager_Write = hass.data["thz"]["write_manager"]
+    device: THZDevice = hass.data["thz"]["device"]
+    write_registers = write_manager.get_all_registers()
+    _LOGGER.debug(f"write_registers: {write_registers}")
+    for name, entry in write_registers.items():
+        if entry["type"] == "switch":
+            _LOGGER.debug(f"Creating Switch for {name} with command {entry['command']}")
+            entity = THZSwitch(
+                name=name,
+                command=entry["command"],
+                min_value=entry["min"],
+                max_value=entry["max"],
+                step=entry.get("step", 1),
+                unit=entry.get("unit", ""),
+                device_class=entry.get("device_class"),
+                device=device,
+                icon=entry.get("icon"),
+                unique_id=f"thz_{name.lower().replace(' ', '_')}",
+            )
+            entities.append(entity)
+        
+    async_add_entities(entities, True)
 class THZSwitch(SwitchEntity):
     _attr_should_poll = True
 
@@ -36,27 +60,3 @@ class THZSwitch(SwitchEntity):
         self._device.write_value(bytes.fromhex(self._command), 0)
         self._is_on = False
 
-    async def async_setup_entry(hass, config_entry, async_add_entities):
-        entities = []
-        write_manager: RegisterMapManager_Write = hass.data["thz"]["write_manager"]
-        device: THZDevice = hass.data["thz"]["device"]
-        write_registers = write_manager.get_all_registers()
-        _LOGGER.debug(f"write_registers: {write_registers}")
-        for name, entry in write_registers.items():
-            if entry["type"] == "switch":
-                _LOGGER.debug(f"Creating Switch for {name} with command {entry['command']}")
-                entity = THZSwitch(
-                    name=name,
-                    command=entry["command"],
-                    min_value=entry["min"],
-                    max_value=entry["max"],
-                    step=entry.get("step", 1),
-                    unit=entry.get("unit", ""),
-                    device_class=entry.get("device_class"),
-                    device=device,
-                    icon=entry.get("icon"),
-                    unique_id=f"thz_{name.lower().replace(' ', '_')}",
-                )
-                entities.append(entity)
-            
-        async_add_entities(entities, True)

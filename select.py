@@ -15,6 +15,32 @@ SELECT_MAP = {
     "faultmap":   { "0" :"n.a.", "1" : "F01_AnodeFault", "2" : "F02_SafetyTempDelimiterEngaged", "3" : "F03_HighPreasureGuardFault", "4" : "F04_LowPreasureGuardFault", "5" : "F05_OutletFanFault", "6" : "F06_InletFanFault", "7" : "F07_MainOutputFanFault", "11" : "F11_LowPreasureSensorFault", "12": "F12_HighPreasureSensorFault", "15" : "F15_DHW_TemperatureFault",  "17" : "F17_DefrostingDurationExceeded", "20" : "F20_SolarSensorFault", "21" : "F21_OutsideTemperatureSensorFault", "22" : "F22_HotGasTemperatureFault", "23" : "F23_CondenserTemperatureSensorFault", "24" : "F24_EvaporatorTemperatureSensorFault", "26" : "F26_ReturnTemperatureSensorFault", "28" : "F28_FlowTemperatureSensorFault", "29" : "F29_DHW_TemperatureSensorFault", "30" : "F30_SoftwareVersionFault", "31" : "F31_RAMfault", "32" : "F32_EEPromFault", "33" : "F33_ExtractAirHumiditySensor", "34" : "F34_FlowSensor", "35" : "F35_minFlowCooling", "36" : "F36_MinFlowRate", "37" : "F37_MinWaterPressure", "40" : "F40_FloatSwitch", "50" : "F50_SensorHeatPumpReturn", "51" : "F51_SensorHeatPumpFlow",  "52" : "F52_SensorCondenserOutlet" },
 }
 
+async def async_setup_entry(hass, config_entry, async_add_entities):
+# ... create THZSelect entities ...
+    entities = []
+    write_manager: RegisterMapManager_Write = hass.data["thz"]["write_manager"]
+    device: THZDevice = hass.data["thz"]["device"]
+    write_registers = write_manager.get_all_registers()
+    _LOGGER.debug(f"write_registers: {write_registers}")
+    for name, entry in write_registers.items():
+        if entry["type"] == "select":
+            _LOGGER.debug(f"Creating Select for {name} with command {entry['command']}")
+            entity = THZSelect(
+                name=name,
+                command=entry["command"],
+                min_value=entry["min"],
+                max_value=entry["max"],
+                step=entry.get("step", 1),
+                unit=entry.get("unit", ""),
+                device_class=entry.get("device_class"),
+                device=device,
+                icon=entry.get("icon"),
+                decode_type=entry.get("decode_type"),
+                unique_id=f"thz_{name.lower().replace(' ', '_')}",
+            )
+            entities.append(entity)
+
+        async_add_entities(entities)
 class THZSelect(SelectEntity):
     _attr_should_poll = True
 
@@ -55,29 +81,3 @@ class THZSelect(SelectEntity):
                 self._device.write_value(bytes.fromhex(self._command), value_int)
                 self._attr_current_option = option
 
-    async def async_setup_entry(hass, config_entry, async_add_entities):
-    # ... create THZSelect entities ...
-        entities = []
-        write_manager: RegisterMapManager_Write = hass.data["thz"]["write_manager"]
-        device: THZDevice = hass.data["thz"]["device"]
-        write_registers = write_manager.get_all_registers()
-        _LOGGER.debug(f"write_registers: {write_registers}")
-        for name, entry in write_registers.items():
-            if entry["type"] == "select":
-                _LOGGER.debug(f"Creating Select for {name} with command {entry['command']}")
-                entity = THZSelect(
-                    name=name,
-                    command=entry["command"],
-                    min_value=entry["min"],
-                    max_value=entry["max"],
-                    step=entry.get("step", 1),
-                    unit=entry.get("unit", ""),
-                    device_class=entry.get("device_class"),
-                    device=device,
-                    icon=entry.get("icon"),
-                    decode_type=entry.get("decode_type"),
-                    unique_id=f"thz_{name.lower().replace(' ', '_')}",
-                )
-                entities.append(entity)
-
-            async_add_entities(entities)

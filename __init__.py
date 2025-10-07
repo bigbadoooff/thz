@@ -18,17 +18,18 @@ async def async_setup_entry(hass, config_entry): # For config flow setup
     hass.data[DOMAIN]["write_manager"] = write_manager
     hass.data[DOMAIN]["register_manager"] = RegisterMapManager(firmware_version)
 
+    # 4. Device speichern
+    device.register_map_manager = hass.data[DOMAIN]["register_manager"]
+    device.write_register_map_manager = hass.data[DOMAIN]["write_manager"]
+    hass.data[DOMAIN]["device"] = device
+    
+
     # Forward setup to platforms
     await hass.config_entries.async_forward_entry_setups(
         config_entry, ["sensor", "number", "switch", "select", "time"]
     )
 
-    # 4. Device speichern
-    device.register_map_manager = hass.data[DOMAIN]["register_manager"]
-    device.write_register_map_manager = hass.data[DOMAIN]["write_manager"]
-    hass.data[DOMAIN]["device"] = device
     return True
-
 async def async_unload_entry(hass, config_entry):
     unload_ok = await hass.config_entries.async_unload_platforms(
         config_entry, ["sensor", "number", "switch", "select", "time"]

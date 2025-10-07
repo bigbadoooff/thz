@@ -1,10 +1,15 @@
 import sys
+import logging
 from copy import deepcopy
 from typing import Dict, List, Tuple
-from . import *
+from . import register_map_all, write_map_all
+from . import register_map_206
+from . import register_map_214
+
+supported_firmwares = ["206, 214"]  # Add other supported firmware versions here
+_LOGGER = logging.getLogger(__name__)
 
 RegisterEntry = Tuple[str, int, int, str, int]  # (name, offset, length, type, factor)
-
 RegisterEntry_Write = Tuple[str, bytes, int, int, str, int, str, str, str, str, str]  # (name, command, min, max, unit, step, type, device_class, icon, decode type)
 
 class BaseRegisterMapManager:
@@ -21,8 +26,9 @@ class BaseRegisterMapManager:
         self._command_map = self._load_register_map(f"{command_map_name}_{firmware_version}", map_attr, entry_type)
         self._merged_map = self._merge_maps(self._base_map, self._command_map)
 
-    def _load_register_map(self, module_name: str, map_attr: str, entry_type: type) -> Dict[str, Any]:
+    def _load_register_map(self, module_name: str, map_attr: str, entry_type: type) -> Dict[str, any]:
         mod = sys.modules.get(module_name)
+        _LOGGER.debug(f"Loading register map from module: {module_name}, found: {mod is not None}")
         if mod is not None:
             full_map = deepcopy(getattr(mod, map_attr))
             # Filter: only keep items of the correct type (list or dict)
@@ -43,7 +49,7 @@ class BaseRegisterMapManager:
     def get_all_registers(self) -> Dict:
         return self._merged_map
 
-    def get_registers_for_block(self, block: str) -> Any:
+    def get_registers_for_block(self, block: str) -> any:
         return self._merged_map.get(block, [])
 
     def get_firmware_version(self) -> str:
@@ -67,7 +73,9 @@ class RegisterMapManager_Write(BaseRegisterMapManager):
             command_map_name="write_map",
             map_attr="WRITE_MAP",
             entry_type=dict,
-        )
+            )
+        
+
 # class RegisterMapManager:
 #     def __init__(self, firmware_version: str):
 #         self.firmware_version = firmware_version
