@@ -1,5 +1,6 @@
 import serial
 import time
+import asyncio
 import logging
 from . import const
 from .register_maps.register_map_manager import RegisterMapManager, RegisterMapManager_Write
@@ -41,11 +42,11 @@ class THZDevice:
         checksum = checksum % 256
         return bytes([checksum])
 
-    def send_request(self, telegram: bytes) -> bytes:
+    async def send_request(self, telegram: bytes) -> bytes:
         # 1. Send greeting
         self.ser.write(const.STARTOFTEXT)
         self.ser.flush()
-        _LOGGER.debug("Greeting gesendet: 02")
+        #_LOGGER.debug("Greeting gesendet: 02")
 
         # 2. Wait for 0x10 response
         response = self.ser.read(1)
@@ -69,7 +70,7 @@ class THZDevice:
         # 5. Send confirmation 0x10
         self.ser.write(const.DATALINKESCAPE)
         self.ser.flush()
-        _LOGGER.debug("Bestätigung gesendet: 10")
+        #_LOGGER.debug("Bestätigung gesendet: 10")
 
         # 6. Read data telegram (ends with 0x10 0x03)
         data = bytearray()
@@ -83,7 +84,7 @@ class THZDevice:
                 if len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT:
                     break
             else:
-                time.sleep(0.01)
+               await asyncio.sleep(0.01)
         _LOGGER.debug(f"Empfangene Rohdaten: {data.hex()}")
 
         if not (len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT):
@@ -92,7 +93,7 @@ class THZDevice:
         # 7. End of communication
         self.ser.write(const.STARTOFTEXT)
         self.ser.flush()
-        _LOGGER.debug("Greeting gesendet: 02")
+        #_LOGGER.debug("Greeting gesendet: 02")
 
 
         # Unescaping is already handled in decode_response
