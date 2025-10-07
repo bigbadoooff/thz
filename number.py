@@ -31,7 +31,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             )
             entities.append(entity)
         
-        async_add_entities(entities)
+    async_add_entities(entities)
 class THZNumber(NumberEntity):
     def __init__(self, name:str, command:bytes, min_value, max_value, step, unit, device_class, device, icon=None, unique_id=None):
         self._attr_name = name

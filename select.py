@@ -40,7 +40,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             )
             entities.append(entity)
 
-        async_add_entities(entities)
+    async_add_entities(entities)
 class THZSelect(SelectEntity):
     _attr_should_poll = True
 

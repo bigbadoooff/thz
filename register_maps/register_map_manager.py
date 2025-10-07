@@ -27,7 +27,9 @@ class BaseRegisterMapManager:
         self._merged_map = self._merge_maps(self._base_map, self._command_map)
 
     def _load_register_map(self, module_name: str, map_attr: str, entry_type: type) -> Dict[str, any]:
-        mod = sys.modules.get(module_name)
+        package_prefix = __package__
+        full_module_name = f"{package_prefix}.{module_name}"
+        mod = sys.modules.get(full_module_name)
         _LOGGER.debug(f"Loading register map from module: {module_name}, found: {mod is not None}")
         if mod is not None:
             full_map = deepcopy(getattr(mod, map_attr))
@@ -74,6 +76,11 @@ class RegisterMapManager_Write(BaseRegisterMapManager):
             map_attr="WRITE_MAP",
             entry_type=dict,
             )
+    
+    def _merge_maps(self, base: Dict, override: Dict) -> Dict:
+        merged = deepcopy(base)
+        merged.update(override)
+        return merged
         
 
 # class RegisterMapManager:
