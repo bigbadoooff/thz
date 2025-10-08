@@ -1,4 +1,5 @@
 import serial
+import socket
 import time
 import asyncio
 import logging
@@ -8,10 +9,29 @@ from .register_maps.register_map_manager import RegisterMapManager, RegisterMapM
 _LOGGER = logging.getLogger(__name__)
 
 class THZDevice:
-    def __init__(self, port=const.SERIAL_PORT, baudrate=const.BAUDRATE, read_timeout=const.TIMEOUT):
+    def __init__(        self,
+        connection: str = "usb",
+        port: str = const.SERIAL_PORT,
+        host: str | None = None,
+        tcp_port: int | None = None,
+        baudrate: int = const.BAUDRATE,
+        read_timeout: float = const.TIMEOUT,
+        ):
+
+        self._connection = connection
         self._port = port
-        self.ser = serial.Serial(port, baudrate=baudrate, timeout=read_timeout)
+        self._host = host
+        self._tcp_port = tcp_port
+        self._baudrate = baudrate
         self.read_timeout = read_timeout
+
+        # Verbindung herstellen
+        if connection == "usb":
+            self._connect_serial()
+        elif connection == "ip":
+            self._connect_tcp()
+        else:
+            raise ValueError(f"Unbekannter Verbindungstyp: {connection}")
 
         # Firmware lesen
         self._firmware_version = None
@@ -21,6 +41,22 @@ class THZDevice:
         self.write_register_map_manager = RegisterMapManager_Write(self.firmware_version)
         self._cache = {}  # { block_name: (timestamp, payload) }
         self._cache_duration = 60  # seconds
+
+    def _connect_serial(self):
+        """Öffnet die USB/Serielle Verbindung."""
+        _LOGGER.debug(f"Öffne serielle Verbindung: {self._port} @ {self._baudrate} baud")
+        self.ser = serial.Serial(
+            self._port,
+            baudrate=self._baudrate,
+            timeout=self.read_timeout,
+        )
+
+    def _connect_tcp(self):
+        """Verbindet sich mit ser.net (TCP/IP)."""
+        _LOGGER.debug(f"Öffne TCP-Verbindung: {self._host}:{self._tcp_port}")
+        self.ser = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.ser.settimeout(self.read_timeout)
+        self.ser.connect((self._host, self._tcp_port))
 
     def read_block_cached(self, block: str) -> bytes:
         now = time.time()
@@ -33,71 +69,164 @@ class THZDevice:
         self._cache[block] = (now, data)
         return data
 
-
-    def close(self):
-        self.ser.close()
-
-    def thz_checksum(self, data: bytes) -> bytes:
-        checksum = sum(b for i, b in enumerate(data) if i != 2)
-        checksum = checksum % 256
-        return bytes([checksum])
-
     def send_request(self, telegram: bytes) -> bytes:
-        # 1. Send greeting
-        self.ser.write(const.STARTOFTEXT)
-        self.ser.flush()
-        #_LOGGER.debug("Greeting gesendet: 02")
-
-        # 2. Wait for 0x10 response
-        response = self.ser.read(1)
-        #_LOGGER.debug(f"Greeting Antwort: {response.hex()}")
-        if response != const.DATALINKESCAPE:
-            raise ValueError("Handshake Schritt 1 fehlgeschlagen: keine 0x10 Antwort")
-
-        # 3. Send request telegram
-        # telegram = self.build_request(telegram)
-        self.ser.reset_input_buffer()
-        self.ser.write(telegram)
-        self.ser.flush()
-        _LOGGER.debug("Request gesendet: %s", telegram.hex())
-
-        # 4. Wait for 0x10 0x02 response
-        response = self.ser.read(2)
-        #_LOGGER.debug(f"Antwort nach Request: {response.hex()}")
-        if response != const.DATALINKESCAPE + const.STARTOFTEXT:
-            raise ValueError("Handshake Schritt 2 fehlgeschlagen: keine 0x10 0x02 Antwort")
-
-        # 5. Send confirmation 0x10
-        self.ser.write(const.DATALINKESCAPE)
-        self.ser.flush()
-        #_LOGGER.debug("Bestätigung gesendet: 10")
-
-        # 6. Read data telegram (ends with 0x10 0x03)
+        """Sende Anfrage über USB oder TCP, empfange Antwort."""
+        is_socket = hasattr(self.ser, "recv")  # TCP Socket
+        timeout = self.read_timeout
         data = bytearray()
+
+        # 1. Greeting senden (0x02)
+        self._write_bytes(const.STARTOFTEXT)
+        _LOGGER.debug("Greeting gesendet (0x02)")
+
+        # 2. 0x10 Antwort erwarten
+        response = self._read_exact(1, timeout)
+        if response != const.DATALINKESCAPE:
+            raise ValueError(f"Handshake 1 fehlgeschlagen, erhalten: {response.hex()}")
+
+        # 3. Telegram senden
+        self._reset_input_buffer()
+        self._write_bytes(telegram)
+        _LOGGER.debug(f"Request gesendet: {telegram.hex()}")
+
+        # 4. 0x10 0x02 Antwort erwarten
+        response = self._read_exact(2, timeout)
+        if response != const.DATALINKESCAPE + const.STARTOFTEXT:
+            raise ValueError(f"Handshake 2 fehlgeschlagen, erhalten: {response.hex()}")
+
+        # 5. Bestätigung senden (0x10)
+        self._write_bytes(const.DATALINKESCAPE)
+
+        # 6. Daten-Telegramm empfangen bis 0x10 0x03
         start_time = time.time()
-        max_wait = self.read_timeout
-        while time.time() - start_time < max_wait:
-            if self.ser.in_waiting > 0:
-                chunk = self.ser.read(self.ser.in_waiting)
+        while time.time() - start_time < timeout:
+            chunk = self._read_available()
+            if chunk:
                 data.extend(chunk)
-                # Check for footer (0x10 0x03) and minimum length
                 if len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT:
                     break
             else:
-               asyncio.sleep(0.01)
+                time.sleep(0.01)
+
         _LOGGER.debug(f"Empfangene Rohdaten: {data.hex()}")
 
         if not (len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT):
             raise ValueError("Keine gültige Antwort nach Datenanfrage erhalten")
-        
-        # 7. End of communication
-        self.ser.write(const.STARTOFTEXT)
-        self.ser.flush()
-        #_LOGGER.debug("Greeting gesendet: 02")
 
-
-        # Unescaping is already handled in decode_response
+        # 7. Ende der Kommunikation
+        self._write_bytes(const.STARTOFTEXT)
         return bytes(data)
+
+
+    # Hilfsmethoden ergänzen
+    def _write_bytes(self, data: bytes):
+        """Sendet Bytes je nach Verbindungstyp."""
+        if hasattr(self.ser, "send"):  # TCP Socket
+            self.ser.send(data)
+        else:  # Serial
+            self.ser.write(data)
+            self.ser.flush()
+
+
+    def _read_exact(self, size: int, timeout: float) -> bytes:
+        """Liest exakt n Bytes, egal ob USB oder TCP."""
+        end_time = time.time() + timeout
+        buf = bytearray()
+        while len(buf) < size and time.time() < end_time:
+            chunk = self._read_available()
+            if chunk:
+                buf.extend(chunk)
+            else:
+                time.sleep(0.01)
+        return bytes(buf)
+
+
+    def _read_available(self) -> bytes:
+        """Liest verfügbare Bytes."""
+        if hasattr(self.ser, "recv"):  # TCP Socket
+            try:
+                self.ser.setblocking(False)
+                return self.ser.recv(1024)
+            except BlockingIOError:
+                return b""
+        else:
+            waiting = getattr(self.ser, "in_waiting", 0)
+            if waiting > 0:
+                return self.ser.read(waiting)
+            return b""
+
+
+    def _reset_input_buffer(self):
+        """Buffer löschen, falls möglich."""
+        if hasattr(self.ser, "reset_input_buffer"):
+            self.ser.reset_input_buffer()
+
+
+    # TCP hat keinen Input Buffer, daher kein Reset nötig
+    # def close(self):
+    #     self.ser.close()
+
+    # def thz_checksum(self, data: bytes) -> bytes:
+    #     checksum = sum(b for i, b in enumerate(data) if i != 2)
+    #     checksum = checksum % 256
+    #     return bytes([checksum])
+
+    # def send_request(self, telegram: bytes) -> bytes:
+    #     # 1. Send greeting
+    #     self.ser.write(const.STARTOFTEXT)
+    #     self.ser.flush()
+    #     #_LOGGER.debug("Greeting gesendet: 02")
+
+    #     # 2. Wait for 0x10 response
+    #     response = self.ser.read(1)
+    #     #_LOGGER.debug(f"Greeting Antwort: {response.hex()}")
+    #     if response != const.DATALINKESCAPE:
+    #         raise ValueError("Handshake Schritt 1 fehlgeschlagen: keine 0x10 Antwort")
+
+    #     # 3. Send request telegram
+    #     # telegram = self.build_request(telegram)
+    #     self.ser.reset_input_buffer()
+    #     self.ser.write(telegram)
+    #     self.ser.flush()
+    #     _LOGGER.debug("Request gesendet: %s", telegram.hex())
+
+    #     # 4. Wait for 0x10 0x02 response
+    #     response = self.ser.read(2)
+    #     #_LOGGER.debug(f"Antwort nach Request: {response.hex()}")
+    #     if response != const.DATALINKESCAPE + const.STARTOFTEXT:
+    #         raise ValueError("Handshake Schritt 2 fehlgeschlagen: keine 0x10 0x02 Antwort")
+
+    #     # 5. Send confirmation 0x10
+    #     self.ser.write(const.DATALINKESCAPE)
+    #     self.ser.flush()
+    #     #_LOGGER.debug("Bestätigung gesendet: 10")
+
+    #     # 6. Read data telegram (ends with 0x10 0x03)
+    #     data = bytearray()
+    #     start_time = time.time()
+    #     max_wait = self.read_timeout
+    #     while time.time() - start_time < max_wait:
+    #         if self.ser.in_waiting > 0:
+    #             chunk = self.ser.read(self.ser.in_waiting)
+    #             data.extend(chunk)
+    #             # Check for footer (0x10 0x03) and minimum length
+    #             if len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT:
+    #                 break
+    #         else:
+    #            asyncio.sleep(0.01)
+    #     _LOGGER.debug(f"Empfangene Rohdaten: {data.hex()}")
+
+    #     if not (len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT):
+    #         raise ValueError("Keine gültige Antwort nach Datenanfrage erhalten")
+        
+    #     # 7. End of communication
+    #     self.ser.write(const.STARTOFTEXT)
+    #     self.ser.flush()
+    #     #_LOGGER.debug("Greeting gesendet: 02")
+
+
+    #     # Unescaping is already handled in decode_response
+    #     return bytes(data)
 
     def unescape(self, data: bytes) -> bytes:
         # 0x10 0x10 -> 0x10

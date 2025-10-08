@@ -5,3 +5,4 @@ TIMEOUT = 1
 DATALINKESCAPE = b'\x10'  # Data Link Escape
 STARTOFTEXT = b'\x02'  # Start of Text
 ENDOFTEXT = b'\x03'  # End of Text
+CONF_CONNECTION_TYPE = "connection_type"

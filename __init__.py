@@ -1,3 +1,6 @@
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+
 from homeassistant.helpers.discovery import load_platform
 from .const import DOMAIN, SERIAL_PORT
 from .thz_device import THZDevice
@@ -5,9 +8,21 @@ from .register_maps.register_map_manager import RegisterMapManager, RegisterMapM
 
 firmware_version = ""  # leer, wird später überschrieben
 
-async def async_setup_entry(hass, config_entry): # For config flow setup
+async def async_setup_entry(hass: Homeassistant, config_entry: ConfigEntry): # For config flow setup
+    """Set up THZ from config entry."""
+    hass.data.setdefault(DOMAIN, {})
+
+    data = config_entry.data
+    conn_type = data["connection_type"]
+
     # 1. Device "roh" initialisieren
-    device = THZDevice(SERIAL_PORT)
+    if conn_type == "ip":
+        device = THZDevice(connection="ip", host=data["host"], port=data["port"])
+    elif conn_type == "usb":
+        device = THZDevice(connection="usb", device_path=data["device"])
+    else:
+        raise ValueError("Ungültiger Verbindungstyp")
+
 
     # 2. Firmware abfragen
     firmware_version = device.firmware_version  # z.B. "206"
