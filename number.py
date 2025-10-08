@@ -36,9 +36,9 @@ class THZNumber(NumberEntity):
     def __init__(self, name:str, command:bytes, min_value, max_value, step, unit, device_class, device, icon=None, unique_id=None):
         self._attr_name = name
         self._command = command
-        self._attr_min_value = float(min_value) if min_value != "" else None
-        self._attr_max_value = float(max_value) if max_value != "" else None
-        self._attr_step = float(step) if step != "" else 1
+        self._attr_native_min_value = float(min_value) if min_value != "" else None
+        self._attr_native_max_value = float(max_value) if max_value != "" else None
+        self._attr_native_step = float(step) if step != "" else 1
         self._attr_native_unit_of_measurement = unit
         self._attr_device_class = device_class
         self._device = device
