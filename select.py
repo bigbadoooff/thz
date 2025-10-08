@@ -1,4 +1,4 @@
-from homeassistant.components.select import SelectEntity
+from homeassistant.components.select import SelectEntity # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 from .register_maps.register_map_manager import RegisterMapManager_Write
 from .thz_device import THZDevice
 

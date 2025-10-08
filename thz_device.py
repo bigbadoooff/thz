@@ -1,5 +1,5 @@
-import serial
-import socket
+import serial # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+import socket 
 import time
 import asyncio
 import logging

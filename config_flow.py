@@ -1,11 +1,9 @@
-import voluptuous as vol
-from homeassistant import config_entries
-from homeassistant.const import CONF_HOST, CONF_PORT, CONF_DEVICE
-import serial.tools.list_ports
+import voluptuous as vol # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+from homeassistant import config_entries # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+from homeassistant.const import CONF_HOST, CONF_PORT, CONF_DEVICE # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+import serial.tools.list_ports # pyright: ignore[reportMissingModuleSource]
 
-from .const import DOMAIN
-
-CONF_CONNECTION_TYPE = "connection_type"
+from .const import DOMAIN, CONF_CONNECTION_TYPE
 
 CONNECTION_USB = "usb"
 CONNECTION_IP = "ip"

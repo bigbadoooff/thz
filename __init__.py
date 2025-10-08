@@ -1,14 +1,14 @@
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.config_entries import ConfigEntry # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+from homeassistant.core import HomeAssistant # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 
-from homeassistant.helpers.discovery import load_platform
+from homeassistant.helpers.discovery import load_platform # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 from .const import DOMAIN, SERIAL_PORT
 from .thz_device import THZDevice
 from .register_maps.register_map_manager import RegisterMapManager, RegisterMapManager_Write
 
 firmware_version = ""  # leer, wird später überschrieben
 
-async def async_setup_entry(hass: Homeassistant, config_entry: ConfigEntry): # For config flow setup
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     """Set up THZ from config entry."""
     hass.data.setdefault(DOMAIN, {})
 
