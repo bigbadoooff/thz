@@ -42,7 +42,7 @@ class THZDevice:
         checksum = checksum % 256
         return bytes([checksum])
 
-    async def send_request(self, telegram: bytes) -> bytes:
+    def send_request(self, telegram: bytes) -> bytes:
         # 1. Send greeting
         self.ser.write(const.STARTOFTEXT)
         self.ser.flush()
@@ -50,7 +50,7 @@ class THZDevice:
 
         # 2. Wait for 0x10 response
         response = self.ser.read(1)
-        _LOGGER.debug(f"Greeting Antwort: {response.hex()}")
+        #_LOGGER.debug(f"Greeting Antwort: {response.hex()}")
         if response != const.DATALINKESCAPE:
             raise ValueError("Handshake Schritt 1 fehlgeschlagen: keine 0x10 Antwort")
 
@@ -63,7 +63,7 @@ class THZDevice:
 
         # 4. Wait for 0x10 0x02 response
         response = self.ser.read(2)
-        _LOGGER.debug(f"Antwort nach Request: {response.hex()}")
+        #_LOGGER.debug(f"Antwort nach Request: {response.hex()}")
         if response != const.DATALINKESCAPE + const.STARTOFTEXT:
             raise ValueError("Handshake Schritt 2 fehlgeschlagen: keine 0x10 0x02 Antwort")
 
@@ -84,7 +84,7 @@ class THZDevice:
                 if len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT:
                     break
             else:
-               await asyncio.sleep(0.01)
+               asyncio.sleep(0.01)
         _LOGGER.debug(f"Empfangene Rohdaten: {data.hex()}")
 
         if not (len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT):
@@ -190,9 +190,9 @@ class THZDevice:
         Returns: byte value read from the device
         """
         response = self.read_write_register(addr_bytes, get_or_set)
-        _LOGGER.debug(f"Antwort von Wärmepumpe: {response.hex()}")
+        #_LOGGER.debug(f"Antwort von Wärmepumpe: {response.hex()}")
         value_raw = response[offset: offset + length]
-        _LOGGER.debug(f"Gelesener Wert (Offset {offset}, Length {length}): {value_raw.hex()}")
+        #_LOGGER.debug(f"Gelesener Wert (Offset {offset}, Length {length}): {value_raw.hex()}")
         return value_raw
     
     def read_block(self, addr_bytes: bytes, get_or_set: str) -> bytes:

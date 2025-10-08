@@ -54,11 +54,11 @@ class THZNumber(NumberEntity):
         # You may need to adapt the offset/length for your protocol
         _LOGGER.debug(f"Updating number {self._attr_name} with command {self._command}")
         value_bytes = self._device.read_value(bytes.fromhex(self._command), "get", 4, 2)
-        value = int.from_bytes(value_bytes, byteorder='big', signed=False)*self._attr_step
+        value = int.from_bytes(value_bytes, byteorder='big', signed=False)*self._attr_native_step
         self._attr_native_value = value
 
     async def async_set_native_value(self, value: float):
         value_int = int(value)
-        self._device.write_value(bytes.fromhex(self._command), value_int/self._attr_step)
+        self._device.write_value(bytes.fromhex(self._command), value_int/self._attr_native_step)
         self._attr_native_value = value
 
