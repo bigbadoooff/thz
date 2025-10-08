@@ -7,7 +7,7 @@ import logging
 _LOGGER = logging.getLogger(__name__)
 
 SELECT_MAP = {
-    "OpMode":     {"1":"standby", "11":"automatic", "3":"DAYmode", "4":"setback", "5":"DHWmode", "14":"manual", "0":"emergency"},   
+    "2opmode":     {"1":"standby", "11":"automatic", "3":"DAYmode", "4":"setback", "5":"DHWmode", "14":"manual", "0":"emergency"},   
     "OpModeHC":   {"1":"normal", "2":"setback", "3":"standby", "4":"restart", "5":"restart"},
     "OpMode2":    {"0" :"manual", "1" : "automatic"},
     "SomWinMode": {"01" :"winter", "02" : "summer"},
