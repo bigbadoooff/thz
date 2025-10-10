@@ -1,7 +1,8 @@
-from homeassistant.components.number import NumberEntity
+from homeassistant.components.number import NumberEntity # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 from .register_maps.register_map_manager import RegisterMapManager_Write
 from .thz_device import THZDevice
 from .const import DOMAIN
+import asyncio
 
 import logging
 
@@ -53,7 +54,8 @@ class THZNumber(NumberEntity):
     async def async_update(self):
         # You may need to adapt the offset/length for your protocol
         _LOGGER.debug(f"Updating number {self._attr_name} with command {self._command}")
-        value_bytes = self._device.read_value(bytes.fromhex(self._command), "get", 4, 2)
+        async with self._device.lock:
+            value_bytes = await self.hass.async_add_executor_job(self._device.read_value, bytes.fromhex(self._command), "get", 4, 2)
         value = int.from_bytes(value_bytes, byteorder='big', signed=False)*self._attr_native_step
         self._attr_native_value = value
 

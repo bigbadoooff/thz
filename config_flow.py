@@ -17,7 +17,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None):
         """Erste Auswahl: Verbindungstyp."""
         if user_input is not None:
-            if user_input[CONF_CONNECTION_TYPE] == CONNECTION_IP:
+            if user_input["connection_type"] == CONNECTION_IP:
                 return await self.async_step_ip()
             return await self.async_step_usb()
 

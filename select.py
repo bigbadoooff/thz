@@ -1,6 +1,7 @@
 from homeassistant.components.select import SelectEntity # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 from .register_maps.register_map_manager import RegisterMapManager_Write
 from .thz_device import THZDevice
+import asyncio
 
 import logging
 
@@ -61,9 +62,10 @@ class THZSelect(SelectEntity):
     def current_option(self):
         return self._attr_current_option
 
-    def update(self):
+    async def async_update(self):
         # Read the value from the device and map it to an option
-        value_bytes = self._device.read_value(bytes.fromhex(self._command), "get", 4, 2)
+        async with self._device.lock:
+            value_bytes = await self.hass.async_add_executor_job(self._device.read_value, bytes.fromhex(self._command), "get", 4, 2)
         value = int.from_bytes(value_bytes, byteorder='big', signed=False)
         # Map value to option string (you must define this mapping)
         if self._decode_type in SELECT_MAP:

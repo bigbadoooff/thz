@@ -1,7 +1,8 @@
-from homeassistant.components.time import TimeEntity
+from homeassistant.components.time import TimeEntity    # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 from datetime import time
 from .register_maps.register_map_manager import RegisterMapManager_Write
 from .thz_device import THZDevice
+import asyncio
 
 import logging
 _LOGGER = logging.getLogger(__name__)
@@ -55,7 +56,8 @@ class THZTime(TimeEntity):
         return self._attr_native_value
 
     async def async_update(self):
-        value_bytes = self._device.read_value(bytes.fromhex(self._command), "get", 4, 2)
+        async with self._device.lock:
+            value_bytes = await self.hass.async_add_executor_job(self._device.read_value, bytes.fromhex(self._command), "get", 4, 2)
         num = value_bytes[0]
         self._attr_native_value = quarters_to_time(num)
 

@@ -1,62 +1,91 @@
-import serial # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+import serial # pyright: ignore[reportMissingModuleSource]
 import socket 
 import time
 import asyncio
 import logging
 from . import const
 from .register_maps.register_map_manager import RegisterMapManager, RegisterMapManager_Write
+from homeassistant.core import HomeAssistant # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 
 _LOGGER = logging.getLogger(__name__)
 
 class THZDevice:
-    def __init__(        self,
+    """Repräsentiert die Verbindung zur THZ-Wärmepumpe."""
+
+    def __init__(
+        self,
         connection: str = "usb",
-        port: str = const.SERIAL_PORT,
+        port: str | None = None,
         host: str | None = None,
         tcp_port: int | None = None,
         baudrate: int = const.BAUDRATE,
         read_timeout: float = const.TIMEOUT,
-        ):
-
-        self._connection = connection
-        self._port = port
-        self._host = host
-        self._tcp_port = tcp_port
-        self._baudrate = baudrate
+    ):
+        """Nur Grundkonfiguration – noch keine Kommunikation."""
+        self.connection = connection
+        self.port = port
+        self.host = host
+        self.tcp_port = tcp_port
+        self.baudrate = baudrate
         self.read_timeout = read_timeout
+        self._initialzed = False
 
-        # Verbindung herstellen
-        if connection == "usb":
+        # Platzhalter
+        self.ser = None
+        self._firmware_version: str | None = None
+        self.register_map_manager = None
+        self.write_register_map_manager = None
+        self._cache = {}
+        self._cache_duration = 60
+
+        # Thread-Lock für parallele Zugriffe
+        self.lock = asyncio.Lock()
+        self._last_access = 0
+        self._min_interval = 0.1  # minimale Zeit zwischen zwei Reads in Sekunden
+
+            # ---------------------------------------------------------------------
+
+    async def async_initialize(self, hass: HomeAssistant) -> None:
+        """Öffnet Verbindung und initialisiert Firmware-abhängige Datenstrukturen."""
+        _LOGGER.debug("Initialisiere THZ-Device (%s)", self.connection)
+
+        # Verbindung öffnen
+        if self.connection == "usb":
             self._connect_serial()
-        elif connection == "ip":
+        elif self.connection == "ip":
             self._connect_tcp()
+            pass
         else:
-            raise ValueError(f"Unbekannter Verbindungstyp: {connection}")
+            raise ValueError(f"Unbekannter Verbindungstyp: {self.connection}")
 
-        # Firmware lesen
-        self._firmware_version = None
-        self._firmware_version = self.read_firmware_version()
-        # RegisterMapManager anhand der Firmware laden
-        self.register_map_manager = RegisterMapManager(self.firmware_version)
-        self.write_register_map_manager = RegisterMapManager_Write(self.firmware_version)
+        # Firmware lesen (läuft synchron im Executor)
+        self._firmware_version = await hass.async_add_executor_job(self.read_firmware_version)
+        _LOGGER.info("Firmware-Version erkannt: %s", self._firmware_version)
+
+        # Firmware-spezifische Register-Maps laden
+        self.register_map_manager = RegisterMapManager(self._firmware_version)
+        self.write_register_map_manager = RegisterMapManager_Write(self._firmware_version)
+
         self._cache = {}  # { block_name: (timestamp, payload) }
         self._cache_duration = 60  # seconds
 
+        self._initialzed = True
+
     def _connect_serial(self):
         """Öffnet die USB/Serielle Verbindung."""
-        _LOGGER.debug(f"Öffne serielle Verbindung: {self._port} @ {self._baudrate} baud")
+        _LOGGER.debug(f"Öffne serielle Verbindung: {self.port} @ {self.baudrate} baud")
         self.ser = serial.Serial(
-            self._port,
-            baudrate=self._baudrate,
+            self.port,
+            baudrate=self.baudrate,
             timeout=self.read_timeout,
         )
 
     def _connect_tcp(self):
         """Verbindet sich mit ser.net (TCP/IP)."""
-        _LOGGER.debug(f"Öffne TCP-Verbindung: {self._host}:{self._tcp_port}")
+        _LOGGER.debug(f"Öffne TCP-Verbindung: {self.host}:{self.tcp_port}")
         self.ser = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ser.settimeout(self.read_timeout)
-        self.ser.connect((self._host, self._tcp_port))
+        self.ser.connect((self.host, self.tcp_port))
 
     def read_block_cached(self, block: str) -> bytes:
         now = time.time()
@@ -160,16 +189,16 @@ class THZDevice:
         """Buffer löschen, falls möglich."""
         if hasattr(self.ser, "reset_input_buffer"):
             self.ser.reset_input_buffer()
+    #TCP hat keinen Input Buffer, daher kein Reset nötig
 
 
-    # TCP hat keinen Input Buffer, daher kein Reset nötig
-    # def close(self):
-    #     self.ser.close()
+    def close(self):
+        self.ser.close()
 
-    # def thz_checksum(self, data: bytes) -> bytes:
-    #     checksum = sum(b for i, b in enumerate(data) if i != 2)
-    #     checksum = checksum % 256
-    #     return bytes([checksum])
+    def thz_checksum(self, data: bytes) -> bytes:
+        checksum = sum(b for i, b in enumerate(data) if i != 2)
+        checksum = checksum % 256
+        return bytes([checksum])
 
     # def send_request(self, telegram: bytes) -> bytes:
     #     # 1. Send greeting

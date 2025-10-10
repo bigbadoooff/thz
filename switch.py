@@ -1,6 +1,7 @@
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntity # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 from .register_maps.register_map_manager import RegisterMapManager_Write
 from .thz_device import THZDevice
+import asyncio
 
 import logging
 
@@ -48,7 +49,8 @@ class THZSwitch(SwitchEntity):
     async def async_update(self):
         # Read the value from the device and interpret as on/off
         _LOGGER.debug(f"Updating switch {self._attr_name} with command {self._command}")
-        value_bytes = self._device.read_value(bytes.fromhex(self._command), "get", 4, 2)
+        async with self._device.lock:
+            value_bytes = await self.hass.async_add_executor_job(self._device.read_value, bytes.fromhex(self._command), "get", 4, 2)
         value = int.from_bytes(value_bytes, byteorder='big', signed=False)
         self._is_on = bool(value)
 
