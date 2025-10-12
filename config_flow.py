@@ -44,7 +44,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             return self.async_create_entry(title=f"THZ (USB: {user_input[CONF_DEVICE]})", data=user_input)
 
-        ports = [p.device for p in serial.tools.list_ports.comports()]
+        ports = await self.hass.async_add_executor_job(serial.tools.list_ports.comports)
         if not ports:
             ports = ["/dev/ttyUSB0", "/dev/ttyACM0", "/dev/ttyAMA0"]
 
@@ -83,14 +83,14 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data = entry.data
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=self.reconfigure_schema(data),
+            data_schema= await self.reconfigure_schema(data),
         )
 
-    def reconfigure_schema(self, defaults: dict | None = None) -> vol.Schema:
+    async def reconfigure_schema(self, defaults: dict | None = None) -> vol.Schema:
         """Generate form schema with defaults."""
         defaults = defaults or {}
 
-        ports = [p.device for p in serial.tools.list_ports.comports()]
+        ports = await self.hass.async_add_executor_job(serial.tools.list_ports.comports)
         if not ports:
             ports = ["/dev/ttyUSB0", "/dev/ttyACM0", "/dev/ttyAMA0"]
 
