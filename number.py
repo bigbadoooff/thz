@@ -52,7 +52,6 @@ class THZNumber(NumberEntity):
         return self._attr_native_value
 
     async def async_update(self):
-        # You may need to adapt the offset/length for your protocol
         _LOGGER.debug(f"Updating number {self._attr_name} with command {self._command}")
         async with self._device.lock:
             value_bytes = await self.hass.async_add_executor_job(self._device.read_value, bytes.fromhex(self._command), "get", 4, 2)

@@ -55,10 +55,11 @@ class THZSwitch(SwitchEntity):
         self._is_on = bool(value)
 
     def turn_on(self, **kwargs):
-        self._device.write_value(bytes.fromhex(self._command), 1)
+        value_int = 1
+        self._device.write_value(bytes.fromhex(self._command), value_int.to_bytes(2, byteorder='big', signed=False))
         self._is_on = True
 
     def turn_off(self, **kwargs):
-        self._device.write_value(bytes.fromhex(self._command), 0)
+        value_int = 0
+        self._device.write_value(bytes.fromhex(self._command), value_int.to_bytes(2, byteorder='big', signed=False))
         self._is_on = False
-

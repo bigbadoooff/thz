@@ -87,11 +87,11 @@ class THZDevice:
         self.ser.settimeout(self.read_timeout)
         self.ser.connect((self.host, self.tcp_port))
 
-    def read_block_cached(self, block: str) -> bytes:
+    def read_block_cached(self, block: str, cache_duration: float = 60) -> bytes:
         now = time.time()
         if block in self._cache:
             ts, data = self._cache[block]
-            if now - ts < self._cache_duration:
+            if now - ts < cache_duration:
                 return data
 
         data = self.read_block(block, "get")
@@ -106,7 +106,7 @@ class THZDevice:
 
         # 1. Greeting senden (0x02)
         self._write_bytes(const.STARTOFTEXT)
-        _LOGGER.debug("Greeting gesendet (0x02)")
+        _LOGGER.info("Greeting gesendet (0x02)")
 
         # 2. 0x10 Antwort erwarten
         response = self._read_exact(1, timeout)
@@ -116,7 +116,7 @@ class THZDevice:
         # 3. Telegram senden
         self._reset_input_buffer()
         self._write_bytes(telegram)
-        _LOGGER.debug(f"Request gesendet: {telegram.hex()}")
+        _LOGGER.info(f"Request gesendet: {telegram.hex()}")
 
         # 4. 0x10 0x02 Antwort erwarten
         response = self._read_exact(2, timeout)
@@ -137,7 +137,7 @@ class THZDevice:
             else:
                 time.sleep(0.01)
 
-        _LOGGER.debug(f"Empfangene Rohdaten: {data.hex()}")
+        _LOGGER.info(f"Empfangene Rohdaten: {data.hex()}")
 
         if not (len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT):
             raise ValueError("Keine gültige Antwort nach Datenanfrage erhalten")
@@ -299,13 +299,13 @@ class THZDevice:
         else:
             raise ValueError(f"Unbekannte Antwort: {data.hex()}")
 
-    def read_write_register(self, addr_bytes: bytes, get_or_set: str = "get") -> bytes:
+    def read_write_register(self, addr_bytes: bytes, get_or_set: str = "get", payload_to_deliver: bytes = bytes()) -> bytes:
         """Register lesen, z.B. "\xFB" für global status."""
         header = b'\x01\x00' if get_or_set == "get" else b'\x01\x80'  # Standard Header für "get" und "set"
         footer = const.DATALINKESCAPE+const.ENDOFTEXT  # Standard Footer
 
-        checksum = self.thz_checksum(header + b'\x00' + addr_bytes)  # xx = Platzhalter für die Checksumme
-        telegram = self.construct_telegram(addr_bytes, header, footer, checksum)
+        checksum = self.thz_checksum(header + b'\x00' + addr_bytes + payload_to_deliver)  # xx = Platzhalter für die Checksumme
+        telegram = self.construct_telegram(addr_bytes + payload_to_deliver, header, footer, checksum)
         raw_response = self.send_request(telegram)
         payload = self.decode_response(raw_response)
         #_LOGGER.debug("Payload dekodiert: %s", payload.hex())
@@ -325,8 +325,8 @@ class THZDevice:
         Reads the firmware version from the THZ device.
 
         - Address (Register): 0xFD
-        - Offset: 0
-        - Length: 4 bytes
+        - Offset: 2
+        - Length: 2 bytes
         - Interpreted as: unsigned big-endian integer
         """
         try:
@@ -348,10 +348,19 @@ class THZDevice:
         Returns: byte value read from the device
         """
         response = self.read_write_register(addr_bytes, get_or_set)
-        #_LOGGER.debug(f"Antwort von Wärmepumpe: {response.hex()}")
+        _LOGGER.info(f"Antwort von Wärmepumpe: {response.hex()}")
         value_raw = response[offset: offset + length]
-        #_LOGGER.debug(f"Gelesener Wert (Offset {offset}, Length {length}): {value_raw.hex()}")
+        _LOGGER.info(f"Gelesener Wert (Offset {offset}, Length {length}): {value_raw.hex()}")
         return value_raw
+    
+    def write_value(self, addr_bytes: bytes, value: bytes) -> None:
+        """
+        Writes a value to the THZ device.
+        addr_bytes: bytes (e.g. b'\xFB')
+        value: integer value to write
+        """
+        self.read_write_register(addr_bytes, "set", value)
+        _LOGGER.debug(f"Wert {value} an Adresse {addr_bytes.hex()} geschrieben.")
     
     def read_block(self, addr_bytes: bytes, get_or_set: str) -> bytes:
         """

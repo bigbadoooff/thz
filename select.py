@@ -55,6 +55,7 @@ class THZSelect(SelectEntity):
 
         if decode_type in SELECT_MAP:
             self._attr_options = list(SELECT_MAP[decode_type].values())
+            _LOGGER.debug(f"Options for {name} ({decode_type}): {self._attr_options}")
 
         self._attr_current_option = None
 
@@ -80,6 +81,8 @@ class THZSelect(SelectEntity):
             reverse_map = {v: int(k) for k, v in SELECT_MAP[self._decode_type].items()}
             if option in reverse_map:
                 value_int = reverse_map[option]
-                self._device.write_value(bytes.fromhex(self._command), value_int)
+                value_bytes = value_int.to_bytes(2, byteorder='big', signed=False)
+                self._device.write_value(bytes.fromhex(self._command), value_bytes)
+                _LOGGER.debug(f"Set {self._attr_name} to {option} (value: {value_int})")
                 self._attr_current_option = option
 

@@ -63,8 +63,6 @@ class THZTime(TimeEntity):
 
     async def async_set_native_value(self, value: str):
         num = time_to_quarters(value)
-        self._device.write_value(bytes.fromhex(self._command), num)
+        num_bytes = num.to_bytes(2, byteorder='big', signed=False)
+        self._device.write_value(bytes.fromhex(self._command), num_bytes)
         self._attr_native_value = value
-
-
-
