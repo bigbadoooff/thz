@@ -48,11 +48,11 @@ def decode_value(raw: bytes, decode_type: str, factor: float = 1.0):
         return int.from_bytes(raw, byteorder="big")
     elif decode_type.startswith("bit"):
         bitnum = int(decode_type[3:])
-        _LOGGER.debug(f"Decode bit {bitnum} from raw {raw.hex()}")
+        # _LOGGER.debug(f"Decode bit {bitnum} from raw {raw.hex()}")
         return (raw[0] >> bitnum) & 0x01
     elif decode_type.startswith("nbit"):
         bitnum = int(decode_type[4:])
-        _LOGGER.debug(f"Decode bit {bitnum} from raw {raw.hex()}")
+        # _LOGGER.debug(f"Decode bit {bitnum} from raw {raw.hex()}")
         return not ((raw[0] >> bitnum) & 0x01)
     elif decode_type == "esp_mant":
         # Dummy Beispiel für spezielle Darstellung
