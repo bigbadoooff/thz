@@ -67,11 +67,15 @@ class THZSelect(SelectEntity):
         # Read the value from the device and map it to an option
         async with self._device.lock:
             value_bytes = await self.hass.async_add_executor_job(self._device.read_value, bytes.fromhex(self._command), "get", 4, 2)
-        value = int.from_bytes(value_bytes, byteorder='big', signed=False)
+            _LOGGER.debug(f"Read bytes for {self._attr_name} ({self._command}): {value_bytes.hex() if value_bytes else 'None'}")
+        value = int.from_bytes(value_bytes, byteorder='little', signed=False)
+        _LOGGER.debug(f"Value for {self._attr_name} ({self._command}): {value}")
         # Map value to option string (you must define this mapping)
         if self._decode_type in SELECT_MAP:
             value_str = str(value).zfill(2) if self._decode_type == "SomWinMode" else str(value)
+            _LOGGER.debug(f"Mapping value {value_str} to option for {self._attr_name} ({self._command})")
             self._attr_current_option = SELECT_MAP[self._decode_type].get(value_str, None)
+            _LOGGER.debug(f"Current option for {self._attr_name} ({self._command}): {self._attr_current_option}")
         else:
             self._attr_current_option = None
 
@@ -80,8 +84,11 @@ class THZSelect(SelectEntity):
         if self._decode_type in SELECT_MAP:
             reverse_map = {v: int(k) for k, v in SELECT_MAP[self._decode_type].items()}
             if option in reverse_map:
+                _LOGGER.debug(f"Setting {self._attr_name} to {option} (value: {reverse_map[option]})")
                 value_int = reverse_map[option]
-                value_bytes = value_int.to_bytes(2, byteorder='big', signed=False)
+                _LOGGER.debug(f"Writing value {value_int} to command {self._command}")
+                value_bytes = value_int.to_bytes(2, byteorder='little', signed=False)
+                _LOGGER.debug(f"Value bytes to write: {value_bytes.hex()}")
                 self._device.write_value(bytes.fromhex(self._command), value_bytes)
                 _LOGGER.debug(f"Set {self._attr_name} to {option} (value: {value_int})")
                 self._attr_current_option = option

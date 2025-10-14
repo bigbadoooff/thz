@@ -106,7 +106,7 @@ class THZDevice:
 
         # 1. Greeting senden (0x02)
         self._write_bytes(const.STARTOFTEXT)
-        _LOGGER.info("Greeting gesendet (0x02)")
+        # _LOGGER.info("Greeting gesendet (0x02)")
 
         # 2. 0x10 Antwort erwarten
         response = self._read_exact(1, timeout)
@@ -116,7 +116,7 @@ class THZDevice:
         # 3. Telegram senden
         self._reset_input_buffer()
         self._write_bytes(telegram)
-        _LOGGER.info(f"Request gesendet: {telegram.hex()}")
+        # _LOGGER.info(f"Request gesendet: {telegram.hex()}")
 
         # 4. 0x10 0x02 Antwort erwarten
         response = self._read_exact(2, timeout)
@@ -137,7 +137,7 @@ class THZDevice:
             else:
                 time.sleep(0.01)
 
-        _LOGGER.info(f"Empfangene Rohdaten: {data.hex()}")
+        # _LOGGER.info(f"Empfangene Rohdaten: {data.hex()}")
 
         if not (len(data) >= 8 and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT):
             raise ValueError("Keine gültige Antwort nach Datenanfrage erhalten")
@@ -348,9 +348,9 @@ class THZDevice:
         Returns: byte value read from the device
         """
         response = self.read_write_register(addr_bytes, get_or_set)
-        _LOGGER.info(f"Antwort von Wärmepumpe: {response.hex()}")
+        # _LOGGER.info(f"Antwort von Wärmepumpe: {response.hex()}")
         value_raw = response[offset: offset + length]
-        _LOGGER.info(f"Gelesener Wert (Offset {offset}, Length {length}): {value_raw.hex()}")
+        # _LOGGER.info(f"Gelesener Wert (Offset {offset}, Length {length}): {value_raw.hex()}")
         return value_raw
     
     def write_value(self, addr_bytes: bytes, value: bytes) -> None:

@@ -44,9 +44,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             return self.async_create_entry(title=f"THZ (USB: {user_input[CONF_DEVICE]})", data=user_input)
 
-        ports = await self.hass.async_add_executor_job(serial.tools.list_ports.comports)
-        if not ports:
-            ports = ["/dev/ttyUSB0", "/dev/ttyACM0", "/dev/ttyAMA0"]
+        ports = await self.get_ports()
 
         schema = vol.Schema({
             vol.Required(CONF_DEVICE, default=ports[0]): vol.In(ports),
@@ -90,9 +88,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Generate form schema with defaults."""
         defaults = defaults or {}
 
-        ports = await self.hass.async_add_executor_job(serial.tools.list_ports.comports)
-        if not ports:
-            ports = ["/dev/ttyUSB0", "/dev/ttyACM0", "/dev/ttyAMA0"]
+        ports = await self.get_ports()
 
         return vol.Schema(
             {
@@ -113,5 +109,13 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "log_level",
                 default=defaults.get("log_level", "info"),
                 ): vol.In(["debug", "info", "warning", "error"])
-            }
-        )
+            })
+    
+    async def get_ports(self) -> list[str]:
+        """Get available serial ports."""
+        ports = await self.hass.async_add_executor_job(serial.tools.list_ports.comports)
+        if ports:
+            ports = [p.device for p in ports]  # <-- Nur den Gerätepfad übernehmen
+        else:
+            ports = ["/dev/ttyUSB0", "/dev/ttyACM0", "/dev/ttyAMA0"]
+        return ports
