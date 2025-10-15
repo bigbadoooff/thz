@@ -34,6 +34,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 "device_class": meta.get("device_class"),
                 "icon": meta.get("icon"),
                 "translation_key": meta.get("translation_key"),
+                "refresh_dict": meta.get("refresh_dict", None)
             }
             sensors.append(THZGenericSensor(entry=entry, block=block_bytes, device=device)
                            )         
@@ -95,6 +96,7 @@ class THZGenericSensor(Entity):
         self._device_class = e.get("device_class")
         self._icon = e.get("icon")
         self._translation_key = e.get("translation_key")
+        self._refresh_dict = e.get("refresh_dict")
         self._device = device
         self._state = None
 
