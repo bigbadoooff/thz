@@ -79,7 +79,7 @@ class THZSelect(SelectEntity):
         else:
             self._attr_current_option = None
 
-    def select_option(self, option: str):
+    async def select_option(self, option: str):
         # Map option string back to value
         if self._decode_type in SELECT_MAP:
             reverse_map = {v: int(k) for k, v in SELECT_MAP[self._decode_type].items()}
@@ -89,7 +89,9 @@ class THZSelect(SelectEntity):
                 _LOGGER.debug(f"Writing value {value_int} to command {self._command}")
                 value_bytes = value_int.to_bytes(2, byteorder='little', signed=False)
                 _LOGGER.debug(f"Value bytes to write: {value_bytes.hex()}")
-                self._device.write_value(bytes.fromhex(self._command), value_bytes)
+                async with self._device.lock:
+                    await self.hass.async_add_executor_job(self._device.write_value(bytes.fromhex(self._command), value_bytes))
+                    await asyncio.sleep(0.01)  # Kurze Pause, um sicherzustellen, dass das Gerät bereit ist
                 _LOGGER.debug(f"Set {self._attr_name} to {option} (value: {value_int})")
                 self._attr_current_option = option
 

@@ -52,7 +52,7 @@ class THZNumber(NumberEntity):
         return self._attr_native_value
 
     async def async_update(self):
-        _LOGGER.debug(f"Updating number {self._attr_name} with command {self._command}")
+        # _LOGGER.debug(f"Updating number {self._attr_name} with command {self._command}")
         async with self._device.lock:
             value_bytes = await self.hass.async_add_executor_job(self._device.read_value, bytes.fromhex(self._command), "get", 4, 2)
         value = int.from_bytes(value_bytes, byteorder='big', signed=False)*self._attr_native_step
@@ -60,6 +60,7 @@ class THZNumber(NumberEntity):
 
     async def async_set_native_value(self, value: float):
         value_int = int(value)
-        self._device.write_value(bytes.fromhex(self._command), value_int/self._attr_native_step)
+        async with self._device.lock:
+            await self.hass.async_add_executor_job(self._device.write_value, bytes.fromhex(self._command), value_int/self._attr_native_step)
         self._attr_native_value = value
 

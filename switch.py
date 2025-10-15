@@ -46,20 +46,25 @@ class THZSwitch(SwitchEntity):
     def is_on(self):
         return self._is_on
 
+
+    #TODO debugging um die richtigen Werte zu bekommen
     async def async_update(self):
         # Read the value from the device and interpret as on/off
         _LOGGER.debug(f"Updating switch {self._attr_name} with command {self._command}")
         async with self._device.lock:
             value_bytes = await self.hass.async_add_executor_job(self._device.read_value, bytes.fromhex(self._command), "get", 4, 2)
+            await asyncio.sleep(0.01)  # Kurze Pause, um sicherzustellen, dass das Gerät bereit ist
         value = int.from_bytes(value_bytes, byteorder='big', signed=False)
         self._is_on = bool(value)
 
-    def turn_on(self, **kwargs):
+    async def turn_on(self, **kwargs):
         value_int = 1
-        self._device.write_value(bytes.fromhex(self._command), value_int.to_bytes(2, byteorder='big', signed=False))
+        async with self._device.lock:
+            await self.hass.async_add_executor_job(self._device.write_value, bytes.fromhex(self._command), value_int.to_bytes(2, byteorder='big', signed=False))
         self._is_on = True
 
-    def turn_off(self, **kwargs):
+    async def turn_off(self, **kwargs):
         value_int = 0
-        self._device.write_value(bytes.fromhex(self._command), value_int.to_bytes(2, byteorder='big', signed=False))
+        async with self._device.lock:
+            await self.hass.async_add_executor_job(self._device.write_value, (bytes.fromhex(self._command), value_int.to_bytes(2, byteorder='big', signed=False)))
         self._is_on = False

@@ -4,6 +4,7 @@ from homeassistant.helpers.entity import Entity # pyright: ignore[reportMissingI
 from .thz_device import THZDevice
 from .register_maps.register_map_manager import RegisterMapManager, RegisterMapManager_Write
 from .sensor_meta import SENSOR_META
+import asyncio
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -129,6 +130,7 @@ class THZGenericSensor(Entity):
     async def async_update(self):
         async with self._device.lock:
             payload = await self.hass.async_add_executor_job(self._device.read_block_cached, self._block)
+            await asyncio.sleep(0.01)  # Kurze Pause, um sicherzustellen, dass das Gerät bereit ist   
         #_LOGGER.debug(f"Updating sensor {self._name} with payload: {payload.hex()}, offset: {self._offset}, length: {self._length}")
         raw_bytes = payload[self._offset:self._offset + self._length]
         self._state = decode_value(raw_bytes, self._decode_type, self._factor)

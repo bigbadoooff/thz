@@ -17,7 +17,7 @@ def quarters_to_time(num: int) -> time:
         return None  # or time(0, 0) if you want a default
     quarters = num % 4
     hour = (num - quarters) // 4
-    _LOGGER.debug(f"Converting {num} to time: {hour}:{quarters * 15}")
+    # _LOGGER.debug(f"Converting {num} to time: {hour}:{quarters * 15}")
     return time(hour, quarters * 15)
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -58,11 +58,14 @@ class THZTime(TimeEntity):
     async def async_update(self):
         async with self._device.lock:
             value_bytes = await self.hass.async_add_executor_job(self._device.read_value, bytes.fromhex(self._command), "get", 4, 2)
+            await asyncio.sleep(0.01)  # Kurze Pause, um sicherzustellen, dass das Gerät bereit ist
         num = value_bytes[0]
         self._attr_native_value = quarters_to_time(num)
 
     async def async_set_native_value(self, value: str):
         num = time_to_quarters(value)
         num_bytes = num.to_bytes(2, byteorder='big', signed=False)
-        self._device.write_value(bytes.fromhex(self._command), num_bytes)
+        async with self._device.lock:
+            await self.hass.async_add_executor_job(self._device.write_value(bytes.fromhex(self._command), num_bytes))
+            await asyncio.sleep(0.01)  # Kurze Pause, um sicherzustellen, dass das Gerät bereit ist
         self._attr_native_value = value
