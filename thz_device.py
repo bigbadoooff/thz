@@ -33,8 +33,8 @@ class THZDevice:
         # Platzhalter
         self.ser = None
         self._firmware_version: str | None = None
-        self.register_map_manager = None
-        self.write_register_map_manager = None
+        self.register_map_manager: RegisterMapManager = None
+        self.write_register_map_manager: RegisterMapManager_Write = None
         self._cache = {}
         self._cache_duration = 60
 
@@ -373,10 +373,34 @@ class THZDevice:
         return response
 
     @property
-    def firmware_version(self):
+    def firmware_version(self) -> str:
         return self._firmware_version
+    
+    @property
+    def available_reading_blocks(self) -> list[str]:
+        if self.register_map_manager:
+            return list(self.register_map_manager.get_all_registers().keys())
+        return []
+
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+class THZCoordinator(DataUpdateCoordinator):
+    def __init__(self, hass, device, refresh_interval: int):
+        super().__init__(
+            hass,
+            _LOGGER,
+            name="THZ Coordinator",
+            update_interval= time.timedelta(seconds=refresh_interval),
+        )
+        self.device = device
+
+    async def _async_update_data(self):
+        return await self.device.read_all()
+
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     dev = THZDevice('/dev/ttyUSB0')
+
+
 

@@ -5,6 +5,10 @@ from homeassistant.data_entry_flow import FlowResult # pyright: ignore[reportMis
 import serial.tools.list_ports # pyright: ignore[reportMissingModuleSource]
 import logging
 
+_LOGGER = logging.getLogger(__name__)
+
+from .thz_device import THZDevice
+
 from .const import DOMAIN, CONF_CONNECTION_TYPE, CONNECTION_USB, CONNECTION_IP, DEFAULT_BAUDRATE, DEFAULT_PORT, DEFAULT_UPDATE_INTERVAL
 
 class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -30,7 +34,8 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_ip(self, user_input=None):
         """Eingabe für IP-Verbindung."""
         if user_input is not None:
-            return self.async_create_entry(title=f"THZ (IP: {user_input[CONF_HOST]})", data=user_input)
+            self.connection_data = user_input
+            return await self.async_step_log()
 
         schema = vol.Schema({
             vol.Required(CONF_HOST): str,
@@ -42,7 +47,8 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_usb(self, user_input=None):
         """Eingabe für serielle Verbindung."""
         if user_input is not None:
-            return self.async_create_entry(title=f"THZ (USB: {user_input[CONF_DEVICE]})", data=user_input)
+            self.connection_data = user_input
+            return await self.async_step_log()
 
         ports = await self.get_ports()
 
@@ -55,7 +61,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_log(self, user_input= None):
         """Handle log level configuration."""
         if user_input is not None:
-            return self.async_create_entry(title="Log Level", data=user_input)
+            return self.async_step_detect_blocks()
         
         schema = vol.Schema({
             vol.Required("log_level", default="info"): vol.In(["debug", "info", "warning", "error"]),
@@ -119,3 +125,62 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         else:
             ports = ["/dev/ttyUSB0", "/dev/ttyACM0", "/dev/ttyAMA0"]
         return ports
+    
+    async def async_step_detect_blocks(self, user_input=None):
+        """Liest dynamisch verfügbare Blöcke aus der Wärmepumpe."""
+        data = self.connection_data
+        conn_type = data["connection_type"]
+
+        # Temporäre Geräteinstanz aufbauen
+        try:
+            device: THZDevice = await self.hass.async_add_executor_job(
+                lambda: THZDevice(
+                    connection_type=conn_type,
+                    host=data.get(CONF_HOST),
+                    port=data.get(CONF_PORT),
+                    device=data.get("device"),
+                )
+            )
+
+            # Firmware lesen (liefert z. B. "759", "214" etc.)
+            firmware = device.firmware_version
+            _LOGGER.info("Firmware erkannt: %s", firmware)
+
+            # Blöcke dynamisch abrufen (z. B. pxxFB, pxxParam, pxxConf …)
+            blocks = device.available_reading_blocks
+            _LOGGER.info("Verfügbare Blöcke: %s", blocks)
+
+        except Exception as e:
+            _LOGGER.error("Fehler beim Lesen der Firmware/Blöcke: %s", e)
+            return self.async_abort(reason="cannot_detect_blocks")
+
+        self.blocks = blocks
+        self.connection_data["firmware"] = firmware
+        return await self.async_step_refresh_blocks()
+    
+    async def async_step_refresh_blocks(self, user_input=None):
+        """Frage nach individuellen Refresh-Intervallen pro Block."""
+        blocks = self.blocks
+
+        if user_input is not None:
+            refresh_intervals = {b: user_input[f"refresh_{b}"] for b in blocks}
+            data = {**self.connection_data, "refresh_intervals": refresh_intervals}
+            title = (
+                f"THZ ({data['connection_type']}: {data.get('host') or data.get('device')})"
+            )
+            return self.async_create_entry(title=title, data=data)
+
+        schema_dict = {}
+        for block in blocks:
+            schema_dict[vol.Optional(f"refresh_{block}", default=30)] = vol.All(
+                int, vol.Range(min=5, max=600)
+            )
+
+        schema = vol.Schema(schema_dict)
+        return self.async_show_form(
+            step_id="refresh_blocks",
+            data_schema=schema,
+            description_placeholders={
+                "hint": "Aktualisierungsintervall je Block (Sekunden)"
+            },
+        )

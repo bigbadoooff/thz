@@ -9,7 +9,7 @@ from . import register_map_214
 supported_firmwares = ["206, 214"]  # Add other supported firmware versions here
 _LOGGER = logging.getLogger(__name__)
 
-RegisterEntry = Tuple[str, int, int, str, int, str]  # (name, offset, length, type, factor, refresh dict)
+RegisterEntry = Tuple[str, int, int, str, int]  # (name, offset, length, type, factor, refresh dict)
 RegisterEntry_Write = Tuple[str, bytes, int, int, str, int, str, str, str, str, str]  # (name, command, min, max, unit, step, type, device_class, icon, decode type)
 
 class BaseRegisterMapManager:

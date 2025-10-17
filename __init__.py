@@ -1,5 +1,7 @@
 from homeassistant.config_entries import ConfigEntry # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 from homeassistant.core import HomeAssistant # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed # pyright: ignore[reportMissingImports, reportMissingModuleSource]
+from datetime import timedelta
 
 from homeassistant.helpers.discovery import load_platform # pyright: ignore[reportMissingImports, reportMissingModuleSource]
 from .const import DOMAIN
@@ -8,7 +10,7 @@ from .register_maps.register_map_manager import RegisterMapManager, RegisterMapM
 import logging
 _LOGGER = logging.getLogger(__name__)
 
-firmware_version = ""  # leer, wird später überschrieben
+
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     """Set up THZ from config entry."""
@@ -44,6 +46,26 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     # device.write_register_map_manager = hass.data[DOMAIN]["write_manager"]
     hass.data[DOMAIN]["device"] = device
     
+    # 5. Prepare dict for storing all coordinators
+    coordinators = {}
+    refresh_intervals = config_entry.data.get("refresh_intervals", {})
+    # Für jeden Block mit eigenem Intervall einen Coordinator anlegen
+    for block, interval in refresh_intervals.items():
+        coordinator = DataUpdateCoordinator(
+            hass,
+            _LOGGER,
+            name=f"THZ {block}",
+            update_interval=timedelta(seconds=int(interval)),
+            update_method=lambda b=block: _async_update_block(device, b),
+        )
+        await coordinator.async_config_entry_first_refresh()
+        coordinators[block] = coordinator
+
+    # im hass.data speichern
+    hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = {
+        "device": device,
+        "coordinators": coordinators,
+    }
 
     # Forward setup to platforms
     await hass.config_entries.async_forward_entry_setups(
@@ -51,8 +73,20 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     )
 
     return True
-async def async_unload_entry(hass, config_entry):
-    unload_ok = await hass.config_entries.async_unload_platforms(
-        config_entry, ["sensor", "number", "switch", "select", "time"]
-    )
+
+async def _async_update_block(device: THZDevice, block_name: str):
+    """Wird vom Coordinator aufgerufen, um einen Block zu lesen."""
+    block_bytes = bytes.fromhex(block_name.strip("pxx"))
+    try:
+        _LOGGER.debug("Lese Block %s ...", block_name)
+        return await device.read_block(block_bytes, "get")
+    except Exception as err:
+        raise UpdateFailed(f"Fehler beim Lesen von {block_name}: {err}") from err
+
+
+async def async_unload_entry(hass, entry):
+    """Entferne Config Entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, ["sensor", "select", "number", "time"])
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
     return unload_ok
