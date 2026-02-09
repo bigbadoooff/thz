@@ -15,6 +15,7 @@ from . import (
     register_map_206,  # noqa: F401
     register_map_214,  # noqa: F401
     register_map_214j,  # noqa: F401
+    register_map_439,  # noqa: F401
     register_map_all,  # noqa: F401
     write_map_206,  # noqa: F401
     write_map_214,  # noqa: F401
@@ -49,11 +50,11 @@ FIRMWARE_MAPS = {
     },
     "439technician": {
         "write": ["write_map_439_539", "write_map_439", "write_map_X39tech"],
-        "read": ["readings_map_439"],
+        "read": ["readings_map_439", "register_map_439"],
     },
     "439": {
         "write": ["write_map_439_539", "write_map_439"],
-        "read": ["readings_map_439"],
+        "read": ["readings_map_439", "register_map_439"],
     },
     # default fallback is treated as 539-like
     "default": {
