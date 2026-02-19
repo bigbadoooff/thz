@@ -96,6 +96,7 @@ async def async_setup_entry(
             meta = SENSOR_META.get(sensor_name, {})
             entry = {
                 "name": sensor_name,
+                "block": block,
                 "offset": offset // 2,  # Register offset in bytes
                 "length": (length + 1)
                 // 2,  # Register length in bytes; +1 to always have >=1 byte
@@ -178,6 +179,7 @@ def normalize_entry(entry):
         name, offset, length, decode, factor = entry
         return {
             "name": name.strip(),
+            "block": None,
             "offset": offset,
             "length": length,
             "decode": decode,
@@ -237,6 +239,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
 
         e = normalize_entry(entry)
         self._block = block
+        self._block_name = e.get("block") or block.hex().upper()
         self._offset = e["offset"]
         self._length = e["length"]
         self._decode_type = e["decode"]
@@ -358,4 +361,19 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         """Return device information to link this entity with the device."""
         return {
             "identifiers": {(DOMAIN, self._device_id)},
+        }
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return register metadata as extra state attributes.
+
+        Returns:
+            A dictionary with register block, offset, length, decode type, and factor.
+        """
+        return {
+            "register_block": self._block_name,
+            "register_offset": self._offset,
+            "register_length": self._length,
+            "register_decode_type": self._decode_type,
+            "register_factor": self._factor,
         }

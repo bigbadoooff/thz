@@ -118,6 +118,17 @@ class THZBaseEntity(Entity):
         return self._attr_entity_registry_enabled_default
 
     @property
+    def extra_state_attributes(self) -> dict:
+        """Return register command as an extra state attribute.
+
+        Returns:
+            A dictionary containing the register command hex string.
+        """
+        return {
+            "register_command": self._command,
+        }
+
+    @property
     def device_info(self):
         """Return device information to link this entity with the device."""
         return {
