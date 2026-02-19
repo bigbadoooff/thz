@@ -1,59 +1,197 @@
 """Register map definitions for THZ readings (firmware 4.39).
 
-This module provides the REGISTER_MAP dictionary containing sensor register definitions
-in the format expected by RegisterMapManager.
-
-Each block key (e.g., "pxx0A0924") maps to a list of tuples defining sensors:
-    (name, offset, length, decode_type, factor)
-
-Where:
-    - name: Sensor name (string with trailing colon)
-    - offset: Byte offset in the response data
-    - length: Number of hex characters (2 per byte)
-    - decode_type: Decoding function identifier
-    - factor: Scaling factor for the value
+This module provides the mapping for sensor readings, including command codes,
+units, device classes, icons, and decode types for each supported reading.
 """
 
-REGISTER_MAP = {
-    "firmware": "439",
-    # Energy and statistics sensors (0A prefix commands)
-    "pxx0A0924": [
-        ("sBoostDHWTotal:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A0928": [
-        ("sBoostHCTotal:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A03AE": [
-        ("sHeatRecoveredDay:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A03B0": [
-        ("sHeatRecoveredTotal:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A092A": [
-        ("sHeatDHWDay:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A092C": [
-        ("sHeatDHWTotal:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A092E": [
-        ("sHeatHCDay:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A0930": [
-        ("sHeatHCTotal:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A091A": [
-        ("sElectrDHWDay:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A091C": [
-        ("sElectrDHWTotal:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A091E": [
-        ("sElectrHCDay:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A0920": [
-        ("sElectrHCTotal:", 4, 4, "1clean", 1),
-    ],
-    "pxx0A05D1": [
-        ("party-time:", 4, 4, "8party", 1),
-    ],
+READINGS_MAP = {
+    "firmware": {
+        "command": "0A0112",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "2opmode",
+    },
+    "sSol": {
+        "command": "16",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "16sol",
+    },
+    "sHistory": {
+        "command": "09",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "09his",
+    },
+    "sLast10errors": {
+        "command": "D1",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "D1last",
+    },
+    "sFan": {
+        "command": "E8",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "E8fan",
+    },
+    "sDHW": {
+        "command": "F3",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "F3dhw",
+    },
+    "sHC1": {
+        "command": "F4",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "F4hc1",
+    },
+    "sHC2": {
+        "command": "F5",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "F5hc2",
+    },
+    "sControl": {
+        "command": "F2",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "F2ctrl",
+    },
+    "sGlobal": {
+        "command": "FB",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "FBglob",
+    },
+    "sTimedate": {
+        "command": "FC",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "FCtime",
+    },
+    "sFirmware": {
+        "command": "FD",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "FDfirm",
+    },
+    "sFirmware-Id": {
+        "command": "FE",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "FEfirmId",
+    },
+    "sDisplay": {
+        "command": "0A0176",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "0A0176Dis",
+    },
+    "sBoostDHWTotal": {
+        "command": "0A0924",
+        "unit": "kWh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sBoostHCTotal": {
+        "command": "0A0928",
+        "unit": "kWh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sHeatRecoveredDay": {
+        "command": "0A03AE",
+        "unit": "Wh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sHeatRecoveredTotal": {
+        "command": "0A03B0",
+        "unit": "kWh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sHeatDHWDay": {
+        "command": "0A092A",
+        "unit": "Wh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sHeatDHWTotal": {
+        "command": "0A092C",
+        "unit": "kWh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sHeatHCDay": {
+        "command": "0A092E",
+        "unit": "Wh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sHeatHCTotal": {
+        "command": "0A0930",
+        "unit": "kWh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sElectrDHWDay": {
+        "command": "0A091A",
+        "unit": "Wh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sElectrDHWTotal": {
+        "command": "0A091C",
+        "unit": "kWh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sElectrHCDay": {
+        "command": "0A091E",
+        "unit": "Wh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "sElectrHCTotal": {
+        "command": "0A0920",
+        "unit": "kWh",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "1clean",
+    },
+    "party-time": {
+        "command": "0A05D1",
+        "unit": "",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "8party",
+    },
 }

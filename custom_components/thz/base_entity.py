@@ -28,7 +28,6 @@ class THZBaseEntity(Entity):
     """
 
     _attr_should_poll = True
-
     def __init__(
         self,
         name: str,
@@ -116,17 +115,6 @@ class THZBaseEntity(Entity):
     def entity_registry_enabled_default(self) -> bool:
         """Return if the entity should be enabled when first added to the registry."""
         return self._attr_entity_registry_enabled_default
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        """Return register command as an extra state attribute.
-
-        Returns:
-            A dictionary containing the register command hex string.
-        """
-        return {
-            "register_command": self._command,
-        }
 
     @property
     def device_info(self):

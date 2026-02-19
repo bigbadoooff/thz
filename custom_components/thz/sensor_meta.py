@@ -346,7 +346,7 @@ SENSOR_META = {
         "unit": "bar",
         "device_class": "pressure",
         "state_class": "measurement",
-        "icon": "mdi:flash",
+        "icon": "mdi:gauge",
         "translation_key": "pressure_nd",
     },
     "P_Hd": {
@@ -357,7 +357,7 @@ SENSOR_META = {
         "unit": "bar",
         "device_class": "pressure",
         "state_class": "measurement",
-        "icon": "mdi:flash",
+        "icon": "mdi:gauge",
         "translation_key": "pressure_hd",
     },
     "actualPower_Qc": {
@@ -434,7 +434,7 @@ SENSOR_META = {
         "offset": 114,
         "length": 4,
         "decode": "hex",
-        "factor": 0.01,
+        "factor": 100,
         "unit": "bar",
         "device_class": "pressure",
         "state_class": "measurement",
@@ -445,7 +445,7 @@ SENSOR_META = {
         "offset": 154,
         "length": 4,
         "decode": "hex",
-        "factor": 0.01,
+        "factor": 100,
         "unit": "%",
         "device_class": "humidity",
         "state_class": "measurement",
@@ -551,5 +551,110 @@ SENSOR_META = {
         "factor": 1,
         "icon": "mdi:fire",
         "translation_key": "hc_booster_stage",
+    },
+    "pumpHC": {
+        "icon": "mdi:pump",
+        "translation_key": "pump_hc",
+    },
+    "ventStage": {
+        "icon": "mdi:fan",
+        "translation_key": "vent_stage",
+    },
+    "switchingProg": {
+        "icon": "mdi:cog",
+        "translation_key": "switching_prog",
+    },
+    "filterBoth": {
+        "icon": "mdi:air-filter",
+        "translation_key": "filter_both",
+    },
+    "filterUp": {
+        "icon": "mdi:air-filter",
+        "translation_key": "filter_up",
+    },
+    "filterDown": {
+        "icon": "mdi:air-filter",
+        "translation_key": "filter_down",
+    },
+    "defrost": {
+        "icon": "mdi:snowflake-melt",
+        "translation_key": "defrost",
+    },
+    "cooling": {
+        "icon": "mdi:snowflake",
+        "translation_key": "cooling",
+    },
+    "heatingDHW": {
+        "icon": "mdi:water-boiler",
+        "translation_key": "heating_dhw",
+    },
+    "heatingHC": {
+        "icon": "mdi:radiator",
+        "translation_key": "heating_hc",
+    },
+    "boosterHC": {
+        "icon": "mdi:fire",
+        "translation_key": "booster_hc",
+    },
+    "dhwBoosterStage": {
+        "icon": "mdi:fire",
+        "translation_key": "dhw_booster_stage",
+    },
+    "dhwOpMode": {
+        "icon": "mdi:cog",
+        "translation_key": "dhw_op_mode",
+    },
+    "dhwSetTemp": {
+        "unit": "°C",
+        "device_class": "temperature",
+        "state_class": "measurement",
+        "icon": "mdi:thermometer",
+        "translation_key": "dhw_set_temp",
+    },
+    "dhwStage": {
+        "icon": "mdi:water-boiler",
+        "translation_key": "dhw_stage",
+    },
+    "heatRequest": {
+        "icon": "mdi:radiator",
+        "translation_key": "heat_request",
+    },
+    "heatRequest2": {
+        "icon": "mdi:radiator",
+        "translation_key": "heat_request_2",
+    },
+    "defrostEvaporator": {
+        "icon": "mdi:snowflake-melt",
+        "translation_key": "defrost_evaporator",
+    },
+    "pasteurisationMode": {
+        "icon": "mdi:water-boiler",
+        "translation_key": "pasteurisation_mode",
+    },
+    "boostBlockTimeAfterHD": {
+        "unit": "s",
+        "device_class": "duration",
+        "icon": "mdi:timer",
+        "translation_key": "boost_block_time_after_hd",
+    },
+    "compBlockTime": {
+        "unit": "s",
+        "device_class": "duration",
+        "icon": "mdi:timer",
+        "translation_key": "comp_block_time",
+    },
+    "heatBlockTime": {
+        "unit": "s",
+        "device_class": "duration",
+        "icon": "mdi:timer",
+        "translation_key": "heat_block_time",
+    },
+    "sensorBits1": {
+        "icon": "mdi:information",
+        "translation_key": "sensor_bits_1",
+    },
+    "sensorBits2": {
+        "icon": "mdi:information",
+        "translation_key": "sensor_bits_2",
     },
 }

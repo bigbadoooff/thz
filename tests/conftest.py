@@ -45,7 +45,6 @@ sys.modules['homeassistant'] = MagicMock()
 sys.modules['homeassistant.config_entries'] = MagicMock()
 sys.modules['homeassistant.core'] = MagicMock()
 sys.modules['homeassistant.helpers'] = MagicMock()
-sys.modules['homeassistant.helpers.config_validation'] = MagicMock()
 
 # Mock entity module
 entity_mock = MagicMock()
@@ -63,15 +62,7 @@ sys.modules['homeassistant.helpers.entity_platform'] = MagicMock()
 sys.modules['homeassistant.helpers.typing'] = MagicMock()
 sys.modules['homeassistant.helpers.device_registry'] = MagicMock()
 sys.modules['homeassistant.helpers.area_registry'] = MagicMock()
-
-# Mock components
-components_mock = MagicMock()
-sys.modules['homeassistant.components'] = components_mock
-
-# Mock diagnostics component
-diagnostics_mock = MagicMock()
-diagnostics_mock.async_redact_data = lambda data, redact_keys: data
-sys.modules['homeassistant.components.diagnostics'] = diagnostics_mock
+sys.modules['homeassistant.components'] = MagicMock()
 
 # Mock sensor component
 sensor_mock = MagicMock()
@@ -114,12 +105,6 @@ sys.modules['homeassistant.const'] = MagicMock()
 sys.modules['serial'] = MagicMock()
 sys.modules['serial.tools'] = MagicMock()
 sys.modules['serial.tools.list_ports'] = MagicMock()
-
-# Mock voluptuous
-voluptuous_mock = MagicMock()
-voluptuous_mock.Schema = MagicMock(return_value=MagicMock())
-voluptuous_mock.Required = MagicMock(return_value="command")
-sys.modules['voluptuous'] = voluptuous_mock
-
+sys.modules['voluptuous'] = MagicMock()
 sys.modules['tzlocal'] = MagicMock()
 sys.modules['zoneinfo'] = MagicMock()

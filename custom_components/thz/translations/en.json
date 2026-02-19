@@ -20,42 +20,6 @@
           "area": "Area",
           "write_interval": "Write Interval (seconds)"
         }
-      },
-      "setup_ip": {
-        "title": "Network Connection Setup",
-        "description": "Configure the network connection to your THZ heat pump. Enter the IP address or hostname of your ser2net server and the port number (default: 2217).",
-        "data": {
-          "host": "IP Address or Hostname",
-          "port": "Port",
-          "connection_type": "Connection Type"
-        }
-      },
-      "setup_usb": {
-        "title": "USB / Serial Connection Setup",
-        "description": "Configure the USB or serial connection to your THZ heat pump. Select the serial device from the dropdown and set the baud rate (default: 115200).",
-        "data": {
-          "device": "Serial Device",
-          "connection_type": "Connection Type",
-          "Baudrate": "Baud Rate"
-        }
-      },
-      "name": {
-        "title": "Device Name and Area",
-        "description": "Optionally give your THZ device a custom name and assign it to a Home Assistant area. This helps organize your devices in the UI.",
-        "data": {
-          "alias": "Device Name (optional)",
-          "area": "Area (optional)"
-        }
-      },
-      "refresh_blocks": {
-        "title": "Configure Polling Intervals",
-        "description": "Set how often (in seconds) each register block should be polled from your heat pump. Lower values provide faster updates but increase system load. The write_interval controls how often writable entities (number/switch/select/time) are updated after changes.\n\nRecommended: 300-600 seconds for read blocks, 60 seconds for write interval.",
-        "data": {
-          "write_interval": "Write Interval (seconds)"
-        },
-        "data_description": {
-          "write_interval": "How often writable entities sync their state (5-86400 seconds)"
-        }
       }
     },
     "abort": {
@@ -177,17 +141,17 @@
       "dew_point": {
         "name": "Dew Point"
       },
-      "power_nd": {
-        "name": "Power Nd"
+      "pressure_nd": {
+        "name": "Low Pressure Side"
       },
-      "power_hd": {
-        "name": "Power Hd"
+      "pressure_hd": {
+        "name": "High Pressure Side"
       },
       "actual_power_qc": {
-        "name": "Actual Power Qc"
+        "name": "Actual Thermal Power"
       },
       "actual_power_pel": {
-        "name": "Actual Power Pel"
+        "name": "Actual Electric Power"
       },
       "collector_temp": {
         "name": "Collector Temperature"
@@ -243,44 +207,77 @@
       "hc_booster_stage": {
         "name": "Heating Circuit Booster Stage"
       },
-      "current_cop": {
-        "name": "Current COP"
+      "pump_hc": {
+        "name": "Heating Circuit Pump"
       },
-      "daily_cop_dhw": {
-        "name": "Daily COP DHW"
+      "vent_stage": {
+        "name": "Ventilation Stage"
       },
-      "daily_cop_hc": {
-        "name": "Daily COP Heating"
+      "switching_prog": {
+        "name": "Switching Program"
       },
-      "daily_cop_total": {
-        "name": "Daily COP Total"
+      "filter_both": {
+        "name": "Filter Both"
       },
-      "monthly_cop_dhw": {
-        "name": "Monthly COP DHW"
+      "filter_up": {
+        "name": "Filter Up"
       },
-      "monthly_cop_hc": {
-        "name": "Monthly COP Heating"
+      "filter_down": {
+        "name": "Filter Down"
       },
-      "monthly_cop_total": {
-        "name": "Monthly COP Total"
+      "defrost": {
+        "name": "Defrost"
       },
-      "yearly_cop_dhw": {
-        "name": "Yearly COP DHW"
+      "cooling": {
+        "name": "Cooling"
       },
-      "yearly_cop_hc": {
-        "name": "Yearly COP Heating"
+      "heating_dhw": {
+        "name": "Heating DHW"
       },
-      "yearly_cop_total": {
-        "name": "Yearly COP Total"
+      "heating_hc": {
+        "name": "Heating HC"
       },
-      "lifetime_cop_dhw": {
-        "name": "Lifetime COP DHW"
+      "booster_hc": {
+        "name": "Booster HC"
       },
-      "lifetime_cop_hc": {
-        "name": "Lifetime COP Heating"
+      "dhw_booster_stage": {
+        "name": "DHW Booster Stage"
       },
-      "lifetime_cop_total": {
-        "name": "Lifetime COP Total"
+      "dhw_op_mode": {
+        "name": "DHW Operating Mode"
+      },
+      "dhw_set_temp": {
+        "name": "DHW Set Temperature"
+      },
+      "dhw_stage": {
+        "name": "DHW Stage"
+      },
+      "heat_request": {
+        "name": "Heat Request"
+      },
+      "heat_request_2": {
+        "name": "Heat Request 2"
+      },
+      "defrost_evaporator": {
+        "name": "Defrost Evaporator"
+      },
+      "pasteurisation_mode": {
+        "name": "Pasteurization Mode"
+      },
+      "boost_block_time_after_hd": {
+        "name": "Boost Block Time After HD"
+      },
+      "comp_block_time": {
+        "name": "Compressor Block Time"
+      },
+      "heat_block_time": {
+        "name": "Heat Block Time"
+      },
+      "sensor_bits_1": {
+        "name": "Sensor Bits 1"
+      },
+      "sensor_bits_2": {
+        "name": "Sensor Bits 2"
       }
     },
     "number": {

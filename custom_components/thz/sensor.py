@@ -31,7 +31,6 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, should_hide_entity_by_default
-from .cop_sensor import async_setup_cop_sensors
 from .register_maps.register_map_manager import RegisterMapManager
 from .sensor_meta import SENSOR_META
 
@@ -96,7 +95,6 @@ async def async_setup_entry(
             meta = SENSOR_META.get(sensor_name, {})
             entry = {
                 "name": sensor_name,
-                "block": block,
                 "offset": offset // 2,  # Register offset in bytes
                 "length": (length + 1)
                 // 2,  # Register length in bytes; +1 to always have >=1 byte
@@ -114,9 +112,6 @@ async def async_setup_entry(
                 )
             )
     async_add_entities(sensors, True)
-    
-    # Set up COP sensors separately
-    await async_setup_cop_sensors(hass, config_entry, async_add_entities)
 
 
 def decode_value(
@@ -179,7 +174,6 @@ def normalize_entry(entry):
         name, offset, length, decode, factor = entry
         return {
             "name": name.strip(),
-            "block": None,
             "offset": offset,
             "length": length,
             "decode": decode,
@@ -239,7 +233,6 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
 
         e = normalize_entry(entry)
         self._block = block
-        self._block_name = e.get("block") or block.hex().upper()
         self._offset = e["offset"]
         self._length = e["length"]
         self._decode_type = e["decode"]
@@ -353,27 +346,12 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         Returns:
             A string representing the unique ID of the sensor.
         """
-        return f"thz_{self._block}_{self._offset}_{self._entity_name.lower().replace(' ', '_')}"
-
+        entity_key = self._entity_name.lower().replace(' ', '_')
+        return f"thz_{self._block}_{self._offset}_{entity_key}"
 
     @property
     def device_info(self):
         """Return device information to link this entity with the device."""
         return {
             "identifiers": {(DOMAIN, self._device_id)},
-        }
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        """Return register metadata as extra state attributes.
-
-        Returns:
-            A dictionary with register block, offset, length, decode type, and factor.
-        """
-        return {
-            "register_block": self._block_name,
-            "register_offset": self._offset,
-            "register_length": self._length,
-            "register_decode_type": self._decode_type,
-            "register_factor": self._factor,
         }
