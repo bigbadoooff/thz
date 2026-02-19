@@ -28,6 +28,7 @@ class THZBaseEntity(Entity):
     """
 
     _attr_should_poll = True
+
     def __init__(
         self,
         name: str,

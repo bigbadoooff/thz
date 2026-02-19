@@ -42,10 +42,18 @@ async def async_get_config_entry_diagnostics(
     # Collect coordinator information (without sensitive data)
     coordinator_info = {}
     for block_name, coordinator in coordinators.items():
+        last_update_time = None
+        if coordinator.last_update_success_time:
+            last_update_time = str(coordinator.last_update_success_time)
+
+        update_interval = None
+        if coordinator.update_interval:
+            update_interval = str(coordinator.update_interval)
+
         coordinator_info[block_name] = {
             "last_update_success": coordinator.last_update_success,
-            "last_update_time": str(coordinator.last_update_success_time) if coordinator.last_update_success_time else None,
-            "update_interval": str(coordinator.update_interval) if coordinator.update_interval else None,
+            "last_update_time": last_update_time,
+            "update_interval": update_interval,
             "data_length": len(coordinator.data) if coordinator.data else 0,
         }
 
@@ -57,7 +65,10 @@ async def async_get_config_entry_diagnostics(
     if register_manager:
         all_registers = register_manager.get_all_registers()
         register_counts["read_blocks"] = len(all_registers)
-        register_counts["read_sensors"] = sum(len(entries) for entries in all_registers.values())
+        total_sensors = sum(
+            len(entries) for entries in all_registers.values()
+        )
+        register_counts["read_sensors"] = total_sensors
 
     if write_manager:
         write_registers = write_manager.get_all_registers()
@@ -81,5 +92,18 @@ async def async_get_config_entry_diagnostics(
         "coordinators": coordinator_info,
         "registers": register_counts,
     }
+
+    # Add raw block hex dumps from all coordinator data
+    raw_block_data = {}
+    for block_name, coordinator in coordinators.items():
+        if coordinator.data:
+            raw_block_data[block_name] = {
+                "hex": coordinator.data.hex(),
+                "length": len(coordinator.data),
+            }
+        else:
+            raw_block_data[block_name] = {"hex": None, "length": 0}
+
+    diagnostics_data["raw_blocks"] = raw_block_data
 
     return diagnostics_data

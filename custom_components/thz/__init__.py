@@ -5,15 +5,26 @@ from __future__ import annotations
 from datetime import timedelta
 import logging
 
+import voluptuous as vol
+
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import (
+    HomeAssistant,
+    ServiceCall,
+    ServiceResponse,
+    SupportsResponse,
+)
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, should_hide_entity_by_default
 from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
+
+# Hex dump formatting constants
+BYTES_PER_HEX_LINE = 16  # Number of bytes to display per line in hex dumps
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
@@ -141,12 +152,170 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         config_entry, ["sensor", "number", "switch", "select", "time"]
     )
 
+    # Register services
+    await _async_setup_services(hass)
+
     # Re-enable any entities that were previously disabled by the integration
     # This ensures the current code's visibility settings take precedence
     # over cached registry state
     await _async_enable_integration_disabled_entities(hass, config_entry)
 
     return True
+
+
+async def _async_setup_services(hass: HomeAssistant) -> None:
+    """Set up services for the THZ integration.
+
+    Registers the read_raw_register service that allows users to read
+    raw register data from the heatpump for debugging purposes.
+    This function is idempotent and will only register services once.
+    """
+    # Only register services once (check if already registered)
+    if hass.services.has_service(DOMAIN, "read_raw_register"):
+        return
+
+    async def _async_handle_read_raw_register(call: ServiceCall) -> ServiceResponse:
+        """Handle the read_raw_register service call.
+
+        This service reads a raw register/block from the heatpump and returns
+        the hex dump. It's useful for debugging firmware-specific register issues.
+
+        Args:
+            call: The service call with command field containing hex string
+
+        Returns:
+            ServiceResponse dict with command, length, hex, and formatted fields
+        """
+        command_str = call.data.get("command", "").strip().upper()
+
+        # Validate hex string
+        try:
+            command_bytes = bytes.fromhex(command_str)
+        except ValueError as err:
+            error_msg = f"Invalid hex command: {command_str} - {err}"
+            _LOGGER.error(error_msg)
+            # Create persistent notification for the error
+            await hass.services.async_call(
+                "persistent_notification",
+                "create",
+                {
+                    "title": "THZ Raw Register Read Error",
+                    "message": error_msg,
+                    "notification_id": f"thz_raw_{command_str}",
+                },
+                blocking=True,
+            )
+            return {
+                "success": False,
+                "error": error_msg,
+                "command": command_str,
+            }
+
+        # Get the device from hass.data
+        device = hass.data[DOMAIN].get("device")
+        if not device:
+            error_msg = "THZ device not initialized"
+            _LOGGER.error(error_msg)
+            await hass.services.async_call(
+                "persistent_notification",
+                "create",
+                {
+                    "title": "THZ Raw Register Read Error",
+                    "message": error_msg,
+                    "notification_id": f"thz_raw_{command_str}",
+                },
+                blocking=True,
+            )
+            return {
+                "success": False,
+                "error": error_msg,
+                "command": command_str,
+            }
+
+        # Read the register with device lock
+        try:
+            _LOGGER.info("Reading raw register: %s", command_str)
+            async with device.lock:
+                data = await hass.async_add_executor_job(
+                    device.read_block, command_bytes, "get"
+                )
+
+            # Format the hex dump with offsets (BYTES_PER_HEX_LINE bytes per line)
+            formatted_lines = []
+            for i in range(0, len(data), BYTES_PER_HEX_LINE):
+                chunk = data[i : i + BYTES_PER_HEX_LINE]
+                hex_str = " ".join(f"{b:02x}" for b in chunk)
+                formatted_lines.append(f"  {i:04x}: {hex_str}")
+            formatted = "\n".join(formatted_lines)
+
+            hex_string = data.hex()
+
+            # Log the result
+            _LOGGER.info(
+                "Raw register %s read successfully (%d bytes):\n%s",
+                command_str,
+                len(data),
+                formatted
+            )
+
+            # Create persistent notification with the result
+            notification_message = (
+                f"Command: {command_str}\n"
+                f"Length: {len(data)} bytes\n"
+                f"Hex: {hex_string}\n\n"
+                f"Formatted:\n{formatted}"
+            )
+
+            await hass.services.async_call(
+                "persistent_notification",
+                "create",
+                {
+                    "title": f"THZ Raw Register Read: {command_str}",
+                    "message": notification_message,
+                    "notification_id": f"thz_raw_{command_str}",
+                },
+                blocking=True,
+            )
+
+            # Return service response
+            return {
+                "success": True,
+                "command": command_str,
+                "length": len(data),
+                "hex": hex_string,
+                "formatted": formatted,
+            }
+
+        except Exception as err:
+            error_msg = f"Error reading register {command_str}: {err}"
+            _LOGGER.error(error_msg, exc_info=True)
+            await hass.services.async_call(
+                "persistent_notification",
+                "create",
+                {
+                    "title": "THZ Raw Register Read Error",
+                    "message": error_msg,
+                    "notification_id": f"thz_raw_{command_str}",
+                },
+                blocking=True,
+            )
+            return {
+                "success": False,
+                "error": str(err),
+                "command": command_str,
+            }
+
+    # Register the service
+    hass.services.async_register(
+        DOMAIN,
+        "read_raw_register",
+        _async_handle_read_raw_register,
+        schema=vol.Schema({
+            vol.Required("command"): cv.string,
+        }),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    _LOGGER.info("THZ services registered")
 
 
 async def _async_cleanup_orphaned_entities(hass: HomeAssistant) -> None:
@@ -237,7 +406,10 @@ async def _async_update_block(hass: HomeAssistant, device: THZDevice, block_name
     try:
         _LOGGER.debug("Reading block %s", block_name)
         async with device.lock:
-            return await hass.async_add_executor_job(device.read_block, block_bytes, "get")
+            result = await hass.async_add_executor_job(
+                device.read_block, block_bytes, "get"
+            )
+            return result
     except Exception as err:
         raise UpdateFailed(f"Error reading {block_name}: {err}") from err
 
@@ -255,6 +427,16 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if device:
                 await hass.async_add_executor_job(device.close)
         hass.data[DOMAIN].pop(entry.entry_id)
+
+        # Remove services if this is the last config entry
+        remaining_entries = [
+            e for e in hass.config_entries.async_entries(DOMAIN)
+            if e.entry_id != entry.entry_id
+        ]
+        if not remaining_entries:
+            _LOGGER.debug("Removing THZ services (last config entry)")
+            hass.services.async_remove(DOMAIN, "read_raw_register")
+
     return unload_ok
 
 

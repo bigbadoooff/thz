@@ -31,6 +31,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, should_hide_entity_by_default
+from .cop_sensor import async_setup_cop_sensors
 from .register_maps.register_map_manager import RegisterMapManager
 from .sensor_meta import SENSOR_META
 
@@ -112,6 +113,9 @@ async def async_setup_entry(
                 )
             )
     async_add_entities(sensors, True)
+    
+    # Set up COP sensors separately
+    await async_setup_cop_sensors(hass, config_entry, async_add_entities)
 
 
 def decode_value(
@@ -346,8 +350,8 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         Returns:
             A string representing the unique ID of the sensor.
         """
-        entity_key = self._entity_name.lower().replace(' ', '_')
-        return f"thz_{self._block}_{self._offset}_{entity_key}"
+        return f"thz_{self._block}_{self._offset}_{self._entity_name.lower().replace(' ', '_')}"
+
 
     @property
     def device_info(self):

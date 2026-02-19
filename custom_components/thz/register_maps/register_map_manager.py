@@ -45,7 +45,7 @@ FIRMWARE_MAPS = {
     },
     "539technician": {
         "write": ["write_map_439_539", "write_map_539", "write_map_X39tech"],
-        "read": ["readings_map_539"],
+        "read": ["readings_map_439", "readings_map_539"],
     },
     "439technician": {
         "write": ["write_map_439_539", "write_map_439", "write_map_X39tech"],
@@ -58,7 +58,7 @@ FIRMWARE_MAPS = {
     # default fallback is treated as 539-like
     "default": {
         "write": ["write_map_439_539", "write_map_539"],
-        "read": ["readings_map_539"],
+        "read": ["readings_map_439", "readings_map_539"],
     },
 }
 

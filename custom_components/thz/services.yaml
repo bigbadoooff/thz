@@ -1,0 +1,16 @@
+read_raw_register:
+  name: Read Raw Register
+  description: >
+    Read a raw register/block from the heatpump and return the hex dump.
+    Useful for debugging and verifying register contents.
+  fields:
+    command:
+      name: Command
+      description: >
+        Hex command string to send to the heatpump.
+        Examples: "FB" (sGlobal), "F2" (sControl), "0A0176" (sDisplay),
+        "FC" (sTimedate), "FD" (sFirmware), "FE" (sFirmware-Id)
+      required: true
+      example: "FB"
+      selector:
+        text:

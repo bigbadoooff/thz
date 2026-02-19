@@ -7,6 +7,55 @@
         "data": {
           "connection_type": "Verbindungstyp"
         }
+      },
+      "reconfigure": {
+        "title": "THZ-Integration neu konfigurieren",
+        "description": "Aktualisieren Sie Ihre THZ-Integrationseinstellungen. Sie können Verbindungsparameter, Gerätename, Bereich und Abfrageintervalle ändern.",
+        "data": {
+          "device": "Serielles Gerät",
+          "host": "Host",
+          "port": "Port",
+          "Baudrate": "Baudrate",
+          "alias": "Gerätename",
+          "area": "Bereich",
+          "write_interval": "Schreibintervall (Sekunden)"
+        }
+      },
+      "setup_ip": {
+        "title": "Netzwerkverbindung einrichten",
+        "description": "Konfigurieren Sie die Netzwerkverbindung zu Ihrer THZ-Wärmepumpe. Geben Sie die IP-Adresse oder den Hostnamen Ihres ser2net-Servers und die Portnummer ein (Standard: 2217).",
+        "data": {
+          "host": "IP-Adresse oder Hostname",
+          "port": "Port",
+          "connection_type": "Verbindungstyp"
+        }
+      },
+      "setup_usb": {
+        "title": "USB / Serielle Verbindung einrichten",
+        "description": "Konfigurieren Sie die USB- oder serielle Verbindung zu Ihrer THZ-Wärmepumpe. Wählen Sie das serielle Gerät aus dem Dropdown-Menü und legen Sie die Baudrate fest (Standard: 115200).",
+        "data": {
+          "device": "Serielles Gerät",
+          "connection_type": "Verbindungstyp",
+          "Baudrate": "Baudrate"
+        }
+      },
+      "name": {
+        "title": "Gerätename und Bereich",
+        "description": "Geben Sie Ihrem THZ-Gerät optional einen benutzerdefinierten Namen und weisen Sie es einem Home Assistant-Bereich zu. Dies hilft, Ihre Geräte in der Benutzeroberfläche zu organisieren.",
+        "data": {
+          "alias": "Gerätename (optional)",
+          "area": "Bereich (optional)"
+        }
+      },
+      "refresh_blocks": {
+        "title": "Abfrageintervalle konfigurieren",
+        "description": "Legen Sie fest, wie oft (in Sekunden) jeder Registerblock von Ihrer Wärmepumpe abgefragt werden soll. Niedrigere Werte liefern schnellere Aktualisierungen, erhöhen aber die Systemlast. Das write_interval steuert, wie oft beschreibbare Entitäten (Nummer/Schalter/Auswahl/Zeit) nach Änderungen aktualisiert werden.\n\nEmpfohlen: 300-600 Sekunden für Leseblöcke, 60 Sekunden für Schreibintervall.",
+        "data": {
+          "write_interval": "Schreibintervall (Sekunden)"
+        },
+        "data_description": {
+          "write_interval": "Wie oft beschreibbare Entitäten ihren Status synchronisieren (5-86400 Sekunden)"
+        }
       }
     },
     "abort": {
@@ -17,8 +66,8 @@
       "reconfigured": "Die THZ-Integration wurde erfolgreich neu konfiguriert."
     },
     "error": {
-      "invalid_host": "Invalid IP address or hostname. Please enter a valid IPv4, IPv6 address, or hostname.",
-      "invalid_port": "Invalid port number. Port must be between 1 and 65535."
+      "invalid_host": "Ungültige IP-Adresse oder Hostname. Bitte geben Sie eine gültige IPv4-, IPv6-Adresse oder einen Hostnamen ein.",
+      "invalid_port": "Ungültige Portnummer. Port muss zwischen 1 und 65535 liegen."
     }
   },
   "entity": {
@@ -128,17 +177,17 @@
       "dew_point": {
         "name": "Taupunkt"
       },
-      "pressure_nd": {
-        "name": "Druck Niederdruckseite"
+      "power_nd": {
+        "name": "Leistung Nd"
       },
-      "pressure_hd": {
-        "name": "Druck Hochdruckseite"
+      "power_hd": {
+        "name": "Leistung Hd"
       },
       "actual_power_qc": {
-        "name": "Aktuelle Wärmeleistung"
+        "name": "Aktuelle Leistung Qc"
       },
       "actual_power_pel": {
-        "name": "Aktuelle Leistung elektrisch"
+        "name": "Aktuelle Leistung Pel"
       },
       "collector_temp": {
         "name": "Kollektortemperatur"
@@ -194,77 +243,44 @@
       "hc_booster_stage": {
         "name": "Heizkreis Zusatzheizung Stufe"
       },
-      "pump_hc": {
-        "name": "Heizkreispumpe"
+      "current_cop": {
+        "name": "Aktueller COP"
       },
-      "vent_stage": {
-        "name": "Lüftungsstufe"
+      "daily_cop_dhw": {
+        "name": "Täglicher COP Warmwasser"
       },
-      "switching_prog": {
-        "name": "Schaltprogramm"
+      "daily_cop_hc": {
+        "name": "Täglicher COP Heizung"
       },
-      "filter_both": {
-        "name": "Filter Beide"
+      "daily_cop_total": {
+        "name": "Täglicher COP Gesamt"
       },
-      "filter_up": {
-        "name": "Filter Oben"
+      "monthly_cop_dhw": {
+        "name": "Monatlicher COP Warmwasser"
       },
-      "filter_down": {
-        "name": "Filter Unten"
+      "monthly_cop_hc": {
+        "name": "Monatlicher COP Heizung"
       },
-      "defrost": {
-        "name": "Abtauung"
+      "monthly_cop_total": {
+        "name": "Monatlicher COP Gesamt"
       },
-      "cooling": {
-        "name": "Kühlung"
+      "yearly_cop_dhw": {
+        "name": "Jährlicher COP Warmwasser"
       },
-      "heating_dhw": {
-        "name": "Warmwasserbereitung"
+      "yearly_cop_hc": {
+        "name": "Jährlicher COP Heizung"
       },
-      "heating_hc": {
-        "name": "Heizkreis Heizung"
+      "yearly_cop_total": {
+        "name": "Jährlicher COP Gesamt"
       },
-      "booster_hc": {
-        "name": "Heizkreis Zusatzheizung"
+      "lifetime_cop_dhw": {
+        "name": "Gesamt-COP Warmwasser"
       },
-      "dhw_booster_stage": {
-        "name": "Warmwasser Zusatzheizung Stufe"
+      "lifetime_cop_hc": {
+        "name": "Gesamt-COP Heizung"
       },
-      "dhw_op_mode": {
-        "name": "Warmwasser Betriebsart"
-      },
-      "dhw_set_temp": {
-        "name": "Warmwasser Solltemperatur"
-      },
-      "dhw_stage": {
-        "name": "Warmwasser Stufe"
-      },
-      "heat_request": {
-        "name": "Wärmeanforderung"
-      },
-      "heat_request_2": {
-        "name": "Wärmeanforderung 2"
-      },
-      "defrost_evaporator": {
-        "name": "Verdampfer Abtauung"
-      },
-      "pasteurisation_mode": {
-        "name": "Pasteurisierungsmodus"
-      },
-      "boost_block_time_after_hd": {
-        "name": "Zusatzheizung Sperrzeit nach HD"
-      },
-      "comp_block_time": {
-        "name": "Kompressor Sperrzeit"
-      },
-      "heat_block_time": {
-        "name": "Heizung Sperrzeit"
-      },
-      "sensor_bits_1": {
-        "name": "Sensorbits 1"
-      },
-      "sensor_bits_2": {
-        "name": "Sensorbits 2"
+      "lifetime_cop_total": {
+        "name": "Gesamt-COP"
       }
     },
     "number": {
@@ -500,169 +516,169 @@
         "name": "Raumtemperatur Standby HK2 Sommer"
       },
       "clock_day": {
-        "name": "Clock Day"
+        "name": "Tag"
       },
       "clock_hour": {
-        "name": "Clock Hour"
+        "name": "Stunde"
       },
       "clock_minutes": {
-        "name": "Clock Minutes"
+        "name": "Minute"
       },
       "clock_month": {
-        "name": "Clock Month"
+        "name": "Monat"
       },
       "clock_year": {
-        "name": "Clock Year"
+        "name": "Jahr"
       },
       "prog_dhw_enable": {
-        "name": "DHW Program Enable"
+        "name": "Warmwasser Programm Aktivieren"
       },
       "prog_dhw_start_time": {
-        "name": "DHW Program Start Time"
+        "name": "Warmwasser Programm Startzeit"
       },
       "prog_dhw_end_time": {
-        "name": "DHW Program End Time"
+        "name": "Warmwasser Programm Endzeit"
       },
       "prog_dhw_monday": {
-        "name": "DHW Program Monday"
+        "name": "Warmwasser Programm Montag"
       },
       "prog_dhw_tuesday": {
-        "name": "DHW Program Tuesday"
+        "name": "Warmwasser Programm Dienstag"
       },
       "prog_dhw_wednesday": {
-        "name": "DHW Program Wednesday"
+        "name": "Warmwasser Programm Mittwoch"
       },
       "prog_dhw_thursday": {
-        "name": "DHW Program Thursday"
+        "name": "Warmwasser Programm Donnerstag"
       },
       "prog_dhw_friday": {
-        "name": "DHW Program Friday"
+        "name": "Warmwasser Programm Freitag"
       },
       "prog_dhw_saturday": {
-        "name": "DHW Program Saturday"
+        "name": "Warmwasser Programm Samstag"
       },
       "prog_dhw_sunday": {
-        "name": "DHW Program Sunday"
+        "name": "Warmwasser Programm Sonntag"
       },
       "prog_fan1_enable": {
-        "name": "Fan 1 Program Enable"
+        "name": "Lüfter 1 Programm Aktivieren"
       },
       "prog_fan1_start_time": {
-        "name": "Fan 1 Program Start Time"
+        "name": "Lüfter 1 Programm Startzeit"
       },
       "prog_fan1_end_time": {
-        "name": "Fan 1 Program End Time"
+        "name": "Lüfter 1 Programm Endzeit"
       },
       "prog_fan1_monday": {
-        "name": "Fan 1 Program Monday"
+        "name": "Lüfter 1 Programm Montag"
       },
       "prog_fan1_tuesday": {
-        "name": "Fan 1 Program Tuesday"
+        "name": "Lüfter 1 Programm Dienstag"
       },
       "prog_fan1_wednesday": {
-        "name": "Fan 1 Program Wednesday"
+        "name": "Lüfter 1 Programm Mittwoch"
       },
       "prog_fan1_thursday": {
-        "name": "Fan 1 Program Thursday"
+        "name": "Lüfter 1 Programm Donnerstag"
       },
       "prog_fan1_friday": {
-        "name": "Fan 1 Program Friday"
+        "name": "Lüfter 1 Programm Freitag"
       },
       "prog_fan1_saturday": {
-        "name": "Fan 1 Program Saturday"
+        "name": "Lüfter 1 Programm Samstag"
       },
       "prog_fan1_sunday": {
-        "name": "Fan 1 Program Sunday"
+        "name": "Lüfter 1 Programm Sonntag"
       },
       "prog_fan2_enable": {
-        "name": "Fan 2 Program Enable"
+        "name": "Lüfter 2 Programm Aktivieren"
       },
       "prog_fan2_start_time": {
-        "name": "Fan 2 Program Start Time"
+        "name": "Lüfter 2 Programm Startzeit"
       },
       "prog_fan2_end_time": {
-        "name": "Fan 2 Program End Time"
+        "name": "Lüfter 2 Programm Endzeit"
       },
       "prog_fan2_monday": {
-        "name": "Fan 2 Program Monday"
+        "name": "Lüfter 2 Programm Montag"
       },
       "prog_fan2_tuesday": {
-        "name": "Fan 2 Program Tuesday"
+        "name": "Lüfter 2 Programm Dienstag"
       },
       "prog_fan2_wednesday": {
-        "name": "Fan 2 Program Wednesday"
+        "name": "Lüfter 2 Programm Mittwoch"
       },
       "prog_fan2_thursday": {
-        "name": "Fan 2 Program Thursday"
+        "name": "Lüfter 2 Programm Donnerstag"
       },
       "prog_fan2_friday": {
-        "name": "Fan 2 Program Friday"
+        "name": "Lüfter 2 Programm Freitag"
       },
       "prog_fan2_saturday": {
-        "name": "Fan 2 Program Saturday"
+        "name": "Lüfter 2 Programm Samstag"
       },
       "prog_fan2_sunday": {
-        "name": "Fan 2 Program Sunday"
+        "name": "Lüfter 2 Programm Sonntag"
       },
       "prog_hc1_enable": {
-        "name": "HC1 Program Enable"
+        "name": "HC1 Programm Aktivieren"
       },
       "prog_hc1_start_time": {
-        "name": "HC1 Program Start Time"
+        "name": "HC1 Programm Startzeit"
       },
       "prog_hc1_end_time": {
-        "name": "HC1 Program End Time"
+        "name": "HC1 Programm Endzeit"
       },
       "prog_hc1_monday": {
-        "name": "HC1 Program Monday"
+        "name": "HC1 Programm Montag"
       },
       "prog_hc1_tuesday": {
-        "name": "HC1 Program Tuesday"
+        "name": "HC1 Programm Dienstag"
       },
       "prog_hc1_wednesday": {
-        "name": "HC1 Program Wednesday"
+        "name": "HC1 Programm Mittwoch"
       },
       "prog_hc1_thursday": {
-        "name": "HC1 Program Thursday"
+        "name": "HC1 Programm Donnerstag"
       },
       "prog_hc1_friday": {
-        "name": "HC1 Program Friday"
+        "name": "HC1 Programm Freitag"
       },
       "prog_hc1_saturday": {
-        "name": "HC1 Program Saturday"
+        "name": "HC1 Programm Samstag"
       },
       "prog_hc1_sunday": {
-        "name": "HC1 Program Sunday"
+        "name": "HC1 Programm Sonntag"
       },
       "prog_hc2_enable": {
-        "name": "HC2 Program Enable"
+        "name": "HC2 Programm Aktivieren"
       },
       "prog_hc2_start_time": {
-        "name": "HC2 Program Start Time"
+        "name": "HC2 Programm Startzeit"
       },
       "prog_hc2_end_time": {
-        "name": "HC2 Program End Time"
+        "name": "HC2 Programm Endzeit"
       },
       "prog_hc2_monday": {
-        "name": "HC2 Program Monday"
+        "name": "HC2 Programm Montag"
       },
       "prog_hc2_tuesday": {
-        "name": "HC2 Program Tuesday"
+        "name": "HC2 Programm Dienstag"
       },
       "prog_hc2_wednesday": {
-        "name": "HC2 Program Wednesday"
+        "name": "HC2 Programm Mittwoch"
       },
       "prog_hc2_thursday": {
-        "name": "HC2 Program Thursday"
+        "name": "HC2 Programm Donnerstag"
       },
       "prog_hc2_friday": {
-        "name": "HC2 Program Friday"
+        "name": "HC2 Programm Freitag"
       },
       "prog_hc2_saturday": {
-        "name": "HC2 Program Saturday"
+        "name": "HC2 Programm Samstag"
       },
       "prog_hc2_sunday": {
-        "name": "HC2 Program Sunday"
+        "name": "HC2 Programm Sonntag"
       },
       "cooling_hc1_hyster_flow_temp": {
         "name": "Kühlung HK1 Hysterese Vorlauftemperatur"

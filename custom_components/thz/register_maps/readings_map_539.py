@@ -1,115 +1,66 @@
 """Register map definitions for THZ readings (firmware 5.39).
 
-This module provides the mapping for sensor readings, including command codes,
-units, device classes, icons, and decode types for each supported reading.
+This module provides the REGISTER_MAP dictionary containing sensor register definitions
+specific to firmware version 5.39 in the format expected by RegisterMapManager.
+
+Each block key (e.g., "pxx0A033B") maps to a list of tuples defining sensors:
+    (name, offset, length, decode_type, factor)
+
+Where:
+    - name: Sensor name (string with trailing colon)
+    - offset: Byte offset in the response data
+    - length: Number of hex characters (2 per byte)
+    - decode_type: Decoding function identifier
+    - factor: Scaling factor for the value
 """
 
-READINGS_MAP = {
+REGISTER_MAP = {
     "firmware": "539",
-    "sFlowRate": {
-        "command": "0A033B",
-        "unit": "cl/min",
-        "device_class": "measurement",
-        "icon": "mdi:water",
-        "decode_type": "1clean",
-    },
-    "sHumMaskingTime": {
-        "command": "0A064F",
-        "unit": "min",
-        "device_class": "measurement",
-        "icon": "mdi:clock",
-        "decode_type": "1clean",
-    },
-    "sHumThreshold": {
-        "command": "0A0650",
-        "unit": "%",
-        "device_class": "measurement",
-        "icon": "mdi:percent",
-        "decode_type": "1clean",
-    },
-    "sHeatingRelPower": {
-        "command": "0A069A",
-        "unit": "%",
-        "device_class": "measurement",
-        "icon": "mdi:percent",
-        "decode_type": "1clean",
-    },
-    "sComprRelPower": {
-        "command": "0A069B",
-        "unit": "%",
-        "device_class": "measurement",
-        "icon": "mdi:percent",
-        "decode_type": "1clean",
-    },
-    "sComprRotUnlimit": {
-        "command": "0A069C",
-        "unit": "Hz",
-        "device_class": "measurement",
-        "icon": "mdi:fan",
-        "decode_type": "1clean",
-    },
-    "sComprRotLimit": {
-        "command": "0A069D",
-        "unit": "Hz",
-        "device_class": "measurement",
-        "icon": "mdi:fan",
-        "decode_type": "1clean",
-    },
-    "sOutputReduction": {
-        "command": "0A06A4",
-        "unit": "%",
-        "device_class": "measurement",
-        "icon": "mdi:percent",
-        "decode_type": "1clean",
-    },
-    "sOutputIncrease": {
-        "command": "0A06A5",
-        "unit": "%",
-        "device_class": "measurement",
-        "icon": "mdi:percent",
-        "decode_type": "1clean",
-    },
-    "sHumProtection": {
-        "command": "0A09D1",
-        "unit": "",
-        "device_class": "measurement",
-        "icon": "mdi:information-outline",
-        "decode_type": "1clean",
-    },
-    "sSetHumidityMin": {
-        "command": "0A09D2",
-        "unit": "%",
-        "device_class": "measurement",
-        "icon": "mdi:percent",
-        "decode_type": "1clean",
-    },
-    "sSetHumidityMax": {
-        "command": "0A09D3",
-        "unit": "%",
-        "device_class": "measurement",
-        "icon": "mdi:percent",
-        "decode_type": "1clean",
-    },
-    "sCoolHCTotal": {
-        "command": "0A0648",
-        "command2": "0A0649",
-        "unit": "kWh",
-        "device_class": "measurement",
-        "icon": "mdi:flash",
-        "decode_type": "1clean",
-    },
-    "sDewPointHC1": {
-        "command": "0B0264",
-        "unit": "°C",
-        "device_class": "measurement",
-        "icon": "mdi:thermometer",
-        "decode_type": "5temp",
-    },
-    "sDewPointHC2": {
-        "command": "0C0264",
-        "unit": "°C",
-        "device_class": "measurement",
-        "icon": "mdi:thermometer",
-        "decode_type": "5temp",
-    },
+    # Flow and measurement sensors
+    "pxx0A033B": [
+        ("sFlowRate:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A064F": [
+        ("sHumMaskingTime:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A0650": [
+        ("sHumThreshold:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A069A": [
+        ("sHeatingRelPower:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A069B": [
+        ("sComprRelPower:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A069C": [
+        ("sComprRotUnlimit:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A069D": [
+        ("sComprRotLimit:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A06A4": [
+        ("sOutputReduction:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A06A5": [
+        ("sOutputIncrease:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A09D1": [
+        ("sHumProtection:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A09D2": [
+        ("sSetHumidityMin:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A09D3": [
+        ("sSetHumidityMax:", 4, 4, "1clean", 1),
+    ],
+    "pxx0A0648": [
+        ("sCoolHCTotal:", 4, 4, "1clean", 1),
+    ],
+    # Temperature sensors (dew point)
+    "pxx0B0264": [
+        ("sDewPointHC1:", 4, 4, "5temp", 1),
+    ],
+    "pxx0C0264": [
+        ("sDewPointHC2:", 4, 4, "5temp", 1),
+    ],
 }
