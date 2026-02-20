@@ -170,11 +170,11 @@ def normalize_entry(entry):
             "length": length,
             "decode": decode,
             "factor": factor,
-            "unit": meta.get("unit") if meta else None,
-            "device_class": meta.get("device_class") if meta else None,
-            "state_class": meta.get("state_class") if meta else None,
-            "icon": meta.get("icon") if meta else None,
-            "translation_key": meta.get("translation_key") if meta else None,
+            "unit": meta.get("unit"),
+            "device_class": meta.get("device_class"),
+            "state_class": meta.get("state_class"),
+            "icon": meta.get("icon"),
+            "translation_key": meta.get("translation_key"),
         }
     if isinstance(entry, dict):
         return entry
