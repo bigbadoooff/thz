@@ -20,7 +20,6 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
-import struct
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -35,40 +34,14 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .value_codec import decode_raw_value
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def decode_value(raw: bytes, decode_type: str, factor: float = 1.0) -> int | float | bool | str:
-    """Decode a raw byte value according to the specified decode type.
-    
-    Note: This is duplicated from sensor.py to avoid circular imports.
-    The decode_value function is needed here for power sensor decoding,
-    but sensor.py imports async_setup_cop_sensors from this module.
-
-    Args:
-        raw: The raw bytes to decode.
-        decode_type: The type of decoding to apply.
-        factor: The divisor for "hex2int" decoding. Defaults to 1.0.
-
-    Returns:
-        The decoded value, type depends on decode_type.
-    """
-    if decode_type == "hex2int":
-        return int.from_bytes(raw, byteorder="big", signed=True) / factor
-    if decode_type == "hex":
-        return int.from_bytes(raw, byteorder="big")
-    if decode_type.startswith("bit"):
-        bitnum = int(decode_type[3:])
-        return bool((raw[0] >> bitnum) & 0x01)
-    if decode_type.startswith("nbit"):
-        bitnum = int(decode_type[4:])
-        return not bool((raw[0] >> bitnum) & 0x01)
-    if decode_type == "esp_mant":
-        mant = struct.unpack('>f', raw)[0]
-        return round(mant, 3)
-    
-    return raw.hex()
+    """Decode a raw byte value (backward-compatibility wrapper for decode_raw_value)."""
+    return decode_raw_value(raw, decode_type, factor)
 
 
 async def async_setup_cop_sensors(

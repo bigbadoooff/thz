@@ -1,8 +1,7 @@
 """Tests for sensor name processing and metadata lookup.
 
 This test file verifies that sensor names from register maps are correctly
-cleaned and matched against SENSOR_META entries to ensure proper entity
-naming and translation key assignment.
+cleaned and that metadata is correctly stored in register map tuples.
 """
 
 import pytest
@@ -37,27 +36,24 @@ class TestSensorNameCleaning:
 
 
 class TestSensorMetadataLookup:
-    """Test sensor metadata lookup with cleaned names."""
+    """Test that sensor metadata is present in register map tuples."""
 
-    def test_cleaned_name_finds_metadata(self):
-        """Test that cleaned names successfully find metadata."""
-        from custom_components.thz.sensor_meta import SENSOR_META
-        
-        # Original name from register map (with colon)
-        original_name = "outsideTemp:"
-        
-        # Clean the name
-        cleaned_name = original_name.strip().rstrip(':')
-        
-        # Lookup should succeed
-        meta = SENSOR_META.get(cleaned_name, {})
-        assert meta != {}
-        assert meta.get("translation_key") == "outside_temp"
+    def test_register_map_tuple_has_metadata(self):
+        """Test that pxxFB entries have translation_key in 6th element."""
+        from custom_components.thz.register_maps.register_map_all import REGISTER_MAP
+
+        # Build lookup: cleaned name -> meta
+        fb_meta = {e[0].strip().rstrip(":"): e[5] for e in REGISTER_MAP["pxxFB"] if len(e) > 5}
+
+        assert "outsideTemp" in fb_meta
+        assert fb_meta["outsideTemp"].get("translation_key") == "outside_temp"
 
     def test_common_sensors_have_metadata(self):
-        """Test that common sensor names have metadata entries."""
-        from custom_components.thz.sensor_meta import SENSOR_META
-        
+        """Test that common sensor names have metadata entries in register map."""
+        from custom_components.thz.register_maps.register_map_all import REGISTER_MAP
+
+        fb_meta = {e[0].strip().rstrip(":"): e[5] for e in REGISTER_MAP["pxxFB"] if len(e) > 5}
+
         common_sensors = [
             "outsideTemp",
             "flowTemp",
@@ -65,13 +61,13 @@ class TestSensorMetadataLookup:
             "hotGasTemp",
             "dhwTemp",
             "evaporatorTemp",
-            "condenserTemp"
+            "condenserTemp",
         ]
-        
+
         for sensor in common_sensors:
-            meta = SENSOR_META.get(sensor, {})
-            assert meta != {}, f"Sensor {sensor} should have metadata"
-            assert meta.get("translation_key") is not None, f"Sensor {sensor} should have translation_key"
+            meta = fb_meta.get(sensor, {})
+            assert meta, f"Sensor {sensor} should have metadata in register map"
+            assert meta.get("translation_key"), f"Sensor {sensor} should have translation_key"
 
 
 class TestEntityHiding:

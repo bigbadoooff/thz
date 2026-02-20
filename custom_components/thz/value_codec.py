@@ -7,10 +7,46 @@ and decoding values received from the device.
 from __future__ import annotations
 
 import logging
+import struct
 
 from .value_maps import SELECT_MAP
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def decode_raw_value(
+    raw: bytes, decode_type: str, factor: float = 1.0
+) -> int | float | bool | str:
+    """Decode a raw byte value according to the specified decode type.
+
+    Args:
+        raw: The raw bytes to decode.
+        decode_type: The type of decoding to apply. Supported types:
+            - "hex2int": Signed integer divided by factor.
+            - "hex": Unsigned integer.
+            - "bitX": Extracts bit number X (e.g., "bit3").
+            - "nbitX": Negation of bit X (e.g., "nbit2").
+            - "esp_mant": Mantissa and exponent representation.
+            - Any other: Returns hexadecimal representation.
+        factor: The divisor for "hex2int" decoding. Defaults to 1.0.
+
+    Returns:
+        The decoded value (int, float, bool, or str).
+    """
+    if decode_type == "hex2int":
+        return int.from_bytes(raw, byteorder="big", signed=True) / factor
+    if decode_type == "hex":
+        return int.from_bytes(raw, byteorder="big")
+    if decode_type.startswith("bit"):
+        bitnum = int(decode_type[3:])
+        return bool((raw[0] >> bitnum) & 0x01)
+    if decode_type.startswith("nbit"):
+        bitnum = int(decode_type[4:])
+        return not bool((raw[0] >> bitnum) & 0x01)
+    if decode_type == "esp_mant":
+        mant = struct.unpack(">f", raw)[0]
+        return round(mant, 3)
+    return raw.hex()
 
 
 class THZValueCodec:

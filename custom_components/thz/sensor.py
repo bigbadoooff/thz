@@ -17,7 +17,6 @@ values according to their metadata, and exposes them as HA sensor entities.
 from __future__ import annotations
 
 import logging
-import struct
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -34,7 +33,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, should_hide_entity_by_default
 from .cop_sensor import async_setup_cop_sensors
 from .register_maps.register_map_manager import RegisterMapManager
-from .sensor_meta import SENSOR_META
+from .value_codec import decode_raw_value
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,7 +78,13 @@ async def async_setup_entry(
 
         block_hex = block.removeprefix("pxx")  # Remove "pxx" prefix
         block_bytes = bytes.fromhex(block_hex)
-        for name, offset, length, decode_type, factor in entries:
+        for entry_tuple in entries:
+            name = entry_tuple[0]
+            offset = entry_tuple[1]
+            length = entry_tuple[2]
+            decode_type = entry_tuple[3]
+            factor = entry_tuple[4]
+            meta = entry_tuple[5] if len(entry_tuple) > 5 else {}
             # Strip whitespace and trailing colons from sensor name
             sensor_name = name.strip().rstrip(':')
 
@@ -94,7 +99,6 @@ async def async_setup_entry(
 
             seen_sensor_names.add(sensor_name)
 
-            meta = SENSOR_META.get(sensor_name, {})
             entry = {
                 "name": sensor_name,
                 "offset": offset // 2,  # Register offset in bytes
@@ -124,38 +128,19 @@ def decode_value(
 ) -> int | float | bool | str:
     """Decode a raw byte value according to the specified decode type.
 
+    This is a thin wrapper around :func:`value_codec.decode_raw_value` kept
+    for backward compatibility.  New code should use ``decode_raw_value``
+    directly.
+
     Args:
         raw: The raw bytes to decode.
-        decode_type: The type of decoding to apply. Supported types:
-            - "hex2int": Signed integer divided by factor.
-            - "hex": Unsigned integer.
-            - "bitX": Extracts bit number X (e.g., "bit3").
-            - "nbitX": Negation of bit X (e.g., "nbit2").
-            - "esp_mant": Mantissa and exponent representation.
-            - Any other: Returns hexadecimal representation.
+        decode_type: The type of decoding to apply.
         factor: The divisor for "hex2int" decoding. Defaults to 1.0.
 
     Returns:
         The decoded value (int, float, bool, or str).
     """
-    if decode_type == "hex2int":
-        # Only use 2 bytes; register indicates 4 chars in hex string
-        return int.from_bytes(raw, byteorder="big", signed=True) / factor
-    if decode_type == "hex":
-        # Only use 2 bytes; register indicates 4 chars in hex string
-        return int.from_bytes(raw, byteorder="big")
-    if decode_type.startswith("bit"):
-        bitnum = int(decode_type[3:])
-        return bool((raw[0] >> bitnum) & 0x01)
-    if decode_type.startswith("nbit"):
-        bitnum = int(decode_type[4:])
-        return not bool((raw[0] >> bitnum) & 0x01)
-    if decode_type == "esp_mant":
-        # FHEM code reverses bytes and unpacks, equivalent to big-endian
-        mant = struct.unpack('>f', raw)[0]
-        return round(mant, 3)
-
-    return raw.hex()
+    return decode_raw_value(raw, decode_type, factor)
 
 
 def normalize_entry(entry):
@@ -167,7 +152,8 @@ def normalize_entry(entry):
 
     Args:
         entry: The sensor entry to normalize. If a tuple, it should contain
-            (name, offset, length, decode, factor).
+            (name, offset, length, decode, factor) or optionally a 6th element
+            that is a dict of HA display metadata (unit, device_class, etc.).
 
     Returns:
         A dictionary containing the normalized sensor entry.
@@ -176,18 +162,19 @@ def normalize_entry(entry):
         ValueError: If the entry is not a tuple or dictionary.
     """
     if isinstance(entry, tuple):
-        name, offset, length, decode, factor = entry
+        name, offset, length, decode, factor = entry[:5]
+        meta = entry[5] if len(entry) > 5 else {}
         return {
             "name": name.strip(),
             "offset": offset,
             "length": length,
             "decode": decode,
             "factor": factor,
-            "unit": None,
-            "device_class": None,
-            "state_class": None,
-            "icon": None,
-            "translation_key": None,
+            "unit": meta.get("unit") if meta else None,
+            "device_class": meta.get("device_class") if meta else None,
+            "state_class": meta.get("state_class") if meta else None,
+            "icon": meta.get("icon") if meta else None,
+            "translation_key": meta.get("translation_key") if meta else None,
         }
     if isinstance(entry, dict):
         return entry
@@ -298,7 +285,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
                 )
                 return None
             raw_bytes = payload[self._offset : self._offset + self._length]
-            return decode_value(raw_bytes, self._decode_type, self._factor)
+            return decode_raw_value(raw_bytes, self._decode_type, self._factor)
         except (ValueError, IndexError, TypeError) as err:
             _LOGGER.error(
                 "Error decoding sensor %s: %s", self._entity_name, err, exc_info=True

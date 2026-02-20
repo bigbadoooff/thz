@@ -4,7 +4,7 @@ This module provides the REGISTER_MAP dictionary containing sensor register defi
 specific to firmware version 5.39 in the format expected by RegisterMapManager.
 
 Each block key (e.g., "pxx0A033B") maps to a list of tuples defining sensors:
-    (name, offset, length, decode_type, factor)
+    (name, offset, length, decode_type, factor, meta)
 
 Where:
     - name: Sensor name (string with trailing colon)
@@ -12,55 +12,56 @@ Where:
     - length: Number of hex characters (2 per byte)
     - decode_type: Decoding function identifier
     - factor: Scaling factor for the value
+    - meta: Optional dict with HA display metadata (unit, device_class, state_class, icon, translation_key)
 """
 
 REGISTER_MAP = {
     "firmware": "539",
     # Flow and measurement sensors
     "pxx0A033B": [
-        ("sFlowRate:", 8, 4, "hex2int", 1),
+        ("sFlowRate:", 8, 4, "hex2int", 1, {"unit": "l/min", "state_class": "measurement", "translation_key": "flow_rate"}),
     ],
     "pxx0A064F": [
-        ("sHumMaskingTime:", 8, 4, "hex2int", 1),
+        ("sHumMaskingTime:", 8, 4, "hex2int", 1, {"unit": "min", "device_class": "duration", "state_class": "measurement", "translation_key": "hum_masking_time"}),
     ],
     "pxx0A0650": [
-        ("sHumThreshold:", 8, 4, "hex2int", 1),
+        ("sHumThreshold:", 8, 4, "hex2int", 1, {"unit": "%", "device_class": "humidity", "state_class": "measurement", "translation_key": "hum_threshold"}),
     ],
     "pxx0A069A": [
-        ("sHeatingRelPower:", 8, 4, "hex2int", 1),
+        ("sHeatingRelPower:", 8, 4, "hex2int", 1, {"unit": "%", "device_class": "power_factor", "state_class": "measurement", "translation_key": "heating_rel_power"}),
     ],
     "pxx0A069B": [
-        ("sComprRelPower:", 8, 4, "hex2int", 1),
+        ("sComprRelPower:", 8, 4, "hex2int", 1, {"unit": "%", "device_class": "power_factor", "state_class": "measurement", "translation_key": "compr_rel_power"}),
     ],
     "pxx0A069C": [
-        ("sComprRotUnlimit:", 8, 4, "hex2int", 1),
+        ("sComprRotUnlimit:", 8, 4, "hex2int", 1, {"unit": "rpm", "state_class": "measurement", "translation_key": "compr_rot_unlimit"}),
     ],
     "pxx0A069D": [
-        ("sComprRotLimit:", 8, 4, "hex2int", 1),
+        ("sComprRotLimit:", 8, 4, "hex2int", 1, {"unit": "rpm", "state_class": "measurement", "translation_key": "compr_rot_limit"}),
     ],
     "pxx0A06A4": [
-        ("sOutputReduction:", 8, 4, "hex2int", 1),
+        ("sOutputReduction:", 8, 4, "hex2int", 1, {"unit": "%", "device_class": "power_factor", "state_class": "measurement", "translation_key": "output_reduction"}),
     ],
     "pxx0A06A5": [
-        ("sOutputIncrease:", 8, 4, "hex2int", 1),
+        ("sOutputIncrease:", 8, 4, "hex2int", 1, {"unit": "%", "device_class": "power_factor", "state_class": "measurement", "translation_key": "output_increase"}),
     ],
     "pxx0A09D1": [
-        ("sHumProtection:", 8, 4, "hex2int", 1),
+        ("sHumProtection:", 8, 4, "hex2int", 1, {"unit": "%", "device_class": "humidity", "state_class": "measurement", "translation_key": "hum_protection"}),
     ],
     "pxx0A09D2": [
-        ("sSetHumidityMin:", 8, 4, "hex2int", 1),
+        ("sSetHumidityMin:", 8, 4, "hex2int", 1, {"unit": "%", "device_class": "humidity", "state_class": "measurement", "translation_key": "set_humidity_min"}),
     ],
     "pxx0A09D3": [
-        ("sSetHumidityMax:", 8, 4, "hex2int", 1),
+        ("sSetHumidityMax:", 8, 4, "hex2int", 1, {"unit": "%", "device_class": "humidity", "state_class": "measurement", "translation_key": "set_humidity_max"}),
     ],
     "pxx0A0648": [
-        ("sCoolHCTotal:", 8, 4, "hex2int", 1),
+        ("sCoolHCTotal:", 8, 4, "hex2int", 1, {"unit": "kWh", "device_class": "energy", "state_class": "total_increasing", "translation_key": "cool_hc_total"}),
     ],
     # Temperature sensors (dew point)
     "pxx0B0264": [
-        ("sDewPointHC1:", 8, 4, "hex2int", 10),
+        ("sDewPointHC1:", 8, 4, "hex2int", 10, {"unit": "°C", "device_class": "temperature", "state_class": "measurement", "translation_key": "dew_point_hc1"}),
     ],
     "pxx0C0264": [
-        ("sDewPointHC2:", 8, 4, "hex2int", 10),
+        ("sDewPointHC2:", 8, 4, "hex2int", 10, {"unit": "°C", "device_class": "temperature", "state_class": "measurement", "translation_key": "dew_point_hc2"}),
     ],
 }
