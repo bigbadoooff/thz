@@ -94,52 +94,46 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     coordinators = {}
     refresh_intervals = config_entry.data.get("refresh_intervals", {})
 
-    # If refresh_intervals is empty or missing, populate with defaults
-    # for all available blocks
-    if not refresh_intervals:
-        available_blocks = device.available_reading_blocks
-        if available_blocks:
+    # Create a coordinator for every block in the current register map.
+    # Use the configured interval where available; fall back to the default
+    # for any block that is new (added after the config entry was created).
+    available_blocks = device.available_reading_blocks
+    if not available_blocks:
+        _LOGGER.error("No available reading blocks found on device")
+    else:
+        if not refresh_intervals:
             _LOGGER.warning(
                 "No refresh_intervals found in config, using default "
                 "interval of %s seconds for %d blocks",
                 DEFAULT_UPDATE_INTERVAL,
-                len(available_blocks)
+                len(available_blocks),
             )
-            refresh_intervals = {
-                block: DEFAULT_UPDATE_INTERVAL
-                for block in available_blocks
-            }
-        else:
-            _LOGGER.error(
-                "No available reading blocks found on device "
-                "and no refresh_intervals in config"
+        for block in available_blocks:
+            interval = refresh_intervals.get(block, DEFAULT_UPDATE_INTERVAL)
+            if refresh_intervals and block not in refresh_intervals:
+                _LOGGER.warning(
+                    "Block %s not in stored refresh_intervals, using default %s seconds",
+                    block,
+                    DEFAULT_UPDATE_INTERVAL,
+                )
+            _LOGGER.debug(
+                "Creating coordinator for block %s with interval %s seconds",
+                block, interval
             )
-            # Continue with empty dict - no coordinators or sensors will be created
-    else:
-        _LOGGER.debug(
-            "Creating coordinators with refresh intervals: %s", refresh_intervals
-        )
-
-    # Create a coordinator for each block with its own interval
-    for block, interval in refresh_intervals.items():
-        _LOGGER.debug(
-            "Creating coordinator for block %s with interval %s seconds",
-            block, interval
-        )
-        coordinator = DataUpdateCoordinator(
-            hass,
-            _LOGGER,
-            name=f"THZ {block}",
-            update_interval=timedelta(seconds=int(interval)),
-            update_method=lambda b=block: _async_update_block(hass, device, b),
-        )
-        await coordinator.async_config_entry_first_refresh()
-        _LOGGER.info(
-            "Initial data fetch completed for block %s, data available: %s",
-            block,
-            coordinator.data is not None,
-        )
-        coordinators[block] = coordinator
+            coordinator = DataUpdateCoordinator(
+                hass,
+                _LOGGER,
+                name=f"THZ {block}",
+                update_interval=timedelta(seconds=int(interval)),
+                update_method=lambda b=block: _async_update_block(hass, device, b),
+            )
+            await coordinator.async_config_entry_first_refresh()
+            _LOGGER.info(
+                "Initial data fetch completed for block %s, data available: %s",
+                block,
+                coordinator.data is not None,
+            )
+            coordinators[block] = coordinator
 
     # Store in hass.data
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = {

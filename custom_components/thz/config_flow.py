@@ -23,6 +23,7 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
 )
+from .register_maps.register_map_manager import RegisterMapManager
 from .thz_device import THZDevice
 
 LOG_LEVELS = {
@@ -270,9 +271,18 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             default=defaults.get("area", ""),
         )] = vol.In(areas)
 
-        # Refresh intervals for each block
-        refresh_intervals = defaults.get("refresh_intervals", {})
-        for block, interval in refresh_intervals.items():
+        # Refresh intervals for each block.
+        # Use the register map for the stored firmware version so that all
+        # available blocks are shown (including any added after initial setup).
+        stored_intervals = defaults.get("refresh_intervals", {})
+        firmware_version = defaults.get("firmware", "")
+        if firmware_version:
+            mgr = RegisterMapManager(firmware_version)
+            all_blocks = list(mgr.get_all_registers().keys())
+        else:
+            all_blocks = list(stored_intervals.keys())
+        for block in all_blocks:
+            interval = stored_intervals.get(block, DEFAULT_UPDATE_INTERVAL)
             schema_dict[vol.Optional(
                 f"refresh_{block}",
                 default=interval,
