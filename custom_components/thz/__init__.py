@@ -472,6 +472,22 @@ async def _async_update_block(
 
                 # Extract low (cmd2) and high (cmd3) values
                 # Both are signed 16-bit integers at byte offset 4
+                if len(result) < 6:
+                    _LOGGER.warning(
+                        "Block %s returned insufficient data: %d bytes",
+                        block_name, len(result),
+                    )
+                    raise UpdateFailed(
+                        f"Insufficient data from {block_name}: got {len(result)} bytes"
+                    )
+                if len(cmd3_result) < 6:
+                    _LOGGER.warning(
+                        "Block %s returned insufficient data: %d bytes",
+                        cmd3_name, len(cmd3_result),
+                    )
+                    raise UpdateFailed(
+                        f"Insufficient data from {cmd3_name}: got {len(cmd3_result)} bytes"
+                    )
                 low_val = int.from_bytes(
                     result[4:6], byteorder="big", signed=True
                 )

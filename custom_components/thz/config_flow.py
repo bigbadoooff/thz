@@ -77,16 +77,21 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Get available areas
         area_registry = ar.async_get(self.hass)
-        areas = {area.id: area.name for area in area_registry.async_list_areas()}
-        areas[""] = "-- No Area --"  # Add option for no area
+        real_areas = {area.id: area.name for area in area_registry.async_list_areas()}
+        areas = {"": "-- No Area --", **real_areas}  # Prepend option for no area
 
         schema_dict = {}
         schema_dict[
             vol.Optional("alias", default=self.connection_data.get("alias", ""))
         ] = str
-        schema_dict[
-            vol.Optional("area", default=self.connection_data.get("area", ""))
-        ] = vol.In(areas)
+        if real_areas:
+            schema_dict[
+                vol.Optional("area", default=self.connection_data.get("area", ""))
+            ] = vol.In(areas)
+        else:
+            schema_dict[
+                vol.Optional("area", default=self.connection_data.get("area", ""))
+            ] = str
 
         schema = vol.Schema(schema_dict)
         return self.async_show_form(step_id="name", data_schema=schema)
