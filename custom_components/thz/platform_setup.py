@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable
 
-from .const import DOMAIN
+from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -42,12 +42,15 @@ async def async_setup_write_platform(
         entity_type: The entity class to instantiate (e.g., THZNumber, THZSwitch).
         platform_type: The type filter for register entries (e.g., "number", "switch").
         entity_factory: Optional custom factory function for creating entities.
-                       If provided, called with (name, entry, device, device_id)
+                       If provided, called with (name, entry, device, device_id, write_interval)
                        and should return a list of entities.
     """
     write_manager: RegisterMapManagerWrite = hass.data[DOMAIN]["write_manager"]
     device: THZDevice = hass.data[DOMAIN]["device"]
     device_id = hass.data[DOMAIN]["device_id"]
+
+    # Get write interval from config, default to DEFAULT_UPDATE_INTERVAL
+    write_interval = config_entry.data.get("write_interval", DEFAULT_UPDATE_INTERVAL)
 
     write_registers = write_manager.get_all_registers()
     _LOGGER.debug(
@@ -66,7 +69,7 @@ async def async_setup_write_platform(
 
             # Use custom factory if provided, otherwise use default
             if entity_factory:
-                new_entities = entity_factory(name, entry, device, device_id)
+                new_entities = entity_factory(name, entry, device, device_id, write_interval)
                 entities.extend(new_entities if isinstance(new_entities, list) else [new_entities])
             else:
                 # Create entity instance with common parameters
@@ -75,6 +78,7 @@ async def async_setup_write_platform(
                     entry=entry,
                     device=device,
                     device_id=device_id,
+                    scan_interval=write_interval,
                 )
                 entities.append(entity)
 

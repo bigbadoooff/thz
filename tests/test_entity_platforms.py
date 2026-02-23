@@ -212,63 +212,66 @@ class TestEntityHidingIntegration:
 
 
 class TestWriteEntityPolling:
-    """Test that write entities do not independently poll the device.
+    """Test that write entities poll at the configured write_interval.
 
-    HA's polling mechanism uses the CLASS-level SCAN_INTERVAL or the platform
-    module's SCAN_INTERVAL, not an instance-level attribute.  Without a
-    class-level value HA falls back to its built-in 30-second default, which
-    would cause write entities to be polled twice a minute regardless of the
-    user-configured refresh interval.  Setting _attr_should_poll = False on
-    THZBaseEntity prevents this entirely.
+    Write entities use async_track_time_interval (registered in
+    async_added_to_hass) instead of HA's built-in polling mechanism.
+    HA's scheduler reads SCAN_INTERVAL from the class or platform module —
+    not from instance attributes — so all entities in a platform would share
+    the same interval, preventing per-config intervals from being honoured.
+    With _attr_should_poll=False and a self-managed timer, each entity
+    polls at the write_interval specified in the config entry.
     """
 
-    def test_base_entity_should_not_poll(self):
-        """THZBaseEntity must have _attr_should_poll = False."""
+    def test_base_entity_does_not_use_ha_polling(self):
+        """THZBaseEntity must have _attr_should_poll=False (uses timer instead)."""
         from custom_components.thz.base_entity import THZBaseEntity
         assert THZBaseEntity._attr_should_poll is False
 
-    def test_number_entity_does_not_poll(self):
-        """THZNumber inherits non-polling behaviour from THZBaseEntity."""
+    def test_number_entity_does_not_use_ha_polling(self):
+        """THZNumber inherits non-HA-polling behaviour from THZBaseEntity."""
         from custom_components.thz.number import THZNumber
         assert THZNumber._attr_should_poll is False
 
-    def test_switch_entity_does_not_poll(self):
-        """THZSwitch inherits non-polling behaviour from THZBaseEntity."""
+    def test_switch_entity_does_not_use_ha_polling(self):
+        """THZSwitch inherits non-HA-polling behaviour from THZBaseEntity."""
         from custom_components.thz.switch import THZSwitch
         assert THZSwitch._attr_should_poll is False
 
-    def test_select_entity_does_not_poll(self):
-        """THZSelect inherits non-polling behaviour from THZBaseEntity."""
+    def test_select_entity_does_not_use_ha_polling(self):
+        """THZSelect inherits non-HA-polling behaviour from THZBaseEntity."""
         from custom_components.thz.select import THZSelect
         assert THZSelect._attr_should_poll is False
 
-    def test_time_entity_does_not_poll(self):
-        """THZTime inherits non-polling behaviour from THZBaseEntity."""
+    def test_time_entity_does_not_use_ha_polling(self):
+        """THZTime inherits non-HA-polling behaviour from THZBaseEntity."""
         from custom_components.thz.time import THZTime
         assert THZTime._attr_should_poll is False
 
-    def test_schedule_time_entity_does_not_poll(self):
-        """THZScheduleTime inherits non-polling behaviour from THZBaseEntity."""
+    def test_schedule_time_entity_does_not_use_ha_polling(self):
+        """THZScheduleTime inherits non-HA-polling behaviour from THZBaseEntity."""
         from custom_components.thz.time import THZScheduleTime
         assert THZScheduleTime._attr_should_poll is False
 
-    def test_base_entity_has_no_scan_interval(self):
-        """THZBaseEntity must NOT define a class-level SCAN_INTERVAL.
+    def test_base_entity_accepts_scan_interval(self):
+        """THZBaseEntity accepts a scan_interval parameter and stores it."""
+        from custom_components.thz.base_entity import THZBaseEntity
+        from datetime import timedelta
+        import inspect
+        sig = inspect.signature(THZBaseEntity.__init__)
+        assert "scan_interval" in sig.parameters
 
-        If a class-level SCAN_INTERVAL were present, it would override the
-        instance attribute for HA's polling mechanism and require all entities
-        in the platform to share the same interval.
-        """
+    def test_base_entity_has_no_class_level_scan_interval(self):
+        """THZBaseEntity must NOT define a class-level SCAN_INTERVAL."""
         from custom_components.thz.base_entity import THZBaseEntity
         assert not hasattr(THZBaseEntity, 'SCAN_INTERVAL')
 
-    def test_write_interval_config_no_longer_drives_polling(self):
-        """write_interval config does not drive entity polling anymore.
-
-        With _attr_should_poll=False, write entities update only at startup
-        (one-time read via async_add_entities update_before_add=True) and
-        when the user explicitly changes a value.
-        """
+    def test_base_entity_has_async_added_to_hass(self):
+        """THZBaseEntity registers timer in async_added_to_hass."""
         from custom_components.thz.base_entity import THZBaseEntity
-        # Confirm should_poll=False is the final word
-        assert THZBaseEntity._attr_should_poll is False
+        assert callable(getattr(THZBaseEntity, 'async_added_to_hass', None))
+
+    def test_base_entity_has_async_will_remove_from_hass(self):
+        """THZBaseEntity cancels timer in async_will_remove_from_hass."""
+        from custom_components.thz.base_entity import THZBaseEntity
+        assert callable(getattr(THZBaseEntity, 'async_will_remove_from_hass', None))

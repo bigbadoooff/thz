@@ -108,7 +108,7 @@ def quarters_to_time(num: int) -> time | None:
 
 
 
-def _create_time_entities(name, entry, device, device_id):
+def _create_time_entities(name, entry, device, device_id, write_interval=None):
     """Factory function to create time entities, handling schedule types specially."""
     if entry["type"] == "schedule":
         # Create both start and end time entities for schedule type
@@ -121,6 +121,7 @@ def _create_time_entities(name, entry, device, device_id):
                 device=device,
                 device_id=device_id,
                 time_type="start",
+                scan_interval=write_interval,
             ),
             THZScheduleTime(
                 name=f"{name} End",
@@ -129,6 +130,7 @@ def _create_time_entities(name, entry, device, device_id):
                 device=device,
                 device_id=device_id,
                 time_type="end",
+                scan_interval=write_interval,
             ),
         ]
     else:
@@ -138,6 +140,7 @@ def _create_time_entities(name, entry, device, device_id):
             entry=entry,
             device=device,
             device_id=device_id,
+            scan_interval=write_interval,
         )
 
 
@@ -152,6 +155,9 @@ async def async_setup_entry(
     device: THZDevice = hass.data[DOMAIN]["device"]
     device_id = hass.data[DOMAIN]["device_id"]
 
+    from .const import DEFAULT_UPDATE_INTERVAL
+    write_interval = config_entry.data.get("write_interval", DEFAULT_UPDATE_INTERVAL)
+
     write_registers = write_manager.get_all_registers()
     _LOGGER.debug("Loading time platform with %d registers", len(write_registers))
 
@@ -162,7 +168,7 @@ async def async_setup_entry(
                 "Creating time entities for %s (type: %s) with command %s",
                 name, entry["type"], entry["command"]
             )
-            new_entities = _create_time_entities(name, entry, device, device_id)
+            new_entities = _create_time_entities(name, entry, device, device_id, write_interval)
             entities.extend(new_entities if isinstance(new_entities, list) else [new_entities])
 
     _LOGGER.info("Created %d time entities", len(entities))
@@ -180,6 +186,7 @@ class THZTime(THZBaseEntity, TimeEntity):
         entry: dict,
         device: THZDevice,
         device_id: str,
+        scan_interval: int | None = None,
     ) -> None:
         """Initialize a THZ time entity.
 
@@ -188,6 +195,7 @@ class THZTime(THZBaseEntity, TimeEntity):
             entry: The register entry dict containing configuration.
             device: THZ device instance.
             device_id: The device identifier for linking to device.
+            scan_interval: Poll interval in seconds for periodic updates.
         """
         # Initialize base class with common properties
         super().__init__(
@@ -196,6 +204,7 @@ class THZTime(THZBaseEntity, TimeEntity):
             device=device,
             device_id=device_id,
             icon=entry.get("icon", "mdi:clock"),
+            scan_interval=scan_interval,
             translation_key=get_translation_key(name),
         )
 
@@ -275,6 +284,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         device: THZDevice,
         device_id: str,
         time_type: str,
+        scan_interval: int | None = None,
     ) -> None:
         """Initialize a THZ schedule time entity.
 
@@ -286,7 +296,8 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             device: THZ device instance.
             device_id: The device identifier for linking to device.
             time_type: Either "start" or "end".
-            
+            scan_interval: Poll interval in seconds for periodic updates.
+
         Example:
             For base_name="programHC1_Mo_0" and time_type="start", the translation key
             becomes "programhc1_mo_0_start" which resolves to "HC1 Program Monday 1 Start".
@@ -297,7 +308,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             translation_key = f"{base_translation_key}_{time_type}"
         else:
             translation_key = None
-        
+
         # Initialize base class with common properties
         super().__init__(
             name=name,
@@ -305,6 +316,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             device=device,
             device_id=device_id,
             icon=entry.get("icon", "mdi:calendar-clock"),
+            scan_interval=scan_interval,
             translation_key=translation_key,
         )
 

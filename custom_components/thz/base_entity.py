@@ -7,11 +7,12 @@ across entity platforms (number, switch, select, time).
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from datetime import timedelta
+from typing import TYPE_CHECKING, Any, Callable
 
 from homeassistant.helpers.entity import Entity
 
-from .const import DOMAIN, should_hide_entity_by_default
+from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, should_hide_entity_by_default
 
 if TYPE_CHECKING:
     from .thz_device import THZDevice
@@ -25,19 +26,14 @@ class THZBaseEntity(Entity):
     This class provides common properties and initialization logic shared
     across all THZ entity types that communicate with write registers.
 
-    Write entities do NOT poll independently.  They read the current device
-    value once at startup (via async_add_entities update_before_add=True) and
-    then only update when the user changes the value via Home Assistant.  The
-    corresponding read sensors (coordinator-backed THZGenericSensor instances)
-    are the authoritative source for current device values and refresh at the
-    user-configured block interval.
-
-    Background: HA's polling mechanism uses the CLASS-level SCAN_INTERVAL or
-    the platform module's SCAN_INTERVAL, not an instance-level attribute.
-    Without a class-level SCAN_INTERVAL, HA falls back to its built-in
-    30-second default, causing write entities to be polled twice a minute
-    regardless of any configured write_interval value.  Setting
-    _attr_should_poll = False avoids this entirely.
+    Write entities use a self-managed timer (async_track_time_interval) for
+    periodic polling instead of HA's built-in polling mechanism.  This is
+    because HA's polling scheduler reads SCAN_INTERVAL from the class or the
+    platform module — not from instance attributes — so all entities in a
+    platform would share the same interval, preventing per-config intervals
+    from working correctly.  With _attr_should_poll = False and a timer
+    registered in async_added_to_hass, each entity polls at the interval
+    specified by the write_interval config option.
     """
 
     _attr_should_poll = False
@@ -50,6 +46,7 @@ class THZBaseEntity(Entity):
         device_id: str,
         icon: str | None = None,
         unique_id: str | None = None,
+        scan_interval: int | None = None,
         translation_key: str | None = None,
     ) -> None:
         """Initialize base THZ entity.
@@ -61,6 +58,9 @@ class THZBaseEntity(Entity):
             device_id: The device identifier for registry linking.
             icon: Optional icon override (defaults to "mdi:eye").
             unique_id: Optional unique ID (auto-generated if not provided).
+            scan_interval: Poll interval in seconds. Defaults to
+                DEFAULT_UPDATE_INTERVAL. Used to schedule async_update calls
+                via async_track_time_interval.
             translation_key: Optional translation key for localization.
         """
         self._command = command
@@ -95,8 +95,38 @@ class THZBaseEntity(Entity):
             getattr(self, '_attr_translation_key', None)
         )
 
+        # Store poll interval for use in async_added_to_hass
+        self._scan_interval = timedelta(
+            seconds=scan_interval if scan_interval is not None else DEFAULT_UPDATE_INTERVAL
+        )
+        self._unsub_poll: Callable[[], None] | None = None
+
         # Set default visibility based on entity naming conventions
         self._attr_entity_registry_enabled_default = not should_hide_entity_by_default(name)
+
+    async def async_added_to_hass(self) -> None:
+        """Register a periodic update timer when the entity is added to HA."""
+        from homeassistant.helpers.event import async_track_time_interval
+
+        async def _scheduled_update(_now) -> None:
+            try:
+                await self.async_update()
+                self.async_write_ha_state()
+            except Exception:
+                _LOGGER.exception(
+                    "Error updating write entity %s",
+                    self._attr_unique_id,
+                )
+
+        self._unsub_poll = async_track_time_interval(
+            self.hass, _scheduled_update, self._scan_interval
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Cancel the periodic update timer when the entity is removed."""
+        if self._unsub_poll is not None:
+            self._unsub_poll()
+            self._unsub_poll = None
 
     def _generate_unique_id(self, command: str, name: str) -> str:
         """Generate a unique identifier for the entity.

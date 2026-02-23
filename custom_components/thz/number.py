@@ -42,6 +42,7 @@ class THZNumber(THZBaseEntity, NumberEntity):
         entry: dict,
         device: THZDevice,
         device_id: str,
+        scan_interval: int | None = None,
     ) -> None:
         """Initialize a THZ number entity.
 
@@ -50,6 +51,7 @@ class THZNumber(THZBaseEntity, NumberEntity):
             entry: The register entry dict containing configuration.
             device: The device instance this entity belongs to.
             device_id: The device identifier for linking to device.
+            scan_interval: Poll interval in seconds for periodic updates.
         """
         # Initialize base class with common properties
         super().__init__(
@@ -58,6 +60,7 @@ class THZNumber(THZBaseEntity, NumberEntity):
             device=device,
             device_id=device_id,
             icon=entry.get("icon"),
+            scan_interval=scan_interval,
             translation_key=get_translation_key(name),
         )
 
