@@ -56,12 +56,14 @@ class TestTimeConversionEdgeCases:
         assert time_to_quarters(time(10, 46)) == 43  # Rounds to 10:45
 
     def test_quarters_clamping(self):
-        """Test that out-of-range quarter values are clamped."""
-        # Values above 95 should clamp to 95 (23:45)
-        assert quarters_to_time(96) == time(23, 45)
+        """Test that out-of-range quarter values are clamped, but 96 is end-of-day."""
+        # 96 means 24:00 (end-of-day) -> returned as 00:00
+        assert quarters_to_time(96) == time(0, 0)
+
+        # Values above 96 should clamp to 95 (23:45)
         assert quarters_to_time(100) == time(23, 45)
         assert quarters_to_time(200) == time(23, 45)
-        
+
         # Negative values should clamp to 0 (00:00)
         assert quarters_to_time(-1) == time(0, 0)
         assert quarters_to_time(-10) == time(0, 0)

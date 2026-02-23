@@ -129,6 +129,42 @@
       "booster_stage_1": {
         "name": "Booster Stage 1"
       },
+      "switching_prog": {
+        "name": "Switching Program"
+      },
+      "heating_hc": {
+        "name": "Heating HC"
+      },
+      "heating_dhw": {
+        "name": "Heating DHW"
+      },
+      "booster_hc": {
+        "name": "Booster HC"
+      },
+      "filter_both": {
+        "name": "Filter Both"
+      },
+      "vent_stage": {
+        "name": "Ventilation Stage"
+      },
+      "pump_hc": {
+        "name": "Pump HC"
+      },
+      "defrost": {
+        "name": "Defrost"
+      },
+      "filter_up": {
+        "name": "Filter Up"
+      },
+      "filter_down": {
+        "name": "Filter Down"
+      },
+      "cooling": {
+        "name": "Cooling"
+      },
+      "service": {
+        "name": "Service"
+      },
       "high_pressure_sensor": {
         "name": "High Pressure Sensor"
       },
@@ -332,24 +368,6 @@
       },
       "daily_cop_total": {
         "name": "Daily COP Total"
-      },
-      "monthly_cop_dhw": {
-        "name": "Monthly COP DHW"
-      },
-      "monthly_cop_hc": {
-        "name": "Monthly COP Heating"
-      },
-      "monthly_cop_total": {
-        "name": "Monthly COP Total"
-      },
-      "yearly_cop_dhw": {
-        "name": "Yearly COP DHW"
-      },
-      "yearly_cop_hc": {
-        "name": "Yearly COP Heating"
-      },
-      "yearly_cop_total": {
-        "name": "Yearly COP Total"
       },
       "lifetime_cop_dhw": {
         "name": "Lifetime COP DHW"

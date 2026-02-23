@@ -190,3 +190,51 @@ class TestShouldHideEntityByDefault:
         """Test single character strings."""
         assert not should_hide_entity_by_default("p")
         assert not should_hide_entity_by_default("a")
+
+    def test_with_names_extracted_from_unique_id(self):
+        """Test that names extracted from write entity unique_ids work correctly.
+
+        This covers the bug where _async_enable_integration_disabled_entities
+        used entity.original_name (which is a translated name after the
+        translation fix) instead of the internal entity name.  The fix extracts
+        the internal name from the unique_id using split("_", 3)[3].
+        """
+        def extract_name(unique_id: str) -> str:
+            """Simulate the extraction logic used in __init__.py."""
+            if unique_id.startswith("thz_set_"):
+                parts = unique_id.split("_", 3)
+                return parts[3] if len(parts) >= 4 else ""
+            return ""
+
+        # p13+ parameters must be hidden even when name is lowercase/from unique_id
+        assert should_hide_entity_by_default(
+            extract_name("thz_set_0104001600_p13gradienthc1")
+        )
+        assert should_hide_entity_by_default(
+            extract_name("thz_set_0104001600_p75passivecooling")
+        )
+        assert should_hide_entity_by_default(
+            extract_name("thz_set_0104001600_p78dualmodepoint")
+        )
+        assert should_hide_entity_by_default(
+            extract_name("thz_set_0104001600_p47compressorrestartdelay")
+        )
+        # program entities must be hidden
+        assert should_hide_entity_by_default(
+            extract_name("thz_set_0104001600_programdhw_mo_0")
+        )
+        # HC2 entities must be hidden
+        assert should_hide_entity_by_default(
+            extract_name("thz_set_0104001600_p01roomtempdayhc2")
+        )
+        # p01-p12 parameters must NOT be hidden
+        assert not should_hide_entity_by_default(
+            extract_name("thz_set_0104001600_p01roomtempday")
+        )
+        assert not should_hide_entity_by_default(
+            extract_name("thz_set_0104001600_p04dhwsetdaytemp")
+        )
+        # pOpMode must NOT be hidden
+        assert not should_hide_entity_by_default(
+            extract_name("thz_set_0104001600_popmode")
+        )

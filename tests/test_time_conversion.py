@@ -87,10 +87,38 @@ class TestQuartersToTime:
 
     def test_invalid_value_clamped(self):
         """Test that invalid values are clamped to valid range."""
-        # Values above 95 should be clamped to 95
+        # Values above 96 should be clamped to 95
         assert quarters_to_time(100) == time(23, 45)
         # Negative values should be clamped to 0
         assert quarters_to_time(-1) == time(0, 0)
+
+    def test_end_of_day_value(self):
+        """Test that value 96 (24:00) is treated as end-of-day (00:00)."""
+        assert quarters_to_time(96) == time(0, 0)
+
+
+class TestEndOfDay:
+    """Tests for end-of-day (value 96) handling."""
+
+    def test_time_to_quarters_end_time_midnight(self):
+        """For end-time entities, time(0, 0) encodes as 96 (end-of-day)."""
+        assert time_to_quarters(time(0, 0), is_end_time=True) == 96
+
+    def test_time_to_quarters_start_time_midnight(self):
+        """For start-time entities, time(0, 0) encodes as 0 (start-of-day)."""
+        assert time_to_quarters(time(0, 0), is_end_time=False) == 0
+        assert time_to_quarters(time(0, 0)) == 0  # default
+
+    def test_time_to_quarters_end_time_non_midnight(self):
+        """For end-time entities, non-midnight values encode normally."""
+        assert time_to_quarters(time(23, 45), is_end_time=True) == 95
+        assert time_to_quarters(time(12, 0), is_end_time=True) == 48
+
+    def test_round_trip_end_of_day(self):
+        """96 -> time(0, 0) -> 96 (end-time round trip)."""
+        t = quarters_to_time(96)
+        assert t == time(0, 0)
+        assert time_to_quarters(t, is_end_time=True) == 96
 
 
 class TestRoundTrip:

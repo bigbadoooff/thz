@@ -120,8 +120,8 @@ class TestSensorMetadataIntegration:
         """Test that register map tuples provide device class for temperature sensors."""
         from custom_components.thz.register_maps.register_map_all import REGISTER_MAP
 
-        fb_entries = {e[0].strip().rstrip(":"): e[5] for e in REGISTER_MAP["pxxFB"] if len(e) > 5}
-        meta = fb_entries.get("outsideTemp", {})
+        fb_meta = {e[0].strip().rstrip(":"): e[5] for e in REGISTER_MAP["pxxFB"] if len(e) > 5}
+        meta = fb_meta.get("outsideTemp", {})
         assert meta.get("device_class") == "temperature"
         assert meta.get("unit") == "°C"
 
@@ -129,13 +129,12 @@ class TestSensorMetadataIntegration:
         """Test that register map tuples provide translation key."""
         from custom_components.thz.register_maps.register_map_all import REGISTER_MAP
 
-        fb_entries = {e[0].strip().rstrip(":"): e[5] for e in REGISTER_MAP["pxxFB"] if len(e) > 5}
-        meta = fb_entries.get("outsideTemp", {})
+        fb_meta = {e[0].strip().rstrip(":"): e[5] for e in REGISTER_MAP["pxxFB"] if len(e) > 5}
+        meta = fb_meta.get("outsideTemp", {})
         assert meta.get("translation_key") == "outside_temp"
 
     def test_missing_sensor_has_no_metadata(self):
         """Test that sensors without a 6th tuple element yield empty metadata."""
-        # A 5-element tuple – no metadata
         entry = ("fakeTemp:", 0, 4, "hex2int", 10)
         meta = entry[5] if len(entry) > 5 else {}
         assert meta == {}

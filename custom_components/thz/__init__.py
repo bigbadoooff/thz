@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 import logging
+import re
 
 import voluptuous as vol
 
@@ -90,7 +91,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     hass.data[DOMAIN]["device"] = device
     hass.data[DOMAIN]["device_id"] = unique_id
 
-    # 5. Prepare dict for storing all coordinators
+    # 5. Collect paired register blocks for energy sensors (cmd2 + cmd3)
+    register_manager = hass.data[DOMAIN]["register_manager"]
+    paired_blocks = register_manager.get_paired_blocks()
+    if paired_blocks:
+        _LOGGER.debug(
+            "Paired register blocks for dual-read: %s", paired_blocks
+        )
+
+    # 6. Prepare dict for storing all coordinators
     coordinators = {}
     refresh_intervals = config_entry.data.get("refresh_intervals", {})
 
@@ -131,7 +140,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             _LOGGER,
             name=f"THZ {block}",
             update_interval=timedelta(seconds=int(interval)),
-            update_method=lambda b=block: _async_update_block(hass, device, b),
+            update_method=lambda b=block: _async_update_block(
+                hass, device, b, paired_blocks
+            ),
         )
         await coordinator.async_config_entry_first_refresh()
         _LOGGER.info(
@@ -361,8 +372,37 @@ async def _async_enable_integration_disabled_entities(
     name_count = 0
 
     for entity in entities:
-        # Get the entity's original name to check visibility
-        entity_name = entity.original_name or ""
+        # Get the entity's internal name to check visibility.
+        # After the translation system fix, write entities no longer set _attr_name
+        # when a translation_key is provided, so entity.original_name may be the
+        # translated name (e.g. "Passive Cooling") or None instead of the internal
+        # name (e.g. "p75PassiveCooling").  For write entities the unique_id always
+        # encodes the internal name as the last segment: thz_set_{command}_{name}.
+        unique_id = entity.unique_id or ""
+        if unique_id.startswith("thz_set_"):
+            # Write entity: thz_set_{hex_command}_{internal_name}
+            # Use maxsplit=3 so that underscores inside the name are preserved.
+            parts = unique_id.split("_", 3)
+            if len(parts) >= 4:
+                entity_name = parts[3]
+            else:
+                _LOGGER.warning(
+                    "Write entity %s has unexpected unique_id format: %s",
+                    entity.entity_id, unique_id
+                )
+                entity_name = entity.original_name or ""
+        else:
+            # Sensor entity: thz_{block}_{int_offset}_{entity_name_lower}
+            # The block is a bytes repr (e.g. "b'\\n\\t('") that may itself contain
+            # underscores, so we use a greedy regex to find the last _integer_name
+            # segment.  This is robust against translation failures where
+            # entity.original_name may be None or a translated string that no longer
+            # carries the internal naming pattern (e.g. "hc2").
+            match = re.search(r"^thz_.+_(\d+)_([a-z][a-z0-9_-]*)$", unique_id)
+            if match:
+                entity_name = match.group(2)
+            else:
+                entity_name = entity.original_name or ""
         should_hide = should_hide_entity_by_default(entity_name)
 
         # Sync visibility state
@@ -400,8 +440,20 @@ async def _async_enable_integration_disabled_entities(
         )
 
 
-async def _async_update_block(hass: HomeAssistant, device: THZDevice, block_name: str):
-    """Called by coordinator to read a data block."""
+async def _async_update_block(
+    hass: HomeAssistant,
+    device: THZDevice,
+    block_name: str,
+    paired_blocks: dict[str, str] | None = None,
+):
+    """Called by coordinator to read a data block.
+
+    For paired register blocks (energy sensors), both the cmd2 and cmd3
+    registers are read and combined following the FHEM convention:
+        combined = cmd3_value * 1000 + cmd2_value
+    The result is stored as a 4-byte signed integer at the sensor offset
+    so that the sensor entity can decode it transparently.
+    """
     block_bytes = bytes.fromhex(block_name.removeprefix("pxx"))
     try:
         _LOGGER.debug("Reading block %s", block_name)
@@ -409,6 +461,36 @@ async def _async_update_block(hass: HomeAssistant, device: THZDevice, block_name
             result = await hass.async_add_executor_job(
                 device.read_block, block_bytes, "get"
             )
+
+            # If this block has a paired cmd3 register, read it too
+            if paired_blocks and block_name in paired_blocks:
+                cmd3_name = paired_blocks[block_name]
+                cmd3_bytes = bytes.fromhex(cmd3_name.removeprefix("pxx"))
+                cmd3_result = await hass.async_add_executor_job(
+                    device.read_block, cmd3_bytes, "get"
+                )
+
+                # Extract low (cmd2) and high (cmd3) values
+                # Both are signed 16-bit integers at byte offset 4
+                low_val = int.from_bytes(
+                    result[4:6], byteorder="big", signed=True
+                )
+                high_val = int.from_bytes(
+                    cmd3_result[4:6], byteorder="big", signed=True
+                )
+                combined = high_val * 1000 + low_val
+
+                _LOGGER.debug(
+                    "Paired read %s: low=%s, high=%s (%s), combined=%s",
+                    block_name, low_val, high_val, cmd3_name, combined,
+                )
+
+                # Build payload with 4-byte combined value at offset 4
+                buf = bytearray(max(len(result) + 2, 8))
+                buf[: len(result)] = result
+                buf[4:8] = combined.to_bytes(4, byteorder="big", signed=True)
+                result = bytes(buf)
+
             return result
     except Exception as err:
         raise UpdateFailed(f"Error reading {block_name}: {err}") from err

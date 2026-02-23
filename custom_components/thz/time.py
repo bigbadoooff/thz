@@ -24,21 +24,26 @@ from .thz_device import THZDevice
 _LOGGER = logging.getLogger(__name__)
 
 
-def time_to_quarters(t: time | None) -> int:
+def time_to_quarters(t: time | None, is_end_time: bool = False) -> int:
     """Convert a time object to the number of 15-minute intervals since midnight.
 
     Parameters
     ----------
     t : datetime.time | None
         The time to convert. If None, a sentinel value of 128 (0x80) is returned.
+    is_end_time : bool
+        When True, midnight (00:00) is treated as end-of-day (24:00) and encoded
+        as 96 rather than 0. This is used for schedule end-time entities where
+        a value of 00:00 means "until midnight / end of day".
 
     Returns:
     -------
     int
         The count of 15-minute intervals since midnight:
-        - 0 represents 00:00,
+        - 0 represents 00:00 (start of day),
         - each hour adds 4 intervals,
         - minutes are floored to the nearest 15-minute boundary (minute // 15).
+        - 96 represents 24:00 (end of day) when is_end_time=True and t == 00:00.
         Valid normal values range from 0 to 95 (00:00 through 23:45). 128 is used as a special sentinel for unset/None.
 
     Examples:
@@ -46,6 +51,8 @@ def time_to_quarters(t: time | None) -> int:
     >>> from datetime import time
     >>> time_to_quarters(time(0, 0))
     0
+    >>> time_to_quarters(time(0, 0), is_end_time=True)
+    96
     >>> time_to_quarters(time(1, 30))
     6
     >>> time_to_quarters(None)
@@ -53,6 +60,9 @@ def time_to_quarters(t: time | None) -> int:
     """
     if t is None:
         return TIME_VALUE_UNSET  # 0x80 sentinel value for "no time"
+    # For end-time entities, midnight represents end-of-day (24:00) -> 96
+    if is_end_time and t.hour == 0 and t.minute == 0:
+        return 96
     return t.hour * 4 + (t.minute // 15)
 
 
@@ -63,19 +73,21 @@ def quarters_to_time(num: int) -> time | None:
     ----------
     num : int
         Number of 15-minute intervals (quarters) since midnight. The expected range is
-        0–95 (0 => 00:00, 95 => 23:45). A special sentinel value 0x80 indicates "no time"
-        and causes the function to return None.
+        0–95 (0 => 00:00, 95 => 23:45). The special value 96 represents 24:00
+        (end-of-day) and is returned as time(0, 0). A special sentinel value 0x80
+        indicates "no time" and causes the function to return None.
 
     Returns:
     -------
     datetime.time | None
-        A datetime.time representing the corresponding hour and minute, where the hour is
-        computed as num // 4 and the minutes as (num % 4) * 15. If num == 0x80, returns None.
+        A datetime.time representing the corresponding hour and minute. If num == 0x80,
+        returns None. If num == 96, returns time(0, 0) representing end-of-day (24:00).
 
     Notes:
     -----
-    - The function validates the 0–95 range and logs a warning for out-of-range values.
-    - Invalid values are clamped to the valid range (0-95) to prevent crashes.
+    - The function validates the 0–95 range (plus 96 for end-of-day) and logs a
+      warning for other out-of-range values.
+    - Invalid values outside 0-96 are clamped to the valid range (0-95) to prevent crashes.
 
     Examples:
     --------
@@ -85,16 +97,23 @@ def quarters_to_time(num: int) -> time | None:
     datetime.time(0, 15)
     >>> quarters_to_time(95)   # 23:45
     datetime.time(23, 45)
+    >>> quarters_to_time(96)   # 24:00 -> 00:00 (end of day)
+    datetime.time(0, 0)
     >>> quarters_to_time(0x80) # sentinel for "no time"
     None
     """
     if num == TIME_VALUE_UNSET:
         return None
 
+    # 96 represents 24:00 (end of day), which is expressed as 00:00 in HA
+    if num == 96:
+        _LOGGER.debug("Converting end-of-day value 96 (24:00) to 00:00")
+        return time(0, 0)
+
     # Validate range and clamp if necessary
     if num < 0 or num > 95:
         _LOGGER.warning(
-            "Invalid quarters value %s (expected 0-95). Value will be clamped. "
+            "Invalid quarters value %s (expected 0-95 or 96 for end-of-day). Value will be clamped. "
             "This may indicate a byte order issue in reading the time value.",
             num
         )
@@ -390,7 +409,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
                 _LOGGER.error("Failed to parse time value '%s': %s", value, e)
                 raise
 
-        new_num = time_to_quarters(t_value)
+        new_num = time_to_quarters(t_value, is_end_time=(self._time_type == "end"))
         _LOGGER.debug(
             "Setting schedule time %s (%s) to %s (%s quarters)",
             self.name, self._time_type, t_value, new_num

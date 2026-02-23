@@ -13,7 +13,14 @@ Where:
     - decode_type: Decoding function identifier
     - factor: Scaling factor for the value
     - meta: Optional dict with HA display metadata (unit, device_class, state_class, icon, translation_key)
+
+Energy sensors use paired registers – see readings_map_439.py for details.
 """
+
+# Paired register blocks specific to firmware 5.39
+PAIRED_BLOCKS: dict[str, str] = {
+    "pxx0A0648": "pxx0A0649",  # sCoolHCTotal
+}
 
 REGISTER_MAP = {
     "firmware": "539",
@@ -55,7 +62,7 @@ REGISTER_MAP = {
         ("sSetHumidityMax:", 8, 4, "hex2int", 1, {"unit": "%", "device_class": "humidity", "state_class": "measurement", "translation_key": "set_humidity_max"}),
     ],
     "pxx0A0648": [
-        ("sCoolHCTotal:", 8, 4, "hex2int", 1, {"unit": "kWh", "device_class": "energy", "state_class": "total_increasing", "translation_key": "cool_hc_total"}),
+        ("sCoolHCTotal:", 8, 8, "hex2int", 1, {"unit": "kWh", "device_class": "energy", "state_class": "total_increasing", "translation_key": "cool_hc_total"}),
     ],
     # Temperature sensors (dew point)
     "pxx0B0264": [

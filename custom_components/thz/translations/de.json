@@ -129,6 +129,42 @@
       "booster_stage_1": {
         "name": "Zusatzheizung Stufe 1"
       },
+      "switching_prog": {
+        "name": "Schaltprogramm"
+      },
+      "heating_hc": {
+        "name": "Heizung HK"
+      },
+      "heating_dhw": {
+        "name": "Heizung WW"
+      },
+      "booster_hc": {
+        "name": "Zusatzheizung HK"
+      },
+      "filter_both": {
+        "name": "Filter beide"
+      },
+      "vent_stage": {
+        "name": "Lüftungsstufe"
+      },
+      "pump_hc": {
+        "name": "Pumpe HK"
+      },
+      "defrost": {
+        "name": "Abtauung"
+      },
+      "filter_up": {
+        "name": "Filter oben"
+      },
+      "filter_down": {
+        "name": "Filter unten"
+      },
+      "cooling": {
+        "name": "Kühlung"
+      },
+      "service": {
+        "name": "Service"
+      },
       "high_pressure_sensor": {
         "name": "Hochdrucksensor"
       },
@@ -332,24 +368,6 @@
       },
       "daily_cop_total": {
         "name": "Täglicher COP Gesamt"
-      },
-      "monthly_cop_dhw": {
-        "name": "Monatlicher COP Warmwasser"
-      },
-      "monthly_cop_hc": {
-        "name": "Monatlicher COP Heizung"
-      },
-      "monthly_cop_total": {
-        "name": "Monatlicher COP Gesamt"
-      },
-      "yearly_cop_dhw": {
-        "name": "Jährlicher COP Warmwasser"
-      },
-      "yearly_cop_hc": {
-        "name": "Jährlicher COP Heizung"
-      },
-      "yearly_cop_total": {
-        "name": "Jährlicher COP Gesamt"
       },
       "lifetime_cop_dhw": {
         "name": "Gesamt-COP Warmwasser"

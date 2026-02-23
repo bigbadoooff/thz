@@ -86,7 +86,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         ] = str
         schema_dict[
             vol.Optional("area", default=self.connection_data.get("area", ""))
-        ] = str
+        ] = vol.In(areas)
 
         schema = vol.Schema(schema_dict)
         return self.async_show_form(step_id="name", data_schema=schema)

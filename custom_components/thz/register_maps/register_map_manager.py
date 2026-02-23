@@ -166,6 +166,25 @@ class BaseRegisterMapManager:
         """Get the merged register map."""
         return self._merged_map
 
+    def get_paired_blocks(self) -> dict[str, str]:
+        """Collect paired register block mappings from all loaded readings modules.
+
+        Some energy sensors require two register reads (cmd2 + cmd3) to obtain
+        the full value.  Each readings module may define a ``PAIRED_BLOCKS``
+        dict that maps a cmd2 block key to its cmd3 companion.
+
+        Returns:
+            A dict mapping cmd2 block keys to cmd3 block keys, merged across
+            all loaded readings modules for the current firmware.
+        """
+        paired: dict[str, str] = {}
+        for m_name in self._readings_map_names:
+            full_name = f"{self._package}.{m_name}"
+            mod = sys.modules.get(full_name)
+            if mod and hasattr(mod, "PAIRED_BLOCKS"):
+                paired.update(mod.PAIRED_BLOCKS)
+        return paired
+
     def get_registers_for_block(self, block: str) -> Any:
         """Get registers for a specific block."""
         return self._merged_map.get(block, [])
