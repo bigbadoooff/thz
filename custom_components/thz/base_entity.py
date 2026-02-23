@@ -7,12 +7,11 @@ across entity platforms (number, switch, select, time).
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers.entity import Entity
 
-from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, should_hide_entity_by_default
+from .const import DOMAIN, should_hide_entity_by_default
 
 if TYPE_CHECKING:
     from .thz_device import THZDevice
@@ -25,9 +24,23 @@ class THZBaseEntity(Entity):
 
     This class provides common properties and initialization logic shared
     across all THZ entity types that communicate with write registers.
+
+    Write entities do NOT poll independently.  They read the current device
+    value once at startup (via async_add_entities update_before_add=True) and
+    then only update when the user changes the value via Home Assistant.  The
+    corresponding read sensors (coordinator-backed THZGenericSensor instances)
+    are the authoritative source for current device values and refresh at the
+    user-configured block interval.
+
+    Background: HA's polling mechanism uses the CLASS-level SCAN_INTERVAL or
+    the platform module's SCAN_INTERVAL, not an instance-level attribute.
+    Without a class-level SCAN_INTERVAL, HA falls back to its built-in
+    30-second default, causing write entities to be polled twice a minute
+    regardless of any configured write_interval value.  Setting
+    _attr_should_poll = False avoids this entirely.
     """
 
-    _attr_should_poll = True
+    _attr_should_poll = False
 
     def __init__(
         self,
@@ -37,7 +50,6 @@ class THZBaseEntity(Entity):
         device_id: str,
         icon: str | None = None,
         unique_id: str | None = None,
-        scan_interval: int | None = None,
         translation_key: str | None = None,
     ) -> None:
         """Initialize base THZ entity.
@@ -49,7 +61,6 @@ class THZBaseEntity(Entity):
             device_id: The device identifier for registry linking.
             icon: Optional icon override (defaults to "mdi:eye").
             unique_id: Optional unique ID (auto-generated if not provided).
-            scan_interval: Update interval in seconds (uses DEFAULT_UPDATE_INTERVAL if not provided).
             translation_key: Optional translation key for localization.
         """
         self._command = command
@@ -83,10 +94,6 @@ class THZBaseEntity(Entity):
             getattr(self, '_attr_name', None),
             getattr(self, '_attr_translation_key', None)
         )
-
-        # Configure update interval
-        interval = scan_interval if scan_interval is not None else DEFAULT_UPDATE_INTERVAL
-        self.SCAN_INTERVAL = timedelta(seconds=interval)
 
         # Set default visibility based on entity naming conventions
         self._attr_entity_registry_enabled_default = not should_hide_entity_by_default(name)

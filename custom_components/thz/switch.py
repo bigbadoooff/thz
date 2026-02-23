@@ -45,7 +45,6 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
         entry: dict,
         device: THZDevice,
         device_id: str,
-        scan_interval: int | None = None,
     ) -> None:
         """Initialize a THZ switch entity.
 
@@ -54,7 +53,6 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             entry: The register entry dict containing configuration.
             device: The device instance this switch is associated with.
             device_id: The device identifier for linking to device.
-            scan_interval: The scan interval in seconds for polling updates.
         """
         # Initialize base class with common properties
         super().__init__(
@@ -63,7 +61,6 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             device=device,
             device_id=device_id,
             icon=entry.get("icon"),
-            scan_interval=scan_interval,
             translation_key=get_translation_key(name),
         )
 
