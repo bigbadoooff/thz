@@ -90,50 +90,66 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     hass.data[DOMAIN]["device"] = device
     hass.data[DOMAIN]["device_id"] = unique_id
 
-    # 5. Prepare dict for storing all coordinators
+    # 5. Collect paired register blocks for energy sensors (cmd2 + cmd3)
+    register_manager = hass.data[DOMAIN]["register_manager"]
+    paired_blocks = register_manager.get_paired_blocks()
+    if paired_blocks:
+        _LOGGER.debug(
+            "Paired register blocks for dual-read: %s", paired_blocks
+        )
+
+    # 6. Prepare dict for storing all coordinators
     coordinators = {}
     refresh_intervals = config_entry.data.get("refresh_intervals", {})
 
-    # Create a coordinator for every block in the current register map.
-    # Use the configured interval where available; fall back to the default
-    # for any block that is new (added after the config entry was created).
-    available_blocks = device.available_reading_blocks
-    if not available_blocks:
-        _LOGGER.error("No available reading blocks found on device")
-    else:
-        if not refresh_intervals:
+    # If refresh_intervals is empty or missing, populate with defaults
+    # for all available blocks
+    if not refresh_intervals:
+        available_blocks = device.available_reading_blocks
+        if available_blocks:
             _LOGGER.warning(
                 "No refresh_intervals found in config, using default "
                 "interval of %s seconds for %d blocks",
                 DEFAULT_UPDATE_INTERVAL,
-                len(available_blocks),
+                len(available_blocks)
             )
-        for block in available_blocks:
-            interval = refresh_intervals.get(block, DEFAULT_UPDATE_INTERVAL)
-            if refresh_intervals and block not in refresh_intervals:
-                _LOGGER.warning(
-                    "Block %s not in stored refresh_intervals, using default %s seconds",
-                    block,
-                    DEFAULT_UPDATE_INTERVAL,
-                )
-            _LOGGER.debug(
-                "Creating coordinator for block %s with interval %s seconds",
-                block, interval
+            refresh_intervals = {
+                block: DEFAULT_UPDATE_INTERVAL
+                for block in available_blocks
+            }
+        else:
+            _LOGGER.error(
+                "No available reading blocks found on device "
+                "and no refresh_intervals in config"
             )
-            coordinator = DataUpdateCoordinator(
-                hass,
-                _LOGGER,
-                name=f"THZ {block}",
-                update_interval=timedelta(seconds=int(interval)),
-                update_method=lambda b=block: _async_update_block(hass, device, b),
-            )
-            await coordinator.async_config_entry_first_refresh()
-            _LOGGER.info(
-                "Initial data fetch completed for block %s, data available: %s",
-                block,
-                coordinator.data is not None,
-            )
-            coordinators[block] = coordinator
+            # Continue with empty dict - no coordinators or sensors will be created
+    else:
+        _LOGGER.debug(
+            "Creating coordinators with refresh intervals: %s", refresh_intervals
+        )
+
+    # Create a coordinator for each block with its own interval
+    for block, interval in refresh_intervals.items():
+        _LOGGER.debug(
+            "Creating coordinator for block %s with interval %s seconds",
+            block, interval
+        )
+        coordinator = DataUpdateCoordinator(
+            hass,
+            _LOGGER,
+            name=f"THZ {block}",
+            update_interval=timedelta(seconds=int(interval)),
+            update_method=lambda b=block: _async_update_block(
+                hass, device, b, paired_blocks
+            ),
+        )
+        await coordinator.async_config_entry_first_refresh()
+        _LOGGER.info(
+            "Initial data fetch completed for block %s, data available: %s",
+            block,
+            coordinator.data is not None,
+        )
+        coordinators[block] = coordinator
 
     # Store in hass.data
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = {
@@ -394,8 +410,20 @@ async def _async_enable_integration_disabled_entities(
         )
 
 
-async def _async_update_block(hass: HomeAssistant, device: THZDevice, block_name: str):
-    """Called by coordinator to read a data block."""
+async def _async_update_block(
+    hass: HomeAssistant,
+    device: THZDevice,
+    block_name: str,
+    paired_blocks: dict[str, str] | None = None,
+):
+    """Called by coordinator to read a data block.
+
+    For paired register blocks (energy sensors), both the cmd2 and cmd3
+    registers are read and combined following the FHEM convention:
+        combined = cmd3_value * 1000 + cmd2_value
+    The result is stored as a 4-byte signed integer at the sensor offset
+    so that the sensor entity can decode it transparently.
+    """
     block_bytes = bytes.fromhex(block_name.removeprefix("pxx"))
     try:
         _LOGGER.debug("Reading block %s", block_name)
@@ -403,6 +431,36 @@ async def _async_update_block(hass: HomeAssistant, device: THZDevice, block_name
             result = await hass.async_add_executor_job(
                 device.read_block, block_bytes, "get"
             )
+
+            # If this block has a paired cmd3 register, read it too
+            if paired_blocks and block_name in paired_blocks:
+                cmd3_name = paired_blocks[block_name]
+                cmd3_bytes = bytes.fromhex(cmd3_name.removeprefix("pxx"))
+                cmd3_result = await hass.async_add_executor_job(
+                    device.read_block, cmd3_bytes, "get"
+                )
+
+                # Extract low (cmd2) and high (cmd3) values
+                # Both are signed 16-bit integers at byte offset 4
+                low_val = int.from_bytes(
+                    result[4:6], byteorder="big", signed=True
+                )
+                high_val = int.from_bytes(
+                    cmd3_result[4:6], byteorder="big", signed=True
+                )
+                combined = high_val * 1000 + low_val
+
+                _LOGGER.debug(
+                    "Paired read %s: low=%s, high=%s (%s), combined=%s",
+                    block_name, low_val, high_val, cmd3_name, combined,
+                )
+
+                # Build payload with 4-byte combined value at offset 4
+                buf = bytearray(max(len(result) + 2, 8))
+                buf[: len(result)] = result
+                buf[4:8] = combined.to_bytes(4, byteorder="big", signed=True)
+                result = bytes(buf)
+
             return result
     except Exception as err:
         raise UpdateFailed(f"Error reading {block_name}: {err}") from err

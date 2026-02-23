@@ -95,12 +95,29 @@ async def async_setup_entry(
             seen_sensor_names.add(sensor_name)
 
             meta = SENSOR_META.get(sensor_name, {})
+
+            # FHEM nibble-offset convention: each register offset is a nibble (4-bit)
+            # position in the raw hex string.  Two consecutive nibble offsets share the
+            # same byte: the EVEN offset is the HIGH nibble (bits 4-7 of the byte) and
+            # the ODD offset is the LOW nibble (bits 0-3).  Python converts these to byte
+            # offsets with `offset // 2`, which maps both nibbles to the same byte.
+            # For single-nibble bit-typed registers at an EVEN offset we must shift the
+            # bit number up by 4 so that bit operations access the correct half of the byte.
+            effective_decode = decode_type
+            if length == 1 and offset % 2 == 0:
+                if decode_type.startswith("bit") and not decode_type.startswith("nbit"):
+                    bitnum = int(decode_type[3:])
+                    effective_decode = f"bit{bitnum + 4}"
+                elif decode_type.startswith("nbit"):
+                    bitnum = int(decode_type[4:])
+                    effective_decode = f"nbit{bitnum + 4}"
+
             entry = {
                 "name": sensor_name,
                 "offset": offset // 2,  # Register offset in bytes
                 "length": (length + 1)
                 // 2,  # Register length in bytes; +1 to always have >=1 byte
-                "decode": decode_type,
+                "decode": effective_decode,
                 "factor": factor,
                 "unit": meta.get("unit"),
                 "device_class": meta.get("device_class"),
