@@ -404,6 +404,12 @@ class THZDevice:
             except RuntimeError as e:
                 last_error = e
                 _LOGGER.error("Protocol error in send_request: %s", e)
+                if attempt < max_retries:
+                    try:
+                        self._reconnect()
+                        continue
+                    except OSError as reconnect_error:
+                        _LOGGER.error("Reconnect failed: %s", reconnect_error)
                 raise
 
             except Exception as e:  # noqa: BLE001

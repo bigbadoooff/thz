@@ -235,3 +235,25 @@ class TestConnectionTimeoutEdgeCases:
 
         # Should still return True (connection seemed alive)
         assert result is True
+
+
+class TestReconnectOnProtocolErrors:
+    """Tests reconnection behavior for protocol-level runtime errors."""
+
+    def test_send_request_retries_after_runtime_error(self, monkeypatch):
+        """RuntimeError should trigger reconnect and one retry."""
+        device = THZDevice(connection="ip", host="192.168.1.100", tcp_port=2000)
+
+        reconnect_mock = Mock()
+        exchange_mock = Mock(
+            side_effect=[RuntimeError("No valid response received"), b"\x01\x00"]
+        )
+
+        monkeypatch.setattr(device, "_reconnect", reconnect_mock)
+        monkeypatch.setattr(device, "_exchange_once", exchange_mock)
+
+        result = device.send_request(b"\x01\x00\x00\xfb\x10\x03", "get")
+
+        assert result == b"\x01\x00"
+        assert exchange_mock.call_count == 2
+        reconnect_mock.assert_called_once()
