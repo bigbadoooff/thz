@@ -15,6 +15,7 @@ from homeassistant.const import CONF_DEVICE, CONF_HOST, CONF_PORT
 from homeassistant.helpers import area_registry as ar
 
 from .const import (
+    BLOCK_LABELS,
     CONF_CONNECTION_TYPE,
     CONNECTION_IP,
     CONNECTION_USB,
@@ -23,6 +24,9 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_WRITE_INTERVAL,
     DOMAIN,
+    WRITE_GROUP_LABELS,
+    WRITE_GROUP_PATTERNS,
+    get_write_group_for_key,
 )
 from .thz_device import THZDevice
 
@@ -45,6 +49,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self.connection_data = {}
         self.blocks = []
+        self.write_groups_available: list[str] = []
 
     async def async_step_user(self, user_input=None) -> config_entries.ConfigFlowResult:
         """First step, select connection type."""
@@ -170,20 +175,43 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             # Extract and rebuild refresh_intervals from form inputs
             refresh_intervals = {}
+            selected_read_blocks = []
+            selected_write_groups = []
             keys_to_remove = []
             for key, value in user_input.items():
                 if key.startswith("refresh_"):
                     block = key.replace("refresh_", "")
                     refresh_intervals[block] = value
                     keys_to_remove.append(key)
+                elif key.startswith("read_"):
+                    if value:
+                        selected_read_blocks.append(key.replace("read_", ""))
+                    keys_to_remove.append(key)
+                elif key.startswith("write_"):
+                    if value:
+                        selected_write_groups.append(key.replace("write_", ""))
+                    keys_to_remove.append(key)
 
-            # Remove refresh_* keys from user_input (now moved to refresh_intervals)
+            # Remove processed keys from user_input
             for key in keys_to_remove:
                 user_input.pop(key)
 
             # Update refresh_intervals if any were modified
             if refresh_intervals:
                 updated_data["refresh_intervals"] = refresh_intervals
+
+            # Update entity group selections
+            if selected_read_blocks:
+                updated_data["selected_read_blocks"] = selected_read_blocks
+                # Remove refresh_intervals for blocks that are no longer selected
+                if "refresh_intervals" in updated_data:
+                    updated_data["refresh_intervals"] = {
+                        k: v
+                        for k, v in updated_data["refresh_intervals"].items()
+                        if k in selected_read_blocks
+                    }
+            if selected_write_groups is not None:
+                updated_data["selected_write_groups"] = selected_write_groups
 
             # Update other fields
             updated_data.update(user_input)
@@ -246,8 +274,34 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             default=defaults.get("area", ""),
         )] = vol.In(areas)
 
-        # Refresh intervals for each block
+        # Entity group selection: read blocks
+        selected_read_blocks = defaults.get("selected_read_blocks")
         refresh_intervals = defaults.get("refresh_intervals", {})
+        all_read_blocks = list(refresh_intervals.keys())
+        if selected_read_blocks is None:
+            # Legacy: all blocks in refresh_intervals are selected
+            selected_read_blocks = all_read_blocks
+
+        for block in all_read_blocks:
+            schema_dict[vol.Optional(
+                f"read_{block}",
+                default=block in selected_read_blocks,
+            )] = bool
+
+        # Entity group selection: write groups
+        selected_write_groups = defaults.get("selected_write_groups")
+        all_write_groups = list(WRITE_GROUP_LABELS.keys())
+        if selected_write_groups is None:
+            # Legacy: all groups enabled
+            selected_write_groups = all_write_groups
+
+        for group in all_write_groups:
+            schema_dict[vol.Optional(
+                f"write_{group}",
+                default=group in selected_write_groups,
+            )] = bool
+
+        # Refresh intervals for each block
         for block, interval in refresh_intervals.items():
             schema_dict[vol.Optional(
                 f"refresh_{block}",
@@ -462,13 +516,65 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             blocks = device.available_reading_blocks
             _LOGGER.info("Available blocks: %s", blocks)
 
+            # Determine available write groups from the write register map
+            write_registers = device.write_register_map_manager.get_all_registers()
+            groups_found: set[str] = set()
+            for key in write_registers:
+                groups_found.add(get_write_group_for_key(key))
+            self.write_groups_available = sorted(groups_found)
+
         except (OSError, RuntimeError):
             _LOGGER.exception("Error reading firmware/blocks")
             return self.async_abort(reason="cannot_detect_blocks")
 
         self.blocks = blocks
         self.connection_data["firmware"] = firmware
-        return await self.async_step_refresh_blocks()
+        return await self.async_step_select_groups()
+
+    async def async_step_select_groups(
+        self, user_input=None
+    ) -> config_entries.ConfigFlowResult:
+        """Allow user to select which entity groups to enable."""
+        if user_input is not None:
+            # Collect selected read blocks
+            selected_blocks = [
+                b for b in self.blocks if user_input.get(f"read_{b}", True)
+            ]
+            # Collect selected write groups
+            selected_write_groups = [
+                g
+                for g in self.write_groups_available
+                if user_input.get(f"write_{g}", True)
+            ]
+
+            self.connection_data["selected_read_blocks"] = selected_blocks
+            self.connection_data["selected_write_groups"] = selected_write_groups
+
+            # Only pass selected blocks to the refresh step
+            self.blocks = selected_blocks
+            return await self.async_step_refresh_blocks()
+
+        schema_dict = {}
+
+        # Read block checkboxes
+        for block in self.blocks:
+            label = BLOCK_LABELS.get(block, block)
+            schema_dict[
+                vol.Optional(f"read_{block}", default=True)
+            ] = bool
+
+        # Write group checkboxes
+        for group in self.write_groups_available:
+            label = WRITE_GROUP_LABELS.get(group, group)
+            schema_dict[
+                vol.Optional(f"write_{group}", default=True)
+            ] = bool
+
+        schema = vol.Schema(schema_dict)
+        return self.async_show_form(
+            step_id="select_groups",
+            data_schema=schema,
+        )
 
     async def async_step_refresh_blocks(
         self, user_input=None

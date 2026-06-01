@@ -107,6 +107,52 @@ BLOCK_LABELS: dict[str, str] = {
 }
 
 
+# Write entity groups: maps a group identifier to a human-readable label.
+# Entity keys are matched to groups using WRITE_GROUP_PATTERNS (prefix/regex patterns).
+WRITE_GROUP_LABELS: dict[str, str] = {
+    "heating_hc1": "Heating Circuit 1",
+    "heating_hc2": "Heating Circuit 2",
+    "dhw": "Domestic Hot Water",
+    "fan": "Fan / Ventilation",
+    "solar": "Solar",
+    "cooling": "Cooling",
+    "programs": "Programs / Schedules",
+    "clock": "Clock / Time",
+    "advanced": "Advanced Parameters",
+}
+
+# Patterns to assign write entity keys to groups.
+# Each entry is (group_id, list_of_prefixes_or_substrings).
+# Keys are matched case-insensitively.  First match wins.
+WRITE_GROUP_PATTERNS: list[tuple[str, list[str]]] = [
+    ("programs", ["program"]),
+    ("clock", ["pClock", "sTimedate", "pHolidayBegin", "pHolidayEnd"]),
+    ("cooling", ["p75passive", "p99Cooling"]),
+    ("solar", ["p80EnableSolar", "p83DHWsetSolar", "pSolar"]),
+    ("heating_hc2", ["HC2"]),
+    ("dhw", ["DHW", "p04DHW", "p05DHW", "p06DHW", "p11DHW", "p32Hyst", "p33Booster", "p34Booster", "p35Pasteuris", "p36DHW", "p89DHWeco", "p99DHW", "pDHW"]),
+    ("fan", ["Fan", "p43Unsched", "p44Unsched", "p45Unsched", "p46Unsched", "pFan"]),
+    ("heating_hc1", ["HC1", "p01Room", "p02Room", "p03Room", "p13Gradient", "p14LowEnd", "p15Room", "p19Flow", "pHeat"]),
+    ("advanced", []),  # Catch-all for remaining entities
+]
+
+
+def get_write_group_for_key(key: str) -> str:
+    """Determine which write group a write entity key belongs to.
+
+    Args:
+        key: The write entity key (e.g. "p01RoomTempDayHC1").
+
+    Returns:
+        The group identifier string.
+    """
+    for group_id, patterns in WRITE_GROUP_PATTERNS:
+        for pattern in patterns:
+            if pattern.lower() in key.lower():
+                return group_id
+    return "advanced"
+
+
 def should_hide_entity_by_default(entity_name: str) -> bool:
     """Determine if an entity should be hidden by default.
 
