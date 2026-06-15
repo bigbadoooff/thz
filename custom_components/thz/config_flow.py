@@ -200,16 +200,26 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if refresh_intervals:
                 updated_data["refresh_intervals"] = refresh_intervals
 
-            # Update entity group selections (allow empty selections)
-            updated_data["selected_read_blocks"] = selected_read_blocks
-            if "refresh_intervals" in updated_data:
-                updated_data["refresh_intervals"] = {
-                    k: v
-                    for k, v in updated_data["refresh_intervals"].items()
-                    if k in selected_read_blocks
-                }
-
-            updated_data["selected_write_groups"] = selected_write_groups
+            # Update entity group selections (allow empty selections)
+
+            updated_data["selected_read_blocks"] = selected_read_blocks
+
+            if "refresh_intervals" in updated_data:
+
+                updated_data["refresh_intervals"] = {
+
+                    k: v
+
+                    for k, v in updated_data["refresh_intervals"].items()
+
+                    if k in selected_read_blocks
+
+                }
+
+
+
+            updated_data["selected_write_groups"] = selected_write_groups
+
             # Update other fields
             updated_data.update(user_input)
 
@@ -545,17 +555,11 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ]
 
             self.connection_data["selected_read_blocks"] = selected_blocks
-            self.connection_data["selected_write_groups"] = selected_write_groups
-
-            # Only pass selected blocks to the refresh step
-            self.blocks = selected_blocks
+            schema_dict[vol.Optional(f"read_{block}", default=True)] = bool
             return await self.async_step_refresh_blocks()
 
         schema_dict = {}
-
-        # Read block checkboxes
-        for block in self.blocks:
-            label = BLOCK_LABELS.get(block, block)
+            schema_dict[vol.Optional(f"write_{group}", default=True)] = bool
             schema_dict[
                 vol.Optional(f"read_{block}", default=True)
             ] = bool
