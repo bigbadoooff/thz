@@ -108,7 +108,8 @@ BLOCK_LABELS: dict[str, str] = {
 
 
 # Write entity groups: maps a group identifier to a human-readable label.
-# Entity keys are matched to groups using WRITE_GROUP_PATTERNS (case-insensitive substring matches).
+# Entity keys are matched to groups using WRITE_GROUP_PATTERNS (case-insensitive substring matches).
+WRITE_GROUP_LABELS: dict[str, str] = {
     "heating_hc1": "Heating Circuit 1",
     "heating_hc2": "Heating Circuit 2",
     "dhw": "Domestic Hot Water",

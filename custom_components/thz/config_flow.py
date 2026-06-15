@@ -15,7 +15,6 @@ from homeassistant.const import CONF_DEVICE, CONF_HOST, CONF_PORT
 from homeassistant.helpers import area_registry as ar
 
 from .const import (
-    BLOCK_LABELS,
     CONF_CONNECTION_TYPE,
     CONNECTION_IP,
     CONNECTION_USB,
@@ -25,7 +24,6 @@ from .const import (
     DEFAULT_WRITE_INTERVAL,
     DOMAIN,
     WRITE_GROUP_LABELS,
-    WRITE_GROUP_PATTERNS,
     get_write_group_for_key,
 )
 from .thz_device import THZDevice
@@ -555,18 +553,19 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ]
 
             self.connection_data["selected_read_blocks"] = selected_blocks
-            schema_dict[vol.Optional(f"read_{block}", default=True)] = bool
+            self.connection_data["selected_write_groups"] = selected_write_groups
             return await self.async_step_refresh_blocks()
 
         schema_dict = {}
-            schema_dict[vol.Optional(f"write_{group}", default=True)] = bool
+
+        # Read block checkboxes
+        for block in self.blocks:
             schema_dict[
                 vol.Optional(f"read_{block}", default=True)
             ] = bool
 
         # Write group checkboxes
         for group in self.write_groups_available:
-            label = WRITE_GROUP_LABELS.get(group, group)
             schema_dict[
                 vol.Optional(f"write_{group}", default=True)
             ] = bool
@@ -581,7 +580,11 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input=None
     ) -> config_entries.ConfigFlowResult:
         """Ask for individual refresh intervals per block."""
-        blocks = self.blocks
+        selected_read_blocks = self.connection_data.get("selected_read_blocks")
+        if selected_read_blocks is None:
+            blocks = self.blocks
+        else:
+            blocks = [b for b in self.blocks if b in selected_read_blocks]
 
         if user_input is not None:
             refresh_intervals = {b: user_input[f"refresh_{b}"] for b in blocks}
