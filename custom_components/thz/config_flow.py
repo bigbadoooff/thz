@@ -200,19 +200,16 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if refresh_intervals:
                 updated_data["refresh_intervals"] = refresh_intervals
 
-            # Update entity group selections
-            if selected_read_blocks:
-                updated_data["selected_read_blocks"] = selected_read_blocks
-                # Remove refresh_intervals for blocks that are no longer selected
-                if "refresh_intervals" in updated_data:
-                    updated_data["refresh_intervals"] = {
-                        k: v
-                        for k, v in updated_data["refresh_intervals"].items()
-                        if k in selected_read_blocks
-                    }
-            if selected_write_groups is not None:
-                updated_data["selected_write_groups"] = selected_write_groups
-
+            # Update entity group selections (allow empty selections)
+            updated_data["selected_read_blocks"] = selected_read_blocks
+            if "refresh_intervals" in updated_data:
+                updated_data["refresh_intervals"] = {
+                    k: v
+                    for k, v in updated_data["refresh_intervals"].items()
+                    if k in selected_read_blocks
+                }
+
+            updated_data["selected_write_groups"] = selected_write_groups
             # Update other fields
             updated_data.update(user_input)
 
