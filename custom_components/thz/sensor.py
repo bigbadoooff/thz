@@ -62,6 +62,7 @@ async def async_setup_entry(
     register_manager: RegisterMapManager = entry_data["register_manager"]
     coordinators = entry_data["coordinators"]
     device_id = entry_data["device_id"]
+    unsupported_blocks: set[str] = entry_data.get("unsupported_blocks", set())
 
     # Create sensors
     sensors = []
