@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/bigbadoooff/thz)](https://github.com/bigbadoooff/thz/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-> **Version 0.3.0-alpha** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
+> **Version 0.4.0** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
 > features and breaking changes in this release.
 
 ## Introduction
@@ -17,61 +17,96 @@ Parts of this software have been developed by the help of AI.
 
 **Origin**: This integration is based on the FHEM-Module developed by Immi, adapted for Home Assistant with modern async architecture and full UI configuration support.
 
-**V0.3 alpha** adds passive cooling control, full diagnostics support, COP sensors, energy sensors via paired-block reads, and many reliability improvements. See [CHANGELOG.md](CHANGELOG.md) for details.
+**v0.4** adds climate entities (HC1, HC2, DHW), diverter valve motor control, compressor/booster runtime sensors, a block-refresh service, and a range of reliability and correctness improvements. See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Features
 
 ### Currently Implemented
 
-- ✅ **Full UI Configuration**: Easy setup through Home Assistant's integration interface - no YAML configuration required
+- ✅ **Full UI Configuration**: Easy setup through Home Assistant's integration interface — no YAML configuration required
 - ✅ **Connection Options**: Support for both USB serial and network (ser2net) connections
-- ✅ **Sensor Platform**: Monitor various heat pump parameters (temperatures, pressures, operating states, etc.)
+- ✅ **Sensor Platform**: Monitor temperatures, pressures, operating states, runtime hours, and more
 - ✅ **Switch Platform**: Control heat pump functions on/off
 - ✅ **Number Platform**: Adjust numeric settings and parameters
-- ✅ **Select Platform**: Choose between predefined options for various settings — including **passive cooling mode** (firmware 4.39/5.39)
-- ✅ **Time Platform**: Set time-based parameters, schedules and programs
+- ✅ **Select Platform**: Choose between predefined options — including **passive cooling mode** (firmware 4.39/5.39)
+- ✅ **Time Platform**: Set time-based parameters, schedules and programmes
+- ✅ **Climate Platform**: Full climate entities for Heating Circuit 1, Heating Circuit 2, and Domestic Hot Water — with temperature control, HVAC mode, preset and fan mode support
 - ✅ **Diagnostics**: Download a diagnostics report for troubleshooting (via Settings → Devices & Services)
 - ✅ **Device Registry Integration**: Proper device identification in Home Assistant
 - ✅ **Per-Block Polling Intervals**: Each register block has its own configurable poll interval
 - ✅ **Smart Entity Management**: Non-essential entities are hidden by default to reduce clutter
-- ✅ **Raw Register Service**: `thz.read_raw_register` service for debugging firmware-specific register layouts
+- ✅ **Services**: `thz.read_raw_register`, `thz.refresh_block`, and `thz.set_diverter_valve`
+
+### Climate Entities
+
+Three climate entities are automatically created when the required data blocks are available:
+
+| Entity | Source block | Supports |
+|--------|-------------|---------|
+| Heating Circuit 1 | `pxxF4` | Temperature setpoint, HVAC mode, preset (comfort/sleep/away), fan mode |
+| Heating Circuit 2 | `pxxF5` | Temperature setpoint, HVAC mode, preset — created only when HC2 is configured |
+| Domestic Hot Water | `pxxF3` | Temperature setpoint, HVAC mode |
+
+HC1 also exposes **HVAC action** (heating / cooling / idle) and optional **cooling mode** when the device supports active cooling.
+
+### Services
+
+#### `thz.read_raw_register`
+Read any raw register block directly from the heat pump and return the hex dump. Useful for firmware research and debugging. See [docs/read-raw-register-service.md](docs/read-raw-register-service.md) for full documentation.
+
+#### `thz.refresh_block`
+Force an immediate re-read of a specific coordinator block without waiting for the next poll interval. Accepts any block name form (`"FB"`, `"pxxFB"`, `"0xFB"`). Returns `{success, block}`.
+
+```yaml
+service: thz.refresh_block
+data:
+  block: "FB"
+```
+
+#### `thz.set_diverter_valve`
+Manual control of the 3-way diverter valve motor. Both `heating` and `dhw` directions are guarded by the `diverterValve` status bit in `pxxF2` — the command is refused if the heat pump is currently pressurising the opposite circuit. After 3 seconds the motor is automatically stopped and the stop is verified by reading back both motor registers.
+
+```yaml
+service: thz.set_diverter_valve
+data:
+  position: "dhw"   # heating | dhw | off
+```
+
+⚠️ Only use this service if you have a manually-controlled 3-way valve and understand the risk of incorrect actuation.
 
 ### Hidden Entities by Default
 
 To provide a cleaner initial setup experience, the following entity types are hidden by default:
 
 - **HC2 (Heating Circuit 2) entities**: Only needed if you have a second heating circuit installed
-- **Time plan/program entities**: Advanced schedule configuration entities (programDHW_*, programHC1_*, programHC2_*)
+- **Time plan/programme entities**: Advanced schedule configuration entities (`programDHW_*`, `programHC1_*`, `programHC2_*`)
 - **Advanced technical parameters**: Parameters like gradient, hysteresis, integral components (typically p13 and higher)
 
-**Note**: Hidden entities can still be manually enabled through the Home Assistant UI:
-1. Go to **Settings** → **Devices & Services**
-2. Find the THZ integration and click on it
-3. Click on the device
-4. Click "Show disabled entities" at the bottom
-5. Enable any entities you need
+Hidden entities can be re-enabled via **Settings → Devices & Services → THZ → device → Show disabled entities**.
 
 ### COP (Coefficient of Performance) Sensors
 
 For firmware versions that support energy monitoring (e.g., 4.39), the integration automatically provides COP sensors:
 
-#### Automatically Created Sensors
-
 - **Current COP**: Real-time COP based on instantaneous power measurements
-- **Daily COP DHW**: Daily COP for domestic hot water
-- **Daily COP Heating**: Daily COP for heating circuit
-- **Daily COP Total**: Combined daily COP (DHW + Heating)
-- **Lifetime COP DHW**: Overall COP for DHW since installation
-- **Lifetime COP Heating**: Overall COP for heating since installation
-- **Lifetime COP Total**: Combined lifetime COP (DHW + Heating)
+- **Daily COP DHW / Heating / Total**
+- **Lifetime COP DHW / Heating / Total**
 
-**Note**: COP (Coefficient of Performance) is calculated as Heat Output ÷ Electrical Input. A COP of 3.0 means the heat pump produces 3 kW of heat for every 1 kW of electricity consumed. 
+COP = Heat Output ÷ Electrical Input. A COP of 3.0 means 3 kW of heat for every 1 kW of electricity consumed.
 
-COP sensors require energy sensors to be available on your device, typically present in firmware 4.39 and higher.
+### Runtime Hours (firmware 4.39 / 5.39)
+
+The `sHistory` block (command `09`) provides cumulative operating hours for the compressor and booster heaters:
+
+- `compressor_runtime_heating` — compressor hours in heating mode
+- `compressor_runtime_cooling` — compressor hours in cooling mode
+- `compressor_runtime_dhw` — compressor hours in DHW mode
+- `booster_runtime_dhw` — booster heater hours for DHW
+- `booster_runtime_heating` — booster heater hours for heating
 
 ### Passive Cooling (firmware 4.39 / 5.39)
 
-For devices running firmware 4.39 or 5.39, a **Passive Cooling** select entity is available to control how the heat pump uses its passive cooling capability. Available modes:
+A **Passive Cooling** select entity controls the passive cooling mode:
 
 | Mode | Description |
 |------|-------------|
@@ -91,27 +126,17 @@ The integration supports Home Assistant's built-in diagnostics download:
 2. Click on your heat pump device
 3. Click **Download Diagnostics**
 
-The report includes firmware version, connection status, coordinator last-update times, and redacted hex dumps of all currently-polled register blocks. This information is useful when reporting bugs.
-
-### Developer: Raw Register Service
-
-Use the `thz.read_raw_register` service to read any raw register block from the heat pump for debugging or firmware research. See [docs/read-raw-register-service.md](docs/read-raw-register-service.md) for full documentation.
-
-### Planned Features
-
-- 🔄 Create climate entities for smoother interaction with Home Assistant's climate card
+The report includes firmware version, connection status, coordinator last-update times, and redacted hex dumps of all currently-polled register blocks.
 
 ## Compatibility
 
 ### Supported Firmware Versions
 
-The register maps and write maps in this release target the following firmware families:
-
 | Firmware | Notes |
 |----------|-------|
-| 2.06     | sensors are supported, writing of entities to be implemented |
-| 2.14 / 2.14j | sensors are supported, writing of entities to be implemented |
-| 4.39     | Full support including energy sensors, COP, and passive cooling |
+| 2.06     | Sensor read support; write support via block read-modify-write |
+| 2.14 / 2.14j | Sensor read support; write support via block read-modify-write |
+| 4.39     | Full support including energy sensors, COP, runtime hours, and passive cooling |
 | 5.39     | Full support including passive cooling energy sensor (`sCoolHCTotal`) |
 | Other    | Falls back to 5.39-like configuration — may work partially |
 
@@ -119,7 +144,7 @@ The register maps and write maps in this release target the following firmware f
 
 | Model | Firmware Version | Status |
 |-------|------------------|--------|
-| LWZ5  | 7.59            | ✅ Working |
+| LWZ5  | 7.59 | ✅ Working |
 
 **Note**: While this integration has been confirmed to work with the devices listed above, it may work with other Stiebel Eltron LWZ and Tecalor THZ models. Users are encouraged to test and report compatibility.
 
@@ -131,103 +156,60 @@ The register maps and write maps in this release target the following firmware f
 - USB-to-serial adapter or ser2net server for network connection
 - Physical access to your heat pump's serial interface
 
-### Installation Methods
-
-#### Option 1: HACS (Recommended)
+### Option 1: HACS (Recommended)
 
 1. Ensure [HACS](https://hacs.xyz/) is installed in your Home Assistant instance
-2. Open HACS in your Home Assistant interface
-3. Navigate to "Integrations"
-4. Click the three dots in the top right corner and select "Custom repositories"
-5. Add `https://github.com/bigbadoooff/thz` as a custom repository with category "Integration"
-6. Search for "Stiebel Eltron LWZ / Tecalor THZ" in HACS
-7. Click "Download" to install the integration
-8. Restart Home Assistant
+2. Open HACS → **Integrations** → three-dot menu → **Custom repositories**
+3. Add `https://github.com/bigbadoooff/thz` as a custom repository with category **Integration**
+4. Search for "Stiebel Eltron LWZ / Tecalor THZ" and click **Download**
+5. Restart Home Assistant
 
-#### Option 2: Manual Installation
+### Option 2: Manual Installation
 
 1. Download the latest release from the [releases page](https://github.com/bigbadoooff/thz/releases)
-2. Extract the `thz` folder from the archive
-3. Copy the `thz` folder to your Home Assistant's `custom_components` directory
-   - Path: `<config_dir>/custom_components/thz/`
-   - If the `custom_components` directory doesn't exist, create it
-4. Restart Home Assistant
+2. Copy the `thz` folder to `<config_dir>/custom_components/thz/`
+3. Restart Home Assistant
 
 ### Configuration
 
-1. Navigate to **Settings** → **Devices & Services** in Home Assistant
-2. Click the **"+ ADD INTEGRATION"** button
-3. Search for **"Stiebel Eltron LWZ / Tecalor THZ Integration"**
-4. Follow the configuration wizard:
-   - **Connection Type**: Choose between USB or Network (ser2net)
-   - **USB Connection**: Provide the device path (e.g., `/dev/ttyUSB0`)
-   - **Network Connection**: Provide the host IP address and port
-5. Complete the setup and the integration will discover your heat pump
+1. Go to **Settings** → **Devices & Services** → **+ ADD INTEGRATION**
+2. Search for **"Stiebel Eltron LWZ / Tecalor THZ Integration"**
+3. Choose your connection type (USB or Network/ser2net) and follow the wizard
+
+## Troubleshooting
+
+### USB connection stops working after host reboot
+
+If you are using USB and another application (e.g., FHEM) also accesses the serial port, it may grab the device before Home Assistant on startup, causing "Handshake 1 failed" errors. Disable the THZ device in FHEM (or whichever application is competing) and restart the Home Assistant container.
+
+If HA is running in Docker and the device was not enumerated when the container started, restart the container after the USB adapter appears: `docker restart homeassistant`.
+
+### Integration does not create entities
+
+Check HA logs for `thz` entries. Common causes:
+- Firmware version not detected (empty firmware string) — the integration falls back to a default map but some blocks may be empty
+- Block not supported on the device — blocks returning no data are skipped silently
+
+Use `thz.read_raw_register` to verify that a specific block returns data on your device.
 
 ## Disclaimer
 
 **IMPORTANT**: This is an unofficial, community-developed integration and is not affiliated with, endorsed by, or supported by Stiebel Eltron or Tecalor.
 
-⚠️ **Use at Your Own Risk**: While this integration has been tested and used successfully, the author makes no guarantees regarding its functionality, safety, or suitability for any particular purpose. By using this integration, you acknowledge and accept the following:
-
-- No warranty or guarantee of any kind is provided
-- The integration may not work with all heat pump models or firmware versions
-- Improper use or configuration could potentially affect your heat pump's operation
-- You are responsible for ensuring compliance with any applicable warranties or regulations
-- Always monitor your heat pump's operation after installing this integration
-
-That said, the integration has been running successfully in production environments without issues. The author welcomes feedback and bug reports to improve the integration.
+⚠️ **Use at Your Own Risk**: While this integration has been tested and used in production, no warranty is provided. Improper use could affect your heat pump's operation. Always monitor your heat pump after installing this integration.
 
 ## How to Contribute
 
-Contributions are welcome and appreciated! Here's how you can help:
+Contributions are welcome!
 
-### Reporting Issues
-
-If you encounter bugs or unexpected behavior:
-
-1. Check the [existing issues](https://github.com/bigbadoooff/thz/issues) to see if your problem has already been reported
-2. If not, create a new issue with:
-   - A clear, descriptive title
-   - Detailed description of the problem
-   - Steps to reproduce the issue
-   - Your Home Assistant version
-   - Your heat pump model and firmware version
-   - Relevant log entries (if available)
-
-### Providing Feedback
-
-Your feedback helps improve the integration:
-
-- Share your experience with different heat pump models and firmware versions
-- Suggest new features or improvements
-- Report which devices work (or don't work) with the integration
-
-### Contributing Code
-
-If you'd like to contribute code:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes following the existing code style
-4. Test your changes thoroughly
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to your branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request with a clear description of your changes
+- **Bugs**: Open an issue with HA version, heat pump model, firmware version, and relevant log entries
+- **Compatibility reports**: Let us know which devices work (or don't)
+- **Code**: Fork → feature branch → PR with a clear description
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
-
-This means you are free to use, modify, and distribute this software under the terms of the GPL v3 license. Any derivative works must also be licensed under GPL v3.
+GNU General Public License v3.0 — see [LICENSE](LICENSE) for details.
 
 ---
 
 **Credits**: Based on the FHEM-Module by Immi. Thanks to the FHEM and Home Assistant community for their support and contributions.
-
-
-
-
-
-
-
