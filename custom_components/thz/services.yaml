@@ -72,3 +72,65 @@ read_raw_register:
       example: "FB"
       selector:
         text:
+
+scan_raw_registers:
+  name: Scan Raw Registers
+  description: >
+    Scan multiple raw registers and return all successful responses.
+    You can use either a wildcard pattern with X (for example: "0A0XXX")
+    or an explicit start/end hex range.
+  fields:
+    pattern:
+      name: Pattern
+      description: >
+        6-character hex pattern with optional X wildcards.
+        Example: "0A0XXX" scans from 0A0000 to 0A0FFF.
+      required: false
+      example: "0A0XXX"
+      selector:
+        text:
+    start:
+      name: Start
+      description: Start of inclusive 6-character hex range.
+      required: false
+      example: "0A0000"
+      selector:
+        text:
+    end:
+      name: End
+      description: End of inclusive 6-character hex range.
+      required: false
+      example: "0A0FFF"
+      selector:
+        text:
+    entry_id:
+      name: Entry ID
+      description: >
+        Optional config entry id. Required when multiple THZ devices are configured.
+      required: false
+      selector:
+        text:
+    include_errors:
+      name: Include errors
+      description: Include failed commands in response results.
+      required: false
+      default: false
+      selector:
+        boolean:
+    decode_values:
+      name: Decode values
+      description: Try to decode payload values and include decoded candidates in results.
+      required: false
+      default: false
+      selector:
+        boolean:
+    max_results:
+      name: Max results
+      description: Maximum number of commands to scan.
+      required: false
+      default: 65535
+      selector:
+        number:
+          min: 1
+          max: 65535
+          mode: box

@@ -97,6 +97,32 @@ The report includes firmware version, connection status, coordinator last-update
 
 Use the `thz.read_raw_register` service to read any raw register block from the heat pump for debugging or firmware research. See [docs/read-raw-register-service.md](docs/read-raw-register-service.md) for full documentation.
 
+### Developer: Scan Raw Registers Service
+
+Use the `thz.scan_raw_registers` service to scan multiple raw registers in one run and collect all successful responses.
+
+- Input modes:
+   - `pattern`: 6-char hex pattern with `X` wildcard (example: `0A0XXX` scans `0A0000`..`0A0FFF`)
+   - `start` + `end`: explicit inclusive hex range
+- Optional fields:
+   - `entry_id`: required when multiple THZ devices are configured
+   - `include_errors`: include failed commands in `results`
+   - `decode_values`: include best-effort decoded values in `results.decoded`
+   - `max_results`: limit amount of scanned commands
+
+Service response contains:
+
+- `summary`: mode, scanned count, success/error counters
+- `results`: list of commands with `command`, `length`, `hex`, formatted hex dump (`formatted`)
+- when `decode_values: true`, each successful result also contains `decoded` with best-effort candidates decoded from payload bytes (not from checksum/echo header bytes)
+
+Example service call:
+
+- `pattern: "0A0XXX"`
+- `max_results: 4096`
+
+This scans every command from `0A0000` to `0A0FFF`, preserving all successful responses in a structured output for easy review.
+
 ### Planned Features
 
 - 🔄 Create climate entities for smoother interaction with Home Assistant's climate card
