@@ -8,6 +8,26 @@ All notable changes to the THZ integration are documented here.
 
 ---
 
+## [0.4.1] – 2026-06-29
+
+### Bug Fixes
+
+- **`NameError: unsupported_blocks` in sensor platform**: The `unsupported_blocks` set
+  was stored in `entry_data` by the integration setup but never retrieved in `sensor.py`,
+  causing the sensor platform to fail on startup. Fixed by reading it from `entry_data`
+  with an empty-set fallback.
+
+- **UTF-8 BOM in `__init__.py`**: A byte-order mark (`EF BB BF`) at the start of the
+  file caused `hassfest` to fail with `SyntaxError` on Python 3.14. Windows git with
+  `core.autocrlf=true` silently stripped it on checkout so it was invisible locally.
+  File committed as plain UTF-8 with LF line endings.
+
+- **Climate platform `KeyError: write_manager`**: `async_setup_entry` in `climate.py`
+  was reading `write_manager`, `register_manager`, and `device_id` from the domain-level
+  dict instead of from the per-entry dict (`hass.data[DOMAIN][entry_id]`).
+
+---
+
 ## [0.4.0] – 2026-06-28
 
 ### New Features

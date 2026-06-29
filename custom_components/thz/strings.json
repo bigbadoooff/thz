@@ -338,10 +338,10 @@
         "name": "Pressure High Side"
       },
       "actual_power_qc": {
-        "name": "Actual Power Qc"
+        "name": "Actual Thermal Power"
       },
       "actual_power_pel": {
-        "name": "Actual Power Pel"
+        "name": "Actual Electric Power"
       },
       "collector_temp": {
         "name": "Collector Temperature"

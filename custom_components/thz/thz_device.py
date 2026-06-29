@@ -22,6 +22,15 @@ from .register_maps.register_map_manager import (
 _LOGGER = logging.getLogger(__name__)
 
 
+class THZRegisterNotSupportedError(RuntimeError):
+    """Raised when the device reports that a register is not supported (0x01 0x04 response).
+
+    This is a permanent condition for a given register on a given device firmware,
+    not a transient communication error. Callers should treat this as an unavailable
+    value rather than retrying or failing setup.
+    """
+
+
 class THZDevice:
     """Represents the connection to the THZ heat pump."""
 
@@ -598,8 +607,7 @@ class THZDevice:
                 _LOGGER.error("Unknown command")
                 return None
             if header == b"\x01\x04":
-                _LOGGER.error("Unknown register request")
-                return None
+                raise THZRegisterNotSupportedError("Register not supported by device firmware")
             _LOGGER.error("Unknown response: %s", data.hex())
             return None
         except Exception as e:  # noqa: BLE001
@@ -617,6 +625,7 @@ class THZDevice:
         Raises:
             ConnectionError: If connection fails
             RuntimeError: If device communication fails
+            THZRegisterNotSupportedError: If the device reports the register is not supported
         """
         header = b"\x01\x00" if get_or_set == "get" else b"\x01\x80"
         # Standard Header für "get" und "set"

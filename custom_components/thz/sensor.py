@@ -62,6 +62,7 @@ async def async_setup_entry(
     register_manager: RegisterMapManager = entry_data["register_manager"]
     coordinators = entry_data["coordinators"]
     device_id = entry_data["device_id"]
+    unsupported_blocks: set[str] = entry_data.get("unsupported_blocks", set())
 
     # Create sensors
     sensors = []
@@ -73,6 +74,13 @@ async def async_setup_entry(
         if coordinator is None:
             _LOGGER.warning(
                 "No coordinator found for block %s, skipping sensors", block
+            )
+            continue
+
+        if block in unsupported_blocks:
+            _LOGGER.debug(
+                "Block %s is unsupported on this firmware, skipping entity creation",
+                block,
             )
             continue
 

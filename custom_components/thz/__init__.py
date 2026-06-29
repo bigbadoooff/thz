@@ -290,6 +290,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         )
 
     # Create a coordinator for each block with its own interval
+    unsupported_blocks: set[str] = set()
     for block, interval in refresh_intervals.items():
         _LOGGER.debug(
             "Creating coordinator for block %s with interval %s seconds",
@@ -305,11 +306,17 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             ),
         )
         await coordinator.async_config_entry_first_refresh()
-        _LOGGER.info(
-            "Initial data fetch completed for block %s, data available: %s",
-            block,
-            coordinator.data is not None,
-        )
+        if coordinator.data is None:
+            unsupported_blocks.add(block)
+            _LOGGER.info(
+                "Block %s is unsupported on this firmware; "
+                "no entities will be created for it.",
+                block,
+            )
+        else:
+            _LOGGER.info(
+                "Initial data fetch completed for block %s", block
+            )
         coordinators[block] = coordinator
 
     # Store in hass.data — all per-entry so multiple config entries don't collide
@@ -319,6 +326,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         "write_manager": write_manager,
         "register_manager": register_manager,
         "coordinators": coordinators,
+        "unsupported_blocks": unsupported_blocks,
     }
 
     # Forward setup to platforms
