@@ -917,6 +917,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 ),
             }
         ),
+    )
     hass.services.async_register(
         DOMAIN,
         "refresh_block",
