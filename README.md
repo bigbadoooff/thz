@@ -4,7 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/bigbadoooff/thz)](https://github.com/bigbadoooff/thz/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-> **Version 0.4.0** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
+> **Version 0.4.1** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
 > features and breaking changes in this release.
 
 ## Introduction
