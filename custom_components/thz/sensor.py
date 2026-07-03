@@ -91,6 +91,10 @@ async def async_setup_entry(
             # 6th element (if present) is a metadata dict with HA entity attributes
             tuple_meta = entry_tuple[5] if len(entry_tuple) > 5 else {}
 
+            # Skip sensors explicitly disabled in firmware-specific register maps
+            if decode_type == "disabled":
+                continue
+
             # Skip bit-decoded entries: they are handled by the binary_sensor platform
             if decode_type.startswith("bit") or decode_type.startswith("nbit"):
                 continue
