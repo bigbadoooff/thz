@@ -6,6 +6,86 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Bug Fixes
+
+- **Periodic "Update is taking over 10 seconds" hang (HA 2026.05+)**: All ~60 write
+  entities would stall simultaneously because every entity update and service call
+  acquired `device.lock` and then blocked indefinitely on an
+  `async_add_executor_job` call with no timeout. If the serial port or TCP socket
+  stopped responding, the lock was never released, causing every subsequent entity
+  update to queue up behind it and all cross the 10-second warning threshold at the
+  same time. Reloading the integration was the only recovery.
+
+  Fixed by introducing `async_execute` on `THZDevice`, which acquires the lock and
+  wraps every executor call in `asyncio.wait_for` with an 8-second deadline. On
+  timeout it calls `_force_close()` **while still holding the lock** (so no other
+  coroutine picks up a broken connection) then raises `ConnectionError`. The stuck
+  executor thread receives an `OSError` when the port is closed and exits on its
+  own. All lock+executor blocks across `__init__.py`, `button.py`, `climate.py`,
+  `number.py`, `select.py`, `switch.py`, and `time.py` now use `async_execute`.
+
+- **Integration does not reconnect after connection loss**: Previously,
+  `async_execute` only called `_force_close()` (setting `self.ser = None`) on an
+  8-second timeout. Protocol-level failures that resolved in under 8 seconds
+  (handshake error, read timeout) propagated out of `async_execute` without
+  cleanup, leaving `self.ser` pointing at a closed or half-connected socket/serial
+  object. On subsequent polls, `_is_connection_alive()` could return inconsistent
+  results for this broken state, causing `_reconnect()` to be skipped and the
+  connection to never recover without a manual integration reload. Fixed by
+  catching all exceptions in `async_execute`, calling `_force_close()` in every
+  error path, and re-raising. `self.ser` is now guaranteed to be `None` after any
+  failure, so the next poll always starts with a clean `_reconnect()` attempt.
+
+- **CPU spin in `_read_exact` can aggravate USB-CDC adapters**: The 5 ms
+  `time.sleep` that was previously removed from `_read_exact` (incorrectly
+  flagged as blocking in an async context) has been restored. `_read_exact` runs
+  exclusively in executor threads, so sleeping is correct; without it the function
+  busy-loops for up to 1 second per call, which can trip USB-CDC adapter firmware
+  rate limits and contribute to serial hangs.
+
+- **Coordinators queue indefinitely when all poll simultaneously (thundering herd)**:
+  All coordinators share a single `device.lock`. After the first poll period, every
+  coordinator fires at approximately the same wall-clock second (because they all
+  completed their initial refresh within seconds of each other during setup). With
+  15–20 coordinators each requiring 3–8 s of serial I/O, the last ones in the queue
+  waited 16–20 s before the lock was available. The 8-second read timeout inside
+  `async_execute` did not help because it only applies *after* the lock is acquired.
+
+  Fixed by two changes:
+
+  1. **Lock-acquisition timeout**: `async_execute` now times out after 20 s if the
+     lock cannot be acquired. A coordinator that loses the race raises `UpdateFailed`
+     and retries at its next scheduled interval rather than blocking for an
+     unbounded time.
+
+  2. **Per-coordinator poll jitter**: Each `DataUpdateCoordinator` is created with a
+     random jitter of up to 10 % added to its `update_interval` (e.g. 600–660 s for
+     a 600 s interval). After the first period the coordinators are naturally spread
+     across the jitter window and no longer fire simultaneously.
+
+- **`asyncio.wait_for` does not raise `TimeoutError` for a running executor thread
+  (Python ≥ 3.12)**: When `asyncio.wait_for` times out on a future that is already
+  running in the thread pool, `Future.cancel()` returns `False` (threads cannot be
+  cancelled). In Python ≥ 3.12 `wait_for` then waits for the thread to finish and
+  returns its result rather than raising `TimeoutError`, so the 8-second deadline
+  was silently bypassed for threads that reconnected and retried successfully (seen
+  as "Finished fetching … in 20 s, success: True" in the coordinator logs).
+
+  Fixed by adding a `call_later` deadline alongside `asyncio.wait_for`. The
+  `call_later` callback fires unconditionally from the event loop at exactly the
+  timeout and calls `_force_close()`, interrupting the thread's blocking I/O
+  regardless of Python version. If the thread nevertheless reconnects and succeeds
+  past the deadline, the valid data is returned (not discarded) but the reconnected
+  connection is immediately force-closed so the next call starts from a clean state.
+
+### Translation Fixes
+
+- **"Schnellentlüftung" → "Schnelllüftung" (binary sensor, German)**: The German
+  name for `quick_air_vent` in the binary sensor section incorrectly used
+  "Schnellentlüftung" (deaeration / bleeding). The FHEM source calls this signal
+  "SchnellLüftung" (ventilation), matching the English "Quick Air Vent". Corrected
+  to "Schnelllüftung".
+
 ---
 
 ## [0.4.1] – 2026-06-29

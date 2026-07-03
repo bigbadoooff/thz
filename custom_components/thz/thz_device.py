@@ -365,6 +365,11 @@ class THZDevice:
             )
             self._reconnect()
 
+        # Flush stale bytes before handshake — boot-up sequences from the
+        # heatpump or leftover bytes from a previous failed attempt would
+        # otherwise be read as the 0x10 response to our 0x02 STX byte.
+        self._reset_input_buffer()
+
         self._do_handshake_1(timeout)
 
         self._reset_input_buffer()
@@ -463,7 +468,8 @@ class THZDevice:
             chunk = self._read_available()
             if chunk:
                 buf.extend(chunk)
-            # Note: time.sleep(0.01) was removed as it causes blocking in async context
+            else:
+                time.sleep(0.005)
         return bytes(buf)
 
     def _read_available(self) -> bytes:
@@ -519,10 +525,103 @@ class THZDevice:
             except AttributeError:
                 pass
 
+    async def async_execute(
+        self,
+        hass: HomeAssistant,
+        fn,
+        *args,
+        timeout: float = 8.0,
+    ):
+        """Execute a blocking device function with the lock held and a hard timeout.
+
+        Acquires the device lock (with a 20-second cap so coordinators cannot
+        queue up indefinitely when many blocks fire simultaneously), then runs
+        ``fn(*args)`` in a thread-pool executor with a ``timeout``-second
+        deadline.
+
+        Two complementary timeout mechanisms are used:
+
+        1. ``asyncio.wait_for`` — cancels a *pending* (not-yet-started) executor
+           future immediately, raising ``asyncio.TimeoutError``.
+        2. ``call_later`` deadline — closes the serial port from the event loop
+           at exactly ``timeout`` seconds.  This interrupts a *running* thread's
+           blocking I/O.  In Python ≥ 3.12 ``asyncio.wait_for`` does not raise
+           ``TimeoutError`` when the future is already running; without this
+           second mechanism the thread could reconnect and succeed silently past
+           the deadline.
+
+        On *any* failure ``_force_close`` is called so ``self.ser`` is
+        guaranteed to be ``None`` on exit, triggering a fresh ``_reconnect()``
+        on the next call.
+        """
+        # Prevent unbounded queuing: if the lock cannot be acquired within
+        # 20 seconds the coordinator gives up and retries at its next interval.
+        _LOCK_WAIT_TIMEOUT = 20.0
+        try:
+            await asyncio.wait_for(self.lock.acquire(), timeout=_LOCK_WAIT_TIMEOUT)
+        except asyncio.TimeoutError:
+            raise ConnectionError(
+                f"Device busy: could not acquire lock within {_LOCK_WAIT_TIMEOUT:.0f}s"
+            ) from None
+
+        # Hard deadline: close the connection at timeout seconds so a running
+        # thread cannot silently hold the port past the deadline.
+        loop = asyncio.get_running_loop()
+        _timed_out = False
+
+        def _deadline_close() -> None:
+            nonlocal _timed_out
+            _timed_out = True
+            self._force_close()
+
+        deadline = loop.call_later(timeout, _deadline_close)
+        try:
+            result = await asyncio.wait_for(
+                hass.async_add_executor_job(fn, *args),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            # Future was pending (never ran); our call_later may also have fired.
+            _LOGGER.error(
+                "Device call timed out after %.1fs; closing connection", timeout
+            )
+            self._force_close()
+            raise ConnectionError(
+                f"Device communication timed out after {timeout}s"
+            ) from None
+        except BaseException:
+            self._force_close()
+            raise
+        else:
+            if _timed_out:
+                # call_later fired and force-closed the connection, but the
+                # thread had already reconnected and succeeded.  The data is
+                # valid; close the now-stale reconnected connection so the next
+                # call starts fresh.
+                _LOGGER.warning(
+                    "Device call exceeded %.1fs deadline but thread reconnected "
+                    "and succeeded; connection reset for next call",
+                    timeout,
+                )
+                self._force_close()
+            return result
+        finally:
+            deadline.cancel()
+            self.lock.release()
+
     def close(self):
         """Close the connection."""
         if self.ser is not None:
             self.ser.close()
+
+    def _force_close(self) -> None:
+        """Close the connection without raising; sets ser=None so the next call reconnects."""
+        if self.ser is not None:
+            try:
+                self.ser.close()
+            except Exception:  # noqa: BLE001
+                pass
+            self.ser = None
 
     def thz_checksum(self, data: bytes) -> bytes:
         """Calculate THZ checksum for given data."""

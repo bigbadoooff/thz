@@ -80,14 +80,14 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             "Updating switch %s with command %s", self.name, self._command
         )
 
-        async with self._device.lock:
-            value_bytes = await self.hass.async_add_executor_job(
-                self._device.read_value,
-                bytes.fromhex(self._command),
-                "get",
-                WRITE_REGISTER_OFFSET,
-                WRITE_REGISTER_LENGTH,
-            )
+        value_bytes = await self._device.async_execute(
+            self.hass,
+            self._device.read_value,
+            bytes.fromhex(self._command),
+            "get",
+            WRITE_REGISTER_OFFSET,
+            WRITE_REGISTER_LENGTH,
+        )
 
         # Validate that we received data
         if not value_bytes:
@@ -116,16 +116,16 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             # Use centralized codec for encoding
             value_bytes = THZValueCodec.encode_switch(True)
 
-            async with self._device.lock:
-                await self.hass.async_add_executor_job(
-                    self._device.write_value,
-                    bytes.fromhex(self._command),
-                    value_bytes,
-                )
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(self._command),
+                value_bytes,
+            )
 
             self._is_on = True
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-        except (ValueError, TypeError) as err:
+        except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
             _LOGGER.error(
                 "Error encoding switch %s to turn on: %s",
                 self.name, err, exc_info=True
@@ -139,16 +139,16 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             # Use centralized codec for encoding
             value_bytes = THZValueCodec.encode_switch(False)
 
-            async with self._device.lock:
-                await self.hass.async_add_executor_job(
-                    self._device.write_value,
-                    bytes.fromhex(self._command),
-                    value_bytes,
-                )
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(self._command),
+                value_bytes,
+            )
 
             self._is_on = False
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-        except (ValueError, TypeError) as err:
+        except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
             _LOGGER.error(
                 "Error encoding switch %s to turn off: %s",
                 self.name, err, exc_info=True

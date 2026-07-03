@@ -91,14 +91,14 @@ class THZSelect(THZBaseEntity, SelectEntity):
 
     async def async_update(self) -> None:
         """Fetch new state data for the select."""
-        async with self._device.lock:
-            value_bytes = await self.hass.async_add_executor_job(
-                self._device.read_value,
-                bytes.fromhex(self._command),
-                "get",
-                WRITE_REGISTER_OFFSET,
-                WRITE_REGISTER_LENGTH,
-            )
+        value_bytes = await self._device.async_execute(
+            self.hass,
+            self._device.read_value,
+            bytes.fromhex(self._command),
+            "get",
+            WRITE_REGISTER_OFFSET,
+            WRITE_REGISTER_LENGTH,
+        )
 
         # Validate that we received data
         if not value_bytes:
@@ -140,12 +140,12 @@ class THZSelect(THZBaseEntity, SelectEntity):
             value_bytes = THZValueCodec.encode_select(option, self._decode_type)
             _LOGGER.debug("Encoded value bytes: %s", value_bytes.hex())
 
-            async with self._device.lock:
-                await self.hass.async_add_executor_job(
-                    self._device.write_value,
-                    bytes.fromhex(self._command),
-                    value_bytes,
-                )
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(self._command),
+                value_bytes,
+            )
 
             self._attr_current_option = option
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
