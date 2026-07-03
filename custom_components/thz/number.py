@@ -84,14 +84,14 @@ class THZNumber(THZBaseEntity, NumberEntity):
 
     async def async_update(self) -> None:
         """Fetch new state data for the number."""
-        async with self._device.lock:
-            value_bytes = await self.hass.async_add_executor_job(
-                self._device.read_value,
-                bytes.fromhex(self._command),
-                "get",
-                WRITE_REGISTER_OFFSET,
-                WRITE_REGISTER_LENGTH,
-            )
+        value_bytes = await self._device.async_execute(
+            self.hass,
+            self._device.read_value,
+            bytes.fromhex(self._command),
+            "get",
+            WRITE_REGISTER_OFFSET,
+            WRITE_REGISTER_LENGTH,
+        )
 
         # Validate that we received data
         if not value_bytes:
@@ -129,16 +129,16 @@ class THZNumber(THZBaseEntity, NumberEntity):
                 self._decode_type
             )
 
-            async with self._device.lock:
-                await self.hass.async_add_executor_job(
-                    self._device.write_value,
-                    bytes.fromhex(self._command),
-                    value_bytes,
-                )
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(self._command),
+                value_bytes,
+            )
 
             self._attr_native_value = value
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-        except (ValueError, TypeError) as err:
+        except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
             _LOGGER.error(
                 "Error encoding number %s value %s: %s",
                 self.name, value, err, exc_info=True

@@ -246,14 +246,14 @@ class THZTime(THZBaseEntity, TimeEntity):
 
     async def async_update(self):
         """Fetch new state data for the time."""
-        async with self._device.lock:
-            value_bytes = await self.hass.async_add_executor_job(
-                self._device.read_value,
-                bytes.fromhex(self._command),
-                "get",
-                WRITE_REGISTER_OFFSET,
-                WRITE_REGISTER_LENGTH,
-            )
+        value_bytes = await self._device.async_execute(
+            self.hass,
+            self._device.read_value,
+            bytes.fromhex(self._command),
+            "get",
+            WRITE_REGISTER_OFFSET,
+            WRITE_REGISTER_LENGTH,
+        )
 
         # Time values are stored as single bytes (0-95 quarters)
         if not value_bytes:
@@ -291,10 +291,16 @@ class THZTime(THZBaseEntity, TimeEntity):
         # Second byte is set to 0 as it appears to be unused by the device.
         num_bytes = bytes([num, 0])
 
-        async with self._device.lock:
-            await self.hass.async_add_executor_job(
-                self._device.write_value, bytes.fromhex(self._command), num_bytes
+        try:
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(self._command),
+                num_bytes,
             )
+        except (ConnectionError, RuntimeError, OSError) as err:
+            _LOGGER.error("Error writing time %s: %s", self.name, err, exc_info=True)
+            return
 
         self._attr_native_value = t_value
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
@@ -371,10 +377,14 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
 
     async def async_update(self):
         """Fetch new state data for the schedule time."""
-        async with self._device.lock:
-            value_bytes = await self.hass.async_add_executor_job(
-                self._device.read_value, bytes.fromhex(self._command), "get", 4, 4
-            )
+        value_bytes = await self._device.async_execute(
+            self.hass,
+            self._device.read_value,
+            bytes.fromhex(self._command),
+            "get",
+            4,
+            4,
+        )
 
         # Schedule data format (from FHEM 7prog):
         # - Bytes 0-3: header/other data
@@ -428,26 +438,37 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             self.name, self._time_type, t_value, new_num
         )
 
-        # Read the current schedule data (4 bytes total)
-        async with self._device.lock:
-            current_bytes = await self.hass.async_add_executor_job(
-                self._device.read_value, bytes.fromhex(self._command), "get", 4, 4
+        try:
+            # Read the current schedule data (4 bytes total)
+            current_bytes = await self._device.async_execute(
+                self.hass,
+                self._device.read_value,
+                bytes.fromhex(self._command),
+                "get",
+                4,
+                4,
             )
 
-        # Modify only the relevant byte (start or end time)
-        schedule_bytes = bytearray(current_bytes)
-        if self._time_type == "start":
-            schedule_bytes[0] = new_num
-        else:  # "end"
-            schedule_bytes[1] = new_num
+            # Modify only the relevant byte (start or end time)
+            schedule_bytes = bytearray(current_bytes)
+            if self._time_type == "start":
+                schedule_bytes[0] = new_num
+            else:  # "end"
+                schedule_bytes[1] = new_num
 
-        # Write the modified schedule back
-        async with self._device.lock:
-            await self.hass.async_add_executor_job(
+            # Write the modified schedule back
+            await self._device.async_execute(
+                self.hass,
                 self._device.write_value,
                 bytes.fromhex(self._command),
-                bytes(schedule_bytes)
+                bytes(schedule_bytes),
             )
+        except (ConnectionError, RuntimeError, OSError) as err:
+            _LOGGER.error(
+                "Error writing schedule time %s (%s): %s",
+                self.name, self._time_type, err, exc_info=True,
+            )
+            return
 
         self._attr_native_value = t_value
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms

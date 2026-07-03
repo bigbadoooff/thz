@@ -97,12 +97,12 @@ class THZButton(THZBaseEntity, ButtonEntity):
         """
         _LOGGER.debug("Pressing button %s (command: %s)", self.name, self._command)
         try:
-            async with self._device.lock:
-                await self.hass.async_add_executor_job(
-                    self._device.write_value,
-                    bytes.fromhex(self._command),
-                    b"\x00",
-                )
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(self._command),
+                b"\x00",
+            )
             _LOGGER.info("Button %s pressed successfully", self.name)
         except (ValueError, TypeError, OSError, RuntimeError, ConnectionError) as err:
             _LOGGER.error(

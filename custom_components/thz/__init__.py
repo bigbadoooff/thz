@@ -6,10 +6,12 @@ import asyncio
 from datetime import timedelta
 import itertools
 import logging
+import random
 
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
@@ -217,7 +219,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     else:
         raise ValueError("Invalid connection type")
 
-    await device.async_initialize(hass)
+    try:
+        await device.async_initialize(hass)
+    except OSError as err:
+        raise ConfigEntryNotReady(
+            f"Cannot connect to THZ device ({err}); will retry"
+        ) from err
 
     # 2. Query firmware version
     _LOGGER.info(
@@ -296,11 +303,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             "Creating coordinator for block %s with interval %s seconds",
             block, interval
         )
+        # Add per-coordinator jitter (up to 10 % of the interval, min 5 s) so
+        # that all coordinators do not fire at the same wall-clock second after
+        # the first period expires, avoiding lock contention thundering herds.
+        jitter = random.uniform(0, max(int(interval) * 0.10, 5))
         coordinator = DataUpdateCoordinator(
             hass,
             _LOGGER,
             name=f"THZ {block}",
-            update_interval=timedelta(seconds=int(interval)),
+            update_interval=timedelta(seconds=int(interval) + jitter),
             update_method=lambda b=block: _async_update_block(
                 hass, device, b, paired_blocks
             ),
@@ -528,13 +539,10 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 "command": command_str,
             }
 
-        # Read the register with device lock
+        # Read the register
         try:
             _LOGGER.info("Reading raw register: %s", command_str)
-            async with device.lock:
-                data = await hass.async_add_executor_job(
-                    device.read_block, command_bytes, "get"
-                )
+            data = await device.async_execute(hass, device.read_block, command_bytes, "get")
 
             formatted = _format_hex_dump(data)
             hex_string = data.hex()
@@ -668,10 +676,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         for command_str in commands:
             command_bytes = bytes.fromhex(command_str)
             try:
-                async with device.lock:
-                    data = await hass.async_add_executor_job(
-                        device.read_block, command_bytes, "get"
-                    )
+                data = await device.async_execute(hass, device.read_block, command_bytes, "get")
                 success_count += 1
                 result_item: dict[str, str | int | bool | dict[str, int | float | bool | str]] = {
                     "command": command_str,
@@ -837,49 +842,34 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         async def _stop_and_verify() -> bool:
             """Stop both motor directions, read back to confirm, retry once if not zero."""
-            async with device.lock:
-                await hass.async_add_executor_job(
-                    device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_OFF
-                )
-                await hass.async_add_executor_job(
-                    device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_OFF
-                )
-                h_state = await hass.async_add_executor_job(
-                    device.read_value, _VALVE_MOTOR_HEATING, "get",
-                    WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH,
-                )
-                d_state = await hass.async_add_executor_job(
-                    device.read_value, _VALVE_MOTOR_DHW, "get",
-                    WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH,
-                )
+            await device.async_execute(hass, device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_OFF)
+            await device.async_execute(hass, device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_OFF)
+            h_state = await device.async_execute(
+                hass, device.read_value, _VALVE_MOTOR_HEATING, "get",
+                WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH,
+            )
+            d_state = await device.async_execute(
+                hass, device.read_value, _VALVE_MOTOR_DHW, "get",
+                WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH,
+            )
 
             if h_state != _VALVE_MOTOR_OFF or d_state != _VALVE_MOTOR_OFF:
                 _LOGGER.warning(
                     "Diverter valve motor not confirmed off (heating=%s dhw=%s), retrying stop",
                     h_state.hex(), d_state.hex(),
                 )
-                async with device.lock:
-                    await hass.async_add_executor_job(
-                        device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_OFF
-                    )
-                    await hass.async_add_executor_job(
-                        device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_OFF
-                    )
+                await device.async_execute(hass, device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_OFF)
+                await device.async_execute(hass, device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_OFF)
                 return False
 
             return True
 
         try:
             # Send the motor ON command
-            async with device.lock:
-                if position == "heating":
-                    await hass.async_add_executor_job(
-                        device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_ON
-                    )
-                elif position == "dhw":
-                    await hass.async_add_executor_job(
-                        device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_ON
-                    )
+            if position == "heating":
+                await device.async_execute(hass, device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_ON)
+            elif position == "dhw":
+                await device.async_execute(hass, device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_ON)
 
             # Auto-stop after 3 seconds (lock released during wait so coordinators can poll)
             if position in ("heating", "dhw"):
@@ -1047,41 +1037,38 @@ async def _async_update_block(
     block_bytes = bytes.fromhex(block_name.removeprefix("pxx"))
     try:
         _LOGGER.debug("Reading block %s", block_name)
-        async with device.lock:
-            result = await hass.async_add_executor_job(
-                device.read_block, block_bytes, "get"
+        result = await device.async_execute(hass, device.read_block, block_bytes, "get")
+
+        # If this block has a paired cmd3 register, read it too
+        if paired_blocks and block_name in paired_blocks:
+            cmd3_name = paired_blocks[block_name]
+            cmd3_bytes = bytes.fromhex(cmd3_name.removeprefix("pxx"))
+            cmd3_result = await device.async_execute(
+                hass, device.read_block, cmd3_bytes, "get"
             )
 
-            # If this block has a paired cmd3 register, read it too
-            if paired_blocks and block_name in paired_blocks:
-                cmd3_name = paired_blocks[block_name]
-                cmd3_bytes = bytes.fromhex(cmd3_name.removeprefix("pxx"))
-                cmd3_result = await hass.async_add_executor_job(
-                    device.read_block, cmd3_bytes, "get"
-                )
+            # Extract low (cmd2) and high (cmd3) values
+            # Both are signed 16-bit integers at byte offset 4
+            low_val = int.from_bytes(
+                result[4:6], byteorder="big", signed=True
+            )
+            high_val = int.from_bytes(
+                cmd3_result[4:6], byteorder="big", signed=True
+            )
+            combined = high_val * 1000 + low_val
 
-                # Extract low (cmd2) and high (cmd3) values
-                # Both are signed 16-bit integers at byte offset 4
-                low_val = int.from_bytes(
-                    result[4:6], byteorder="big", signed=True
-                )
-                high_val = int.from_bytes(
-                    cmd3_result[4:6], byteorder="big", signed=True
-                )
-                combined = high_val * 1000 + low_val
+            _LOGGER.debug(
+                "Paired read %s: low=%s, high=%s (%s), combined=%s",
+                block_name, low_val, high_val, cmd3_name, combined,
+            )
 
-                _LOGGER.debug(
-                    "Paired read %s: low=%s, high=%s (%s), combined=%s",
-                    block_name, low_val, high_val, cmd3_name, combined,
-                )
+            # Build payload with 4-byte combined value at offset 4
+            buf = bytearray(max(len(result) + 2, 8))
+            buf[: len(result)] = result
+            buf[4:8] = combined.to_bytes(4, byteorder="big", signed=True)
+            result = bytes(buf)
 
-                # Build payload with 4-byte combined value at offset 4
-                buf = bytearray(max(len(result) + 2, 8))
-                buf[: len(result)] = result
-                buf[4:8] = combined.to_bytes(4, byteorder="big", signed=True)
-                result = bytes(buf)
-
-            return result
+        return result
     except Exception as err:  # noqa: BLE001
         raise UpdateFailed(f"Error reading {block_name}: {err}") from err
 

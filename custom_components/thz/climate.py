@@ -834,12 +834,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             return
         try:
             value_bytes = THZValueCodec.encode_select(opmode_str, "2opmode")
-            async with self._device.lock:
-                await self.hass.async_add_executor_job(
-                    self._device.write_value,
-                    bytes.fromhex(self._opmode_entry["command"]),
-                    value_bytes,
-                )
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(self._opmode_entry["command"]),
+                value_bytes,
+            )
             await self.coordinator.async_request_refresh()
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
             _LOGGER.error(
@@ -871,12 +871,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         decode_type = entry.get("decode_type", "1clean")
         try:
             value_bytes = THZValueCodec.encode_number(float(stage), step, decode_type)
-            async with self._device.lock:
-                await self.hass.async_add_executor_job(
-                    self._device.write_value,
-                    bytes.fromhex(entry["command"]),
-                    value_bytes,
-                )
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(entry["command"]),
+                value_bytes,
+            )
             await self._async_read_fan_stage()
             self.async_write_ha_state()
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
@@ -909,12 +909,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         )
         try:
             value_bytes = THZValueCodec.encode_number(temperature, step, decode_type)
-            async with self._device.lock:
-                await self.hass.async_add_executor_job(
-                    self._device.write_value,
-                    bytes.fromhex(entry["command"]),
-                    value_bytes,
-                )
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(entry["command"]),
+                value_bytes,
+            )
             await self.coordinator.async_request_refresh()
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
             _LOGGER.error(
@@ -944,12 +944,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         )
         try:
             value_bytes = THZValueCodec.encode_number(temperature, step, decode_type)
-            async with self._device.lock:
-                await self.hass.async_add_executor_job(
-                    self._device.write_value,
-                    bytes.fromhex(entry["command"]),
-                    value_bytes,
-                )
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(entry["command"]),
+                value_bytes,
+            )
             await self._async_read_cooling_setpoint()
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
             _LOGGER.error(
@@ -970,12 +970,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             self.name, enabled, self._cool_switch_entry["command"],
         )
         try:
-            async with self._device.lock:
-                await self.hass.async_add_executor_job(
-                    self._device.write_value,
-                    bytes.fromhex(self._cool_switch_entry["command"]),
-                    THZValueCodec.encode_switch(enabled),
-                )
+            await self._device.async_execute(
+                self.hass,
+                self._device.write_value,
+                bytes.fromhex(self._cool_switch_entry["command"]),
+                THZValueCodec.encode_switch(enabled),
+            )
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
             _LOGGER.error(
                 "Error setting cooling switch for %s: %s", self.name, err, exc_info=True
@@ -991,14 +991,14 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         decode_type = entry.get("decode_type", "5temp")
 
         try:
-            async with self._device.lock:
-                value_bytes = await self.hass.async_add_executor_job(
-                    self._device.read_value,
-                    bytes.fromhex(entry["command"]),
-                    "get",
-                    WRITE_REGISTER_OFFSET,
-                    WRITE_REGISTER_LENGTH,
-                )
+            value_bytes = await self._device.async_execute(
+                self.hass,
+                self._device.read_value,
+                bytes.fromhex(entry["command"]),
+                "get",
+                WRITE_REGISTER_OFFSET,
+                WRITE_REGISTER_LENGTH,
+            )
             if value_bytes:
                 self._cooling_target_temp = THZValueCodec.decode_number(
                     value_bytes, step, decode_type
@@ -1020,14 +1020,14 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         step = _get_step(entry)
         decode_type = entry.get("decode_type", "1clean")
         try:
-            async with self._device.lock:
-                value_bytes = await self.hass.async_add_executor_job(
-                    self._device.read_value,
-                    bytes.fromhex(entry["command"]),
-                    "get",
-                    WRITE_REGISTER_OFFSET,
-                    WRITE_REGISTER_LENGTH,
-                )
+            value_bytes = await self._device.async_execute(
+                self.hass,
+                self._device.read_value,
+                bytes.fromhex(entry["command"]),
+                "get",
+                WRITE_REGISTER_OFFSET,
+                WRITE_REGISTER_LENGTH,
+            )
             if value_bytes:
                 raw = THZValueCodec.decode_number(value_bytes, step, decode_type)
                 self._fan_stage_cache = int(raw)
