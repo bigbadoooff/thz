@@ -7,7 +7,28 @@ The map is used to validate and describe writable registers for the device, supp
 Example parameter entry:
 
 This structure enables dynamic configuration and validation of device settings in Home Assistant integrations.
+
+PARENT_BLOCK_MAP maps "parent" group names used in WRITE_MAP entries to their corresponding
+register block hex address strings (matching the "pxx<hex>" keys in register_map_206.REGISTER_MAP).
+For 2xx firmware, writing a parameter requires reading the entire block, modifying the specific
+bytes, and writing the complete block back to the device.
 """
+
+# Maps parent group names to their block hex address (e.g. "pxx17" → "17").
+PARENT_BLOCK_MAP: dict[str, str] = {
+    "p01-p12": "17",    # pxx17: setpoint temperatures & fan stages
+    "pHeat1": "05",     # pxx05: heating curve settings
+    "pHeat2": "06",     # pxx06: hysteresis & summer mode settings
+    "pDHW": "07",       # pxx07: DHW settings
+    "pFan": "01",       # pxx01: fan stage airflow settings
+    "pDefrostEva": "03",  # pxx03: defrost & booster settings
+    "pCircPump": "0A",  # pxx0A: pump cycle settings
+    "pSolar": "08",     # pxx08: solar settings
+    "pHeatProg": "0B",  # pxx0B: heating circuit schedule
+    "pDHWProg": "0C",   # pxx0C: DHW schedule
+    "pFanProg": "0D",   # pxx0D: fan schedule
+    "sTimedate": "FC",  # pxxFC: date & time
+}
 
 WRITE_MAP = {
     "firmware": "206",

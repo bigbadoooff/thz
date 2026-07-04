@@ -192,13 +192,17 @@ class THZValueCodec:
     """
 
     @staticmethod
-    def encode_number(value: float, step: float, decode_type: str) -> bytes:
+    def encode_number(
+        value: float, step: float, decode_type: str, length: int = 2
+    ) -> bytes:
         """Encode a numeric value for device communication.
 
         Args:
             value: The numeric value to encode.
             step: The step size (for scaling).
             decode_type: The encoding type ("hex2int", "0clean", etc.).
+            length: Number of bytes for the encoded value (default 2 for 4xx/5xx
+                firmware; pass the register-map length for 2xx block writes).
 
         Returns:
             Encoded bytes ready to send to device.
@@ -207,9 +211,9 @@ class THZValueCodec:
             # Single byte encoding
             return bytes([int(value)])
         else:
-            # Standard 2-byte signed integer encoding
+            # Standard signed integer encoding scaled by step.
             value_int = int(value / step)
-            return value_int.to_bytes(2, byteorder="big", signed=True)
+            return value_int.to_bytes(length, byteorder="big", signed=True)
 
     @staticmethod
     def decode_number(value_bytes: bytes, step: float, decode_type: str) -> float:
