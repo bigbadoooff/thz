@@ -77,6 +77,13 @@ class THZNumber(THZBaseEntity, NumberEntity):
         self._decode_type = entry["decode_type"]
         self._attr_native_value = None
 
+        # Support 2xx firmware block read-modify-write:
+        # "offset" and "length" override the default WRITE_REGISTER_OFFSET/LENGTH
+        # when the parameter lives inside a shared register block.
+        self._read_offset = entry.get("offset", WRITE_REGISTER_OFFSET)
+        self._read_length = entry.get("length", WRITE_REGISTER_LENGTH)
+        self._write_mode = entry.get("write_mode", "direct")
+
     @property
     def native_value(self) -> float | None:
         """Return the native value of the number."""
@@ -89,8 +96,8 @@ class THZNumber(THZBaseEntity, NumberEntity):
             self._device.read_value,
             bytes.fromhex(self._command),
             "get",
-            WRITE_REGISTER_OFFSET,
-            WRITE_REGISTER_LENGTH,
+            self._read_offset,
+            self._read_length,
         )
 
         # Validate that we received data
@@ -122,19 +129,31 @@ class THZNumber(THZBaseEntity, NumberEntity):
         _LOGGER.debug("Setting value for %s to %s", self.name, value)
 
         try:
-            # Use centralized codec for encoding
+            # Use centralized codec for encoding; pass the register length so 2xx
+            # firmware block parameters (which may be 4 bytes) are encoded correctly.
             value_bytes = THZValueCodec.encode_number(
                 value,
                 self._attr_native_step,
-                self._decode_type
+                self._decode_type,
+                self._read_length,
             )
 
-            await self._device.async_execute(
-                self.hass,
-                self._device.write_value,
-                bytes.fromhex(self._command),
-                value_bytes,
-            )
+            if self._write_mode == "block":
+                await self._device.async_execute(
+                    self.hass,
+                    self._device.write_block_value,
+                    bytes.fromhex(self._command),
+                    self._read_offset,
+                    self._read_length,
+                    value_bytes,
+                )
+            else:
+                await self._device.async_execute(
+                    self.hass,
+                    self._device.write_value,
+                    bytes.fromhex(self._command),
+                    value_bytes,
+                )
 
             self._attr_native_value = value
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms

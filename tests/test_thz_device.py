@@ -212,3 +212,88 @@ class TestFirmwareVersion:
         
         with pytest.raises(RuntimeError, match="Device not initialized"):
             _ = device.firmware_version
+
+
+class TestWriteBlockValue:
+    """Tests for write_block_value method (2xx firmware read-modify-write)."""
+
+    def _make_device_with_block(self, block_data: bytes):
+        """Create a THZDevice mock with read_write_register returning block_data."""
+
+        device = THZDevice(connection="usb", port="/dev/null")
+
+        # Simulate decode_response output: [CRC] + PAYLOAD_BYTES
+        # block_data represents the raw PAYLOAD_BYTES (without CRC prefix).
+        simulated_response = b"\xAB" + block_data  # CRC=0xAB, payload=block_data
+
+        call_log = []
+
+        def fake_read_write_register(addr, mode, payload=b""):
+            call_log.append((addr, mode, payload))
+            if mode == "get":
+                return simulated_response
+            return b""  # "set" returns empty bytes
+
+        device.read_write_register = fake_read_write_register
+        return device, call_log
+
+    def test_write_block_value_modifies_correct_bytes(self):
+        """Test that write_block_value replaces only the target bytes.
+
+        p01RoomTempDay: nibble offset=4 in FHEM/register_map → byte offset=2 in full
+        response (CRC at byte 0).  write_block_value strips the CRC byte so the payload
+        index is offset-1 = 1.  The value is 2 bytes wide (nibble length 4 → byte 2).
+        """
+        block_payload = bytes(range(20))  # [0,1,2,...,19]
+        device, call_log = self._make_device_with_block(block_payload)
+
+        new_value = b"\xAA\xBB"
+        # offset=2 is the byte offset in the full response (CRC at 0); payload index=1.
+        device.write_block_value(b"\x17", offset=2, length=2, value=new_value)
+
+        assert len(call_log) == 2
+        assert call_log[0] == (b"\x17", "get", b"")
+        addr, mode, written_payload = call_log[1]
+        assert addr == b"\x17"
+        assert mode == "set"
+        expected = bytearray(block_payload)
+        expected[1:3] = new_value  # payload_offset = offset-1 = 1
+        assert written_payload == bytes(expected)
+
+    def test_write_block_value_preserves_other_bytes(self):
+        """Test that write_block_value does not disturb other bytes in the block."""
+        block_payload = b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A"
+        device, call_log = self._make_device_with_block(block_payload)
+
+        # Write 2 bytes at offset 6 (payload index 5)
+        new_value = b"\xFF\xFE"
+        device.write_block_value(b"\x06", offset=6, length=2, value=new_value)
+
+        _, _, written = call_log[1]
+        assert written[0:5] == block_payload[0:5]   # bytes before target unchanged
+        assert written[5:7] == b"\xFF\xFE"           # target bytes replaced
+        assert written[7:] == block_payload[7:]       # bytes after target unchanged
+
+    def test_write_block_value_wrong_length_raises(self):
+        """Test that passing a value of wrong length raises ValueError."""
+        block_payload = bytes(10)
+        device, _ = self._make_device_with_block(block_payload)
+
+        with pytest.raises(ValueError, match="value length"):
+            device.write_block_value(
+                b"\x17", offset=2, length=2, value=b"\xAA"  # 1 byte, expected 2
+            )
+
+    def test_write_block_value_out_of_range_raises(self):
+        """Test that an out-of-range offset raises ValueError."""
+        block_payload = bytes(5)
+        device, _ = self._make_device_with_block(block_payload)
+
+        with pytest.raises(ValueError, match="out of range"):
+            # offset=5 → payload_offset=4, length=2 → needs payload[4:6] but len=5
+            device.write_block_value(
+                b"\x17",
+                offset=5,
+                length=2,
+                value=b"\xAA\xBB",
+            )
