@@ -270,9 +270,104 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
             entry_type=dict,
             has_cooling=has_cooling,
         )
+        # For 2xx firmware, enrich write entries with block address, offset, and length
+        # derived from the read register maps so that block read-modify-write works.
+        if firmware_version and firmware_version.startswith("2"):
+            self._enrich_2xx_write_entries()
 
     def _merge_maps(self, base: dict, override: dict) -> dict:
         """For write maps prefer a simple dict update behaviour."""
         merged = deepcopy(base) if base else {}
         merged.update(deepcopy(override) or {})
         return merged
+
+    def _enrich_2xx_write_entries(self) -> None:
+        """Enrich 2xx firmware write entries with block address, offset, length and step.
+
+        For 2xx firmware, each writable parameter lives inside a larger register block.
+        Writing requires reading the complete block, modifying the relevant bytes, and
+        writing the whole block back.  This method cross-references the read register
+        maps (register_map_206, register_map_214, register_map_214j) to discover the
+        byte offset, length, and scaling factor for each parameter, then stores those
+        values into the write-map entry alongside a ``write_mode="block"`` flag so that
+        entity code can dispatch to the correct write path.
+
+        Only entries with ``type="pclean"`` are promoted to ``type="number"`` here.
+        Entries with ``type="ptime"`` (schedule start/end times) require a different
+        time-encoding and are left unchanged for now.
+        """
+        # Build lookup: stripped_param_name → (hex_block_addr, offset, length, factor)
+        # from all 2xx-series read register maps.
+        param_lookup: dict[str, tuple[str, int, int, float]] = {}
+        for mod_name in ("register_map_206", "register_map_214", "register_map_214j"):
+            full_name = f"{self._package}.{mod_name}"
+            mod = sys.modules.get(full_name)
+            if mod is None:
+                continue
+            reg_map = getattr(mod, "REGISTER_MAP", {})
+            for block_key, entries in reg_map.items():
+                if not isinstance(entries, list) or not block_key.startswith("pxx"):
+                    continue
+                hex_addr = block_key[3:]  # e.g. "pxx17" → "17"
+                for entry in entries:
+                    if not isinstance(entry, tuple) or len(entry) < 5:
+                        continue
+                    # entry: (name_str, offset, length, decode_type, factor, ...)
+                    raw_name: str = entry[0].strip().rstrip(":").strip()
+                    offset: int = entry[1]
+                    length: int = entry[2]
+                    factor: float = float(entry[4]) if entry[4] else 1.0
+                    if raw_name and raw_name not in param_lookup:
+                        param_lookup[raw_name] = (hex_addr, offset, length, factor)
+
+        # Load the parent→block-address mapping from write_map_206.
+        full_wm = f"{self._package}.write_map_206"
+        wm_mod = sys.modules.get(full_wm)
+        parent_block_map: dict[str, str] = (
+            getattr(wm_mod, "PARENT_BLOCK_MAP", {}) if wm_mod else {}
+        )
+
+        # Enrich write entries that have a "parent" field but no "command".
+        for name, entry in self._merged_map.items():
+            if not isinstance(entry, dict):
+                continue
+            if "command" in entry:
+                continue  # Already enriched or a non-2xx entry with its own command.
+            parent = entry.get("parent")
+            if parent is None:
+                continue
+
+            block_addr = parent_block_map.get(parent)
+            if block_addr is None:
+                _LOGGER.debug(
+                    "Unknown parent '%s' for 2xx write entry '%s'; skipping",
+                    parent,
+                    name,
+                )
+                continue
+
+            entry["command"] = block_addr
+
+            # Look up offset / length / factor from the read register maps.
+            if name in param_lookup:
+                _, nibble_offset, nibble_length, factor = param_lookup[name]
+                # Register map offsets/lengths are in nibbles (FHEM convention).
+                # Convert to bytes so read_value and write_block_value can use them
+                # directly (same conversion as sensor.py async_setup_entry).
+                entry["offset"] = nibble_offset // 2
+                entry["length"] = (nibble_length + 1) // 2
+                entry["write_mode"] = "block"
+                # step = 1/factor so encode/decode functions scale correctly.
+                step_val = (1.0 / factor) if factor else 1.0
+                entry["step"] = str(step_val)
+            else:
+                _LOGGER.debug(
+                    "No register map entry found for 2xx write parameter '%s'",
+                    name,
+                )
+
+            # Promote "pclean" to the standard "number" HA entity type.
+            # "ptime" entries are left unchanged for now (different encoding needed).
+            if entry.get("type") == "pclean":
+                entry["type"] = "number"
+

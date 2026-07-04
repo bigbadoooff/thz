@@ -270,3 +270,119 @@ class TestBaseRegisterMapManager:
         
         # Should return override
         assert "block1" in result
+
+
+class TestRegisterMapManagerWrite2xxEnrichment:
+    """Tests for 2xx firmware write entry enrichment."""
+
+    def test_2xx_entries_get_command(self):
+        """Test that 2xx write entries are enriched with a 'command' field."""
+        manager = RegisterMapManagerWrite("206")
+        registers = manager.get_all_registers()
+
+        # p01RoomTempDay should have been enriched with command "17" (block pxx17)
+        entry = registers.get("p01RoomTempDay")
+        assert entry is not None, "p01RoomTempDay missing from 206 write map"
+        assert entry.get("command") == "17", (
+            f"Expected command='17', got {entry.get('command')!r}"
+        )
+
+    def test_2xx_entries_get_offset_and_length(self):
+        """Test that 2xx write entries get byte offset and length converted from nibbles.
+
+        p01RoomTempDay has nibble offset=4, nibble length=4 in register_map_206.
+        After conversion (nibble//2): byte offset=2, byte length=2.
+        """
+        manager = RegisterMapManagerWrite("206")
+        registers = manager.get_all_registers()
+
+        entry = registers.get("p01RoomTempDay")
+        assert entry is not None
+        assert entry.get("offset") == 2   # nibble 4 → byte 2
+        assert entry.get("length") == 2   # nibble 4 → byte 2
+
+    def test_2xx_entries_get_step_from_factor(self):
+        """Test that step is computed as 1/factor from the register map."""
+        manager = RegisterMapManagerWrite("206")
+        registers = manager.get_all_registers()
+
+        # factor=10 for temperature -> step=0.1
+        entry = registers.get("p01RoomTempDay")
+        assert entry is not None
+        assert abs(float(entry.get("step", 0)) - 0.1) < 1e-6
+
+        # factor=1 for fan stages -> step=1.0
+        entry_fan = registers.get("p07FanStageDay")
+        assert entry_fan is not None
+        assert abs(float(entry_fan.get("step", 0)) - 1.0) < 1e-6
+
+    def test_2xx_entries_get_write_mode_block(self):
+        """Test that 2xx write entries have write_mode='block'."""
+        manager = RegisterMapManagerWrite("206")
+        registers = manager.get_all_registers()
+
+        entry = registers.get("p01RoomTempDay")
+        assert entry is not None
+        assert entry.get("write_mode") == "block"
+
+    def test_2xx_pclean_type_promoted_to_number(self):
+        """Test that 'pclean' type entries are converted to 'number'."""
+        manager = RegisterMapManagerWrite("206")
+        registers = manager.get_all_registers()
+
+        entry = registers.get("p01RoomTempDay")
+        assert entry is not None
+        assert entry.get("type") == "number"
+
+    def test_2xx_ptime_type_not_changed(self):
+        """Test that 'ptime' type entries are NOT converted (different encoding needed)."""
+        manager = RegisterMapManagerWrite("206")
+        registers = manager.get_all_registers()
+
+        # progHC1StartTime has type="ptime"
+        entry = registers.get("progHC1StartTime")
+        assert entry is not None
+        assert entry.get("type") == "ptime", (
+            "ptime entries should remain unchanged pending schedule time support"
+        )
+
+    def test_2xx_multiple_parent_groups(self):
+        """Test that parameters from multiple parent groups are all enriched."""
+        manager = RegisterMapManagerWrite("206")
+        registers = manager.get_all_registers()
+
+        expected = [
+            ("p13GradientHC1", "05"),   # pHeat1
+            ("p21Hyst1", "06"),          # pHeat2
+            ("p32HystDHW", "07"),        # pDHW
+            ("p37Fanstage1AirflowInlet", "01"),  # pFan
+            ("p54MinPumpCycles", "0A"),  # pCircPump
+        ]
+        for param_name, expected_cmd in expected:
+            entry = registers.get(param_name)
+            assert entry is not None, f"{param_name} missing from registers"
+            assert entry.get("command") == expected_cmd, (
+                f"{param_name}: expected command={expected_cmd!r}, "
+                f"got {entry.get('command')!r}"
+            )
+
+    def test_4xx_entries_not_affected(self):
+        """Test that 4xx/5xx firmware entries are not affected by enrichment."""
+        manager = RegisterMapManagerWrite("439")
+        registers = manager.get_all_registers()
+
+        # 439 firmware pOpMode should keep its original command
+        entry = registers.get("pOpMode")
+        assert entry is not None
+        assert entry.get("command") == "0A0112"
+        assert entry.get("write_mode") is None  # no write_mode for direct writes
+
+    def test_214_enrichment(self):
+        """Test that 214 firmware entries are also enriched (it is a 2xx firmware)."""
+        manager = RegisterMapManagerWrite("214")
+        registers = manager.get_all_registers()
+
+        entry = registers.get("p01RoomTempDay")
+        assert entry is not None
+        assert entry.get("command") == "17"
+        assert entry.get("write_mode") == "block"

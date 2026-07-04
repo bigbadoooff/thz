@@ -841,6 +841,63 @@ class THZDevice:
         self.read_write_register(addr_bytes, "set", value)
         _LOGGER.debug("Value %s written to address %s", value, addr_bytes.hex())
 
+    def write_block_value(
+        self, block_addr: bytes, offset: int, length: int, value: bytes
+    ) -> None:
+        r"""Write a value inside a register block using read-modify-write (2xx).
+
+        2xx firmware devices do not support writing individual parameters directly.
+        Instead the entire block must be read first, the target bytes modified, and
+        the complete block written back.
+
+        The ``offset`` and ``length`` parameters use the same coordinate system as the
+        register map tuples in ``register_map_206`` (i.e. relative to the full decoded
+        response which starts with the CRC byte at index 0).
+
+        Args:
+            block_addr: Single-byte block address (e.g. b'\x17' for block "pxx17").
+            offset: Byte offset of the parameter within the decoded block response.
+                    The decoded response starts with a CRC byte at index 0, so
+                    offset=4 corresponds to payload byte 3.
+            length: Number of bytes occupied by the parameter value.
+            value: Encoded bytes to write (must be exactly ``length`` bytes).
+
+        Raises:
+            ValueError: If ``value`` is not ``length`` bytes, or if the offset/length
+                        is out of range for the block.
+            RuntimeError: If the device read or write fails.
+        """
+        if len(value) != length:
+            raise ValueError(
+                f"write_block_value: value length {len(value)} != expected {length}"
+            )
+
+        # Read the current block.
+        # decode_response returns [CRC_byte] + PAYLOAD_BYTES, so response[1:] is the
+        # raw payload that must be sent back unchanged (except for the modified bytes).
+        response = self.read_write_register(block_addr, "get")
+
+        # response[0] = calculated CRC; response[1:] = PAYLOAD_BYTES from device.
+        payload = bytearray(response[1:])
+
+        # Register map offsets are relative to the full decoded response (CRC at 0),
+        # so we subtract 1 to get the index into the payload slice.
+        payload_offset = offset - 1
+        if payload_offset < 0 or payload_offset + length > len(payload):
+            raise ValueError(
+                f"write_block_value: offset={offset}/length={length} out of range "
+                f"for block {block_addr.hex()} (payload size {len(payload)})"
+            )
+
+        payload[payload_offset : payload_offset + length] = value
+
+        # Write the modified payload back to the device.
+        self.read_write_register(block_addr, "set", bytes(payload))
+        _LOGGER.debug(
+            "Block value written: block=%s offset=%d length=%d value=%s",
+            block_addr.hex(), offset, length, value.hex(),
+        )
+
     def read_block(self, addr_bytes: bytes, get_or_set: str) -> bytes:
         r"""Read a block from the THZ device.
 
