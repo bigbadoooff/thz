@@ -459,6 +459,12 @@ class THZDevice:
             # Connection reset, broken pipe, or other socket/serial errors
             _LOGGER.error("Connection error during write: %s", e)
             raise ConnectionError(f"Failed to write to connection: {e}") from e
+        except (ValueError, AttributeError) as e:
+            # Raised by select.select() when the fd is closed mid-write (pyserial sets
+            # fd=None on close, so fileno() returns None, which is not an int).
+            # Also catches AttributeError if self.ser is set to None by _force_close()
+            # between the hasattr check and the actual send/write call.
+            raise ConnectionError(f"Connection closed during write: {e}") from e
 
     def _read_exact(self, size: int, timeout: float) -> bytes:
         """Read exactly n bytes, regardless of USB or TCP."""
@@ -497,19 +503,31 @@ class THZDevice:
                 # Connection reset, broken pipe, or other socket errors
                 _LOGGER.error("TCP socket error during read: %s", e)
                 raise ConnectionError(f"TCP connection error: {e}") from e
+            except (ValueError, AttributeError) as e:
+                # select.select() raises ValueError when the socket fd is closed
+                # (fileno() returns None after close); AttributeError if self.ser
+                # becomes None between the hasattr check and the recv call.
+                raise ConnectionError(f"Connection closed during read: {e}") from e
             finally:
                 # Always restore the original timeout
                 try:
                     self.ser.settimeout(original_timeout)
-                except (OSError, socket.error):
-                    # Socket may be in bad state, ignore
+                except (OSError, socket.error, AttributeError):
+                    # Socket may be in bad state or already None, ignore
                     pass
         elif hasattr(self.ser, 'in_waiting') and hasattr(self.ser, 'read'):
             # This is serial
-            waiting = getattr(self.ser, "in_waiting", 0)
-            if waiting > 0:
-                return self.ser.read(waiting)
-            return b""
+            try:
+                waiting = getattr(self.ser, "in_waiting", 0)
+                if waiting > 0:
+                    return self.ser.read(waiting)
+                return b""
+            except (OSError, serial.SerialException) as e:
+                raise ConnectionError(f"Serial read error: {e}") from e
+            except (ValueError, AttributeError) as e:
+                # pyserial's select.select() raises ValueError when the port fd
+                # is None (set by close()); AttributeError if self.ser is None.
+                raise ConnectionError(f"Connection closed during serial read: {e}") from e
         else:
             return b""
 
