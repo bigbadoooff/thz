@@ -415,6 +415,9 @@ class THZDevice:
                     f"Connection failed after {max_retries + 1} attempts: {e}"
                 ) from e
 
+            except THZRegisterNotSupportedError:
+                raise  # legitimate device response — no reconnect
+
             except RuntimeError as e:
                 last_error = e
                 _LOGGER.error("Protocol error in send_request: %s", e)
@@ -607,6 +610,8 @@ class THZDevice:
             raise ConnectionError(
                 f"Device communication timed out after {timeout}s"
             ) from None
+        except THZRegisterNotSupportedError:
+            raise  # device said "not supported" — connection is fine, don't close it
         except BaseException:
             self._force_close()
             raise
@@ -727,6 +732,8 @@ class THZDevice:
                 raise THZRegisterNotSupportedError("Register not supported by device firmware")
             _LOGGER.error("Unknown response: %s", data.hex())
             return None
+        except THZRegisterNotSupportedError:
+            raise  # propagate — not a decode error, not a connection failure
         except Exception as e:  # noqa: BLE001
             _LOGGER.error("Error decoding response: %s", e)
             return None
