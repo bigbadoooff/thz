@@ -8,6 +8,21 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Firmware 509 and 709 (LWZ 304 / LWZ 304 Trend) — dedicated register maps**
+  (fixes #113, #115): Both firmware variants run on 5.39-class hardware but do
+  not expose four compressor/power blocks (`pxx0A069A` Heating Relative Power,
+  `pxx0A069B` Compressor Relative Power, `pxx0A069C` Compressor Speed Unlimited,
+  `pxx0A069D` Compressor Speed Limited). Without a dedicated map these variants
+  fell through to the 5.39 default, where the first unsupported block aborted the
+  coordinator setup loop before energy/COP blocks (`pxx0A09D2`, `pxx0A09D3`) ever
+  got coordinators — causing "No coordinator found for block …" warnings and the
+  COP sensor failing with "No COP sensors could be created — missing required data".
+
+  Added `readings_map_509` and `readings_map_709`, each filtering the four
+  unsupported blocks out of the 5.39 base map. Firmware 509 and 709 now resolve
+  to these maps directly; the `PAIRED_BLOCKS` mapping (needed for combined energy
+  sensor reads) is re-exported unchanged so COP sensors work correctly.
+
 - **Firmware 709 (LWZ 304 Trend) — dedicated register map**: Added
   `readings_map_709` for firmware 7.09 devices. The map reuses the 5.39 map
   but excludes the four blocks that are absent on this firmware variant
