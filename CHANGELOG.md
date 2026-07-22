@@ -8,6 +8,14 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Firmware 709 (LWZ 304 Trend) — dedicated register map**: Added
+  `readings_map_709` for firmware 7.09 devices. The map reuses the 5.39 map
+  but excludes the four blocks that are absent on this firmware variant
+  (`pxx0A069A` Heating Relative Power, `pxx0A069B` Compressor Relative Power,
+  `pxx0A069C` Compressor Speed Unlimited, `pxx0A069D` Compressor Speed Limited).
+  Firmware 709 now resolves to this map directly instead of falling through to
+  the generic 5.39 default.
+
 - **Firmware 709 (LWZ 304 Trend) fails to start due to unsupported registers
   `pxx0A069A`–`pxx0A069D`**: These four blocks (Heating/Compressor Relative Power,
   Compressor Speed Unlimited/Limited) return a `\x01\x04` "not supported" response
