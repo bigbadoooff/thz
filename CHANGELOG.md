@@ -8,6 +8,53 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Firmware 709 (LWZ 304 Trend) fails to start due to unsupported registers
+  `pxx0A069A`–`pxx0A069D`**: These four blocks (Heating/Compressor Relative Power,
+  Compressor Speed Unlimited/Limited) return a `\x01\x04` "not supported" response
+  on firmware 709. Previously this propagated as `RuntimeError("Failed to decode
+  device response")` → `UpdateFailed` → `ConfigEntryNotReady`, aborting the entire
+  integration setup. Fixed by two layers of defence:
+
+  1. `_async_update_block` now catches `THZRegisterNotSupportedError` and returns
+     `None` instead of raising `UpdateFailed`. The coordinator treats `None` data as
+     a successful (but empty) fetch, so `async_config_entry_first_refresh` completes
+     without raising. The block is detected by the existing
+     `if coordinator.data is None` check and added to `unsupported_blocks`.
+
+  2. `async_config_entry_first_refresh` is now wrapped in `try/except
+     ConfigEntryNotReady` inside the coordinator setup loop. Any block that still
+     raises (e.g., a transient decode error that slips through) is marked as
+     unsupported and skipped rather than aborting setup. The block is not added to
+     `coordinators`, so it is never polled again.
+
+- **Unsupported registers trigger a reconnect on every poll**: When the device
+  responds with `\x01\x04` (register not supported by firmware),
+  `decode_response` raised `THZRegisterNotSupportedError` inside its `try` block,
+  where it was caught by the broad `except Exception` handler, logged as
+  "Error decoding response: Register not supported by device firmware", and
+  returned `None`. The caller then raised `RuntimeError("Failed to decode device
+  response")`, which `send_request`'s `except RuntimeError` handler treated as a
+  protocol error and triggered `_reconnect()`. `async_execute`'s
+  `except BaseException` path additionally called `_force_close()`.
+
+  Fixed by adding `except THZRegisterNotSupportedError: raise` guards in
+  `decode_response`, `send_request`, and `async_execute`. The exception now
+  propagates cleanly through the call chain without reconnecting or closing the
+  connection. The coordinator wraps it in `UpdateFailed` and skips that poll cycle,
+  which is the correct behaviour for a permanent "not supported" condition.
+
+- **`ValueError: argument must be an int, or have a fileno() method` in executor
+  thread**: A `call_later` deadline fires `_force_close()` from the event loop
+  while an executor thread is blocked inside pyserial's `read()`. pyserial's
+  `close()` sets the internal file descriptor to `None`; the pending `select.select`
+  call inside `read()` then receives `None` where it expects an `int`, raising
+  `ValueError`. The same race can raise `AttributeError` via `fileno()`.
+
+  Fixed by catching `(ValueError, AttributeError)` alongside `OSError` and
+  `serial.SerialException` in `_write_bytes` and `_read_available`, and re-raising
+  them as `ConnectionError`. This collapses the race-condition exception into the
+  normal connection-lost path without any special-case handling.
+
 - **Periodic "Update is taking over 10 seconds" hang (HA 2026.05+)**: All ~60 write
   entities would stall simultaneously because every entity update and service call
   acquired `device.lock` and then blocked indefinitely on an
