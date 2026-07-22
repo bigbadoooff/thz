@@ -220,10 +220,10 @@
         "name": "Umschaltventil"
       },
       "dhw_pump": {
-        "name": "Warmwasserpumpe"
+        "name": "Zirkulation Warmwasser"
       },
       "heating_circuit_pump": {
-        "name": "Heizkreispumpe"
+        "name": "Zirkulation Heizung"
       },
       "solar_pump": {
         "name": "Solarpumpe"
@@ -259,7 +259,7 @@
         "name": "Lüftungsstufe"
       },
       "pump_hc": {
-        "name": "Pumpe HK"
+        "name": "Zirkulationspumpe"
       },
       "defrost": {
         "name": "Abtauung"
@@ -2843,7 +2843,7 @@
         "name": "Abtauung"
       },
       "dhw_pump": {
-        "name": "Warmwasserpumpe"
+        "name": "Zirkulation Warmwasser"
       },
       "diverter_valve": {
         "name": "Umschaltventil"
@@ -2867,7 +2867,7 @@
         "name": "Wärmerohrventil"
       },
       "heating_circuit_pump": {
-        "name": "Heizkreispumpe"
+        "name": "Zirkulation Heizung"
       },
       "heating_dhw": {
         "name": "Warmwasserheizung"
@@ -2996,7 +2996,7 @@
         "name": "HK2 Programm Mittwoch"
       },
       "pump_hc": {
-        "name": "Pumpe HK"
+        "name": "Zirkulationspumpe"
       },
       "quick_air_vent": {
         "name": "Schnelllüftung"

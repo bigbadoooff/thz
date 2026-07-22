@@ -224,10 +224,10 @@
         "name": "Diverter Valve"
       },
       "dhw_pump": {
-        "name": "DHW Pump"
+        "name": "Circulation Hot Water"
       },
       "heating_circuit_pump": {
-        "name": "Heating Circuit Pump"
+        "name": "Circulation Heating"
       },
       "solar_pump": {
         "name": "Solar Pump"
@@ -263,7 +263,7 @@
         "name": "Ventilation Stage"
       },
       "pump_hc": {
-        "name": "Pump HC"
+        "name": "Circulation Pump"
       },
       "defrost": {
         "name": "Defrost"
@@ -1702,7 +1702,7 @@
         "name": "Pump DHW"
       },
       "z_pump_hc": {
-        "name": "Pump HC"
+        "name": "Circulation Pump"
       },
       "z_reset_last10errors": {
         "name": "Reset Last 10 Errors"
@@ -2833,7 +2833,7 @@
         "name": "Defrost"
       },
       "dhw_pump": {
-        "name": "DHW Pump"
+        "name": "Circulation Hot Water"
       },
       "diverter_valve": {
         "name": "Diverter Valve"
@@ -2857,7 +2857,7 @@
         "name": "Heat Pipe Valve"
       },
       "heating_circuit_pump": {
-        "name": "Heating Circuit Pump"
+        "name": "Circulation Heating"
       },
       "heating_dhw": {
         "name": "Heating DHW"
@@ -2986,7 +2986,7 @@
         "name": "HC2 Program Wednesday"
       },
       "pump_hc": {
-        "name": "Pump HC"
+        "name": "Circulation Pump"
       },
       "quick_air_vent": {
         "name": "Quick Air Vent"

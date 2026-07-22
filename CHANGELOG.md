@@ -37,6 +37,16 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Binary sensor renames** (fixes #117): Three binary sensors have been renamed
+  for clarity and consistency with the German HVAC terminology used in the THZ
+  device:
+  - `dhw_pump` → "Circulation Hot Water" / "Zirkulation Warmwasser"
+  - `heating_circuit_pump` → "Circulation Heating" / "Zirkulation Heizung"
+  - `pump_hc` → "Circulation Pump" / "Zirkulationspumpe"
+
+  Only translation display names are changed; translation keys and entity IDs
+  remain the same.
+
 - **Firmware 509 and 709 (LWZ 304 / LWZ 304 Trend) — dedicated register maps**
   (fixes #113, #115): Both firmware variants run on 5.39-class hardware but do
   not expose four compressor/power blocks (`pxx0A069A` Heating Relative Power,
@@ -51,14 +61,6 @@ All notable changes to the THZ integration are documented here.
   unsupported blocks out of the 5.39 base map. Firmware 509 and 709 now resolve
   to these maps directly; the `PAIRED_BLOCKS` mapping (needed for combined energy
   sensor reads) is re-exported unchanged so COP sensors work correctly.
-
-- **Firmware 709 (LWZ 304 Trend) — dedicated register map**: Added
-  `readings_map_709` for firmware 7.09 devices. The map reuses the 5.39 map
-  but excludes the four blocks that are absent on this firmware variant
-  (`pxx0A069A` Heating Relative Power, `pxx0A069B` Compressor Relative Power,
-  `pxx0A069C` Compressor Speed Unlimited, `pxx0A069D` Compressor Speed Limited).
-  Firmware 709 now resolves to this map directly instead of falling through to
-  the generic 5.39 default.
 
 - **Firmware 709 (LWZ 304 Trend) fails to start due to unsupported registers
   `pxx0A069A`–`pxx0A069D`**: These four blocks (Heating/Compressor Relative Power,
