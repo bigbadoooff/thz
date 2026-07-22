@@ -1121,6 +1121,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 ),
             }
         ),
+        supports_response=SupportsResponse.OPTIONAL,
     )
     hass.services.async_register(
         DOMAIN,
