@@ -11,7 +11,9 @@ from . import (
     readings_map_214,  # noqa: F401
     readings_map_214j,  # noqa: F401
     readings_map_439,  # noqa: F401
+    readings_map_509,  # noqa: F401
     readings_map_539,  # noqa: F401
+    readings_map_709,  # noqa: F401
     register_map_206,  # noqa: F401
     register_map_214,  # noqa: F401
     register_map_214j,  # noqa: F401
@@ -26,7 +28,7 @@ from . import (
 )
 
 supported_firmwares = [
-    "206, 214, 439, 539"
+    "206, 214, 439, 509, 539, 709"
 ]  # Add other supported firmware versions here
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,6 +75,14 @@ FIRMWARE_MAPS = {
     "439": {
         "write": ["write_map_439_539", "write_map_439"],
         "read": ["readings_map_439", "register_map_439"],
+    },
+    "509": {
+        "write": ["write_map_439_539", "write_map_539"],
+        "read": ["readings_map_439", "readings_map_509"],
+    },
+    "709": {
+        "write": ["write_map_439_539", "write_map_539"],
+        "read": ["readings_map_439", "readings_map_709"],
     },
     # default fallback is treated as 539-like
     "default": {

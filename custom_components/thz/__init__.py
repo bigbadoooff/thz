@@ -318,7 +318,21 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 hass, device, b, paired_blocks
             ),
         )
-        await coordinator.async_config_entry_first_refresh()
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except ConfigEntryNotReady as exc:
+            # A block-level failure (unsupported register, transient decode error,
+            # etc.) should not abort the entire config entry setup — the device
+            # connection was already verified above.  Mark the block as unsupported
+            # so no entities are created for it; do not add it to coordinators so
+            # it is not polled again.
+            unsupported_blocks.add(block)
+            _LOGGER.warning(
+                "Block %s could not be read at startup (%s); "
+                "no entities will be created for it.",
+                block, exc,
+            )
+            continue
         if coordinator.data is None:
             unsupported_blocks.add(block)
             _LOGGER.info(
@@ -1296,6 +1310,14 @@ async def _async_update_block(
             result = bytes(buf)
 
         return result
+    except THZRegisterNotSupportedError:
+        # Device permanently doesn't support this block — return None so the
+        # coordinator marks the block as unsupported without triggering a reconnect
+        # or raising UpdateFailed (which would propagate as ConfigEntryNotReady).
+        _LOGGER.info(
+            "Block %s is not supported by this device firmware; skipping.", block_name
+        )
+        return None
     except Exception as err:  # noqa: BLE001
         raise UpdateFailed(f"Error reading {block_name}: {err}") from err
 

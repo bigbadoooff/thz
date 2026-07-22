@@ -37,10 +37,52 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
-- **Unsupported registers trigger reconnect on every poll**: When the device
-  responds with `\x01\x04` (register not supported by firmware), `decode_response`
-  raised `THZRegisterNotSupportedError` inside its `try` block, where it was
-  immediately caught by the broad `except Exception` handler, logged as
+- **Firmware 509 and 709 (LWZ 304 / LWZ 304 Trend) — dedicated register maps**
+  (fixes #113, #115): Both firmware variants run on 5.39-class hardware but do
+  not expose four compressor/power blocks (`pxx0A069A` Heating Relative Power,
+  `pxx0A069B` Compressor Relative Power, `pxx0A069C` Compressor Speed Unlimited,
+  `pxx0A069D` Compressor Speed Limited). Without a dedicated map these variants
+  fell through to the 5.39 default, where the first unsupported block aborted the
+  coordinator setup loop before energy/COP blocks (`pxx0A09D2`, `pxx0A09D3`) ever
+  got coordinators — causing "No coordinator found for block …" warnings and the
+  COP sensor failing with "No COP sensors could be created — missing required data".
+
+  Added `readings_map_509` and `readings_map_709`, each filtering the four
+  unsupported blocks out of the 5.39 base map. Firmware 509 and 709 now resolve
+  to these maps directly; the `PAIRED_BLOCKS` mapping (needed for combined energy
+  sensor reads) is re-exported unchanged so COP sensors work correctly.
+
+- **Firmware 709 (LWZ 304 Trend) — dedicated register map**: Added
+  `readings_map_709` for firmware 7.09 devices. The map reuses the 5.39 map
+  but excludes the four blocks that are absent on this firmware variant
+  (`pxx0A069A` Heating Relative Power, `pxx0A069B` Compressor Relative Power,
+  `pxx0A069C` Compressor Speed Unlimited, `pxx0A069D` Compressor Speed Limited).
+  Firmware 709 now resolves to this map directly instead of falling through to
+  the generic 5.39 default.
+
+- **Firmware 709 (LWZ 304 Trend) fails to start due to unsupported registers
+  `pxx0A069A`–`pxx0A069D`**: These four blocks (Heating/Compressor Relative Power,
+  Compressor Speed Unlimited/Limited) return a `\x01\x04` "not supported" response
+  on firmware 709. Previously this propagated as `RuntimeError("Failed to decode
+  device response")` → `UpdateFailed` → `ConfigEntryNotReady`, aborting the entire
+  integration setup. Fixed by two layers of defence:
+
+  1. `_async_update_block` now catches `THZRegisterNotSupportedError` and returns
+     `None` instead of raising `UpdateFailed`. The coordinator treats `None` data as
+     a successful (but empty) fetch, so `async_config_entry_first_refresh` completes
+     without raising. The block is detected by the existing
+     `if coordinator.data is None` check and added to `unsupported_blocks`.
+
+  2. `async_config_entry_first_refresh` is now wrapped in `try/except
+     ConfigEntryNotReady` inside the coordinator setup loop. Any block that still
+     raises (e.g., a transient decode error that slips through) is marked as
+     unsupported and skipped rather than aborting setup. The block is not added to
+     `coordinators`, so it is never polled again.
+
+- **Unsupported registers trigger a reconnect on every poll**: When the device
+  responds with `\x01\x04` (register not supported by firmware),
+  `decode_response` raised `THZRegisterNotSupportedError` inside its `try` block,
+  where it was caught by the broad `except Exception` handler, logged as
   "Error decoding response: Register not supported by device firmware", and
   returned `None`. The caller then raised `RuntimeError("Failed to decode device
   response")`, which `send_request`'s `except RuntimeError` handler treated as a
