@@ -6,7 +6,64 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### New Features
+
+- **`thz.backup_settings` / `thz.restore_settings` services**: Snapshot all
+  writable parameter values to a JSON file and restore them in one call.
+  `backup_settings` reads every number, select, switch, time, and schedule
+  entity from the device and saves the raw bytes to `thz_backup.json` in the
+  HA config directory (path is configurable). Unsupported registers are silently
+  skipped. `restore_settings` reads the file and writes each value back using
+  the same direct or block read-modify-write path as the entity itself.
+  Parameters absent from the current firmware's write map (e.g. after a
+  firmware downgrade) are skipped without error. Both services return a
+  `{success, count/restored/skipped, errors}` response and accept an optional
+  `entry_id` for multi-device setups.
+
+- **Write support for 2xx firmware (206, 214, 214j) via block read-modify-write**:
+  2xx devices cannot write individual parameters directly. Instead, the full
+  register block must be read, the target bytes modified, and the block written
+  back. A new `write_block_value` method on `THZDevice` implements this
+  read-modify-write cycle. The register map manager now cross-references the read
+  maps at startup to derive the byte offset, length, and scaling factor for each
+  writable parameter and stores them in the write-map entry alongside a
+  `write_mode="block"` flag. Number entities use this flag to dispatch to the
+  correct write path. The `PARENT_BLOCK_MAP` in `write_map_206.py` maps each
+  parent group to its block address (e.g. `"p01-p12"` → `"17"`).
+
+  Note: Offsets in the register maps follow the FHEM nibble-position convention.
+  They are divided by two when stored in the enriched write entries so that all
+  device I/O uses byte addressing consistently.
+
 ### Bug Fixes
+
+- **Unsupported registers trigger reconnect on every poll**: When the device
+  responds with `\x01\x04` (register not supported by firmware), `decode_response`
+  raised `THZRegisterNotSupportedError` inside its `try` block, where it was
+  immediately caught by the broad `except Exception` handler, logged as
+  "Error decoding response: Register not supported by device firmware", and
+  returned `None`. The caller then raised `RuntimeError("Failed to decode device
+  response")`, which `send_request`'s `except RuntimeError` handler treated as a
+  protocol error and triggered `_reconnect()`. `async_execute`'s
+  `except BaseException` path additionally called `_force_close()`.
+
+  Fixed by adding `except THZRegisterNotSupportedError: raise` guards in
+  `decode_response`, `send_request`, and `async_execute`. The exception now
+  propagates cleanly through the call chain without reconnecting or closing the
+  connection. The coordinator wraps it in `UpdateFailed` and skips that poll cycle,
+  which is the correct behaviour for a permanent "not supported" condition.
+
+- **`ValueError: argument must be an int, or have a fileno() method` in executor
+  thread**: A `call_later` deadline fires `_force_close()` from the event loop
+  while an executor thread is blocked inside pyserial's `read()`. pyserial's
+  `close()` sets the internal file descriptor to `None`; the pending `select.select`
+  call inside `read()` then receives `None` where it expects an `int`, raising
+  `ValueError`. The same race can raise `AttributeError` via `fileno()`.
+
+  Fixed by catching `(ValueError, AttributeError)` alongside `OSError` and
+  `serial.SerialException` in `_write_bytes` and `_read_available`, and re-raising
+  them as `ConnectionError`. This collapses the race-condition exception into the
+  normal connection-lost path without any special-case handling.
 
 - **Periodic "Update is taking over 10 seconds" hang (HA 2026.05+)**: All ~60 write
   entities would stall simultaneously because every entity update and service call

@@ -1,3 +1,51 @@
+backup_settings:
+  name: Backup Settings
+  description: >
+    Read all writable parameter values from the device and save them to a JSON
+    file. The file can later be used with restore_settings to write all values
+    back. By default the file is written to thz_backup.json in the HA
+    configuration directory.
+  fields:
+    backup_file:
+      name: Backup file
+      description: >
+        Path to the backup file. If relative, it is resolved relative to the
+        HA configuration directory. Defaults to "thz_backup.json".
+      required: false
+      example: "thz_backup.json"
+      selector:
+        text:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID. Only required when multiple THZ devices are configured.
+      required: false
+      selector:
+        text:
+
+restore_settings:
+  name: Restore Settings
+  description: >
+    Write all parameter values from a previously saved backup file back to the
+    device. Parameters not present in the current firmware's write map are
+    skipped automatically.
+  fields:
+    backup_file:
+      name: Backup file
+      description: >
+        Path to the backup file written by backup_settings. If relative, it is
+        resolved relative to the HA configuration directory. Defaults to
+        "thz_backup.json".
+      required: false
+      example: "thz_backup.json"
+      selector:
+        text:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID. Only required when multiple THZ devices are configured.
+      required: false
+      selector:
+        text:
+
 refresh_block:
   name: Refresh Block
   description: >
@@ -132,5 +180,18 @@ scan_raw_registers:
       selector:
         number:
           min: 1
+          max: 65535
+          mode: box
+    preview_limit:
+      name: Preview limit
+      description: >
+        Maximum number of results shown in the persistent notification.
+        Set to 0 to show all results. The full result list is always returned
+        in the service response regardless of this setting.
+      required: false
+      default: 20
+      selector:
+        number:
+          min: 0
           max: 65535
           mode: box

@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 import itertools
+import json
 import logging
+import os
 import random
 
 import voluptuous as vol
@@ -29,7 +31,7 @@ from .const import (
     WRITE_REGISTER_OFFSET,
     should_hide_entity_by_default,
 )
-from .thz_device import THZDevice
+from .thz_device import THZDevice, THZRegisterNotSupportedError
 from .value_codec import decode_raw_value
 from .value_maps import SELECT_MAP
 
@@ -611,6 +613,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         include_errors = bool(call.data.get("include_errors", False))
         decode_values = bool(call.data.get("decode_values", False))
         max_results = int(call.data.get("max_results", 65535))
+        preview_limit = int(call.data.get("preview_limit", 20))
 
         if max_results <= 0:
             return {
@@ -728,7 +731,8 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             f"Success: {success_count}",
             f"Errors: {error_count}",
         ]
-        for item in results[:20]:
+        preview_items = results if preview_limit == 0 else results[:preview_limit]
+        for item in preview_items:
             if item.get("success"):
                 preview_lines.append(
                     f"{item['command']} ({item['length']} B): {item['hex']}"
@@ -737,8 +741,8 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 preview_lines.append(
                     f"{item['command']} ERROR: {item.get('error', 'unknown error')}"
                 )
-        if len(results) > 20:
-            preview_lines.append(f"... and {len(results) - 20} more")
+        if preview_limit != 0 and len(results) > preview_limit:
+            preview_lines.append(f"... and {len(results) - preview_limit} more")
 
         await hass.services.async_call(
             "persistent_notification",
@@ -886,6 +890,205 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         _LOGGER.info("Diverter valve command sent: position=%s confirmed_off=%s", position, confirmed)
         return {"success": True, "position": position, "confirmed_off": confirmed}
 
+    _SKIP_TYPES: frozenset[str] = frozenset({"button", "ptime"})
+
+    async def _async_handle_backup_settings(call: ServiceCall) -> ServiceResponse:
+        """Snapshot all writable parameter values and save them to a JSON file."""
+        requested_entry_id: str | None = call.data.get("entry_id")
+        backup_file: str | None = call.data.get("backup_file")
+
+        available_entries = {
+            eid: ed
+            for eid, ed in hass.data.get(DOMAIN, {}).items()
+            if isinstance(ed, dict) and "device" in ed
+        }
+        if requested_entry_id:
+            if requested_entry_id not in available_entries:
+                return {"success": False, "error": f"No THZ entry found for entry_id '{requested_entry_id}'"}
+            entry_id = requested_entry_id
+        elif len(available_entries) == 1:
+            entry_id = next(iter(available_entries))
+        elif len(available_entries) > 1:
+            return {"success": False, "error": "Multiple THZ devices found; provide 'entry_id'"}
+        else:
+            return {"success": False, "error": "THZ device not initialized"}
+
+        entry_data = available_entries[entry_id]
+        device: THZDevice = entry_data["device"]
+        write_manager = entry_data["write_manager"]
+
+        if backup_file is None:
+            backup_file = os.path.join(hass.config.config_dir, "thz_backup.json")
+        elif not os.path.isabs(backup_file):
+            backup_file = os.path.join(hass.config.config_dir, backup_file)
+
+        settings: dict = {}
+        errors: dict = {}
+
+        for name, entry in write_manager.get_all_registers().items():
+            entry_type = entry.get("type", "")
+            if entry_type in _SKIP_TYPES or not entry.get("command"):
+                continue
+
+            cmd: str = entry["command"]
+            write_mode: str = entry.get("write_mode", "direct")
+
+            if entry_type == "schedule":
+                offset, length = 4, 4
+            elif write_mode == "block":
+                offset = entry.get("offset", WRITE_REGISTER_OFFSET)
+                length = entry.get("length", WRITE_REGISTER_LENGTH)
+            else:
+                offset, length = WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH
+
+            try:
+                value_bytes = await device.async_execute(
+                    hass, device.read_value,
+                    bytes.fromhex(cmd), "get", offset, length,
+                )
+            except THZRegisterNotSupportedError as exc:
+                _LOGGER.debug("Backup: skipping unsupported register %s: %s", name, exc)
+                continue
+            except (ConnectionError, RuntimeError, OSError) as exc:
+                _LOGGER.warning("Backup: could not read %s: %s", name, exc)
+                errors[name] = str(exc)
+                continue
+
+            settings[name] = {
+                "type": entry_type,
+                "command": cmd,
+                "write_mode": write_mode,
+                "offset": offset,
+                "length": length,
+                "value_hex": value_bytes.hex(),
+            }
+
+        backup_data = {"version": 1, "entry_id": entry_id, "settings": settings}
+
+        try:
+            def _write() -> None:
+                with open(backup_file, "w", encoding="utf-8") as fh:
+                    json.dump(backup_data, fh, indent=2)
+            await hass.async_add_executor_job(_write)
+        except OSError as exc:
+            _LOGGER.error("Backup: could not write %s: %s", backup_file, exc)
+            return {"success": False, "error": f"Could not write backup file: {exc}"}
+
+        _LOGGER.info(
+            "THZ settings backup: %d parameters saved to %s (%d read errors)",
+            len(settings), backup_file, len(errors),
+        )
+        return {
+            "success": True,
+            "count": len(settings),
+            "backup_file": backup_file,
+            "errors": errors,
+            "settings": settings,
+        }
+
+    async def _async_handle_restore_settings(call: ServiceCall) -> ServiceResponse:
+        """Restore writable parameter values from a previously saved backup file."""
+        requested_entry_id: str | None = call.data.get("entry_id")
+        backup_file: str | None = call.data.get("backup_file")
+
+        available_entries = {
+            eid: ed
+            for eid, ed in hass.data.get(DOMAIN, {}).items()
+            if isinstance(ed, dict) and "device" in ed
+        }
+        if requested_entry_id:
+            if requested_entry_id not in available_entries:
+                return {"success": False, "error": f"No THZ entry found for entry_id '{requested_entry_id}'"}
+            entry_id = requested_entry_id
+        elif len(available_entries) == 1:
+            entry_id = next(iter(available_entries))
+        elif len(available_entries) > 1:
+            return {"success": False, "error": "Multiple THZ devices found; provide 'entry_id'"}
+        else:
+            return {"success": False, "error": "THZ device not initialized"}
+
+        entry_data = available_entries[entry_id]
+        device: THZDevice = entry_data["device"]
+        write_manager = entry_data["write_manager"]
+
+        if backup_file is None:
+            backup_file = os.path.join(hass.config.config_dir, "thz_backup.json")
+        elif not os.path.isabs(backup_file):
+            backup_file = os.path.join(hass.config.config_dir, backup_file)
+
+        try:
+            def _read() -> dict:
+                with open(backup_file, encoding="utf-8") as fh:
+                    return json.load(fh)
+            backup_data = await hass.async_add_executor_job(_read)
+        except (OSError, json.JSONDecodeError) as exc:
+            return {"success": False, "error": f"Could not read backup file '{backup_file}': {exc}"}
+
+        saved_settings: dict = backup_data.get("settings", {})
+        current_registers = write_manager.get_all_registers()
+
+        restored = 0
+        skipped = 0
+        errors: dict = {}
+
+        for name, saved in saved_settings.items():
+            current_entry = current_registers.get(name)
+            if current_entry is None:
+                _LOGGER.debug("Restore: %s not in current write map, skipping", name)
+                skipped += 1
+                continue
+
+            current_type = current_entry.get("type", "")
+            if current_type in _SKIP_TYPES:
+                skipped += 1
+                continue
+
+            cmd: str = saved.get("command", "")
+            value_hex: str = saved.get("value_hex", "")
+            write_mode: str = saved.get("write_mode", "direct")
+            offset: int = saved.get("offset", WRITE_REGISTER_OFFSET)
+            length: int = saved.get("length", WRITE_REGISTER_LENGTH)
+
+            if not cmd or not value_hex:
+                errors[name] = "missing command or value in backup"
+                continue
+
+            try:
+                value_bytes = bytes.fromhex(value_hex)
+            except ValueError as exc:
+                errors[name] = f"invalid value_hex: {exc}"
+                continue
+
+            try:
+                if write_mode == "block":
+                    await device.async_execute(
+                        hass, device.write_block_value,
+                        bytes.fromhex(cmd), offset, length, value_bytes,
+                    )
+                else:
+                    await device.async_execute(
+                        hass, device.write_value,
+                        bytes.fromhex(cmd), value_bytes,
+                    )
+                restored += 1
+            except THZRegisterNotSupportedError as exc:
+                _LOGGER.debug("Restore: skipping unsupported register %s: %s", name, exc)
+                skipped += 1
+            except (ConnectionError, RuntimeError, OSError) as exc:
+                _LOGGER.error("Restore: failed to write %s: %s", name, exc)
+                errors[name] = str(exc)
+
+        _LOGGER.info(
+            "THZ settings restore: %d restored, %d skipped, %d errors",
+            restored, skipped, len(errors),
+        )
+        return {
+            "success": len(errors) == 0,
+            "restored": restored,
+            "skipped": skipped,
+            "errors": errors,
+        }
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -913,6 +1116,9 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 vol.Optional("max_results", default=65535): vol.All(
                     vol.Coerce(int), vol.Range(min=1, max=65535)
                 ),
+                vol.Optional("preview_limit", default=20): vol.All(
+                    vol.Coerce(int), vol.Range(min=0, max=65535)
+                ),
             }
         ),
     )
@@ -932,6 +1138,26 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         _async_handle_set_diverter_valve,
         schema=vol.Schema({
             vol.Required("position"): vol.In(["heating", "dhw", "off"]),
+            vol.Optional("entry_id"): cv.string,
+        }),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "backup_settings",
+        _async_handle_backup_settings,
+        schema=vol.Schema({
+            vol.Optional("backup_file"): cv.string,
+            vol.Optional("entry_id"): cv.string,
+        }),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "restore_settings",
+        _async_handle_restore_settings,
+        schema=vol.Schema({
+            vol.Optional("backup_file"): cv.string,
             vol.Optional("entry_id"): cv.string,
         }),
         supports_response=SupportsResponse.OPTIONAL,
