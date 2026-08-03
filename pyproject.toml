@@ -20,6 +20,8 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "custom_components/thz/register_maps/*.py" = ["D100", "D104", "E501"]
+# Test method/class names are self-documenting; docstrings add no value there.
+"tests/*.py" = ["D100", "D101", "D102", "D103", "D104", "D107"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

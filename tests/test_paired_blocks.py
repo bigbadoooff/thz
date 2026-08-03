@@ -82,7 +82,7 @@ class TestPairedBlocksRegisterLength:
         for block in readings_map_439.PAIRED_BLOCKS:
             entries = register_map.get(block, [])
             for entry in entries:
-                name, offset, length = entry[0], entry[1], entry[2]
+                name, length = entry[0], entry[2]
                 assert length == 8, (
                     f"Paired sensor {name} in block {block} should have "
                     f"length 8 (4 bytes) for combined value, got {length}"

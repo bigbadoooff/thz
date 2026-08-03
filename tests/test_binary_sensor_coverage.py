@@ -180,7 +180,8 @@ class TestAsyncSetupEntry:
 
 class TestTHZBinarySensorAdditional:
     """Additional THZBinarySensor property/behavior tests not already covered
-    by tests/test_entity_platforms.py::TestBinarySensorModule."""
+    by tests/test_entity_platforms.py::TestBinarySensorModule.
+    """
 
     def test_init_without_translation_key_sets_attr_name(self):
         coord = MagicMock()

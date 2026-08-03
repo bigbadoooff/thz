@@ -102,7 +102,6 @@ from custom_components.thz.const import (  # noqa: E402
     CONNECTION_IP,
     CONNECTION_USB,
     DEFAULT_BAUDRATE,
-    DEFAULT_PORT,
 )
 
 # These come from the mocked homeassistant.const module, so they're

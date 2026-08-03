@@ -1,11 +1,11 @@
-"""Coverage tests for async_setup_entry, async_unload_entry, and related
-lifecycle/migration helpers in __init__.py.
+"""Coverage tests for async_setup_entry, async_unload_entry, and related helpers.
 
 DataUpdateCoordinator is mocked in conftest.py as the bare `MagicMock` class,
 which cannot be spec'd against another Mock (our `hass` fixture) — so these
 tests patch `custom_components.thz.DataUpdateCoordinator` with a factory that
 returns a fully-controllable fake coordinator instance.
 """
+from contextlib import ExitStack, contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -33,6 +33,53 @@ def _fake_device(firmware="539", blocks=None):
     device.unique_id = "thz-unique-1"
     device.close = MagicMock()
     return device
+
+
+def _default_dev_reg():
+    return MagicMock(
+        async_get_or_create=MagicMock(return_value=MagicMock(id="dev1"))
+    )
+
+
+@contextmanager
+def _patched_setup(device=None, coordinator_factory=None, dev_reg=None):
+    """Patch the collaborators async_setup_entry needs, DRYing up the tests below.
+
+    Always patches device_registry.async_get, entity_registry.async_get, and
+    entity_registry.async_entries_for_config_entry with sensible defaults.
+    THZDevice and DataUpdateCoordinator are only patched when a device /
+    coordinator_factory is supplied. Yields the THZDevice patch object (so
+    callers can assert on its call args) or None if device wasn't given.
+    """
+    with ExitStack() as stack:
+        thz_device_mock = None
+        if device is not None:
+            thz_device_mock = stack.enter_context(
+                patch.object(thz_module, "THZDevice", return_value=device)
+            )
+        if coordinator_factory is not None:
+            stack.enter_context(
+                patch.object(
+                    thz_module, "DataUpdateCoordinator",
+                    side_effect=coordinator_factory,
+                )
+            )
+        stack.enter_context(
+            patch.object(
+                thz_module.dr, "async_get", return_value=dev_reg or _default_dev_reg()
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                thz_module.er, "async_get", return_value=MagicMock(entities={})
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                thz_module.er, "async_entries_for_config_entry", return_value=[]
+            )
+        )
+        yield thz_device_mock
 
 
 def _mock_hass():
@@ -72,13 +119,9 @@ class TestAsyncSetupEntry:
         entry = _mock_config_entry()
         device = _fake_device()
 
-        with patch.object(thz_module, "THZDevice", return_value=device) as mock_cls, \
-             patch.object(thz_module, "DataUpdateCoordinator", side_effect=lambda *a, **kw: _fake_coordinator()), \
-             patch.object(thz_module.dr, "async_get", return_value=MagicMock(
-                 async_get_or_create=MagicMock(return_value=MagicMock(id="dev1"))
-             )), \
-             patch.object(thz_module.er, "async_get", return_value=MagicMock(entities={})), \
-             patch.object(thz_module.er, "async_entries_for_config_entry", return_value=[]):
+        with _patched_setup(
+            device=device, coordinator_factory=lambda *a, **kw: _fake_coordinator()
+        ) as mock_cls:
             result = await thz_module.async_setup_entry(hass, entry)
 
         assert result is True
@@ -97,24 +140,22 @@ class TestAsyncSetupEntry:
         )
         device = _fake_device()
 
-        with patch.object(thz_module, "THZDevice", return_value=device) as mock_cls, \
-             patch.object(thz_module, "DataUpdateCoordinator", side_effect=lambda *a, **kw: _fake_coordinator()), \
-             patch.object(thz_module.dr, "async_get", return_value=MagicMock(
-                 async_get_or_create=MagicMock(return_value=MagicMock(id="dev1"))
-             )), \
-             patch.object(thz_module.er, "async_get", return_value=MagicMock(entities={})), \
-             patch.object(thz_module.er, "async_entries_for_config_entry", return_value=[]):
+        with _patched_setup(
+            device=device, coordinator_factory=lambda *a, **kw: _fake_coordinator()
+        ) as mock_cls:
             result = await thz_module.async_setup_entry(hass, entry)
 
         assert result is True
-        mock_cls.assert_called_once_with(connection="ip", host="10.0.0.5", tcp_port=2323)
+        mock_cls.assert_called_once_with(
+            connection="ip", host="10.0.0.5", tcp_port=2323
+        )
 
     @pytest.mark.asyncio
     async def test_invalid_connection_type_raises(self):
         hass = _mock_hass()
         entry = _mock_config_entry(connection_type="bluetooth")
 
-        with patch.object(thz_module.er, "async_get", return_value=MagicMock(entities={})):
+        with _patched_setup():
             with pytest.raises(ValueError, match="Invalid connection type"):
                 await thz_module.async_setup_entry(hass, entry)
 
@@ -125,8 +166,7 @@ class TestAsyncSetupEntry:
         device = _fake_device()
         device.async_initialize = AsyncMock(side_effect=OSError("no port"))
 
-        with patch.object(thz_module, "THZDevice", return_value=device), \
-             patch.object(thz_module.er, "async_get", return_value=MagicMock(entities={})):
+        with _patched_setup(device=device):
             with pytest.raises(thz_module.ConfigEntryNotReady):
                 await thz_module.async_setup_entry(hass, entry)
 
@@ -136,13 +176,9 @@ class TestAsyncSetupEntry:
         entry = _mock_config_entry()
         device = _fake_device(blocks=["pxxFB", "pxxF2"])
 
-        with patch.object(thz_module, "THZDevice", return_value=device), \
-             patch.object(thz_module, "DataUpdateCoordinator", side_effect=lambda *a, **kw: _fake_coordinator()), \
-             patch.object(thz_module.dr, "async_get", return_value=MagicMock(
-                 async_get_or_create=MagicMock(return_value=MagicMock(id="dev1"))
-             )), \
-             patch.object(thz_module.er, "async_get", return_value=MagicMock(entities={})), \
-             patch.object(thz_module.er, "async_entries_for_config_entry", return_value=[]):
+        with _patched_setup(
+            device=device, coordinator_factory=lambda *a, **kw: _fake_coordinator()
+        ):
             await thz_module.async_setup_entry(hass, entry)
 
         stored = hass.data[DOMAIN][entry.entry_id]
@@ -154,12 +190,7 @@ class TestAsyncSetupEntry:
         entry = _mock_config_entry()
         device = _fake_device(blocks=[])
 
-        with patch.object(thz_module, "THZDevice", return_value=device), \
-             patch.object(thz_module.dr, "async_get", return_value=MagicMock(
-                 async_get_or_create=MagicMock(return_value=MagicMock(id="dev1"))
-             )), \
-             patch.object(thz_module.er, "async_get", return_value=MagicMock(entities={})), \
-             patch.object(thz_module.er, "async_entries_for_config_entry", return_value=[]):
+        with _patched_setup(device=device):
             await thz_module.async_setup_entry(hass, entry)
 
         stored = hass.data[DOMAIN][entry.entry_id]
@@ -176,13 +207,9 @@ class TestAsyncSetupEntry:
             side_effect=thz_module.ConfigEntryNotReady("block failed")
         )
 
-        with patch.object(thz_module, "THZDevice", return_value=device), \
-             patch.object(thz_module, "DataUpdateCoordinator", return_value=failing_coordinator), \
-             patch.object(thz_module.dr, "async_get", return_value=MagicMock(
-                 async_get_or_create=MagicMock(return_value=MagicMock(id="dev1"))
-             )), \
-             patch.object(thz_module.er, "async_get", return_value=MagicMock(entities={})), \
-             patch.object(thz_module.er, "async_entries_for_config_entry", return_value=[]):
+        with _patched_setup(
+            device=device, coordinator_factory=lambda *a, **kw: failing_coordinator
+        ):
             await thz_module.async_setup_entry(hass, entry)
 
         stored = hass.data[DOMAIN][entry.entry_id]
@@ -196,13 +223,9 @@ class TestAsyncSetupEntry:
         device = _fake_device()
         coordinator = _fake_coordinator(data=None)
 
-        with patch.object(thz_module, "THZDevice", return_value=device), \
-             patch.object(thz_module, "DataUpdateCoordinator", return_value=coordinator), \
-             patch.object(thz_module.dr, "async_get", return_value=MagicMock(
-                 async_get_or_create=MagicMock(return_value=MagicMock(id="dev1"))
-             )), \
-             patch.object(thz_module.er, "async_get", return_value=MagicMock(entities={})), \
-             patch.object(thz_module.er, "async_entries_for_config_entry", return_value=[]):
+        with _patched_setup(
+            device=device, coordinator_factory=lambda *a, **kw: coordinator
+        ):
             await thz_module.async_setup_entry(hass, entry)
 
         stored = hass.data[DOMAIN][entry.entry_id]
@@ -214,13 +237,13 @@ class TestAsyncSetupEntry:
         hass = _mock_hass()
         entry = _mock_config_entry(alias="Basement THZ", area="Basement")
         device = _fake_device()
-        dev_reg = MagicMock(async_get_or_create=MagicMock(return_value=MagicMock(id="dev1")))
+        dev_reg = _default_dev_reg()
 
-        with patch.object(thz_module, "THZDevice", return_value=device), \
-             patch.object(thz_module, "DataUpdateCoordinator", side_effect=lambda *a, **kw: _fake_coordinator()), \
-             patch.object(thz_module.dr, "async_get", return_value=dev_reg), \
-             patch.object(thz_module.er, "async_get", return_value=MagicMock(entities={})), \
-             patch.object(thz_module.er, "async_entries_for_config_entry", return_value=[]):
+        with _patched_setup(
+            device=device,
+            coordinator_factory=lambda *a, **kw: _fake_coordinator(),
+            dev_reg=dev_reg,
+        ):
             await thz_module.async_setup_entry(hass, entry)
 
         _, kwargs = dev_reg.async_get_or_create.call_args
@@ -235,12 +258,7 @@ class TestAsyncSetupEntry:
         entry = _mock_config_entry(log_level="debug")
         device = _fake_device(blocks=[])
 
-        with patch.object(thz_module, "THZDevice", return_value=device), \
-             patch.object(thz_module.dr, "async_get", return_value=MagicMock(
-                 async_get_or_create=MagicMock(return_value=MagicMock(id="dev1"))
-             )), \
-             patch.object(thz_module.er, "async_get", return_value=MagicMock(entities={})), \
-             patch.object(thz_module.er, "async_entries_for_config_entry", return_value=[]):
+        with _patched_setup(device=device):
             await thz_module.async_setup_entry(hass, entry)
 
         assert thz_module._LOGGER.level == logging.DEBUG
@@ -322,11 +340,12 @@ class TestAsyncRemoveEntry:
         entity1 = MagicMock(entity_id="sensor.thz_a")
         entity2 = MagicMock(entity_id="sensor.thz_b")
 
-        with patch.object(thz_module.er, "async_get", return_value=MagicMock()) as mock_get, \
-             patch.object(
-                 thz_module.er, "async_entries_for_config_entry",
-                 return_value=[entity1, entity2],
-             ):
+        with patch.object(
+            thz_module.er, "async_get", return_value=MagicMock()
+        ) as mock_get, patch.object(
+            thz_module.er, "async_entries_for_config_entry",
+            return_value=[entity1, entity2],
+        ):
             await thz_module.async_remove_entry(hass, entry)
 
         mock_get.return_value.async_remove.assert_any_call("sensor.thz_a")
@@ -383,9 +402,15 @@ class TestCleanupOrphanedEntities:
     @pytest.mark.asyncio
     async def test_removes_orphaned_thz_entities(self):
         hass = _mock_hass()
-        orphaned = MagicMock(platform="thz", config_entry_id=None, entity_id="sensor.orphan")
-        owned = MagicMock(platform="thz", config_entry_id="entry1", entity_id="sensor.owned")
-        other_domain = MagicMock(platform="other", config_entry_id=None, entity_id="light.x")
+        orphaned = MagicMock(
+            platform="thz", config_entry_id=None, entity_id="sensor.orphan"
+        )
+        owned = MagicMock(
+            platform="thz", config_entry_id="entry1", entity_id="sensor.owned"
+        )
+        other_domain = MagicMock(
+            platform="other", config_entry_id=None, entity_id="light.x"
+        )
 
         ent_reg = MagicMock()
         ent_reg.entities = {

@@ -150,7 +150,7 @@ class TestRegisterMapManagerWrite:
         manager = RegisterMapManagerWrite("206")
         # Try a common write register key
         registers = manager.get_registers_for_block("pOpMode")
-        # Could be dict or empty based on map structure
+        assert isinstance(registers, list)
 
     def test_firmware_version_property(self):
         """Test firmware_version property for write manager."""

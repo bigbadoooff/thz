@@ -78,12 +78,12 @@ class TestDecodeValueExtended:
         # Test byte with all bits set
         raw_all = b'\xff'
         for bit in range(8):
-            assert decode_value(raw_all, f"bit{bit}") == True
+            assert decode_value(raw_all, f"bit{bit}")
 
         # Test byte with no bits set
         raw_none = b'\x00'
         for bit in range(8):
-            assert decode_value(raw_none, f"bit{bit}") == False
+            assert not decode_value(raw_none, f"bit{bit}")
 
         # Test individual bits
         for bit in range(8):
@@ -97,23 +97,23 @@ class TestDecodeValueExtended:
         # Test byte with all bits set (all nbits should be False)
         raw_all = b'\xff'
         for bit in range(8):
-            assert decode_value(raw_all, f"nbit{bit}") == False
+            assert not decode_value(raw_all, f"nbit{bit}")
 
         # Test byte with no bits set (all nbits should be True)
         raw_none = b'\x00'
         for bit in range(8):
-            assert decode_value(raw_none, f"nbit{bit}") == True
+            assert decode_value(raw_none, f"nbit{bit}")
 
     def test_bit_extraction_multi_byte_uses_first(self):
         """Test that bit extraction only uses first byte."""
         # Second byte should be ignored
         raw = b'\x01\xff'
-        assert decode_value(raw, "bit0") == True
-        assert decode_value(raw, "bit1") == False
+        assert decode_value(raw, "bit0")
+        assert not decode_value(raw, "bit1")
 
         raw = b'\x00\xff'
-        assert decode_value(raw, "bit0") == False
-        assert decode_value(raw, "bit7") == False
+        assert not decode_value(raw, "bit0")
+        assert not decode_value(raw, "bit7")
 
     def test_esp_mant_special_values(self):
         """Test esp_mant with special float values."""
@@ -248,17 +248,17 @@ class TestDecodeValueBoundaries:
         """Test bit patterns with alternating bits."""
         # 0b01010101 = 0x55
         raw = b'\x55'
-        assert decode_value(raw, "bit0") == True
-        assert decode_value(raw, "bit1") == False
-        assert decode_value(raw, "bit2") == True
-        assert decode_value(raw, "bit3") == False
+        assert decode_value(raw, "bit0")
+        assert not decode_value(raw, "bit1")
+        assert decode_value(raw, "bit2")
+        assert not decode_value(raw, "bit3")
 
         # 0b10101010 = 0xAA
         raw = b'\xaa'
-        assert decode_value(raw, "bit0") == False
-        assert decode_value(raw, "bit1") == True
-        assert decode_value(raw, "bit2") == False
-        assert decode_value(raw, "bit3") == True
+        assert not decode_value(raw, "bit0")
+        assert decode_value(raw, "bit1")
+        assert not decode_value(raw, "bit2")
+        assert decode_value(raw, "bit3")
 
 
 class TestDecodeOpmodehc:

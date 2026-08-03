@@ -59,34 +59,34 @@ class TestDecodeBit:
     def test_bit0_set(self):
         """Test extracting bit 0 when set."""
         raw = b'\x01'  # 0b00000001
-        assert decode_value(raw, "bit0") == True
+        assert decode_value(raw, "bit0")
 
     def test_bit0_clear(self):
         """Test extracting bit 0 when clear."""
         raw = b'\x00'  # 0b00000000
-        assert decode_value(raw, "bit0") == False
+        assert not decode_value(raw, "bit0")
 
     def test_bit3_set(self):
         """Test extracting bit 3 when set."""
         raw = b'\x08'  # 0b00001000
-        assert decode_value(raw, "bit3") == True
+        assert decode_value(raw, "bit3")
 
     def test_bit3_clear(self):
         """Test extracting bit 3 when clear."""
         raw = b'\x07'  # 0b00000111
-        assert decode_value(raw, "bit3") == False
+        assert not decode_value(raw, "bit3")
 
     def test_bit7_set(self):
         """Test extracting bit 7 (highest bit)."""
         raw = b'\x80'  # 0b10000000
-        assert decode_value(raw, "bit7") == True
+        assert decode_value(raw, "bit7")
 
     def test_multiple_bits_set(self):
         """Test extracting specific bit when multiple are set."""
         raw = b'\xff'  # 0b11111111
-        assert decode_value(raw, "bit0") == True
-        assert decode_value(raw, "bit4") == True
-        assert decode_value(raw, "bit7") == True
+        assert decode_value(raw, "bit0")
+        assert decode_value(raw, "bit4")
+        assert decode_value(raw, "bit7")
 
 
 class TestDecodeNbit:
@@ -95,22 +95,22 @@ class TestDecodeNbit:
     def test_nbit0_set(self):
         """Test negated bit 0 when original is set."""
         raw = b'\x01'  # 0b00000001
-        assert decode_value(raw, "nbit0") == False
+        assert not decode_value(raw, "nbit0")
 
     def test_nbit0_clear(self):
         """Test negated bit 0 when original is clear."""
         raw = b'\x00'  # 0b00000000
-        assert decode_value(raw, "nbit0") == True
+        assert decode_value(raw, "nbit0")
 
     def test_nbit3_set(self):
         """Test negated bit 3 when original is set."""
         raw = b'\x08'  # 0b00001000
-        assert decode_value(raw, "nbit3") == False
+        assert not decode_value(raw, "nbit3")
 
     def test_nbit3_clear(self):
         """Test negated bit 3 when original is clear."""
         raw = b'\x07'  # 0b00000111
-        assert decode_value(raw, "nbit3") == True
+        assert decode_value(raw, "nbit3")
 
 
 class TestDecodeEspMant:
@@ -178,8 +178,8 @@ class TestEdgeCases:
     def test_bit_with_multi_byte(self):
         """Test bit extraction only uses first byte."""
         raw = b'\x01\xff'
-        assert decode_value(raw, "bit0") == True
-        assert decode_value(raw, "bit1") == False
+        assert decode_value(raw, "bit0")
+        assert not decode_value(raw, "bit1")
 
 
 class TestDecodeFaultmap:
