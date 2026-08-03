@@ -37,6 +37,10 @@ from .value_codec import decode_raw_value
 
 _LOGGER = logging.getLogger(__name__)
 
+# Read-only sensors backed by a DataUpdateCoordinator: no per-entity polling
+# and no service actions, so updates are not limited.
+PARALLEL_UPDATES = 0
+
 
 # Maps sensor names to (block_name, byte_offset, byte_length, decode_type, factor).
 # Offsets/lengths match the sensor.py conversion from readings_map_439.py nibble

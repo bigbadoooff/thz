@@ -57,6 +57,11 @@ from .value_codec import THZValueCodec, decode_raw_value
 
 _LOGGER = logging.getLogger(__name__)
 
+# Reads come from a DataUpdateCoordinator, but set_temperature/set_hvac_mode/
+# set_preset_mode write to the device directly; limit to one in-flight
+# service call at a time.
+PARALLEL_UPDATES = 1
+
 _TEMP_FACTOR = 10.0
 
 # Write-register name candidates for heat setpoints (tried in order)

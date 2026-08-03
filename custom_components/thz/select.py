@@ -21,6 +21,10 @@ from .value_maps import SELECT_MAP
 
 _LOGGER = logging.getLogger(__name__)
 
+# Each entity polls and writes to the device directly (no coordinator);
+# limit to one in-flight update/service call at a time.
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

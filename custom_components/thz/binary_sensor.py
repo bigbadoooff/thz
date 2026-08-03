@@ -30,6 +30,10 @@ from .value_codec import decode_raw_value
 
 _LOGGER = logging.getLogger(__name__)
 
+# Read-only sensors backed by a DataUpdateCoordinator: no per-entity polling
+# and no service actions, so updates are not limited.
+PARALLEL_UPDATES = 0
+
 
 def _is_bit_decode_type(decode_type: str) -> bool:
     """Return True if the decode type extracts a single bit (boolean value)."""

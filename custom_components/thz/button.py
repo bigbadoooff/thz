@@ -31,6 +31,10 @@ from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
 
+# Buttons write to the device directly (no coordinator, no polling); limit
+# to one in-flight press at a time.
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

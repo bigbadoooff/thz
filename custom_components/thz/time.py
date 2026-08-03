@@ -21,6 +21,10 @@ from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
 
+# Each entity polls and writes to the device directly (no coordinator);
+# limit to one in-flight update/service call at a time.
+PARALLEL_UPDATES = 1
+
 
 def time_to_quarters(t: time | None, is_end_time: bool = False) -> int:
     """Convert a time object to the number of 15-minute intervals since midnight.
