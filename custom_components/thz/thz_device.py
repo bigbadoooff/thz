@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class THZRegisterNotSupportedError(RuntimeError):
-    """Raised when the device reports that a register is not supported (0x01 0x04 response).
+    """Raised when the device reports a register is not supported (0x01 0x04 response).
 
     This is a permanent condition for a given register on a given device firmware,
     not a transient communication error. Callers should treat this as an unavailable
@@ -530,7 +530,9 @@ class THZDevice:
             except (ValueError, AttributeError) as e:
                 # pyserial's select.select() raises ValueError when the port fd
                 # is None (set by close()); AttributeError if self.ser is None.
-                raise ConnectionError(f"Connection closed during serial read: {e}") from e
+                raise ConnectionError(
+                    f"Connection closed during serial read: {e}"
+                ) from e
         else:
             return b""
 
@@ -638,7 +640,7 @@ class THZDevice:
             self.ser.close()
 
     def _force_close(self) -> None:
-        """Close the connection without raising; sets ser=None so the next call reconnects."""
+        """Close without raising; sets ser=None so the next call reconnects."""
         if self.ser is not None:
             try:
                 self.ser.close()
@@ -729,7 +731,9 @@ class THZDevice:
                 _LOGGER.error("Unknown command")
                 return None
             if header == b"\x01\x04":
-                raise THZRegisterNotSupportedError("Register not supported by device firmware")
+                raise THZRegisterNotSupportedError(
+                    "Register not supported by device firmware"
+                )
             _LOGGER.error("Unknown response: %s", data.hex())
             return None
         except THZRegisterNotSupportedError:
@@ -749,7 +753,8 @@ class THZDevice:
         Raises:
             ConnectionError: If connection fails
             RuntimeError: If device communication fails
-            THZRegisterNotSupportedError: If the device reports the register is not supported
+            THZRegisterNotSupportedError: If the device reports the register is
+                not supported
         """
         header = b"\x01\x00" if get_or_set == "get" else b"\x01\x80"
         # Standard Header für "get" und "set"

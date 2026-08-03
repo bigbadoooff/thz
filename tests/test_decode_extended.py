@@ -1,6 +1,5 @@
 """Extended tests for decode_value function to increase coverage."""
 
-import pytest
 import struct
 
 from tests.test_helpers import decode_value
@@ -12,7 +11,7 @@ class TestDecodeValueExtended:
     def test_hex2int_with_various_factors(self):
         """Test hex2int with different factor values."""
         raw = b'\x03\xe8'  # 1000 in hex
-        
+
         # Test various factors
         assert decode_value(raw, "hex2int", 1) == 1000.0
         assert decode_value(raw, "hex2int", 10) == 100.0
@@ -22,7 +21,7 @@ class TestDecodeValueExtended:
     def test_hex2int_negative_with_factors(self):
         """Test hex2int negative values with factors."""
         raw = b'\xff\x9c'  # -100 in signed 16-bit
-        
+
         assert decode_value(raw, "hex2int", 1) == -100.0
         assert decode_value(raw, "hex2int", 10) == -10.0
         assert decode_value(raw, "hex2int", 100) == -1.0
@@ -31,7 +30,7 @@ class TestDecodeValueExtended:
         """Test hex2int with single byte signed values."""
         # Positive single byte
         assert decode_value(b'\x7f', "hex2int", 1) == 127.0
-        
+
         # Single byte 0x80 is interpreted as -128 in signed representation
         assert decode_value(b'\x80', "hex2int", 1) == -128.0
 
@@ -53,13 +52,13 @@ class TestDecodeValueExtended:
         """Test hex (unsigned) with various byte lengths."""
         # Single byte
         assert decode_value(b'\xff', "hex") == 255
-        
+
         # Two bytes
         assert decode_value(b'\x01\x00', "hex") == 256
-        
+
         # Three bytes
         assert decode_value(b'\x01\x00\x00', "hex") == 65536
-        
+
         # Four bytes
         assert decode_value(b'\x01\x00\x00\x00', "hex") == 16777216
 
@@ -67,10 +66,10 @@ class TestDecodeValueExtended:
         """Test hex with large unsigned values."""
         # Maximum 16-bit value
         assert decode_value(b'\xff\xff', "hex") == 65535
-        
+
         # Maximum 24-bit value
         assert decode_value(b'\xff\xff\xff', "hex") == 16777215
-        
+
         # Maximum 32-bit value
         assert decode_value(b'\xff\xff\xff\xff', "hex") == 4294967295
 
@@ -80,12 +79,12 @@ class TestDecodeValueExtended:
         raw_all = b'\xff'
         for bit in range(8):
             assert decode_value(raw_all, f"bit{bit}") == True
-        
+
         # Test byte with no bits set
         raw_none = b'\x00'
         for bit in range(8):
             assert decode_value(raw_none, f"bit{bit}") == False
-        
+
         # Test individual bits
         for bit in range(8):
             raw = bytes([1 << bit])
@@ -99,7 +98,7 @@ class TestDecodeValueExtended:
         raw_all = b'\xff'
         for bit in range(8):
             assert decode_value(raw_all, f"nbit{bit}") == False
-        
+
         # Test byte with no bits set (all nbits should be True)
         raw_none = b'\x00'
         for bit in range(8):
@@ -111,7 +110,7 @@ class TestDecodeValueExtended:
         raw = b'\x01\xff'
         assert decode_value(raw, "bit0") == True
         assert decode_value(raw, "bit1") == False
-        
+
         raw = b'\x00\xff'
         assert decode_value(raw, "bit0") == False
         assert decode_value(raw, "bit7") == False
@@ -121,12 +120,12 @@ class TestDecodeValueExtended:
         # Zero
         raw = struct.pack('>f', 0.0)
         assert decode_value(raw, "esp_mant") == 0.0
-        
+
         # One
         raw = struct.pack('>f', 1.0)
         result = decode_value(raw, "esp_mant")
         assert abs(result - 1.0) < 0.001
-        
+
         # Negative one
         raw = struct.pack('>f', -1.0)
         result = decode_value(raw, "esp_mant")
@@ -138,7 +137,7 @@ class TestDecodeValueExtended:
         raw = struct.pack('>f', 1000.5)
         result = decode_value(raw, "esp_mant")
         assert abs(result - 1000.5) < 0.001
-        
+
         # Large negative
         raw = struct.pack('>f', -1000.5)
         result = decode_value(raw, "esp_mant")
@@ -150,7 +149,7 @@ class TestDecodeValueExtended:
         raw = struct.pack('>f', 0.001)
         result = decode_value(raw, "esp_mant")
         assert abs(result - 0.001) < 0.0001
-        
+
         # Small negative
         raw = struct.pack('>f', -0.001)
         result = decode_value(raw, "esp_mant")
@@ -161,7 +160,7 @@ class TestDecodeValueExtended:
         # Value with more than 3 decimal places
         raw = struct.pack('>f', 1.23456789)
         result = decode_value(raw, "esp_mant")
-        
+
         # Should be rounded to 3 decimals
         # The exact value might vary due to float precision
         str_result = str(result)
@@ -173,13 +172,13 @@ class TestDecodeValueExtended:
         """Test default hex string return for various byte lengths."""
         # Single byte
         assert decode_value(b'\xab', "unknown") == "ab"
-        
+
         # Two bytes
         assert decode_value(b'\xab\xcd', "unknown") == "abcd"
-        
+
         # Three bytes
         assert decode_value(b'\xab\xcd\xef', "unknown") == "abcdef"
-        
+
         # Four bytes
         assert decode_value(b'\x01\x23\x45\x67', "unknown") == "01234567"
 
@@ -197,7 +196,7 @@ class TestDecodeValueExtended:
     def test_unknown_decode_types(self):
         """Test various unknown decode types return hex string or boolean."""
         raw = b'\xde\xad\xbe\xef'
-        
+
         # These return hex strings
         hex_string_types = [
             "invalid",
@@ -206,11 +205,11 @@ class TestDecodeValueExtended:
             "hex2float",  # Not implemented
             "decimal",    # Not implemented
         ]
-        
+
         for decode_type in hex_string_types:
             result = decode_value(raw, decode_type)
             assert result == "deadbeef"
-        
+
         # These try to extract bits and return boolean
         # bit8 and nbit8 would try to extract bit 8, which causes an error or unexpected behavior
         # Let's test that they at least return something without crashing
@@ -253,7 +252,7 @@ class TestDecodeValueBoundaries:
         assert decode_value(raw, "bit1") == False
         assert decode_value(raw, "bit2") == True
         assert decode_value(raw, "bit3") == False
-        
+
         # 0b10101010 = 0xAA
         raw = b'\xaa'
         assert decode_value(raw, "bit0") == False

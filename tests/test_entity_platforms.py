@@ -1,6 +1,5 @@
 """Basic tests for number, select, switch, and time modules."""
 
-import pytest
 
 
 class TestNumberModule:

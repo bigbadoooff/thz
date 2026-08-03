@@ -1,6 +1,5 @@
 """Additional tests for time module to increase coverage."""
 
-import pytest
 from datetime import time
 
 from custom_components.thz.const import TIME_VALUE_UNSET
@@ -14,10 +13,10 @@ class TestTimeConversionEdgeCases:
         """Test boundary values for quarters_to_time."""
         # Test 0 (midnight)
         assert quarters_to_time(0) == time(0, 0)
-        
+
         # Test maximum valid value (95 = 23:45)
         assert quarters_to_time(95) == time(23, 45)
-        
+
         # Test mid-range values
         assert quarters_to_time(50) == time(12, 30)
         assert quarters_to_time(40) == time(10, 0)
@@ -28,12 +27,12 @@ class TestTimeConversionEdgeCases:
         assert time_to_quarters(time(0, 0)) == 0
         assert time_to_quarters(time(6, 30)) == 26
         assert time_to_quarters(time(9, 45)) == 39
-        
+
         # Afternoon times
         assert time_to_quarters(time(12, 0)) == 48
         assert time_to_quarters(time(15, 15)) == 61
         assert time_to_quarters(time(18, 30)) == 74
-        
+
         # Evening times
         assert time_to_quarters(time(21, 45)) == 87
         assert time_to_quarters(time(23, 45)) == 95
@@ -44,12 +43,12 @@ class TestTimeConversionEdgeCases:
         assert time_to_quarters(time(10, 1)) == 40   # Rounds to 10:00
         assert time_to_quarters(time(10, 7)) == 40   # Rounds to 10:00
         assert time_to_quarters(time(10, 14)) == 40  # Rounds to 10:00
-        
+
         # Test values at quarter boundaries
         assert time_to_quarters(time(10, 15)) == 41  # Exact quarter
         assert time_to_quarters(time(10, 30)) == 42  # Exact quarter
         assert time_to_quarters(time(10, 45)) == 43  # Exact quarter
-        
+
         # Test values that round to next quarter
         assert time_to_quarters(time(10, 16)) == 41  # Rounds to 10:15
         assert time_to_quarters(time(10, 31)) == 42  # Rounds to 10:30
@@ -72,7 +71,7 @@ class TestTimeConversionEdgeCases:
         """Test handling of TIME_VALUE_UNSET sentinel."""
         # Converting None to quarters should return unset
         assert time_to_quarters(None) == TIME_VALUE_UNSET
-        
+
         # Converting unset value to time should return None
         assert quarters_to_time(TIME_VALUE_UNSET) is None
         assert quarters_to_time(128) is None  # 0x80 = 128
@@ -90,11 +89,11 @@ class TestTimeConversionEdgeCases:
         # Test midnight
         assert time_to_quarters(time(0, 0)) == 0
         assert quarters_to_time(0) == time(0, 0)
-        
+
         # Test noon
         assert time_to_quarters(time(12, 0)) == 48
         assert quarters_to_time(48) == time(12, 0)
-        
+
         # Test end of day
         assert time_to_quarters(time(23, 59)) == 95  # Rounds down to 23:45
         assert quarters_to_time(95) == time(23, 45)
@@ -115,7 +114,7 @@ class TestTimeModuleConstants:
         assert time_to_quarters(time(1, 0)) == 4
         assert time_to_quarters(time(2, 0)) == 8
         assert time_to_quarters(time(3, 0)) == 12
-        
+
         # Verify pattern continues
         for hour in range(24):
             expected_quarters = hour * 4
@@ -153,12 +152,12 @@ class TestTimeConversionConsistency:
     def test_idempotent_conversions(self):
         """Test that multiple conversions produce same result."""
         original_time = time(14, 30)
-        
+
         # time -> quarters -> time -> quarters should be same as time -> quarters
         quarters1 = time_to_quarters(original_time)
         time1 = quarters_to_time(quarters1)
         quarters2 = time_to_quarters(time1)
-        
+
         assert quarters1 == quarters2
 
 
@@ -174,7 +173,7 @@ class TestTimeValidation:
             time(6, 45),
             time(18, 15),
         ]
-        
+
         for t in valid_times:
             result = time_to_quarters(t)
             assert isinstance(result, int)

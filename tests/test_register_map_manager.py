@@ -1,10 +1,8 @@
 """Tests for register map manager."""
 
-import pytest
 
 from custom_components.thz.register_maps.register_map_manager import (
     FIRMWARE_MAPS,
-    BaseRegisterMapManager,
     RegisterMapManager,
     RegisterMapManagerWrite,
 )
@@ -57,10 +55,10 @@ class TestFirmwareMaps:
         """Test technician mode firmware configurations."""
         assert "439technician" in FIRMWARE_MAPS
         assert "539technician" in FIRMWARE_MAPS
-        
+
         config_439t = FIRMWARE_MAPS["439technician"]
         assert "write_map_X39tech" in config_439t["write"]
-        
+
         config_539t = FIRMWARE_MAPS["539technician"]
         assert "write_map_X39tech" in config_539t["write"]
 
@@ -122,7 +120,7 @@ class TestRegisterMapManager:
         """Test that different firmware versions load different maps."""
         manager_206 = RegisterMapManager("206")
         manager_214 = RegisterMapManager("214")
-        
+
         # Both should be valid but potentially different
         assert manager_206.get_firmware_version() == "206"
         assert manager_214.get_firmware_version() == "214"
@@ -193,7 +191,7 @@ class TestBaseRegisterMapManager:
         """Test map selection for known firmware."""
         manager = RegisterMapManager("206")
         write_maps, read_maps = manager._select_maps_for_firmware("206")
-        
+
         assert isinstance(write_maps, list)
         assert isinstance(read_maps, list)
         assert len(write_maps) > 0
@@ -203,7 +201,7 @@ class TestBaseRegisterMapManager:
         """Test map selection for unknown firmware uses default."""
         manager = RegisterMapManager("999")
         write_maps, read_maps = manager._select_maps_for_firmware("999")
-        
+
         # Should return default maps
         assert isinstance(write_maps, list)
         assert isinstance(read_maps, list)
@@ -233,16 +231,16 @@ class TestBaseRegisterMapManager:
     def test_merge_maps_with_lists(self):
         """Test merging maps with list entries."""
         manager = RegisterMapManager("206")
-        
+
         base = {
             "block1": [("sensor1", 0, 2, "hex"), ("sensor2", 2, 2, "hex")]
         }
         override = {
             "block1": [("sensor2", 2, 2, "hex2int", 10)]  # Override sensor2
         }
-        
+
         result = manager._merge_maps(base, override)
-        
+
         # Should have merged properly
         assert "block1" in result
         assert isinstance(result["block1"], list)
@@ -250,24 +248,24 @@ class TestBaseRegisterMapManager:
     def test_merge_maps_with_empty_override(self):
         """Test merging with empty override."""
         manager = RegisterMapManager("206")
-        
+
         base = {"block1": [("sensor1", 0, 2, "hex")]}
         override = {}
-        
+
         result = manager._merge_maps(base, override)
-        
+
         # Should return base unchanged
         assert result == base
 
     def test_merge_maps_with_empty_base(self):
         """Test merging with empty base."""
         manager = RegisterMapManager("206")
-        
+
         base = {}
         override = {"block1": [("sensor1", 0, 2, "hex")]}
-        
+
         result = manager._merge_maps(base, override)
-        
+
         # Should return override
         assert "block1" in result
 

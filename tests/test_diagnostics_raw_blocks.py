@@ -15,7 +15,7 @@ class TestDiagnosticsRawBlocks:
 
         # Create mock hass
         hass = MagicMock()
-        
+
         # Create mock device
         mock_device = MagicMock()
         mock_device.firmware_version = "4.39"

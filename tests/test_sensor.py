@@ -12,7 +12,7 @@ class TestNormalizeEntry:
         """Test normalizing a tuple entry."""
         entry = ("outsideTemp", 0, 4, "hex2int", 10)
         result = normalize_entry(entry)
-        
+
         assert isinstance(result, dict)
         assert result["name"] == "outsideTemp"
         assert result["offset"] == 0
@@ -29,7 +29,7 @@ class TestNormalizeEntry:
         """Test normalizing a tuple entry with whitespace in name."""
         entry = ("  flowTemp  ", 2, 4, "hex2int", 10)
         result = normalize_entry(entry)
-        
+
         assert result["name"] == "flowTemp"
         assert result["offset"] == 2
         assert result["length"] == 4
@@ -49,7 +49,7 @@ class TestNormalizeEntry:
             "translation_key": "dhw_temp",
         }
         result = normalize_entry(entry)
-        
+
         assert result == entry
         assert result["name"] == "dhwTemp"
         assert result["unit"] == "°C"
@@ -69,7 +69,7 @@ class TestNormalizeEntry:
         """Test normalizing tuple with minimal values."""
         entry = ("sensor", 0, 2, "hex", 1)
         result = normalize_entry(entry)
-        
+
         assert result["name"] == "sensor"
         assert result["offset"] == 0
         assert result["length"] == 2
@@ -181,7 +181,7 @@ class TestOffsetLengthCalculation:
         register_length = 0
         byte_length = (register_length + 1) // 2
         assert byte_length == 0  # (0+1)//2 = 0 (actual result)
-        
+
     def test_length_ensures_at_least_some_bytes(self):
         """Test that length conversion always produces a result."""
         register_length = 1
@@ -218,13 +218,13 @@ class TestDuplicateSensorHandling:
     def test_duplicate_detection_logic(self):
         """Test the logic for detecting duplicate sensor names."""
         seen_sensor_names = set()
-        
+
         # First sensor
         sensor_name = "outsideTemp"
         is_duplicate = sensor_name in seen_sensor_names
         assert not is_duplicate
         seen_sensor_names.add(sensor_name)
-        
+
         # Second sensor with same name
         sensor_name = "outsideTemp"
         is_duplicate = sensor_name in seen_sensor_names
@@ -233,11 +233,11 @@ class TestDuplicateSensorHandling:
     def test_different_sensors_not_duplicate(self):
         """Test that different sensor names are not duplicates."""
         seen_sensor_names = set()
-        
+
         sensor_name1 = "outsideTemp"
         sensor_name2 = "flowTemp"
-        
+
         seen_sensor_names.add(sensor_name1)
-        
+
         is_duplicate = sensor_name2 in seen_sensor_names
         assert not is_duplicate

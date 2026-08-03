@@ -228,7 +228,9 @@ async def async_setup_entry(
     hc1_coordinator = coordinators.get("pxxF4")
     if hc1_coordinator is not None:
         if None in (f4_current, f4_target, f4_opmode):
-            _LOGGER.error("Required fields missing from pxxF4 map; skipping HC1 climate entity")
+            _LOGGER.error(
+                "Required fields missing from pxxF4 map; skipping HC1 climate entity"
+            )
         else:
             heat_entry = _find_entry(write_registers, _HC1_HEAT_SETPOINT_NAMES)
             cool_switch_entry = write_registers.get(_HC1_COOL_SWITCH_NAME)
@@ -244,7 +246,9 @@ async def async_setup_entry(
                 cool_setpoint_entry = None
 
             fan_stage_entry: dict | None = write_registers.get(_FAN_STAGE_DAY_NAME)
-            if not (isinstance(fan_stage_entry, dict) and fan_stage_entry.get("command")):
+            if not (
+                isinstance(fan_stage_entry, dict) and fan_stage_entry.get("command")
+            ):
                 fan_stage_entry = None
 
             entities.append(
@@ -275,7 +279,9 @@ async def async_setup_entry(
     hc2_coordinator = coordinators.get("pxxF5")
     if hc2_coordinator is not None:
         if None in (f5_target, f5_opmode):
-            _LOGGER.error("Required fields missing from pxxF5 map; skipping HC2 climate entity")
+            _LOGGER.error(
+                "Required fields missing from pxxF5 map; skipping HC2 climate entity"
+            )
         else:
             hc2_heat_entry = _find_entry(write_registers, _HC2_HEAT_SETPOINT_NAMES)
             if hc2_heat_entry is not None:
@@ -317,7 +323,9 @@ async def async_setup_entry(
     dhw_coordinator = coordinators.get("pxxF3")
     if dhw_coordinator is not None:
         if None in (f3_current, f3_target, f3_opmode):
-            _LOGGER.error("Required fields missing from pxxF3 map; skipping DHW climate entity")
+            _LOGGER.error(
+                "Required fields missing from pxxF3 map; skipping DHW climate entity"
+            )
         else:
             dhw_entry = _find_entry(write_registers, _DHW_SETPOINT_NAMES)
             entities.append(
@@ -496,6 +504,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 register (``pOpMode``).  Enables preset mode when provided.
             fan_stage_entry: Write-register metadata for the day fan-stage
                 register (``p07FanStageDay``).  Enables fan mode when provided.
+            cooling_byte: Byte index of the cooling-active bit in the
+                ``pxx0A0176`` coordinator data, or ``None`` if unavailable.
+            cooling_bit: Bit index of the cooling-active flag within
+                ``cooling_byte``, or ``None`` if unavailable.
+            compressor_bit: Bit index of the compressor-active flag within
+                ``cooling_byte``, or ``None`` if unavailable.
         """
         super().__init__(coordinator)
 

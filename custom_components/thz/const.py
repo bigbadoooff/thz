@@ -31,7 +31,7 @@ CONNECTION_IP = "ip"
 DEFAULT_BAUDRATE = 115200
 DEFAULT_PORT = 2323
 DEFAULT_UPDATE_INTERVAL = 600  # in seconds
-DEFAULT_WRITE_INTERVAL = 3600  # in seconds, for write entities (number/switch/select/time)
+DEFAULT_WRITE_INTERVAL = 3600  # seconds; write entities (number/switch/select/time)
 
 # Write register offsets and lengths
 # These values are used when reading/writing individual parameters
@@ -109,7 +109,8 @@ BLOCK_LABELS: dict[str, str] = {
 
 
 # Write entity groups: maps a group identifier to a human-readable label.
-# Entity keys are matched to groups using WRITE_GROUP_PATTERNS (case-insensitive substring matches).
+# Entity keys are matched to groups using WRITE_GROUP_PATTERNS (case-insensitive
+# substring matches).
 WRITE_GROUP_LABELS: dict[str, str] = {
     "heating_hc1": "Heating Circuit 1",
     "heating_hc2": "Heating Circuit 2",
@@ -131,9 +132,22 @@ WRITE_GROUP_PATTERNS: list[tuple[str, list[str]]] = [
     ("cooling", ["p75passive", "p99Cooling"]),
     ("solar", ["p80EnableSolar", "p83DHWsetSolar", "pSolar"]),
     ("heating_hc2", ["HC2"]),
-    ("dhw", ["DHW", "p04DHW", "p05DHW", "p06DHW", "p11DHW", "p32Hyst", "p33Booster", "p34Booster", "p35Pasteuris", "p36DHW", "p89DHWeco", "p99DHW", "pDHW"]),
+    (
+        "dhw",
+        [
+            "DHW", "p04DHW", "p05DHW", "p06DHW", "p11DHW", "p32Hyst",
+            "p33Booster", "p34Booster", "p35Pasteuris", "p36DHW",
+            "p89DHWeco", "p99DHW", "pDHW",
+        ],
+    ),
     ("fan", ["Fan", "p43Unsched", "p44Unsched", "p45Unsched", "p46Unsched", "pFan"]),
-    ("heating_hc1", ["HC1", "p01Room", "p02Room", "p03Room", "p13Gradient", "p14LowEnd", "p15Room", "p19Flow", "pHeat"]),
+    (
+        "heating_hc1",
+        [
+            "HC1", "p01Room", "p02Room", "p03Room", "p13Gradient",
+            "p14LowEnd", "p15Room", "p19Flow", "pHeat",
+        ],
+    ),
     ("advanced", []),  # Catch-all for remaining entities
 ]
 

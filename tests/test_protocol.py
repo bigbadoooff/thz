@@ -119,9 +119,9 @@ class TestTelegramConstruction:
         header = b'\x01\x00'
         footer = b'\x10\x03'
         checksum = b'\x5a'
-        
+
         telegram = device.construct_telegram(addr_bytes, header, footer, checksum)
-        
+
         # Should be: header + escaped(checksum + addr_bytes) + footer
         # 0x5a and 0xfb don't need escaping
         assert telegram == b'\x01\x00\x5a\xfb\x10\x03'
@@ -133,9 +133,9 @@ class TestTelegramConstruction:
         header = b'\x01\x00'
         footer = b'\x10\x03'
         checksum = b'\x20'
-        
+
         telegram = device.construct_telegram(addr_bytes, header, footer, checksum)
-        
+
         # checksum + addr_bytes = b'\x20\x10'
         # After escaping: b'\x20\x10\x10'
         assert telegram == b'\x01\x00\x20\x10\x10\x10\x03'
@@ -147,9 +147,9 @@ class TestTelegramConstruction:
         header = b'\x01\x00'
         footer = b'\x10\x03'
         checksum = b'\x30'
-        
+
         telegram = device.construct_telegram(addr_bytes, header, footer, checksum)
-        
+
         # checksum + addr_bytes = b'\x30\x2b'
         # After escaping: b'\x30\x2b\x18'
         assert telegram == b'\x01\x00\x30\x2b\x18\x10\x03'

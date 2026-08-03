@@ -600,9 +600,10 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema_dict = {}
         for block in blocks:
-            schema_dict[vol.Optional(f"refresh_{block}", default=DEFAULT_UPDATE_INTERVAL)] = vol.All(
-                int, vol.Range(min=5, max=86400)
+            refresh_key = vol.Optional(
+                f"refresh_{block}", default=DEFAULT_UPDATE_INTERVAL
             )
+            schema_dict[refresh_key] = vol.All(int, vol.Range(min=5, max=86400))
 
         # Add write interval for number/switch/select/time entities
         write_key = vol.Optional("write_interval", default=DEFAULT_WRITE_INTERVAL)
@@ -616,9 +617,10 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=schema,
             description_placeholders={
                 "hint": (
-                    f"Update interval per block (seconds, default {DEFAULT_UPDATE_INTERVAL}),"
-                    f" write_interval for write entities (number/switch/select/time,"
-                    f" default {DEFAULT_WRITE_INTERVAL})"
+                    "Update interval per block (seconds, default "
+                    f"{DEFAULT_UPDATE_INTERVAL}), write_interval for write "
+                    "entities (number/switch/select/time, default "
+                    f"{DEFAULT_WRITE_INTERVAL})"
                 ),
             },
         )

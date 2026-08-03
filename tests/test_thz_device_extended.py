@@ -43,14 +43,14 @@ class TestTHZDeviceProtocolExtended:
     def test_checksum_index_2_really_skipped(self):
         """Verify index 2 is completely ignored in checksum."""
         device = THZDevice(connection="usb", port="/dev/null")
-        
+
         # Two arrays identical except at index 2
         data1 = b'\x01\x02\x00\x04\x05'
         data2 = b'\x01\x02\xff\x04\x05'
-        
+
         checksum1 = device.thz_checksum(data1)
         checksum2 = device.thz_checksum(data2)
-        
+
         # Should produce same checksum
         assert checksum1 == checksum2
         # Verify calculation: 0x01 + 0x02 + 0x04 + 0x05 = 0x0c
@@ -128,7 +128,7 @@ class TestTHZDeviceProtocolExtended:
         header = b'\x01\x00'
         footer = b'\x10\x03'
         checksum = b'\x5a'
-        
+
         telegram = device.construct_telegram(addr_bytes, header, footer, checksum)
         assert telegram == b'\x01\x00\x5a\x10\x03'
 
@@ -139,7 +139,7 @@ class TestTHZDeviceProtocolExtended:
         header = b'\x01\x00'
         footer = b'\x10\x03'
         checksum = b'\x5a'
-        
+
         telegram = device.construct_telegram(addr_bytes, header, footer, checksum)
         # checksum + addr_bytes = b'\x5a\xfb\xfc\xfd', no escaping needed
         assert telegram == b'\x01\x00\x5a\xfb\xfc\xfd\x10\x03'
@@ -151,7 +151,7 @@ class TestTHZDeviceProtocolExtended:
         header = b'\x01\x00'
         footer = b'\x10\x03'
         checksum = b'\x10'  # Also needs escaping
-        
+
         telegram = device.construct_telegram(addr_bytes, header, footer, checksum)
         # checksum + addr = b'\x10\x10\x2b'
         # After escape: b'\x10\x10\x10\x10\x2b\x18'
@@ -223,7 +223,7 @@ class TestTHZDeviceProperties:
         """Test that connection type is stored correctly."""
         usb_device = THZDevice(connection="usb", port="/dev/ttyUSB0")
         assert usb_device.connection == "usb"
-        
+
         ip_device = THZDevice(connection="ip", host="192.168.1.1", tcp_port=2000)
         assert ip_device.connection == "ip"
 
@@ -231,7 +231,7 @@ class TestTHZDeviceProperties:
         """Test that port information is stored."""
         usb_device = THZDevice(connection="usb", port="/dev/ttyUSB0")
         assert usb_device.port == "/dev/ttyUSB0"
-        
+
         ip_device = THZDevice(connection="ip", host="192.168.1.1", tcp_port=2323)
         assert ip_device.host == "192.168.1.1"
         assert ip_device.tcp_port == 2323

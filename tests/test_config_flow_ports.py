@@ -11,7 +11,6 @@ Covers _list_serial_ports():
 import sys
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 # ---------------------------------------------------------------------------
@@ -201,7 +200,8 @@ class TestListSerialPorts:
 
     def test_stored_ttyusb_upgraded_to_by_id_canonical(self):
         """If the stored path is /dev/ttyUSB0 but a by-id symlink exists for the same
-        device, the canonical default should be the by-id key, not /dev/ttyUSB0."""
+        device, the canonical default should be the by-id key, not /dev/ttyUSB0.
+        """
         port = _make_port("/dev/ttyUSB0", "Silicon Labs CP2102")
         by_id_name = "usb-Silicon_Labs_0001-if00-port0"
         by_id_path = f"/dev/serial/by-id/{by_id_name}"
@@ -246,7 +246,8 @@ class TestListSerialPorts:
 
     def test_disconnected_stored_device_remains_selectable(self):
         """If the stored device is not currently connected, add it to the options
-        dict so the reconfigure form can still display and select it."""
+        dict so the reconfigure form can still display and select it.
+        """
         # No ports currently connected
         result, canonical = self._call(
             ports=[],

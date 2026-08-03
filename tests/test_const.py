@@ -1,6 +1,5 @@
 """Tests for constants and utility functions."""
 
-import pytest
 
 from custom_components.thz.const import (
     CONF_CONNECTION_TYPE,
@@ -171,7 +170,7 @@ class TestShouldHideEntityByDefault:
         assert should_hide_entity_by_default("p13Something")
         assert should_hide_entity_by_default("p20Test")
         assert should_hide_entity_by_default("p99Max")
-        
+
         # p01-p12 should be visible (if not caught by other rules)
         assert not should_hide_entity_by_default("p01Test")
         assert not should_hide_entity_by_default("p12Test")

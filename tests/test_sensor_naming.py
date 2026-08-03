@@ -5,7 +5,6 @@ cleaned and matched against SENSOR_META entries to ensure proper entity
 naming and translation key assignment.
 """
 
-import pytest
 
 
 class TestSensorNameCleaning:
@@ -84,7 +83,7 @@ class TestEntityHiding:
     def test_hc2_sensors_hidden(self):
         """Test that HC2 sensors are hidden by default."""
         from custom_components.thz.const import should_hide_entity_by_default
-        
+
         hc2_sensors = ["flowTempHC2", "roomTempHC2", "setTempHC2"]
         for sensor in hc2_sensors:
             assert should_hide_entity_by_default(sensor), f"{sensor} should be hidden"
@@ -92,7 +91,7 @@ class TestEntityHiding:
     def test_program_entities_hidden(self):
         """Test that program entities are hidden by default."""
         from custom_components.thz.const import should_hide_entity_by_default
-        
+
         program_entities = ["programDHW_Mo", "programHC1_Tu", "programHC2_We"]
         for entity in program_entities:
             assert should_hide_entity_by_default(entity), f"{entity} should be hidden"
@@ -100,7 +99,7 @@ class TestEntityHiding:
     def test_advanced_parameters_hidden(self):
         """Test that advanced parameters (p13+) are hidden by default."""
         from custom_components.thz.const import should_hide_entity_by_default
-        
+
         advanced_params = ["p13GradientHC1", "p21Hyst1", "p30integralComponent"]
         for param in advanced_params:
             assert should_hide_entity_by_default(param), f"{param} should be hidden"
@@ -108,7 +107,7 @@ class TestEntityHiding:
     def test_basic_entities_visible(self):
         """Test that basic entities are visible by default."""
         from custom_components.thz.const import should_hide_entity_by_default
-        
+
         basic_entities = [
             "outsideTemp",
             "flowTemp",

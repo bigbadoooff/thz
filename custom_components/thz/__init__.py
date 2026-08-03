@@ -40,6 +40,12 @@ _LOGGER = logging.getLogger(__name__)
 # Hex dump formatting constants
 BYTES_PER_HEX_LINE = 16  # Number of bytes to display per line in hex dumps
 
+# Entity platforms forwarded to/unloaded from this config entry
+PLATFORMS = [
+    "sensor", "binary_sensor", "number", "switch", "select", "time",
+    "button", "climate",
+]
+
 
 def _resolve_target_device(
     hass: HomeAssistant, requested_entry_id: str | None
@@ -359,7 +365,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # Forward setup to platforms
     await hass.config_entries.async_forward_entry_setups(
         config_entry,
-        ["sensor", "binary_sensor", "number", "switch", "select", "time", "button", "climate"],
+        PLATFORMS,
     )
 
     # One-time migration: disable entities that should be hidden by default
@@ -434,7 +440,9 @@ async def async_refresh_block(
     if entry_id:
         entry_data = available_entries.get(entry_id)
         if entry_data is None:
-            _LOGGER.error("async_refresh_block: no THZ entry for entry_id '%s'", entry_id)
+            _LOGGER.error(
+                "async_refresh_block: no THZ entry for entry_id '%s'", entry_id
+            )
             return False
         candidates = [entry_data]
     else:
@@ -449,7 +457,9 @@ async def async_refresh_block(
             found = True
 
     if not found:
-        _LOGGER.warning("async_refresh_block: block '%s' not found in any coordinator", normalized)
+        _LOGGER.warning(
+            "async_refresh_block: block '%s' not found in any coordinator", normalized
+        )
     return found
 
 
@@ -558,7 +568,9 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         # Read the register
         try:
             _LOGGER.info("Reading raw register: %s", command_str)
-            data = await device.async_execute(hass, device.read_block, command_bytes, "get")
+            data = await device.async_execute(
+                hass, device.read_block, command_bytes, "get"
+            )
 
             formatted = _format_hex_dump(data)
             hex_string = data.hex()
@@ -686,16 +698,19 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 "error": "THZ device not initialized",
             }
 
-        results: list[dict[str, str | int | bool | dict[str, int | float | bool | str]]] = []
+        result_value = str | int | bool | dict[str, int | float | bool | str]
+        results: list[dict[str, result_value]] = []
         success_count = 0
         error_count = 0
 
         for command_str in commands:
             command_bytes = bytes.fromhex(command_str)
             try:
-                data = await device.async_execute(hass, device.read_block, command_bytes, "get")
+                data = await device.async_execute(
+                    hass, device.read_block, command_bytes, "get"
+                )
                 success_count += 1
-                result_item: dict[str, str | int | bool | dict[str, int | float | bool | str]] = {
+                result_item: dict[str, result_value] = {
                     "command": command_str,
                     "success": True,
                     "length": len(data),
@@ -964,11 +979,17 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         if requested_entry_id:
             entry_data = available_entries.get(requested_entry_id)
             if entry_data is None:
-                return {"success": False, "error": f"No THZ entry for entry_id '{requested_entry_id}'"}
+                return {
+                    "success": False,
+                    "error": f"No THZ entry for entry_id '{requested_entry_id}'",
+                }
         elif len(available_entries) > 1:
             return {
                 "success": False,
-                "error": "Multiple THZ entries found. Provide 'entry_id' to target a specific device.",
+                "error": (
+                    "Multiple THZ entries found. Provide 'entry_id' to target "
+                    "a specific device."
+                ),
             }
         elif available_entries:
             entry_data = next(iter(available_entries.values()))
@@ -983,35 +1004,47 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             if coordinator is None or coordinator.data is None:
                 return {
                     "success": False,
-                    "error": f"Cannot verify valve state: {_DIVERTER_BLOCK} coordinator data not available",
+                    "error": (
+                        f"Cannot verify valve state: {_DIVERTER_BLOCK} coordinator "
+                        "data not available"
+                    ),
                 }
             data: bytes = coordinator.data
             if len(data) <= _DIVERTER_BYTE:
-                return {"success": False, "error": f"Insufficient data from {_DIVERTER_BLOCK} block"}
+                return {
+                    "success": False,
+                    "error": f"Insufficient data from {_DIVERTER_BLOCK} block",
+                }
             diverter_active = bool((data[_DIVERTER_BYTE] >> _DIVERTER_BIT) & 0x01)
             if position == "dhw" and not diverter_active:
                 return {
                     "success": False,
                     "error": (
-                        "Heat pump is not in DHW mode (diverterValve bit = 0 in pxxF2). "
-                        "Moving valve to DHW refused — heating circuit is under pressure."
+                        "Heat pump is not in DHW mode (diverterValve bit = 0 in "
+                        "pxxF2). Moving valve to DHW refused — heating circuit is "
+                        "under pressure."
                     ),
                 }
             if position == "heating" and diverter_active:
                 return {
                     "success": False,
                     "error": (
-                        "Heat pump is in DHW mode (diverterValve bit = 1 in pxxF2). "
-                        "Moving valve to heating refused — DHW circuit is under pressure."
+                        "Heat pump is in DHW mode (diverterValve bit = 1 in "
+                        "pxxF2). Moving valve to heating refused — DHW circuit "
+                        "is under pressure."
                     ),
                 }
 
         device: THZDevice = entry_data["device"]
 
         async def _stop_and_verify() -> bool:
-            """Stop both motor directions, read back to confirm, retry once if not zero."""
-            await device.async_execute(hass, device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_OFF)
-            await device.async_execute(hass, device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_OFF)
+            """Stop both motors; read back to confirm, retry once if not zero."""
+            await device.async_execute(
+                hass, device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_OFF
+            )
+            await device.async_execute(
+                hass, device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_OFF
+            )
             h_state = await device.async_execute(
                 hass, device.read_value, _VALVE_MOTOR_HEATING, "get",
                 WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH,
@@ -1023,11 +1056,16 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
             if h_state != _VALVE_MOTOR_OFF or d_state != _VALVE_MOTOR_OFF:
                 _LOGGER.warning(
-                    "Diverter valve motor not confirmed off (heating=%s dhw=%s), retrying stop",
+                    "Diverter valve motor not confirmed off (heating=%s dhw=%s), "
+                    "retrying stop",
                     h_state.hex(), d_state.hex(),
                 )
-                await device.async_execute(hass, device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_OFF)
-                await device.async_execute(hass, device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_OFF)
+                await device.async_execute(
+                    hass, device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_OFF
+                )
+                await device.async_execute(
+                    hass, device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_OFF
+                )
                 return False
 
             return True
@@ -1035,11 +1073,15 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         try:
             # Send the motor ON command
             if position == "heating":
-                await device.async_execute(hass, device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_ON)
+                await device.async_execute(
+                    hass, device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_ON
+                )
             elif position == "dhw":
-                await device.async_execute(hass, device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_ON)
+                await device.async_execute(
+                    hass, device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_ON
+                )
 
-            # Auto-stop after 3 seconds (lock released during wait so coordinators can poll)
+            # Auto-stop after 3s (lock released during wait so coordinators can poll)
             if position in ("heating", "dhw"):
                 await asyncio.sleep(3)
 
@@ -1051,7 +1093,10 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             _LOGGER.error(error_msg)
             return {"success": False, "error": error_msg}
 
-        _LOGGER.info("Diverter valve command sent: position=%s confirmed_off=%s", position, confirmed)
+        _LOGGER.info(
+            "Diverter valve command sent: position=%s confirmed_off=%s",
+            position, confirmed,
+        )
         return {"success": True, "position": position, "confirmed_off": confirmed}
 
     _SKIP_TYPES: frozenset[str] = frozenset({"button", "ptime"})
@@ -1068,12 +1113,20 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         }
         if requested_entry_id:
             if requested_entry_id not in available_entries:
-                return {"success": False, "error": f"No THZ entry found for entry_id '{requested_entry_id}'"}
+                return {
+                    "success": False,
+                    "error": (
+                        f"No THZ entry found for entry_id '{requested_entry_id}'"
+                    ),
+                }
             entry_id = requested_entry_id
         elif len(available_entries) == 1:
             entry_id = next(iter(available_entries))
         elif len(available_entries) > 1:
-            return {"success": False, "error": "Multiple THZ devices found; provide 'entry_id'"}
+            return {
+                "success": False,
+                "error": "Multiple THZ devices found; provide 'entry_id'",
+            }
         else:
             return {"success": False, "error": "THZ device not initialized"}
 
@@ -1162,12 +1215,20 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         }
         if requested_entry_id:
             if requested_entry_id not in available_entries:
-                return {"success": False, "error": f"No THZ entry found for entry_id '{requested_entry_id}'"}
+                return {
+                    "success": False,
+                    "error": (
+                        f"No THZ entry found for entry_id '{requested_entry_id}'"
+                    ),
+                }
             entry_id = requested_entry_id
         elif len(available_entries) == 1:
             entry_id = next(iter(available_entries))
         elif len(available_entries) > 1:
-            return {"success": False, "error": "Multiple THZ devices found; provide 'entry_id'"}
+            return {
+                "success": False,
+                "error": "Multiple THZ devices found; provide 'entry_id'",
+            }
         else:
             return {"success": False, "error": "THZ device not initialized"}
 
@@ -1186,7 +1247,10 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                     return json.load(fh)
             backup_data = await hass.async_add_executor_job(_read)
         except (OSError, json.JSONDecodeError) as exc:
-            return {"success": False, "error": f"Could not read backup file '{backup_file}': {exc}"}
+            return {
+                "success": False,
+                "error": f"Could not read backup file '{backup_file}': {exc}",
+            }
 
         saved_settings: dict = backup_data.get("settings", {})
         current_registers = write_manager.get_all_registers()
@@ -1236,7 +1300,9 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                     )
                 restored += 1
             except THZRegisterNotSupportedError as exc:
-                _LOGGER.debug("Restore: skipping unsupported register %s: %s", name, exc)
+                _LOGGER.debug(
+                    "Restore: skipping unsupported register %s: %s", name, exc
+                )
                 skipped += 1
             except (ConnectionError, RuntimeError, OSError) as exc:
                 _LOGGER.error("Restore: failed to write %s: %s", name, exc)
@@ -1497,9 +1563,7 @@ async def _async_update_block(
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Remove Config Entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(
-        entry, ["sensor", "binary_sensor", "number", "switch", "select", "time", "button", "climate"]
-    )
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         # Clean up device connection
         entry_data = hass.data[DOMAIN].get(entry.entry_id)

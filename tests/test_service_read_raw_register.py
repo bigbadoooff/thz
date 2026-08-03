@@ -1,6 +1,6 @@
 """Tests for the read_raw_register service."""
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 

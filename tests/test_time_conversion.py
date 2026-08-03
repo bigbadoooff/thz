@@ -1,7 +1,6 @@
 """Tests for time conversion functions."""
 from datetime import time
 
-import pytest
 
 from custom_components.thz.const import TIME_VALUE_UNSET
 from custom_components.thz.time import quarters_to_time, time_to_quarters

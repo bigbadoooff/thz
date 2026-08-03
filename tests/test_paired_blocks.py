@@ -7,7 +7,6 @@ values that can exceed 16-bit range.  The combined value is computed as:
 This matches the FHEM THZ module's behaviour for "1clean" type sensors.
 """
 
-import pytest
 
 from custom_components.thz.register_maps.register_map_manager import RegisterMapManager
 from custom_components.thz.register_maps import readings_map_439, readings_map_539
