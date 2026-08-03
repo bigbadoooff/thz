@@ -183,6 +183,39 @@ class THZBaseEntity(Entity):
         """Return True if the device was reachable on the last update."""
         return self._attr_available
 
+    async def _async_read_register(self, offset: int, length: int) -> bytes | None:
+        """Read this entity's register, tracking availability along the way.
+
+        On a connectivity failure, marks the entity unavailable (logging once
+        on the transition) and returns None. On success but an empty
+        response, logs a warning and also returns None. Either way, callers
+        should treat None as "nothing to decode this cycle, keep the
+        previous value" and return from their own async_update.
+        """
+        try:
+            value_bytes: bytes = await self._device.async_execute(
+                self.hass,
+                self._device.read_value,
+                bytes.fromhex(self._command),
+                "get",
+                offset,
+                length,
+            )
+        except (ConnectionError, RuntimeError, OSError) as err:
+            if self._attr_available:
+                _LOGGER.warning("%s became unavailable: %s", self.name, err)
+            self._attr_available = False
+            return None
+        self._attr_available = True
+
+        if not value_bytes:
+            _LOGGER.warning(
+                "No data received for %s, keeping previous value", self.name
+            )
+            return None
+
+        return value_bytes
+
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes including register information.

@@ -7,7 +7,7 @@ across entity platforms.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from ._typing_compat import get_runtime_data
 from .const import DEFAULT_UPDATE_INTERVAL, get_write_group_for_key
@@ -29,12 +29,12 @@ async def async_setup_write_platform(
     async_add_entities: AddEntitiesCallback,
     entity_type: type,
     platform_type: str,
-    entity_factory: Callable | None = None,
 ) -> None:
-    """Generic setup for write platforms (number, switch, select, time).
+    """Generic setup for write platforms (number, switch, select, button).
 
     This function consolidates the common setup logic used by all write-based
-    entity platforms, reducing code duplication.
+    entity platforms, reducing code duplication. (time.py has its own
+    async_setup_entry since schedule entries split into two entities.)
 
     Args:
         hass: The Home Assistant instance.
@@ -42,10 +42,6 @@ async def async_setup_write_platform(
         async_add_entities: Callback function to register new entities.
         entity_type: The entity class to instantiate (e.g., THZNumber, THZSwitch).
         platform_type: The type filter for register entries (e.g., "number", "switch").
-        entity_factory: Optional custom factory function for creating entities.
-                       If provided, called with
-                       (name, entry, device, device_id, write_interval)
-                       and should return a list of entities.
     """
     entry_data = get_runtime_data(config_entry)
     write_manager: RegisterMapManagerWrite = entry_data["write_manager"]
@@ -78,24 +74,14 @@ async def async_setup_write_platform(
                 entry["command"]
             )
 
-            # Use custom factory if provided, otherwise use default
-            if entity_factory:
-                new_entities = entity_factory(
-                    name, entry, device, device_id, write_interval
-                )
-                entities.extend(
-                    new_entities if isinstance(new_entities, list) else [new_entities]
-                )
-            else:
-                # Create entity instance with common parameters
-                entity = entity_type(
-                    name=name,
-                    entry=entry,
-                    device=device,
-                    device_id=device_id,
-                    scan_interval=write_interval,
-                )
-                entities.append(entity)
+            entity = entity_type(
+                name=name,
+                entry=entry,
+                device=device,
+                device_id=device_id,
+                scan_interval=write_interval,
+            )
+            entities.append(entity)
 
     _LOGGER.info("Created %d %s entities", len(entities), platform_type)
     async_add_entities(entities, True)

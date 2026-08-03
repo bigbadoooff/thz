@@ -131,6 +131,51 @@ def _expand_scan_range(start: str, end: str) -> list[str]:
     return [f"{value:06X}" for value in range(start_val, end_val + 1)]
 
 
+def _resolve_scan_commands(
+    pattern: str | None, start: str | None, end: str | None, max_results: int
+) -> tuple[list[str], str]:
+    """Validate and expand a pattern/range scan request into a command list.
+
+    Shared by scan_raw_registers and watch_raw_registers_changes, which both
+    accept exactly one of a wildcard ``pattern`` or a ``start``/``end`` range.
+
+    Raises:
+        ServiceValidationError: If max_results isn't positive, neither or both
+            of pattern/range are provided, or the pattern/range is malformed.
+
+    Returns:
+        A tuple of (commands, scan_mode) — the expanded, max_results-truncated
+        list of 6-hex-char commands, and a human-readable mode label used in
+        logging and notification text.
+    """
+    if max_results <= 0:
+        raise ServiceValidationError("max_results must be greater than 0")
+
+    use_pattern = bool(pattern)
+    use_range = bool(start) or bool(end)
+    if use_pattern == use_range:
+        raise ServiceValidationError(
+            "Provide either 'pattern' or both 'start' and 'end'"
+        )
+
+    try:
+        if use_pattern:
+            commands = _expand_scan_pattern(pattern or "")
+            scan_mode = f"pattern:{(pattern or '').strip().upper()}"
+        else:
+            if not start or not end:
+                raise ValueError("Both 'start' and 'end' are required")
+            commands = _expand_scan_range(start, end)
+            scan_mode = f"range:{start.strip().upper()}-{end.strip().upper()}"
+    except ValueError as err:
+        raise ServiceValidationError(str(err)) from err
+
+    if len(commands) > max_results:
+        commands = commands[:max_results]
+
+    return commands, scan_mode
+
+
 def _format_hex_dump(data: bytes) -> str:
     """Format bytes as an offset-based hex dump string."""
     formatted_lines = []
@@ -621,30 +666,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         max_results = int(call.data.get("max_results", 65535))
         preview_limit = int(call.data.get("preview_limit", 20))
 
-        if max_results <= 0:
-            raise ServiceValidationError("max_results must be greater than 0")
-
-        use_pattern = bool(pattern)
-        use_range = bool(start) or bool(end)
-        if use_pattern == use_range:
-            raise ServiceValidationError(
-                "Provide either 'pattern' or both 'start' and 'end'"
-            )
-
-        try:
-            if use_pattern:
-                commands = _expand_scan_pattern(pattern or "")
-                scan_mode = f"pattern:{(pattern or '').strip().upper()}"
-            else:
-                if not start or not end:
-                    raise ValueError("Both 'start' and 'end' are required")
-                commands = _expand_scan_range(start, end)
-                scan_mode = f"range:{start.strip().upper()}-{end.strip().upper()}"
-        except ValueError as err:
-            raise ServiceValidationError(str(err)) from err
-
-        if len(commands) > max_results:
-            commands = commands[:max_results]
+        commands, scan_mode = _resolve_scan_commands(pattern, start, end, max_results)
 
         _, entry_data = _require_target_entry_data(hass, requested_entry_id)
         device = entry_data["device"]
@@ -759,30 +781,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 "interval_seconds must be greater than or equal to 0"
             )
 
-        if max_results <= 0:
-            raise ServiceValidationError("max_results must be greater than 0")
-
-        use_pattern = bool(pattern)
-        use_range = bool(start) or bool(end)
-        if use_pattern == use_range:
-            raise ServiceValidationError(
-                "Provide either 'pattern' or both 'start' and 'end'"
-            )
-
-        try:
-            if use_pattern:
-                commands = _expand_scan_pattern(pattern or "")
-                scan_mode = f"pattern:{(pattern or '').strip().upper()}"
-            else:
-                if not start or not end:
-                    raise ValueError("Both 'start' and 'end' are required")
-                commands = _expand_scan_range(start, end)
-                scan_mode = f"range:{start.strip().upper()}-{end.strip().upper()}"
-        except ValueError as err:
-            raise ServiceValidationError(str(err)) from err
-
-        if len(commands) > max_results:
-            commands = commands[:max_results]
+        commands, scan_mode = _resolve_scan_commands(pattern, start, end, max_results)
 
         _, entry_data = _require_target_entry_data(hass, requested_entry_id)
         device = entry_data["device"]

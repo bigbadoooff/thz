@@ -2,8 +2,7 @@
 
 Exercises async_setup_write_platform():
 - Filtering write registers by platform_type.
-- Default entity construction path (entity_type(...)).
-- Custom entity_factory path, including both list and single-entity returns.
+- Entity construction path (entity_type(...)).
 - write_interval sourced from config_entry.data, with DEFAULT_UPDATE_INTERVAL
   fallback when absent.
 - Empty register map -> async_add_entities called with an empty list.
@@ -129,66 +128,3 @@ class TestAsyncSetupWritePlatformDefaultFactory:
 
         entities, _ = async_add_entities.call_args.args
         assert entities[0].scan_interval == 4242
-
-
-class TestAsyncSetupWritePlatformCustomFactory:
-    @pytest.mark.asyncio
-    async def test_factory_returning_list_is_extended(self):
-        registers = {"reg1": {"type": "select", "command": "cmd"}}
-        hass, config_entry, device, _ = _make_hass_and_entry(registers)
-        async_add_entities = MagicMock()
-
-        created = [FakeEntity("a", registers["reg1"], device, "dev1", 600),
-                   FakeEntity("b", registers["reg1"], device, "dev1", 600)]
-
-        def factory(name, entry, dev, device_id, write_interval):
-            assert name == "reg1"
-            assert dev is device
-            assert device_id == "dev1"
-            return created
-
-        await async_setup_write_platform(
-            hass, config_entry, async_add_entities, FakeEntity, "select",
-            entity_factory=factory,
-        )
-
-        entities, _ = async_add_entities.call_args.args
-        assert entities == created
-
-    @pytest.mark.asyncio
-    async def test_factory_returning_single_entity_is_wrapped(self):
-        registers = {"reg1": {"type": "select", "command": "cmd"}}
-        hass, config_entry, device, _ = _make_hass_and_entry(registers)
-        async_add_entities = MagicMock()
-
-        single = FakeEntity("only", registers["reg1"], device, "dev1", 600)
-
-        def factory(name, entry, dev, device_id, write_interval):
-            return single
-
-        await async_setup_write_platform(
-            hass, config_entry, async_add_entities, FakeEntity, "select",
-            entity_factory=factory,
-        )
-
-        entities, _ = async_add_entities.call_args.args
-        assert entities == [single]
-
-    @pytest.mark.asyncio
-    async def test_factory_only_called_for_matching_type(self):
-        registers = {
-            "reg1": {"type": "select", "command": "cmd1"},
-            "reg2": {"type": "number", "command": "cmd2"},
-        }
-        hass, config_entry, _, _ = _make_hass_and_entry(registers)
-        async_add_entities = MagicMock()
-
-        factory = MagicMock(return_value=[])
-
-        await async_setup_write_platform(
-            hass, config_entry, async_add_entities, FakeEntity, "select",
-            entity_factory=factory,
-        )
-
-        factory.assert_called_once()
-        assert factory.call_args.args[0] == "reg1"

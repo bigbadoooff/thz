@@ -253,17 +253,31 @@ class TestGetTranslationKey:
                 )
 
     def test_all_program_keys_count(self):
-        """Test that we have exactly 120 base program translation keys.
+        """Test that get_translation_key() computes exactly 120 distinct program keys.
 
-        This validates the base program keys only (without _start/_end suffixes).
-        Total program-related keys: 120 base + 120 _start + 120 _end = 360 keys.
-        Structure: 4 program types x 30 entities each = 120 base keys
-        - Each type has: 7 individual days x 3 slots + 3 day ranges x 3 slots = 30 keys
+        Program keys are computed by get_translation_key() (lowercase +
+        "-" -> "_"), not hand-maintained in ENTITY_TRANSLATION_KEYS.
+        Structure: 4 program types x 30 entities each = 120 keys - each type
+        has 7 individual days x 3 slots + 3 day ranges x 3 slots = 30 keys.
         """
-        program_keys = [
-            k for k in ENTITY_TRANSLATION_KEYS.keys() if k.startswith("program")
+        days = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "So"]
+        day_ranges = ["Mo-Fr", "Sa-So", "Mo-So"]
+        slots = [0, 1, 2]
+        program_types = ["HC1", "HC2", "DHW", "Fan"]
+
+        names = [
+            f"program{ptype}_{day}_{slot}"
+            for ptype in program_types
+            for day in days + day_ranges
+            for slot in slots
         ]
-        # 4 program types × 30 entities each = 120 total base keys
-        assert len(program_keys) == 120, (
-            f"Expected 120 program keys, found {len(program_keys)}"
+        assert len(names) == 120
+
+        translation_keys = {get_translation_key(name) for name in names}
+        assert len(translation_keys) == 120, (
+            f"Expected 120 distinct program keys, found {len(translation_keys)}"
         )
+        assert None not in translation_keys
+
+        # Program keys are computed, not hand-maintained in the dict.
+        assert not any(k.startswith("program") for k in ENTITY_TRANSLATION_KEYS)

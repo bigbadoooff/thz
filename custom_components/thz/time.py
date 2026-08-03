@@ -250,29 +250,11 @@ class THZTime(THZBaseEntity, TimeEntity):
 
     async def async_update(self):
         """Fetch new state data for the time."""
-        try:
-            value_bytes = await self._device.async_execute(
-                self.hass,
-                self._device.read_value,
-                bytes.fromhex(self._command),
-                "get",
-                WRITE_REGISTER_OFFSET,
-                WRITE_REGISTER_LENGTH,
-            )
-        except (ConnectionError, RuntimeError, OSError) as err:
-            if self._attr_available:
-                _LOGGER.warning("Time %s became unavailable: %s", self.name, err)
-            self._attr_available = False
-            return
-        self._attr_available = True
-
         # Time values are stored as single bytes (0-95 quarters)
-        if not value_bytes:
-            _LOGGER.warning(
-                "No data received for time %s (command %s), keeping previous value",
-                self.name,
-                self._command,
-            )
+        value_bytes = await self._async_read_register(
+            WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH
+        )
+        if value_bytes is None:
             return
 
         num = value_bytes[0]
@@ -388,23 +370,9 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
 
     async def async_update(self):
         """Fetch new state data for the schedule time."""
-        try:
-            value_bytes = await self._device.async_execute(
-                self.hass,
-                self._device.read_value,
-                bytes.fromhex(self._command),
-                "get",
-                4,
-                4,
-            )
-        except (ConnectionError, RuntimeError, OSError) as err:
-            if self._attr_available:
-                _LOGGER.warning(
-                    "Schedule time %s became unavailable: %s", self.name, err
-                )
-            self._attr_available = False
+        value_bytes = await self._async_read_register(4, 4)
+        if value_bytes is None:
             return
-        self._attr_available = True
 
         # Schedule data format (from FHEM 7prog):
         # - Bytes 0-3: header/other data
@@ -413,7 +381,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         # However, read_value returns data starting at offset 4, so:
         # - value_bytes[0]: start time
         # - value_bytes[1]: end time
-        if not value_bytes or len(value_bytes) < 2:
+        if len(value_bytes) < 2:
             _LOGGER.warning(
                 "No data received for schedule time %s (%s), keeping previous value",
                 self.name,

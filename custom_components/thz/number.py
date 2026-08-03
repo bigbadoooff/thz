@@ -97,29 +97,10 @@ class THZNumber(THZBaseEntity, NumberEntity):
 
     async def async_update(self) -> None:
         """Fetch new state data for the number."""
-        try:
-            value_bytes = await self._device.async_execute(
-                self.hass,
-                self._device.read_value,
-                bytes.fromhex(self._command),
-                "get",
-                self._read_offset,
-                self._read_length,
-            )
-        except (ConnectionError, RuntimeError, OSError) as err:
-            if self._attr_available:
-                _LOGGER.warning(
-                    "Number %s became unavailable: %s", self.name, err
-                )
-            self._attr_available = False
-            return
-        self._attr_available = True
-
-        # Validate that we received data
-        if not value_bytes:
-            _LOGGER.warning(
-                "No data received for number %s, keeping previous value", self.name
-            )
+        value_bytes = await self._async_read_register(
+            self._read_offset, self._read_length
+        )
+        if value_bytes is None:
             return
 
         _LOGGER.debug("Received bytes for %s: %s", self.name, value_bytes.hex())
