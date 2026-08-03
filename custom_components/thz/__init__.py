@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable, Coroutine
 from datetime import timedelta
 import itertools
 import json
 import logging
 import os
 import random
+from typing import Any, cast
 
 import voluptuous as vol
 
@@ -28,6 +30,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
+from ._typing_compat import get_runtime_data, set_runtime_data
 from .const import (
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
@@ -61,9 +64,10 @@ def _require_target_entry_data(
     device is initialized at all.
     """
     available_entries: dict[str, dict] = {
-        entry.entry_id: entry.runtime_data
+        entry.entry_id: get_runtime_data(entry)
         for entry in hass.config_entries.async_entries(DOMAIN)
-        if isinstance(entry.runtime_data, dict) and "device" in entry.runtime_data
+        if isinstance(get_runtime_data(entry), dict)
+        and "device" in get_runtime_data(entry)
     }
 
     if requested_entry_id:
@@ -313,6 +317,14 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             "Creating coordinators with refresh intervals: %s", refresh_intervals
         )
 
+    def _make_update_method(
+        block_name: str,
+    ) -> Callable[[], Coroutine[Any, Any, bytes | None]]:
+        async def _update() -> bytes | None:
+            return await _async_update_block(hass, device, block_name, paired_blocks)
+
+        return _update
+
     # Create a coordinator for each block with its own interval
     unsupported_blocks: set[str] = set()
     for block, interval in refresh_intervals.items():
@@ -329,9 +341,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             _LOGGER,
             name=f"THZ {block}",
             update_interval=timedelta(seconds=int(interval) + jitter),
-            update_method=lambda b=block: _async_update_block(
-                hass, device, b, paired_blocks
-            ),
+            update_method=_make_update_method(block),
         )
         try:
             await coordinator.async_config_entry_first_refresh()
@@ -363,14 +373,14 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     # Store per-entry runtime state on the config entry itself (not hass.data),
     # per HA's recommended runtime-data pattern.
-    config_entry.runtime_data = {
+    set_runtime_data(config_entry, {
         "device": device,
         "device_id": unique_id,
         "write_manager": write_manager,
         "register_manager": register_manager,
         "coordinators": coordinators,
         "unsupported_blocks": unsupported_blocks,
-    }
+    })
 
     # Forward setup to platforms
     await hass.config_entries.async_forward_entry_setups(
@@ -442,10 +452,10 @@ async def async_refresh_block(
     normalized = _normalize_block_name(block)
 
     available_entries: dict[str, dict] = {
-        entry.entry_id: entry.runtime_data
+        entry.entry_id: get_runtime_data(entry)
         for entry in hass.config_entries.async_entries(DOMAIN)
-        if isinstance(entry.runtime_data, dict)
-        and "coordinators" in entry.runtime_data
+        if isinstance(get_runtime_data(entry), dict)
+        and "coordinators" in get_runtime_data(entry)
     }
 
     if entry_id:
@@ -1069,9 +1079,9 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             backup_file = os.path.join(hass.config.config_dir, backup_file)
 
         try:
-            def _read() -> dict:
+            def _read() -> dict[str, Any]:
                 with open(backup_file, encoding="utf-8") as fh:
-                    return json.load(fh)
+                    return cast(dict[str, Any], json.load(fh))
             backup_data = await hass.async_add_executor_job(_read)
         except (OSError, json.JSONDecodeError) as exc:
             raise HomeAssistantError(
@@ -1280,9 +1290,14 @@ async def _async_migrate_disable_hidden_entities(
         )
 
         if should_hide and entity_entry.disabled_by is None:
+            # RegistryEntryDisabler members are mistyped as plain `str` in
+            # some older homeassistant-stubs snapshots; not a real type error.
+            disabler: er.RegistryEntryDisabler = (
+                er.RegistryEntryDisabler.INTEGRATION  # type: ignore[assignment]
+            )
             ent_reg.async_update_entity(
                 entity_entry.entity_id,
-                disabled_by=er.RegistryEntryDisabler.INTEGRATION,
+                disabled_by=disabler,
             )
             disabled_count += 1
             _LOGGER.debug(
@@ -1331,7 +1346,7 @@ async def _async_update_block(
     device: THZDevice,
     block_name: str,
     paired_blocks: dict[str, str] | None = None,
-):
+) -> bytes | None:
     """Called by coordinator to read a data block.
 
     For paired register blocks (energy sensors), both the cmd2 and cmd3
@@ -1343,7 +1358,9 @@ async def _async_update_block(
     block_bytes = bytes.fromhex(block_name.removeprefix("pxx"))
     try:
         _LOGGER.debug("Reading block %s", block_name)
-        result = await device.async_execute(hass, device.read_block, block_bytes, "get")
+        result: bytes = await device.async_execute(
+            hass, device.read_block, block_bytes, "get"
+        )
 
         # If this block has a paired cmd3 register, read it too
         if paired_blocks and block_name in paired_blocks:
@@ -1392,7 +1409,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         # Clean up device connection
-        entry_data = entry.runtime_data
+        entry_data = get_runtime_data(entry)
         if entry_data:
             device = entry_data.get("device")
             if device:

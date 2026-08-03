@@ -4,8 +4,10 @@ This module provides the configuration flow for setting up THZ heat pump
 connections via USB serial or network (ser2net).
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import serial.tools.list_ports
 import voluptuous as vol
@@ -28,6 +30,9 @@ from .const import (
 )
 from .thz_device import THZDevice
 
+if TYPE_CHECKING:
+    from ._typing_compat import ConfigFlowResult
+
 LOG_LEVELS = {
     "Error": "error",
     "Warning": "warning",
@@ -45,11 +50,11 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         """Initialize the config flow."""
-        self.connection_data = {}
-        self.blocks = []
+        self.connection_data: dict[str, Any] = {}
+        self.blocks: list[Any] = []
         self.write_groups_available: list[str] = []
 
-    async def async_step_user(self, user_input=None) -> config_entries.ConfigFlowResult:
+    async def async_step_user(self, user_input=None) -> ConfigFlowResult:
         """First step, select connection type."""
         if user_input is not None:
             if user_input["connection_type"] == CONNECTION_IP:
@@ -70,7 +75,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_setup_ip(
         self, user_input=None
-    ) -> config_entries.ConfigFlowResult:
+    ) -> ConfigFlowResult:
         """Input for IP connection."""
         errors = {}
 
@@ -137,7 +142,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_setup_usb(
         self, user_input: dict[str, Any] | None = None
-    ) -> config_entries.ConfigFlowResult:
+    ) -> ConfigFlowResult:
         """Input for serial connection."""
         if user_input is not None:
             self.connection_data = user_input
@@ -158,7 +163,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure(
         self, user_input: dict | None = None
-    ) -> config_entries.ConfigFlowResult:
+    ) -> ConfigFlowResult:
         """Handle reconfiguration initiated from the device UI."""
         entry_id = self.context.get("entry_id")
         if entry_id is None:
@@ -245,7 +250,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         areas[""] = "-- No Area --"
 
         conn_type = defaults.get(CONF_CONNECTION_TYPE, CONNECTION_USB)
-        schema_dict = {}
+        schema_dict: dict[vol.Marker, Any] = {}
 
         # Connection-specific fields
         if conn_type == CONNECTION_USB:
@@ -487,7 +492,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_detect_blocks(
         self, user_input=None
-    ) -> config_entries.ConfigFlowResult:
+    ) -> ConfigFlowResult:
         """Dynamically read available blocks from the heat pump."""
         data = self.connection_data
         conn_type = data["connection_type"]
@@ -530,7 +535,13 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.info("Available blocks: %s", blocks)
 
             # Determine available write groups from the write register map
-            write_registers = device.write_register_map_manager.get_all_registers()
+            write_manager = device.write_register_map_manager
+            if write_manager is None:
+                _LOGGER.error(
+                    "write_register_map_manager missing after async_initialize"
+                )
+                return self.async_abort(reason="cannot_detect_blocks")
+            write_registers = write_manager.get_all_registers()
             groups_found: set[str] = set()
             for key in write_registers:
                 groups_found.add(get_write_group_for_key(key))
@@ -546,7 +557,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_select_groups(
         self, user_input=None
-    ) -> config_entries.ConfigFlowResult:
+    ) -> ConfigFlowResult:
         """Allow user to select which entity groups to enable."""
         if user_input is not None:
             # Collect selected read blocks
@@ -586,7 +597,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_refresh_blocks(
         self, user_input=None
-    ) -> config_entries.ConfigFlowResult:
+    ) -> ConfigFlowResult:
         """Ask for individual refresh intervals per block."""
         selected_read_blocks = self.connection_data.get("selected_read_blocks")
         if selected_read_blocks is None:

@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from ._typing_compat import get_runtime_data
 from .base_entity import THZBaseEntity
 from .const import (
     TIME_VALUE_UNSET,
@@ -175,7 +176,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up THZ Time entities from a config entry."""
     # Use platform setup for both "time" and "schedule" types
-    entry_data = config_entry.runtime_data
+    entry_data = get_runtime_data(config_entry)
     write_manager: RegisterMapManagerWrite = entry_data["write_manager"]
     device: THZDevice = entry_data["device"]
     device_id = entry_data["device_id"]

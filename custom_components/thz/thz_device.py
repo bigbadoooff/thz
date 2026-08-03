@@ -178,12 +178,15 @@ class THZDevice:
                 if self.ser.fileno() == -1:
                     return False
 
-                # Save original timeout to restore after the check
-                original_timeout = self.ser.gettimeout()
+                # Save original timeout to restore after the check.
+                # mypy only narrows the exact attributes named in the hasattr()
+                # check above, not gettimeout/setblocking/settimeout, so these
+                # accesses need an explicit ignore despite being runtime-safe.
+                original_timeout = self.ser.gettimeout()  # type: ignore[union-attr]
 
                 # Try a quick peek without blocking to detect closed connections
                 # This is a best-effort check; MSG_PEEK may not work on all platforms
-                self.ser.setblocking(False)
+                self.ser.setblocking(False)  # type: ignore[union-attr]
                 try:
                     # recv with MSG_PEEK doesn't remove data from buffer
                     # Empty return on non-blocking socket just means no data available
@@ -197,7 +200,7 @@ class THZDevice:
                 finally:
                     # Always restore the original timeout
                     try:
-                        self.ser.settimeout(original_timeout)
+                        self.ser.settimeout(original_timeout)  # type: ignore[union-attr]
                     except (OSError, socket.error):
                         # Socket may be in bad state, ignore
                         pass
@@ -393,7 +396,7 @@ class THZDevice:
                 invalid response).
         """
         max_retries = 1  # Allow one retry on connection error
-        last_error = None
+        last_error: Exception | None = None
 
         for attempt in range(max_retries + 1):
             try:
@@ -449,13 +452,16 @@ class THZDevice:
         try:
             # Use hasattr to check connection type instead of isinstance
             # This is more robust when modules are mocked in tests
+            # mypy can't narrow away None (or Serial/socket) through hasattr();
+            # self.ser turning None mid-call is a real, accepted race handled
+            # by the AttributeError clause below.
             if hasattr(self.ser, 'send') and hasattr(self.ser, 'recv'):
                 # This is a socket
-                self.ser.send(data)
+                self.ser.send(data)  # type: ignore[union-attr]
             elif hasattr(self.ser, 'write') and hasattr(self.ser, 'flush'):
                 # This is serial
-                self.ser.write(data)
-                self.ser.flush()
+                self.ser.write(data)  # type: ignore[union-attr]
+                self.ser.flush()  # type: ignore[union-attr]
             else:
                 raise ConnectionError("Unknown connection type")
         except (OSError, socket.error, BrokenPipeError) as e:
@@ -489,14 +495,21 @@ class THZDevice:
         """
         # Use hasattr to check connection type instead of isinstance
         # This is more robust when modules are mocked in tests
+        # mypy can't narrow away None (or Serial/socket) through hasattr();
+        # self.ser turning None mid-call is a real, accepted race handled by
+        # the AttributeError clauses below.
         if hasattr(self.ser, 'recv') and hasattr(self.ser, 'setblocking'):
             # This is a socket
             # Save original timeout to restore after reading
-            original_timeout = self.ser.gettimeout()
+            original_timeout = self.ser.gettimeout()  # type: ignore[union-attr]
             try:
-                self.ser.setblocking(False)
-                data = self.ser.recv(1024)
-                if not data and hasattr(self.ser, 'fileno') and self.ser.fileno() == -1:
+                self.ser.setblocking(False)  # type: ignore[union-attr]
+                data = self.ser.recv(1024)  # type: ignore[union-attr]
+                if (
+                    not data
+                    and hasattr(self.ser, 'fileno')
+                    and self.ser.fileno() == -1  # type: ignore[union-attr]
+                ):
                     # Socket is closed
                     raise ConnectionError("TCP socket connection closed")
                 return data
@@ -514,7 +527,7 @@ class THZDevice:
             finally:
                 # Always restore the original timeout
                 try:
-                    self.ser.settimeout(original_timeout)
+                    self.ser.settimeout(original_timeout)  # type: ignore[union-attr]
                 except (OSError, socket.error, AttributeError):
                     # Socket may be in bad state or already None, ignore
                     pass
@@ -523,7 +536,7 @@ class THZDevice:
             try:
                 waiting = getattr(self.ser, "in_waiting", 0)
                 if waiting > 0:
-                    return self.ser.read(waiting)
+                    return self.ser.read(waiting)  # type: ignore[union-attr]
                 return b""
             except (OSError, serial.SerialException) as e:
                 raise ConnectionError(f"Serial read error: {e}") from e
@@ -685,7 +698,7 @@ class THZDevice:
         # 0x2B -> 0x2B 0x18 (matches Perl line 1768)
         return data.replace(b"\x2b", b"\x2b\x18")
 
-    def decode_response(self, data: bytes):
+    def decode_response(self, data: bytes) -> bytes | None:
         """Decode the response from the THZ device.
 
         Checks header, CRC, and performs unescaping.

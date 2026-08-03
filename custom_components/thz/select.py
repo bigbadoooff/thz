@@ -62,7 +62,7 @@ class THZSelect(THZBaseEntity, SelectEntity):
         # Initialize base class with common properties
         super().__init__(
             name=name,
-            command=entry.get("command"),
+            command=entry["command"],
             device=device,
             device_id=device_id,
             icon=entry.get("icon"),

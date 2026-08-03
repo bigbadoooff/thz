@@ -2,3 +2,12 @@ pytest>=7.0.0
 pytest-asyncio>=0.21.0
 pytest-cov>=4.0.0
 ruff>=0.6.0
+mypy>=1.8.0
+pyserial>=3.5
+types-pyserial>=3.5
+voluptuous>=0.13.1
+tzlocal>=5.0
+types-tzlocal>=5.0
+# homeassistant-stubs is installed separately with --no-deps in CI (see
+# .github/workflows/ci.yml) to avoid pulling in Home Assistant's full,
+# heavy runtime dependency tree just for type stubs.

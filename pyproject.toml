@@ -25,3 +25,18 @@ ignore = [
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["custom_components/thz"]
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+strict_equality = true
+check_untyped_defs = true
+
+# Dev-only type stubs (see requirements_test.txt: mypy, homeassistant-stubs,
+# types-pyserial) may lag behind the minimum Home Assistant version this
+# integration targets. custom_components/thz/_typing_compat.py and scattered
+# `# type: ignore` comments document and confine the resulting gaps; see
+# that module's docstring for details.

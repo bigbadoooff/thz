@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import EntityCategory
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
 
@@ -116,7 +117,9 @@ class THZBaseEntity(Entity):
         # Advanced/technician-mode parameters (also hidden by default above)
         # are configuration values from the user's point of view.
         if should_hide_entity_by_default(name):
-            self._attr_entity_category = EntityCategory.CONFIG
+            # EntityCategory members are mistyped as plain `str` in some
+            # older homeassistant-stubs snapshots; not a real type error.
+            self._attr_entity_category = EntityCategory.CONFIG  # type: ignore[assignment]
 
         _LOGGER.debug(
             "Entity %s: entity_registry_enabled_default=%s (hide=%s)",
@@ -193,7 +196,7 @@ class THZBaseEntity(Entity):
         }
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
         return {
             "identifiers": {(DOMAIN, self._device_id)},

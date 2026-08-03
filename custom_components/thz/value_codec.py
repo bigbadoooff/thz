@@ -29,7 +29,7 @@ def _dec_esp_mant(raw: bytes, factor: float) -> float:
             f"Invalid esp_mant length: expected 4 bytes, got {len(raw)}"
         )
     try:
-        mant = struct.unpack(">f", raw)[0]
+        mant: float = struct.unpack(">f", raw)[0]
     except struct.error as err:
         raise ValueError(f"Failed to decode esp_mant value: {err}") from err
     return round(mant, 3)
@@ -242,7 +242,7 @@ class THZValueCodec:
             return value * step
 
     @staticmethod
-    def encode_select(option: str, decode_type: str) -> bytes:
+    def encode_select(option: str, decode_type: str | None) -> bytes:
         """Encode a select option for device communication.
 
         Args:
@@ -281,7 +281,7 @@ class THZValueCodec:
         return value.to_bytes(2, byteorder="big", signed=False)
 
     @staticmethod
-    def decode_select(value_bytes: bytes, decode_type: str) -> str | None:
+    def decode_select(value_bytes: bytes, decode_type: str | None) -> str | None:
         """Decode a select value from device response.
 
         Args:

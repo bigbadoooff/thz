@@ -17,7 +17,7 @@ values according to their metadata, and exposes them as HA sensor entities.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -27,14 +27,18 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._typing_compat import get_runtime_data
 from .const import DOMAIN, should_hide_entity_by_default
 from .cop_sensor import async_setup_cop_sensors
 from .register_maps.register_map_manager import RegisterMapManager
 from .value_codec import decode_raw_value
+
+if TYPE_CHECKING:
+    from ._typing_compat import AddConfigEntryEntitiesCallback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,7 +66,7 @@ async def async_setup_entry(
     Returns:
         None
     """
-    entry_data = config_entry.runtime_data
+    entry_data = get_runtime_data(config_entry)
     register_manager: RegisterMapManager = entry_data["register_manager"]
     coordinators = entry_data["coordinators"]
     device_id = entry_data["device_id"]
@@ -311,7 +315,11 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         # Advanced/technician-mode sensors (also hidden by default above)
         # are diagnostic information rather than primary readings.
         if should_hide_entity_by_default(self._entity_name):
-            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            # EntityCategory members are mistyped as plain `str` in some
+            # older homeassistant-stubs snapshots; not a real type error.
+            self._attr_entity_category = (
+                EntityCategory.DIAGNOSTIC  # type: ignore[assignment]
+            )
 
     @property
     def native_value(self) -> StateType | int | float | bool | str | None:
@@ -355,7 +363,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         Returns:
             The native unit of measurement, or None if not set.
         """
-        return self._unit
+        return cast("str | None", self._unit)
 
     @property
     def device_class(self) -> SensorDeviceClass | None:
@@ -364,7 +372,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         Returns:
             The device class, or None if not set.
         """
-        return self._device_class
+        return cast("SensorDeviceClass | None", self._device_class)
 
     @property
     def state_class(self) -> SensorStateClass | None:
@@ -373,7 +381,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         Returns:
             The state class for long-term statistics, or None if not set.
         """
-        return self._state_class
+        return cast("SensorStateClass | None", self._state_class)
 
     @property
     def icon(self) -> str | None:
@@ -412,7 +420,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         }
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
         return {
             "identifiers": {(DOMAIN, self._device_id)},

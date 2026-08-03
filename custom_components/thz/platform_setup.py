@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable
 
+from ._typing_compat import get_runtime_data
 from .const import DEFAULT_UPDATE_INTERVAL, get_write_group_for_key
 
 if TYPE_CHECKING:
@@ -46,7 +47,7 @@ async def async_setup_write_platform(
                        (name, entry, device, device_id, write_interval)
                        and should return a list of entities.
     """
-    entry_data = config_entry.runtime_data
+    entry_data = get_runtime_data(config_entry)
     write_manager: RegisterMapManagerWrite = entry_data["write_manager"]
     device: THZDevice = entry_data["device"]
     device_id = entry_data["device_id"]

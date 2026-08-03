@@ -32,7 +32,7 @@ read-only mode — ``target_temperature`` is still shown but
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.climate import (
     ClimateEntity,
@@ -46,14 +46,18 @@ from homeassistant.components.climate import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PRECISION_TENTHS, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
 )
 
+from ._typing_compat import get_runtime_data
 from .const import DOMAIN, WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
 from .value_codec import THZValueCodec, decode_raw_value
+
+if TYPE_CHECKING:
+    from ._typing_compat import AddConfigEntryEntitiesCallback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,12 +86,17 @@ _OPMODE_NAME = "pOpMode"
 _FAN_STAGE_DAY_NAME = "p07FanStageDay"
 
 # OpModeHC string value → HVACMode
-_OP_MODE_TO_HVAC: dict[str, HVACMode] = {
-    "normal": HVACMode.HEAT,
-    "setback": HVACMode.HEAT,
-    "standby": HVACMode.OFF,
-    "restart": HVACMode.HEAT,
-}
+# cast(): HVACMode members are mistyped as plain `str` in some older
+# homeassistant-stubs snapshots; not a real type error.
+_OP_MODE_TO_HVAC: dict[str, HVACMode] = cast(
+    "dict[str, HVACMode]",
+    {
+        "normal": HVACMode.HEAT,
+        "setback": HVACMode.HEAT,
+        "standby": HVACMode.OFF,
+        "restart": HVACMode.HEAT,
+    },
+)
 
 # Default temperature bounds used when no write entry is available
 _DEFAULT_MIN_TEMP = 10.0
@@ -199,7 +208,7 @@ async def async_setup_entry(
         config_entry: The configuration entry for this integration.
         async_add_entities: Callback to register new entities.
     """
-    entry_data = config_entry.runtime_data
+    entry_data = get_runtime_data(config_entry)
     coordinators: dict[str, DataUpdateCoordinator] = entry_data["coordinators"]
     device = entry_data["device"]
     device_id: str = entry_data["device_id"]
@@ -232,7 +241,7 @@ async def async_setup_entry(
     # ── Heating Circuit 1 ──────────────────────────────────────────────────
     hc1_coordinator = coordinators.get("pxxF4")
     if hc1_coordinator is not None:
-        if None in (f4_current, f4_target, f4_opmode):
+        if f4_current is None or f4_target is None or f4_opmode is None:
             _LOGGER.error(
                 "Required fields missing from pxxF4 map; skipping HC1 climate entity"
             )
@@ -283,7 +292,7 @@ async def async_setup_entry(
     # ── Heating Circuit 2 ──────────────────────────────────────────────────
     hc2_coordinator = coordinators.get("pxxF5")
     if hc2_coordinator is not None:
-        if None in (f5_target, f5_opmode):
+        if f5_target is None or f5_opmode is None:
             _LOGGER.error(
                 "Required fields missing from pxxF5 map; skipping HC2 climate entity"
             )
@@ -327,7 +336,7 @@ async def async_setup_entry(
     # ── Domestic Hot Water ─────────────────────────────────────────────────
     dhw_coordinator = coordinators.get("pxxF3")
     if dhw_coordinator is not None:
-        if None in (f3_current, f3_target, f3_opmode):
+        if f3_current is None or f3_target is None or f3_opmode is None:
             _LOGGER.error(
                 "Required fields missing from pxxF3 map; skipping DHW climate entity"
             )
@@ -416,9 +425,11 @@ def _read_op_mode(data: bytes, offset: int, length: int) -> HVACMode:
         The corresponding :class:`HVACMode`, defaulting to ``HEAT``.
     """
     mode_str = _read_op_mode_raw(data, offset, length)
+    # HVACMode members are mistyped as plain `str` in some older
+    # homeassistant-stubs snapshots; not a real type error.
     if mode_str is not None:
-        return _OP_MODE_TO_HVAC.get(mode_str, HVACMode.HEAT)
-    return HVACMode.HEAT
+        return _OP_MODE_TO_HVAC.get(mode_str, HVACMode.HEAT)  # type: ignore[arg-type]
+    return HVACMode.HEAT  # type: ignore[return-value]
 
 
 def _bit_active(data: bytes, byte_idx: int, bit_idx: int) -> bool:
@@ -554,16 +565,25 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         self._supports_cooling = (
             cool_switch_entry is not None and cool_setpoint_entry is not None
         )
+        # HVACMode/ClimateEntityFeature members are mistyped as plain `str`/
+        # `int` in some older homeassistant-stubs snapshots; not real type
+        # errors.
         if self._supports_cooling:
-            self._attr_hvac_modes = [HVACMode.HEAT, HVACMode.COOL, HVACMode.OFF]
+            self._attr_hvac_modes = [
+                HVACMode.HEAT, HVACMode.COOL, HVACMode.OFF,  # type: ignore[list-item]
+            ]
         else:
-            self._attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
+            self._attr_hvac_modes = [
+                HVACMode.HEAT, HVACMode.OFF,  # type: ignore[list-item]
+            ]
 
         # TARGET_TEMPERATURE feature is available whenever we have a heat
         # setpoint command OR cooling is supported (then both heat/cool temps
         # are settable depending on the current mode)
         if heat_setpoint_entry is not None or self._supports_cooling:
-            self._attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
+            self._attr_supported_features = (
+                ClimateEntityFeature.TARGET_TEMPERATURE  # type: ignore[assignment]
+            )
         else:
             self._attr_supported_features = ClimateEntityFeature(0)
 
@@ -639,7 +659,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         Returns:
             Temperature in °C, or ``None`` if unavailable.
         """
-        if self._current_temp_offset is None:
+        if self._current_temp_offset is None or self._current_temp_length is None:
             return None
         if self.coordinator.data is None:
             return None
@@ -692,11 +712,13 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 and self._cooling_bit is not None
                 and _bit_active(cool_data, self._cooling_byte, self._cooling_bit)
             ):
-                return HVACMode.COOL
+                # HVACMode members are mistyped as plain `str` in some older
+                # homeassistant-stubs snapshots; not a real type error.
+                return HVACMode.COOL  # type: ignore[return-value]
 
         # Fall back to hcOpMode / dhwOpMode
         if self.coordinator.data is None:
-            return HVACMode.HEAT
+            return HVACMode.HEAT  # type: ignore[return-value]
         return _read_op_mode(
             self.coordinator.data,
             self._op_mode_offset,
@@ -728,14 +750,16 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             and self._cooling_bit is not None
             and _bit_active(cool_data, self._cooling_byte, self._cooling_bit)
         ):
-            return HVACAction.COOLING
+            # HVACAction members are mistyped as plain `str` in some older
+            # homeassistant-stubs snapshots; not a real type error.
+            return HVACAction.COOLING  # type: ignore[return-value]
         if (
             self._cooling_byte is not None
             and self._compressor_bit is not None
             and _bit_active(cool_data, self._cooling_byte, self._compressor_bit)
         ):
-            return HVACAction.HEATING
-        return HVACAction.IDLE
+            return HVACAction.HEATING  # type: ignore[return-value]
+        return HVACAction.IDLE  # type: ignore[return-value]
 
     @property
     def preset_mode(self) -> str | None:
@@ -1061,6 +1085,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
     # ── Device registry ─────────────────────────────────────────────────────
 
     @property
-    def device_info(self) -> dict:
+    def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
         return {"identifiers": {(DOMAIN, self._device_id)}}

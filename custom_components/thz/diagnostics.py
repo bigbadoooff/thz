@@ -7,6 +7,8 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from ._typing_compat import get_runtime_data
+
 # Keys to redact from diagnostics to protect user privacy
 TO_REDACT = {
     "host",
@@ -25,7 +27,7 @@ async def async_get_config_entry_diagnostics(
     THZ integration without exposing sensitive data like IP addresses or
     serial numbers.
     """
-    entry_data = config_entry.runtime_data or {}
+    entry_data = get_runtime_data(config_entry) or {}
     device = entry_data.get("device")
     coordinators = entry_data.get("coordinators", {})
 
@@ -59,7 +61,7 @@ async def async_get_config_entry_diagnostics(
     register_manager = entry_data.get("register_manager")
     write_manager = entry_data.get("write_manager")
 
-    register_counts = {}
+    register_counts: dict[str, Any] = {}
     if register_manager:
         all_registers = register_manager.get_all_registers()
         register_counts["read_blocks"] = len(all_registers)
@@ -73,7 +75,7 @@ async def async_get_config_entry_diagnostics(
         register_counts["write_entities"] = len(write_registers)
 
         # Count by type
-        type_counts = {}
+        type_counts: dict[str, int] = {}
         for entry in write_registers.values():
             entity_type = entry.get("type", "unknown")
             type_counts[entity_type] = type_counts.get(entity_type, 0) + 1

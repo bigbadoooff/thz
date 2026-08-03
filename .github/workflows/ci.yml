@@ -41,6 +41,22 @@ jobs:
       - name: Run ruff
         run: ruff check custom_components/thz tests
 
+  typecheck:
+    name: Type check (mypy)
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - name: Set up Python
+        uses: "actions/setup-python@v5"
+        with:
+          python-version: "3.11"
+      - name: Install type-check dependencies
+        run: |
+          pip install -r requirements_test.txt
+          pip install --no-deps homeassistant-stubs
+      - name: Run mypy
+        run: mypy
+
   test:
     name: Test suite
     runs-on: "ubuntu-latest"

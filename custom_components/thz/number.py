@@ -77,7 +77,9 @@ class THZNumber(THZBaseEntity, NumberEntity):
         self._attr_native_step = float(step) if step != "" else 1.0
         self._attr_native_unit_of_measurement = entry.get("unit", "")
         self._attr_device_class = entry.get("device_class")
-        self._attr_mode = NumberMode.BOX  # Use box input instead of slider
+        # NumberMode members are mistyped as plain `str` in some older
+        # homeassistant-stubs snapshots; not a real type error.
+        self._attr_mode = NumberMode.BOX  # type: ignore[assignment]
         self._decode_type = entry["decode_type"]
         self._attr_native_value = None
 

@@ -16,13 +16,8 @@ from typing import Any
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-
-try:
-    from homeassistant.exceptions import HomeAssistantError
-except ModuleNotFoundError:  # pragma: no cover - test stubs may not expose this module
-    class HomeAssistantError(Exception):
-        """Fallback error type for environments without Home Assistant exceptions."""
 
 from .base_entity import THZBaseEntity
 from .entity_translations import get_translation_key

@@ -19,7 +19,7 @@ Separate COP values are calculated for:
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -28,12 +28,16 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._typing_compat import get_runtime_data
 from .const import DOMAIN
 from .value_codec import decode_raw_value
+
+if TYPE_CHECKING:
+    from ._typing_compat import AddConfigEntryEntitiesCallback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,7 +84,7 @@ async def async_setup_cop_sensors(
     Returns:
         None
     """
-    entry_data = config_entry.runtime_data
+    entry_data = get_runtime_data(config_entry)
     coordinators = entry_data["coordinators"]
     device_id = entry_data["device_id"]
     device = entry_data["device"]
@@ -95,7 +99,7 @@ async def async_setup_cop_sensors(
         )
         return
 
-    cop_sensors = []
+    cop_sensors: list[SensorEntity] = []
 
     # Create COP sensors based on available data
     # Check if we have power sensors for current COP (mainly in fw 206, 214)
@@ -235,7 +239,11 @@ class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
 
         self._device_id = device_id
         self._attr_unique_id = f"thz_{device_id}_current_cop"
-        self._attr_device_class = SensorDeviceClass.POWER_FACTOR
+        # SensorDeviceClass members are mistyped as plain `str` in some
+        # older homeassistant-stubs snapshots; not a real type error.
+        self._attr_device_class = (
+            SensorDeviceClass.POWER_FACTOR  # type: ignore[assignment]
+        )
         self._attr_state_class = SensorStateClass.MEASUREMENT
         # Icon comes from icons.json (icon translations), not a hardcoded
         # _attr_icon, per HA's icon-translations quality-scale rule.
@@ -306,7 +314,7 @@ class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
             return None
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
         return {
             "identifiers": {(DOMAIN, self._device_id)},
@@ -336,7 +344,11 @@ class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
         super().__init__(primary_coordinator)
 
         self._device_id = device_id
-        self._attr_device_class = SensorDeviceClass.POWER_FACTOR
+        # SensorDeviceClass members are mistyped as plain `str` in some
+        # older homeassistant-stubs snapshots; not a real type error.
+        self._attr_device_class = (
+            SensorDeviceClass.POWER_FACTOR  # type: ignore[assignment]
+        )
         self._attr_state_class = SensorStateClass.MEASUREMENT
         # Icon comes from icons.json (icon translations), not a hardcoded
         # _attr_icon, per HA's icon-translations quality-scale rule.
@@ -377,7 +389,7 @@ class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
             return None
 
     @property
-    def device_info(self):
+    def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
         return {
             "identifiers": {(DOMAIN, self._device_id)},
@@ -404,6 +416,8 @@ class THZDailyCOPSensor(THZBaseCOPSensor):
         super().__init__(coordinators, device_id)
 
         self._cop_type = cop_type
+        self._heat_sensor: str | None
+        self._elec_sensor: str | None
 
         if cop_type == "DHW":
             self._attr_unique_id = f"thz_{device_id}_daily_cop_dhw"
@@ -428,6 +442,9 @@ class THZDailyCOPSensor(THZBaseCOPSensor):
         Returns:
             float | None: The daily COP value, or None if data is unavailable.
         """
+        total_heat: float | None
+        total_elec: float | None
+
         if self._cop_type == "Total":
             # Sum DHW and HC values
             heat_dhw = self._get_sensor_value("sHeatDHWDay")
@@ -435,15 +452,22 @@ class THZDailyCOPSensor(THZBaseCOPSensor):
             elec_dhw = self._get_sensor_value("sElectrDHWDay")
             elec_hc = self._get_sensor_value("sElectrHCDay")
 
-            if all(v is not None for v in [heat_dhw, heat_hc, elec_dhw, elec_hc]):
+            if (
+                heat_dhw is not None
+                and heat_hc is not None
+                and elec_dhw is not None
+                and elec_hc is not None
+            ):
                 total_heat = heat_dhw + heat_hc
                 total_elec = elec_dhw + elec_hc
             else:
                 return None
-        else:
+        elif self._heat_sensor is not None and self._elec_sensor is not None:
             # Use specific sensor values
             total_heat = self._get_sensor_value(self._heat_sensor)
             total_elec = self._get_sensor_value(self._elec_sensor)
+        else:
+            return None
 
         if total_heat is not None and total_elec is not None and total_elec > 0:
             cop = total_heat / total_elec
@@ -474,6 +498,8 @@ class THZLifetimeCOPSensor(THZBaseCOPSensor):
         super().__init__(coordinators, device_id)
 
         self._cop_type = cop_type
+        self._heat_sensor: str | None
+        self._elec_sensor: str | None
 
         if cop_type == "DHW":
             self._attr_unique_id = f"thz_{device_id}_lifetime_cop_dhw"
@@ -498,6 +524,9 @@ class THZLifetimeCOPSensor(THZBaseCOPSensor):
         Returns:
             float | None: The lifetime COP value, or None if data is unavailable.
         """
+        total_heat: float | None
+        total_elec: float | None
+
         if self._cop_type == "Total":
             # Sum DHW and HC values
             heat_dhw = self._get_sensor_value("sHeatDHWTotal")
@@ -505,15 +534,22 @@ class THZLifetimeCOPSensor(THZBaseCOPSensor):
             elec_dhw = self._get_sensor_value("sElectrDHWTotal")
             elec_hc = self._get_sensor_value("sElectrHCTotal")
 
-            if all(v is not None for v in [heat_dhw, heat_hc, elec_dhw, elec_hc]):
+            if (
+                heat_dhw is not None
+                and heat_hc is not None
+                and elec_dhw is not None
+                and elec_hc is not None
+            ):
                 total_heat = heat_dhw + heat_hc
                 total_elec = elec_dhw + elec_hc
             else:
                 return None
-        else:
+        elif self._heat_sensor is not None and self._elec_sensor is not None:
             # Use specific sensor values
             total_heat = self._get_sensor_value(self._heat_sensor)
             total_elec = self._get_sensor_value(self._elec_sensor)
+        else:
+            return None
 
         if total_heat is not None and total_elec is not None and total_elec > 0:
             cop = total_heat / total_elec

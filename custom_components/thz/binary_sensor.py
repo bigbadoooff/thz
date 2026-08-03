@@ -13,7 +13,7 @@ native automations and notifications (e.g., filter-change reminders).
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -22,12 +22,16 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._typing_compat import get_runtime_data
 from .const import DOMAIN, should_hide_entity_by_default
 from .register_maps.register_map_manager import RegisterMapManager
 from .value_codec import decode_raw_value
+
+if TYPE_CHECKING:
+    from ._typing_compat import AddConfigEntryEntitiesCallback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,24 +57,28 @@ def _get_device_class(name: str) -> BinarySensorDeviceClass | None:
     n = name.lower()
     # Running: compressor, pumps
     if any(x in n for x in ["pump", "compressor"]):
-        return BinarySensorDeviceClass.RUNNING
+        device_class = BinarySensorDeviceClass.RUNNING
     # Problem: filters, service flag
-    if any(x in n for x in ["filter", "service"]):
-        return BinarySensorDeviceClass.PROBLEM
+    elif any(x in n for x in ["filter", "service"]):
+        device_class = BinarySensorDeviceClass.PROBLEM
     # Window contact
-    if "window" in n:
-        return BinarySensorDeviceClass.WINDOW
+    elif "window" in n:
+        device_class = BinarySensorDeviceClass.WINDOW
     # Opening: valves and mixer
-    if any(x in n for x in ["valve", "mixer"]):
-        return BinarySensorDeviceClass.OPENING
+    elif any(x in n for x in ["valve", "mixer"]):
+        device_class = BinarySensorDeviceClass.OPENING
     # Heat: active heating signals
-    if "heating" in n:
-        return BinarySensorDeviceClass.HEAT
+    elif "heating" in n:
+        device_class = BinarySensorDeviceClass.HEAT
     # Cold: active cooling or defrost
-    if any(x in n for x in ["cooling", "defrost"]):
-        return BinarySensorDeviceClass.COLD
-    # Default: no device class (shows generic on/off)
-    return None
+    elif any(x in n for x in ["cooling", "defrost"]):
+        device_class = BinarySensorDeviceClass.COLD
+    else:
+        # Default: no device class (shows generic on/off)
+        device_class = None
+    # BinarySensorDeviceClass members are mistyped as plain `str` in some
+    # older homeassistant-stubs snapshots; not a real type error.
+    return cast("BinarySensorDeviceClass | None", device_class)
 
 
 async def async_setup_entry(
@@ -88,7 +96,7 @@ async def async_setup_entry(
         config_entry: The configuration entry for this integration.
         async_add_entities: Callback to add entities to Home Assistant.
     """
-    entry_data = config_entry.runtime_data
+    entry_data = get_runtime_data(config_entry)
     register_manager: RegisterMapManager = entry_data["register_manager"]
     coordinators = entry_data["coordinators"]
     device_id = entry_data["device_id"]
@@ -223,7 +231,11 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         # Advanced/technician-mode sensors (also hidden by default above)
         # are diagnostic information rather than primary readings.
         if should_hide_entity_by_default(self._entity_name):
-            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+            # EntityCategory members are mistyped as plain `str` in some
+            # older homeassistant-stubs snapshots; not a real type error.
+            self._attr_entity_category = (
+                EntityCategory.DIAGNOSTIC  # type: ignore[assignment]
+            )
 
     @property
     def is_on(self) -> bool | None:
@@ -279,7 +291,7 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         }
 
     @property
-    def device_info(self) -> dict[str, Any]:
+    def device_info(self) -> DeviceInfo:
         """Return device information to link this entity to the device."""
         return {
             "identifiers": {(DOMAIN, self._device_id)},
