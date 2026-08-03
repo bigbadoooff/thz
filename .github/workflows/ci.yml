@@ -27,6 +27,20 @@ jobs:
         with:
           category: "integration"
 
+  lint:
+    name: Lint (ruff)
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - name: Set up Python
+        uses: "actions/setup-python@v5"
+        with:
+          python-version: "3.11"
+      - name: Install lint dependencies
+        run: pip install -r requirements_test.txt
+      - name: Run ruff
+        run: ruff check custom_components/thz tests
+
   test:
     name: Test suite
     runs-on: "ubuntu-latest"
@@ -38,5 +52,8 @@ jobs:
           python-version: "3.11"
       - name: Install test dependencies
         run: pip install -r requirements_test.txt
-      - name: Run test suite
-        run: python3 -m pytest tests/ -v
+      - name: Run test suite with coverage
+        run: >
+          python3 -m pytest tests/ -v
+          --cov=custom_components/thz --cov-report=term-missing
+          --cov-fail-under=85
