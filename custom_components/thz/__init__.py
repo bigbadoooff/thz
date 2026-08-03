@@ -771,6 +771,156 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         return response
 
+    async def _async_handle_watch_raw_registers_changes(
+        call: ServiceCall,
+    ) -> ServiceResponse:
+        """Handle the watch_raw_registers_changes service call."""
+        requested_entry_id: str | None = call.data.get("entry_id")
+        pattern: str | None = call.data.get("pattern")
+        start: str | None = call.data.get("start")
+        end: str | None = call.data.get("end")
+        duration_seconds = int(call.data.get("duration_seconds", 0))
+        interval_seconds = float(call.data.get("interval_seconds", 0.0))
+        max_results = int(call.data.get("max_results", 65535))
+
+        if duration_seconds < 1:
+            return {
+                "success": False,
+                "error": "duration_seconds must be greater than or equal to 1",
+            }
+
+        if interval_seconds < 0:
+            return {
+                "success": False,
+                "error": "interval_seconds must be greater than or equal to 0",
+            }
+
+        if max_results <= 0:
+            return {
+                "success": False,
+                "error": "max_results must be greater than 0",
+            }
+
+        use_pattern = bool(pattern)
+        use_range = bool(start) or bool(end)
+        if use_pattern == use_range:
+            return {
+                "success": False,
+                "error": "Provide either 'pattern' or both 'start' and 'end'",
+            }
+
+        try:
+            if use_pattern:
+                commands = _expand_scan_pattern(pattern or "")
+                scan_mode = f"pattern:{(pattern or '').strip().upper()}"
+            else:
+                if not start or not end:
+                    raise ValueError("Both 'start' and 'end' are required")
+                commands = _expand_scan_range(start, end)
+                scan_mode = f"range:{start.strip().upper()}-{end.strip().upper()}"
+        except ValueError as err:
+            return {
+                "success": False,
+                "error": str(err),
+            }
+
+        if len(commands) > max_results:
+            commands = commands[:max_results]
+
+        device = _resolve_target_device(hass, requested_entry_id)
+        if device is None:
+            available_entries: dict[str, dict] = {
+                eid: ed
+                for eid, ed in hass.data.get(DOMAIN, {}).items()
+                if isinstance(ed, dict) and "device" in ed
+            }
+            if requested_entry_id and requested_entry_id not in available_entries:
+                return {
+                    "success": False,
+                    "error": f"No THZ entry found for entry_id '{requested_entry_id}'",
+                }
+            if len(available_entries) > 1 and not requested_entry_id:
+                return {
+                    "success": False,
+                    "error": (
+                        "Multiple THZ config entries found. "
+                        "Provide 'entry_id' to target a specific device."
+                    ),
+                }
+            return {
+                "success": False,
+                "error": "THZ device not initialized",
+            }
+
+        valid_registers: dict[str, str] = {}
+        for command_str in commands:
+            command_bytes = bytes.fromhex(command_str)
+            try:
+                data = await device.async_execute(
+                    hass, device.read_block, command_bytes, "get"
+                )
+                valid_registers[command_str] = data.hex()
+            except Exception:  # noqa: BLE001
+                continue
+
+        changed_registers: list[dict[str, str | int]] = []
+        total_reads = 0
+        iterations = 0
+
+        start_ts = asyncio.get_running_loop().time()
+        while (asyncio.get_running_loop().time() - start_ts) < duration_seconds:
+            iterations += 1
+            for command_str, old_hex in list(valid_registers.items()):
+                command_bytes = bytes.fromhex(command_str)
+                try:
+                    data = await device.async_execute(
+                        hass, device.read_block, command_bytes, "get"
+                    )
+                    total_reads += 1
+                    new_hex = data.hex()
+                    if new_hex != old_hex:
+                        changed_registers.append(
+                            {
+                                "command": command_str,
+                                "iteration": iterations,
+                                "old_hex": old_hex,
+                                "new_hex": new_hex,
+                            }
+                        )
+                        valid_registers[command_str] = new_hex
+                except Exception:  # noqa: BLE001
+                    # Already validated in pre-scan; skip runtime read failures.
+                    continue
+
+            if interval_seconds > 0:
+                await asyncio.sleep(interval_seconds)
+
+        _LOGGER.info(
+            "Watch raw register changes done (%s): scanned=%d, valid=%d, "
+            "iterations=%d, reads=%d, changes=%d",
+            scan_mode,
+            len(commands),
+            len(valid_registers),
+            iterations,
+            total_reads,
+            len(changed_registers),
+        )
+
+        return {
+            "success": True,
+            "summary": {
+                "mode": scan_mode,
+                "duration_seconds": duration_seconds,
+                "interval_seconds": interval_seconds,
+                "iterations": iterations,
+                "scanned": len(commands),
+                "valid_count": len(valid_registers),
+                "total_reads": total_reads,
+                "changes_detected": len(changed_registers),
+            },
+            "changed_registers": changed_registers,
+        }
+
     # Register the service
     async def _async_handle_refresh_block(call: ServiceCall) -> ServiceResponse:
         """Handle the refresh_block service call."""
@@ -1139,6 +1289,29 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
     )
     hass.services.async_register(
         DOMAIN,
+        "watch_raw_registers_changes",
+        _async_handle_watch_raw_registers_changes,
+        schema=vol.Schema(
+            {
+                vol.Exclusive("pattern", "scan_input"): cv.string,
+                vol.Inclusive("start", "scan_range"): cv.string,
+                vol.Inclusive("end", "scan_range"): cv.string,
+                vol.Required("duration_seconds"): vol.All(
+                    vol.Coerce(int), vol.Range(min=1)
+                ),
+                vol.Optional("interval_seconds", default=0.0): vol.All(
+                    vol.Coerce(float), vol.Range(min=0)
+                ),
+                vol.Optional("entry_id"): cv.string,
+                vol.Optional("max_results", default=65535): vol.All(
+                    vol.Coerce(int), vol.Range(min=1, max=65535)
+                ),
+            }
+        ),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
         "refresh_block",
         _async_handle_refresh_block,
         schema=vol.Schema({
@@ -1345,6 +1518,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.debug("Removing THZ services (last config entry)")
             hass.services.async_remove(DOMAIN, "read_raw_register")
             hass.services.async_remove(DOMAIN, "scan_raw_registers")
+            hass.services.async_remove(DOMAIN, "watch_raw_registers_changes")
             hass.services.async_remove(DOMAIN, "refresh_block")
             hass.services.async_remove(DOMAIN, "set_diverter_valve")
 

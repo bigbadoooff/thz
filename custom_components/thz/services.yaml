@@ -195,3 +195,73 @@ scan_raw_registers:
           min: 0
           max: 65535
           mode: box
+
+watch_raw_registers_changes:
+  name: Watch Raw Registers Changes
+  description: >
+    Find valid raw registers in a pattern/range and watch only those registers
+    for value changes during the specified duration.
+    Failed registers are excluded after initial validation and are not rescanned.
+  fields:
+    pattern:
+      name: Pattern
+      description: >
+        6-character hex pattern with optional X wildcards.
+        Example: "0A0XXX" watches from 0A0000 to 0A0FFF.
+      required: false
+      example: "0A0XXX"
+      selector:
+        text:
+    start:
+      name: Start
+      description: Start of inclusive 6-character hex range.
+      required: false
+      example: "0A0000"
+      selector:
+        text:
+    end:
+      name: End
+      description: End of inclusive 6-character hex range.
+      required: false
+      example: "0A0FFF"
+      selector:
+        text:
+    duration_seconds:
+      name: Duration seconds
+      description: Total watch duration in seconds.
+      required: true
+      example: 30
+      selector:
+        number:
+          min: 1
+          mode: box
+    interval_seconds:
+      name: Interval seconds
+      description: >
+        Optional delay between iterations.
+        If omitted or 0, polling is continuous (as fast as possible).
+      required: false
+      default: 0
+      example: 0.5
+      selector:
+        number:
+          min: 0
+          step: 0.1
+          mode: box
+    entry_id:
+      name: Entry ID
+      description: >
+        Optional config entry id. Required when multiple THZ devices are configured.
+      required: false
+      selector:
+        text:
+    max_results:
+      name: Max results
+      description: Maximum number of commands to include from pattern/range.
+      required: false
+      default: 65535
+      selector:
+        number:
+          min: 1
+          max: 65535
+          mode: box
