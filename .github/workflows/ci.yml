@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hassfest:
+    name: Validate with hassfest
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS validation
+    runs-on: "ubuntu-latest"
+    steps:
+      - name: HACS validation
+        uses: "hacs/action@main"
+        with:
+          category: "integration"
+
+  test:
+    name: Test suite
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - name: Set up Python
+        uses: "actions/setup-python@v5"
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements_test.txt
+      - name: Run test suite
+        run: python3 -m pytest tests/ -v
