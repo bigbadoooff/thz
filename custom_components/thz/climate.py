@@ -194,7 +194,7 @@ async def async_setup_entry(
         config_entry: The configuration entry for this integration.
         async_add_entities: Callback to register new entities.
     """
-    entry_data = hass.data[DOMAIN][config_entry.entry_id]
+    entry_data = config_entry.runtime_data
     coordinators: dict[str, DataUpdateCoordinator] = entry_data["coordinators"]
     device = entry_data["device"]
     device_id: str = entry_data["device_id"]

@@ -13,7 +13,14 @@ class TestReadRawRegisterService:
 
     @pytest.fixture
     def mock_hass(self):
-        """Create a mock Home Assistant instance."""
+        """Create a mock Home Assistant instance.
+
+        Production code resolves per-entry state via config_entry.runtime_data
+        (looked up through hass.config_entries.async_entries(DOMAIN)) rather
+        than hass.data. Tests still populate hass.data[DOMAIN]["entry_id"] as a
+        convenient fixture shape; the async_entries side_effect below turns
+        those entries into fake ConfigEntry mocks with a matching runtime_data.
+        """
         hass = MagicMock()
         hass.data = {DOMAIN: {}}
         hass.services = MagicMock()
@@ -22,6 +29,18 @@ class TestReadRawRegisterService:
         hass.services.async_remove = MagicMock()
         hass.services.async_call = AsyncMock()
         hass.async_add_executor_job = AsyncMock()
+
+        def _fake_async_entries(domain):
+            entries = []
+            for entry_id, runtime_data in hass.data.get(domain, {}).items():
+                entry = MagicMock()
+                entry.entry_id = entry_id
+                entry.runtime_data = runtime_data
+                entries.append(entry)
+            return entries
+
+        hass.config_entries = MagicMock()
+        hass.config_entries.async_entries = MagicMock(side_effect=_fake_async_entries)
         return hass
 
     @pytest.fixture
@@ -266,13 +285,7 @@ class TestReadRawRegisterService:
         # Create mock config entry
         entry = MagicMock()
         entry.entry_id = "test_entry"
-
-        # Setup hass.data
-        mock_hass.data[DOMAIN] = {
-            "test_entry": {
-                "device": MagicMock(close=MagicMock()),
-            }
-        }
+        entry.runtime_data = {"device": MagicMock(close=MagicMock())}
 
         # Mock config_entries.async_entries to return no remaining entries
         mock_hass.config_entries = MagicMock()
@@ -298,12 +311,7 @@ class TestReadRawRegisterService:
 
         entry = MagicMock()
         entry.entry_id = "test_entry"
-
-        mock_hass.data[DOMAIN] = {
-            "test_entry": {
-                "device": MagicMock(close=MagicMock()),
-            }
-        }
+        entry.runtime_data = {"device": MagicMock(close=MagicMock())}
 
         # Mock config_entries.async_entries to return remaining entry
         other_entry = MagicMock()

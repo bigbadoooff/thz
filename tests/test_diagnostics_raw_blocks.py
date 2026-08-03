@@ -2,8 +2,6 @@
 import pytest
 from unittest.mock import MagicMock
 
-from custom_components.thz.const import DOMAIN
-
 
 class TestDiagnosticsRawBlocks:
     """Tests for diagnostics raw blocks feature."""
@@ -50,16 +48,9 @@ class TestDiagnosticsRawBlocks:
             "connection_type": "usb",
             "device": "/dev/ttyUSB0",
         }
-
-        # Setup hass.data
-        hass.data = {
-            DOMAIN: {
-                "device": mock_device,
-                "test_entry": {
-                    "device": mock_device,
-                    "coordinators": coordinators,
-                },
-            }
+        config_entry.runtime_data = {
+            "device": mock_device,
+            "coordinators": coordinators,
         }
 
         # Call diagnostics
@@ -104,15 +95,9 @@ class TestDiagnosticsRawBlocks:
         config_entry.title = "Test THZ"
         config_entry.version = 1
         config_entry.data = {"connection_type": "usb", "device": "/dev/ttyUSB0"}
-
-        hass.data = {
-            DOMAIN: {
-                "device": mock_device,
-                "test_entry": {
-                    "device": mock_device,
-                    "coordinators": coordinators,
-                },
-            }
+        config_entry.runtime_data = {
+            "device": mock_device,
+            "coordinators": coordinators,
         }
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
@@ -140,15 +125,9 @@ class TestDiagnosticsRawBlocks:
         config_entry.title = "Test THZ"
         config_entry.version = 1
         config_entry.data = {"connection_type": "usb", "device": "/dev/ttyUSB0"}
-
-        hass.data = {
-            DOMAIN: {
-                "device": mock_device,
-                "test_entry": {
-                    "device": mock_device,
-                    "coordinators": {},
-                },
-            }
+        config_entry.runtime_data = {
+            "device": mock_device,
+            "coordinators": {},
         }
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
@@ -183,15 +162,9 @@ class TestDiagnosticsRawBlocks:
         config_entry.title = "Test THZ"
         config_entry.version = 1
         config_entry.data = {"connection_type": "usb", "device": "/dev/ttyUSB0"}
-
-        hass.data = {
-            DOMAIN: {
-                "device": mock_device,
-                "test_entry": {
-                    "device": mock_device,
-                    "coordinators": coordinators,
-                },
-            }
+        config_entry.runtime_data = {
+            "device": mock_device,
+            "coordinators": coordinators,
         }
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)

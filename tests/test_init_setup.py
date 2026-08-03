@@ -11,7 +11,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import custom_components.thz as thz_module
-from custom_components.thz.const import DOMAIN
 
 
 def _fake_coordinator(data=b"\x00" * 20):
@@ -84,7 +83,6 @@ def _patched_setup(device=None, coordinator_factory=None, dev_reg=None):
 
 def _mock_hass():
     hass = MagicMock()
-    hass.data = {}
     hass.services = MagicMock()
     hass.services.has_service = MagicMock(return_value=False)
     hass.services.async_register = MagicMock()
@@ -101,6 +99,7 @@ def _mock_config_entry(entry_id="entry1", **data_overrides):
     entry = MagicMock()
     entry.entry_id = entry_id
     entry.as_dict = MagicMock(return_value={})
+    entry.runtime_data = None
     data = {
         "connection_type": "usb",
         "device": "/dev/ttyUSB0",
@@ -126,8 +125,7 @@ class TestAsyncSetupEntry:
 
         assert result is True
         mock_cls.assert_called_once_with(connection="usb", port="/dev/ttyUSB0")
-        assert entry.entry_id in hass.data[DOMAIN]
-        stored = hass.data[DOMAIN][entry.entry_id]
+        stored = entry.runtime_data
         assert stored["device"] is device
         assert "pxxFB" in stored["coordinators"]
         hass.config_entries.async_forward_entry_setups.assert_awaited_once()
@@ -181,7 +179,7 @@ class TestAsyncSetupEntry:
         ):
             await thz_module.async_setup_entry(hass, entry)
 
-        stored = hass.data[DOMAIN][entry.entry_id]
+        stored = entry.runtime_data
         assert set(stored["coordinators"]) == {"pxxFB", "pxxF2"}
 
     @pytest.mark.asyncio
@@ -193,7 +191,7 @@ class TestAsyncSetupEntry:
         with _patched_setup(device=device):
             await thz_module.async_setup_entry(hass, entry)
 
-        stored = hass.data[DOMAIN][entry.entry_id]
+        stored = entry.runtime_data
         assert stored["coordinators"] == {}
 
     @pytest.mark.asyncio
@@ -212,7 +210,7 @@ class TestAsyncSetupEntry:
         ):
             await thz_module.async_setup_entry(hass, entry)
 
-        stored = hass.data[DOMAIN][entry.entry_id]
+        stored = entry.runtime_data
         assert "pxxFB" in stored["unsupported_blocks"]
         assert "pxxFB" not in stored["coordinators"]
 
@@ -228,7 +226,7 @@ class TestAsyncSetupEntry:
         ):
             await thz_module.async_setup_entry(hass, entry)
 
-        stored = hass.data[DOMAIN][entry.entry_id]
+        stored = entry.runtime_data
         assert "pxxFB" in stored["unsupported_blocks"]
         assert "pxxFB" in stored["coordinators"]  # still stored, just unsupported
 
@@ -271,14 +269,13 @@ class TestAsyncUnloadEntry:
         hass = _mock_hass()
         entry = _mock_config_entry()
         device = _fake_device()
-        hass.data[DOMAIN] = {entry.entry_id: {"device": device}}
+        entry.runtime_data = {"device": device}
         hass.config_entries.async_entries = MagicMock(return_value=[])
 
         result = await thz_module.async_unload_entry(hass, entry)
 
         assert result is True
         hass.async_add_executor_job.assert_awaited_once_with(device.close)
-        assert entry.entry_id not in hass.data[DOMAIN]
         removed = {c.args[1] for c in hass.services.async_remove.call_args_list}
         assert "read_raw_register" in removed
 
@@ -288,7 +285,7 @@ class TestAsyncUnloadEntry:
         entry = _mock_config_entry("entry1")
         other_entry = MagicMock(entry_id="entry2")
         device = _fake_device()
-        hass.data[DOMAIN] = {entry.entry_id: {"device": device}}
+        entry.runtime_data = {"device": device}
         hass.config_entries.async_entries = MagicMock(return_value=[other_entry])
 
         result = await thz_module.async_unload_entry(hass, entry)
@@ -301,20 +298,20 @@ class TestAsyncUnloadEntry:
         hass = _mock_hass()
         entry = _mock_config_entry()
         device = _fake_device()
-        hass.data[DOMAIN] = {entry.entry_id: {"device": device}}
+        entry.runtime_data = {"device": device}
         hass.config_entries.async_unload_platforms = AsyncMock(return_value=False)
 
         result = await thz_module.async_unload_entry(hass, entry)
 
         assert result is False
-        assert entry.entry_id in hass.data[DOMAIN]
+        assert entry.runtime_data == {"device": device}
         hass.async_add_executor_job.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_unload_missing_entry_data_is_safe(self):
         hass = _mock_hass()
         entry = _mock_config_entry()
-        hass.data[DOMAIN] = {}
+        entry.runtime_data = None
 
         result = await thz_module.async_unload_entry(hass, entry)
 

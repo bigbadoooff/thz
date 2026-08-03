@@ -1007,8 +1007,10 @@ class TestClimateAsyncSetupEntry:
     def _make_hass(cls, register_manager, coordinators, write_registers):
         hass = MagicMock()
         entry_data = cls._entry_data(register_manager, coordinators, write_registers)
-        hass.data = {"thz": {"entry1": entry_data}}
-        return hass
+        config_entry = MagicMock()
+        config_entry.entry_id = "entry1"
+        config_entry.runtime_data = entry_data
+        return hass, config_entry
 
     _F4_ENTRIES = [
         ("insideTempRC:", 68, 4, "hex2int", 10, {}),
@@ -1049,9 +1051,9 @@ class TestClimateAsyncSetupEntry:
                 "command": "0B0006", "step": 0.1, "decode_type": "5temp",
             },
         }
-        hass = self._make_hass(register_manager, coordinators, write_registers)
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
+        hass, config_entry = self._make_hass(
+            register_manager, coordinators, write_registers
+        )
 
         added = []
         async_add_entities = MagicMock(side_effect=lambda ents, *a: added.extend(ents))
@@ -1074,9 +1076,9 @@ class TestClimateAsyncSetupEntry:
             "p99CoolingHC1Switch": {"command": "0B0287", "decode_type": "1clean"},
             "p99CoolingHC1SetTemp": COOL_SETPOINT_ENTRY,
         }
-        hass = self._make_hass(register_manager, coordinators, write_registers)
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
+        hass, config_entry = self._make_hass(
+            register_manager, coordinators, write_registers
+        )
 
         added = []
         async_add_entities = MagicMock(side_effect=lambda ents, *a: added.extend(ents))
@@ -1096,9 +1098,9 @@ class TestClimateAsyncSetupEntry:
                 "command": "0B0007", "step": 0.1, "decode_type": "5temp",
             },
         }
-        hass = self._make_hass(register_manager, coordinators, write_registers)
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
+        hass, config_entry = self._make_hass(
+            register_manager, coordinators, write_registers
+        )
 
         added = []
         async_add_entities = MagicMock(side_effect=lambda ents, *a: added.extend(ents))
@@ -1113,9 +1115,7 @@ class TestClimateAsyncSetupEntry:
 
         register_manager = self._register_manager({"pxxF5": self._F5_ENTRIES})
         coordinators = {"pxxF5": MagicMock()}
-        hass = self._make_hass(register_manager, coordinators, {})
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
+        hass, config_entry = self._make_hass(register_manager, coordinators, {})
 
         async_add_entities = MagicMock()
         await async_setup_entry(hass, config_entry, async_add_entities)
@@ -1127,9 +1127,7 @@ class TestClimateAsyncSetupEntry:
 
         register_manager = self._register_manager({"pxxF4": []})  # missing fields
         coordinators = {"pxxF4": MagicMock()}
-        hass = self._make_hass(register_manager, coordinators, {})
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
+        hass, config_entry = self._make_hass(register_manager, coordinators, {})
 
         async_add_entities = MagicMock()
         await async_setup_entry(hass, config_entry, async_add_entities)
@@ -1140,9 +1138,7 @@ class TestClimateAsyncSetupEntry:
         from custom_components.thz.climate import async_setup_entry
 
         register_manager = self._register_manager({})
-        hass = self._make_hass(register_manager, {}, {})
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
+        hass, config_entry = self._make_hass(register_manager, {}, {})
 
         async_add_entities = MagicMock()
         await async_setup_entry(hass, config_entry, async_add_entities)

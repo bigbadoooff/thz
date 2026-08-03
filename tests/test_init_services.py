@@ -15,6 +15,14 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 
 def _mock_hass():
+    """Build a mock hass whose config_entries.async_entries() reflects hass.data.
+
+    Production code resolves per-entry state via config_entry.runtime_data
+    (looked up through hass.config_entries.async_entries(DOMAIN)) rather than
+    hass.data. Tests still populate hass.data[DOMAIN]["entry_id"] = {...} as a
+    convenient fixture shape; this adapter turns those entries into fake
+    ConfigEntry mocks with a matching .runtime_data on each lookup.
+    """
     hass = MagicMock()
     hass.data = {DOMAIN: {}}
     hass.services = MagicMock()
@@ -25,6 +33,18 @@ def _mock_hass():
     hass.async_add_executor_job = AsyncMock()
     hass.config = MagicMock()
     hass.config.config_dir = "/config"
+
+    def _fake_async_entries(domain):
+        entries = []
+        for entry_id, runtime_data in hass.data.get(domain, {}).items():
+            entry = MagicMock()
+            entry.entry_id = entry_id
+            entry.runtime_data = runtime_data
+            entries.append(entry)
+        return entries
+
+    hass.config_entries = MagicMock()
+    hass.config_entries.async_entries = MagicMock(side_effect=_fake_async_entries)
     return hass
 
 

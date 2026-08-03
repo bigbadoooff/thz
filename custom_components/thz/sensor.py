@@ -57,8 +57,7 @@ async def async_setup_entry(
     Returns:
         None
     """
-    # Get data from hass.data
-    entry_data = hass.data[DOMAIN][config_entry.entry_id]
+    entry_data = config_entry.runtime_data
     register_manager: RegisterMapManager = entry_data["register_manager"]
     coordinators = entry_data["coordinators"]
     device_id = entry_data["device_id"]

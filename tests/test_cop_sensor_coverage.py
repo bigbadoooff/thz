@@ -134,22 +134,18 @@ class TestAsyncSetupCopSensors:
         device = MagicMock()
         device.firmware_version = firmware_version
         hass = MagicMock()
-        hass.data = {
-            DOMAIN: {
-                "entry1": {
-                    "coordinators": coordinators,
-                    "device_id": device_id,
-                    "device": device,
-                }
-            }
+        config_entry = MagicMock()
+        config_entry.entry_id = "entry1"
+        config_entry.runtime_data = {
+            "coordinators": coordinators,
+            "device_id": device_id,
+            "device": device,
         }
-        return hass
+        return hass, config_entry
 
     @pytest.mark.asyncio
     async def test_unsupported_firmware_skips_all(self):
-        hass = self._make_hass({}, firmware_version="2.06")
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
+        hass, config_entry = self._make_hass({}, firmware_version="2.06")
         async_add_entities = MagicMock()
 
         await async_setup_cop_sensors(hass, config_entry, async_add_entities)
@@ -161,9 +157,7 @@ class TestAsyncSetupCopSensors:
         # Firmware supports energy, but no power data and no energy blocks.
         coord = MagicMock()
         coord.data = bytes(10)
-        hass = self._make_hass({"pxxFB": coord})
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
+        hass, config_entry = self._make_hass({"pxxFB": coord})
         async_add_entities = MagicMock()
 
         await async_setup_cop_sensors(hass, config_entry, async_add_entities)
@@ -174,9 +168,7 @@ class TestAsyncSetupCopSensors:
     async def test_power_sensors_create_current_cop_only(self):
         coord = MagicMock()
         coord.data = bytes(150)
-        hass = self._make_hass({"pxx0B": coord})
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
+        hass, config_entry = self._make_hass({"pxx0B": coord})
         async_add_entities = MagicMock()
 
         await async_setup_cop_sensors(hass, config_entry, async_add_entities)
@@ -191,9 +183,7 @@ class TestAsyncSetupCopSensors:
     async def test_energy_sensors_create_six_cop_sensors(self):
         coord = MagicMock()
         coord.data = bytes(10)
-        hass = self._make_hass({"pxx0A091A": coord})
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
+        hass, config_entry = self._make_hass({"pxx0A091A": coord})
         async_add_entities = MagicMock()
 
         await async_setup_cop_sensors(hass, config_entry, async_add_entities)
@@ -212,11 +202,9 @@ class TestAsyncSetupCopSensors:
         power_coord.data = bytes(150)
         energy_coord = MagicMock()
         energy_coord.data = bytes(10)
-        hass = self._make_hass(
+        hass, config_entry = self._make_hass(
             {"pxx0B": power_coord, "pxx0A091A": energy_coord}
         )
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry1"
         async_add_entities = MagicMock()
 
         await async_setup_cop_sensors(hass, config_entry, async_add_entities)

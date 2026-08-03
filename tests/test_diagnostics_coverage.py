@@ -8,19 +8,19 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.thz.const import DOMAIN
 from custom_components.thz.diagnostics import (
     TO_REDACT,
     async_get_config_entry_diagnostics,
 )
 
 
-def _make_config_entry(entry_id="test_entry", data=None):
+def _make_config_entry(entry_id="test_entry", data=None, runtime_data=None):
     config_entry = MagicMock()
     config_entry.entry_id = entry_id
     config_entry.title = "Test THZ"
     config_entry.version = 1
     config_entry.data = data or {"connection_type": "usb", "device": "/dev/ttyUSB0"}
+    config_entry.runtime_data = {} if runtime_data is None else runtime_data
     return config_entry
 
 
@@ -36,16 +36,13 @@ class TestDiagnosticsRegisterCounts:
         }
 
         hass = MagicMock()
-        hass.data = {
-            DOMAIN: {
-                "test_entry": {
-                    "device": MagicMock(),
-                    "coordinators": {},
-                    "register_manager": register_manager,
-                }
+        config_entry = _make_config_entry(
+            runtime_data={
+                "device": MagicMock(),
+                "coordinators": {},
+                "register_manager": register_manager,
             }
-        }
-        config_entry = _make_config_entry()
+        )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 
@@ -64,16 +61,13 @@ class TestDiagnosticsRegisterCounts:
         }
 
         hass = MagicMock()
-        hass.data = {
-            DOMAIN: {
-                "test_entry": {
-                    "device": MagicMock(),
-                    "coordinators": {},
-                    "write_manager": write_manager,
-                }
+        config_entry = _make_config_entry(
+            runtime_data={
+                "device": MagicMock(),
+                "coordinators": {},
+                "write_manager": write_manager,
             }
-        }
-        config_entry = _make_config_entry()
+        )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 
@@ -87,15 +81,12 @@ class TestDiagnosticsRegisterCounts:
     @pytest.mark.asyncio
     async def test_no_register_manager_or_write_manager(self):
         hass = MagicMock()
-        hass.data = {
-            DOMAIN: {
-                "test_entry": {
-                    "device": MagicMock(),
-                    "coordinators": {},
-                }
+        config_entry = _make_config_entry(
+            runtime_data={
+                "device": MagicMock(),
+                "coordinators": {},
             }
-        }
-        config_entry = _make_config_entry()
+        )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 
@@ -116,15 +107,12 @@ class TestDiagnosticsCoordinatorInfo:
         coordinator.update_interval = timedelta(seconds=600)
 
         hass = MagicMock()
-        hass.data = {
-            DOMAIN: {
-                "test_entry": {
-                    "device": MagicMock(),
-                    "coordinators": {"pxxFB": coordinator},
-                }
+        config_entry = _make_config_entry(
+            runtime_data={
+                "device": MagicMock(),
+                "coordinators": {"pxxFB": coordinator},
             }
-        }
-        config_entry = _make_config_entry()
+        )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 
@@ -142,15 +130,12 @@ class TestDiagnosticsCoordinatorInfo:
         coordinator.update_interval = None
 
         hass = MagicMock()
-        hass.data = {
-            DOMAIN: {
-                "test_entry": {
-                    "device": MagicMock(),
-                    "coordinators": {"pxxFB": coordinator},
-                }
+        config_entry = _make_config_entry(
+            runtime_data={
+                "device": MagicMock(),
+                "coordinators": {"pxxFB": coordinator},
             }
-        }
-        config_entry = _make_config_entry()
+        )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 
@@ -166,7 +151,6 @@ class TestDiagnosticsMissingEntryData:
     @pytest.mark.asyncio
     async def test_missing_entry_data_uses_defaults(self):
         hass = MagicMock()
-        hass.data = {DOMAIN: {}}
         config_entry = _make_config_entry(entry_id="missing_entry")
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
@@ -180,10 +164,10 @@ class TestDiagnosticsMissingEntryData:
         assert result["raw_blocks"] == {}
 
     @pytest.mark.asyncio
-    async def test_missing_domain_data_uses_defaults(self):
+    async def test_none_runtime_data_uses_defaults(self):
         hass = MagicMock()
-        hass.data = {}
         config_entry = _make_config_entry(entry_id="missing_entry")
+        config_entry.runtime_data = None  # simulate an entry never fully set up
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 
@@ -192,7 +176,6 @@ class TestDiagnosticsMissingEntryData:
     @pytest.mark.asyncio
     async def test_redact_keys_used_for_config_data(self):
         hass = MagicMock()
-        hass.data = {DOMAIN: {}}
         config_entry = _make_config_entry(
             data={"host": "10.0.0.5", "device": "/dev/ttyUSB0", "other": "value"}
         )

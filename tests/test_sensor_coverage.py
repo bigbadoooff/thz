@@ -37,19 +37,15 @@ def _make_hass_and_entry(registers, coordinators, unsupported_blocks=None,
     device.firmware_version = firmware_version
 
     hass = MagicMock()
-    hass.data = {
-        DOMAIN: {
-            "entry1": {
-                "register_manager": FakeRegisterManager(registers),
-                "coordinators": coordinators,
-                "device_id": device_id,
-                "device": device,
-                "unsupported_blocks": unsupported_blocks or set(),
-            }
-        }
-    }
     config_entry = MagicMock()
     config_entry.entry_id = "entry1"
+    config_entry.runtime_data = {
+        "register_manager": FakeRegisterManager(registers),
+        "coordinators": coordinators,
+        "device_id": device_id,
+        "device": device,
+        "unsupported_blocks": unsupported_blocks or set(),
+    }
     return hass, config_entry
 
 

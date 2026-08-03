@@ -12,61 +12,70 @@ from custom_components.thz import (
     _require_target_entry_data,
     async_refresh_block,
 )
-from custom_components.thz.const import DOMAIN
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+
+
+def _make_hass_with_entries(entries: dict) -> MagicMock:
+    """Build a hass whose config_entries.async_entries returns fake entries.
+
+    `entries` maps entry_id -> runtime_data dict.
+    """
+    hass = MagicMock()
+    fake_entries = []
+    for entry_id, runtime_data in entries.items():
+        entry = MagicMock()
+        entry.entry_id = entry_id
+        entry.runtime_data = runtime_data
+        fake_entries.append(entry)
+    hass.config_entries.async_entries = MagicMock(return_value=fake_entries)
+    return hass
 
 
 class TestRequireTargetEntryData:
     """Tests for _require_target_entry_data."""
 
     def test_raises_home_assistant_error_when_no_entries(self):
-        hass = MagicMock()
-        hass.data = {DOMAIN: {}}
+        hass = _make_hass_with_entries({})
         with pytest.raises(HomeAssistantError, match="not initialized"):
             _require_target_entry_data(hass, None)
 
     def test_single_entry_no_entry_id_returns_it(self):
-        hass = MagicMock()
         entry_data = {"device": MagicMock()}
-        hass.data = {DOMAIN: {"entry1": entry_data}}
+        hass = _make_hass_with_entries({"entry1": entry_data})
         entry_id, result = _require_target_entry_data(hass, None)
         assert entry_id == "entry1"
         assert result is entry_data
 
     def test_multiple_entries_no_entry_id_raises_validation_error(self):
-        hass = MagicMock()
-        hass.data = {
-            DOMAIN: {
+        hass = _make_hass_with_entries(
+            {
                 "entry1": {"device": MagicMock()},
                 "entry2": {"device": MagicMock()},
             }
-        }
+        )
         with pytest.raises(ServiceValidationError, match="Multiple THZ config entries"):
             _require_target_entry_data(hass, None)
 
     def test_multiple_entries_with_valid_entry_id(self):
-        hass = MagicMock()
         entry_data1 = {"device": MagicMock()}
         entry_data2 = {"device": MagicMock()}
-        hass.data = {
-            DOMAIN: {
+        hass = _make_hass_with_entries(
+            {
                 "entry1": entry_data1,
                 "entry2": entry_data2,
             }
-        }
+        )
         entry_id, result = _require_target_entry_data(hass, "entry2")
         assert entry_id == "entry2"
         assert result is entry_data2
 
     def test_entry_id_not_found_raises_validation_error(self):
-        hass = MagicMock()
-        hass.data = {DOMAIN: {"entry1": {"device": MagicMock()}}}
+        hass = _make_hass_with_entries({"entry1": {"device": MagicMock()}})
         with pytest.raises(ServiceValidationError, match="No THZ entry found"):
             _require_target_entry_data(hass, "nonexistent")
 
     def test_ignores_entries_without_device_key(self):
-        hass = MagicMock()
-        hass.data = {DOMAIN: {"entry1": {"not_a_device_entry": True}}}
+        hass = _make_hass_with_entries({"entry1": {"not_a_device_entry": True}})
         with pytest.raises(HomeAssistantError, match="not initialized"):
             _require_target_entry_data(hass, None)
 
@@ -211,14 +220,11 @@ class TestAsyncRefreshBlock:
 
     @pytest.mark.asyncio
     async def test_refreshes_matching_coordinator(self):
-        hass = MagicMock()
         coordinator = MagicMock()
         coordinator.async_request_refresh = AsyncMock()
-        hass.data = {
-            DOMAIN: {
-                "entry1": {"coordinators": {"pxxFB": coordinator}},
-            }
-        }
+        hass = _make_hass_with_entries(
+            {"entry1": {"coordinators": {"pxxFB": coordinator}}}
+        )
 
         result = await async_refresh_block(hass, "FB")
 
@@ -227,8 +233,7 @@ class TestAsyncRefreshBlock:
 
     @pytest.mark.asyncio
     async def test_block_not_found_returns_false(self):
-        hass = MagicMock()
-        hass.data = {DOMAIN: {"entry1": {"coordinators": {}}}}
+        hass = _make_hass_with_entries({"entry1": {"coordinators": {}}})
 
         result = await async_refresh_block(hass, "FB")
 
@@ -236,8 +241,7 @@ class TestAsyncRefreshBlock:
 
     @pytest.mark.asyncio
     async def test_entry_id_not_found_returns_false(self):
-        hass = MagicMock()
-        hass.data = {DOMAIN: {"entry1": {"coordinators": {}}}}
+        hass = _make_hass_with_entries({"entry1": {"coordinators": {}}})
 
         result = await async_refresh_block(hass, "FB", entry_id="nonexistent")
 
@@ -245,17 +249,16 @@ class TestAsyncRefreshBlock:
 
     @pytest.mark.asyncio
     async def test_entry_id_targets_specific_entry(self):
-        hass = MagicMock()
         coord1 = MagicMock()
         coord1.async_request_refresh = AsyncMock()
         coord2 = MagicMock()
         coord2.async_request_refresh = AsyncMock()
-        hass.data = {
-            DOMAIN: {
+        hass = _make_hass_with_entries(
+            {
                 "entry1": {"coordinators": {"pxxFB": coord1}},
                 "entry2": {"coordinators": {"pxxFB": coord2}},
             }
-        }
+        )
 
         result = await async_refresh_block(hass, "FB", entry_id="entry2")
 
@@ -265,17 +268,16 @@ class TestAsyncRefreshBlock:
 
     @pytest.mark.asyncio
     async def test_refreshes_across_all_entries_without_entry_id(self):
-        hass = MagicMock()
         coord1 = MagicMock()
         coord1.async_request_refresh = AsyncMock()
         coord2 = MagicMock()
         coord2.async_request_refresh = AsyncMock()
-        hass.data = {
-            DOMAIN: {
+        hass = _make_hass_with_entries(
+            {
                 "entry1": {"coordinators": {"pxxFB": coord1}},
                 "entry2": {"coordinators": {"pxxFB": coord2}},
             }
-        }
+        )
 
         result = await async_refresh_block(hass, "FB")
 

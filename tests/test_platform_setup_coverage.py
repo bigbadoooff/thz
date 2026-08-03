@@ -14,7 +14,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from custom_components.thz.platform_setup import async_setup_write_platform
-from custom_components.thz.const import DOMAIN, DEFAULT_UPDATE_INTERVAL
+from custom_components.thz.const import DEFAULT_UPDATE_INTERVAL
 
 
 class FakeEntity:
@@ -34,19 +34,15 @@ def _make_hass_and_entry(registers, write_interval_data=None):
     write_manager.get_all_registers.return_value = registers
 
     hass = MagicMock()
-    hass.data = {
-        DOMAIN: {
-            "entry1": {
-                "write_manager": write_manager,
-                "device": device,
-                "device_id": "dev1",
-            }
-        }
-    }
 
     config_entry = MagicMock()
     config_entry.entry_id = "entry1"
     config_entry.data = write_interval_data or {}
+    config_entry.runtime_data = {
+        "write_manager": write_manager,
+        "device": device,
+        "device_id": "dev1",
+    }
 
     return hass, config_entry, device, write_manager
 

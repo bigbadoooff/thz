@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable
 
-from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, get_write_group_for_key
+from .const import DEFAULT_UPDATE_INTERVAL, get_write_group_for_key
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -46,7 +46,7 @@ async def async_setup_write_platform(
                        (name, entry, device, device_id, write_interval)
                        and should return a list of entities.
     """
-    entry_data = hass.data[DOMAIN][config_entry.entry_id]
+    entry_data = config_entry.runtime_data
     write_manager: RegisterMapManagerWrite = entry_data["write_manager"]
     device: THZDevice = entry_data["device"]
     device_id = entry_data["device_id"]

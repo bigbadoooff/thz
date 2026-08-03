@@ -7,8 +7,6 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
-
 # Keys to redact from diagnostics to protect user privacy
 TO_REDACT = {
     "host",
@@ -27,8 +25,7 @@ async def async_get_config_entry_diagnostics(
     THZ integration without exposing sensitive data like IP addresses or
     serial numbers.
     """
-    domain_data = hass.data.get(DOMAIN, {})
-    entry_data = domain_data.get(config_entry.entry_id, {})
+    entry_data = config_entry.runtime_data or {}
     device = entry_data.get("device")
     coordinators = entry_data.get("coordinators", {})
 

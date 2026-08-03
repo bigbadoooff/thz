@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.thz.const import DOMAIN
 from custom_components.thz.binary_sensor import THZBinarySensor, async_setup_entry
 
 
@@ -25,17 +24,13 @@ class FakeRegisterManager:
 
 def _make_hass_and_entry(registers, coordinators, device_id="dev1"):
     hass = MagicMock()
-    hass.data = {
-        DOMAIN: {
-            "entry1": {
-                "register_manager": FakeRegisterManager(registers),
-                "coordinators": coordinators,
-                "device_id": device_id,
-            }
-        }
-    }
     config_entry = MagicMock()
     config_entry.entry_id = "entry1"
+    config_entry.runtime_data = {
+        "register_manager": FakeRegisterManager(registers),
+        "coordinators": coordinators,
+        "device_id": device_id,
+    }
     return hass, config_entry
 
 

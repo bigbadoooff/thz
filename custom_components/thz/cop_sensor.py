@@ -76,8 +76,7 @@ async def async_setup_cop_sensors(
     Returns:
         None
     """
-    # Get data from hass.data
-    entry_data = hass.data[DOMAIN][config_entry.entry_id]
+    entry_data = config_entry.runtime_data
     coordinators = entry_data["coordinators"]
     device_id = entry_data["device_id"]
     device = entry_data["device"]

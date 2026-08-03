@@ -61,9 +61,9 @@ def _require_target_entry_data(
     device is initialized at all.
     """
     available_entries: dict[str, dict] = {
-        eid: ed
-        for eid, ed in hass.data.get(DOMAIN, {}).items()
-        if isinstance(ed, dict) and "device" in ed
+        entry.entry_id: entry.runtime_data
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if isinstance(entry.runtime_data, dict) and "device" in entry.runtime_data
     }
 
     if requested_entry_id:
@@ -225,8 +225,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # This ensures a fresh start without ghost entities with broken names
     await _async_cleanup_orphaned_entities(hass)
 
-    hass.data.setdefault(DOMAIN, {})
-
     data = config_entry.data
     conn_type = data["connection_type"]
 
@@ -363,8 +361,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             )
         coordinators[block] = coordinator
 
-    # Store in hass.data — all per-entry so multiple config entries don't collide
-    hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = {
+    # Store per-entry runtime state on the config entry itself (not hass.data),
+    # per HA's recommended runtime-data pattern.
+    config_entry.runtime_data = {
         "device": device,
         "device_id": unique_id,
         "write_manager": write_manager,
@@ -443,9 +442,10 @@ async def async_refresh_block(
     normalized = _normalize_block_name(block)
 
     available_entries: dict[str, dict] = {
-        eid: ed
-        for eid, ed in hass.data.get(DOMAIN, {}).items()
-        if isinstance(ed, dict) and "coordinators" in ed
+        entry.entry_id: entry.runtime_data
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if isinstance(entry.runtime_data, dict)
+        and "coordinators" in entry.runtime_data
     }
 
     if entry_id:
@@ -1392,12 +1392,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         # Clean up device connection
-        entry_data = hass.data[DOMAIN].get(entry.entry_id)
+        entry_data = entry.runtime_data
         if entry_data:
             device = entry_data.get("device")
             if device:
                 await hass.async_add_executor_job(device.close)
-        hass.data[DOMAIN].pop(entry.entry_id, None)
 
         # Remove services if this is the last config entry
         remaining_entries = [
