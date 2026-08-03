@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable
 
-from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
+from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, get_write_group_for_key
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -54,6 +54,9 @@ async def async_setup_write_platform(
     # Get write interval from config, default to DEFAULT_UPDATE_INTERVAL
     write_interval = config_entry.data.get("write_interval", DEFAULT_UPDATE_INTERVAL)
 
+    # Get selected write groups (if not set, all groups are enabled)
+    selected_write_groups = config_entry.data.get("selected_write_groups")
+
     write_registers = write_manager.get_all_registers()
     _LOGGER.debug(
         "Loading %s platform with %d registers", platform_type, len(write_registers)
@@ -62,6 +65,11 @@ async def async_setup_write_platform(
     entities = []
     for name, entry in write_registers.items():
         if entry["type"] == platform_type:
+            # Filter by selected write groups if configured
+            if selected_write_groups is not None:
+                group = get_write_group_for_key(name)
+                if group not in selected_write_groups:
+                    continue
             _LOGGER.debug(
                 "Creating %s for %s with command %s",
                 entity_type.__name__,
