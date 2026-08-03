@@ -343,6 +343,12 @@
       "flow_temp_hc2": {
         "name": "Flow Temperature HC2"
       },
+      "hc2_setpoint_temp": {
+        "name": "HC2 Setpoint Temperature"
+      },
+      "hc2_mixer_valve": {
+        "name": "HC2 Mixer Valve"
+      },
       "evaporator_temp": {
         "name": "Evaporator Temperature"
       },
@@ -513,6 +519,9 @@
       },
       "inside_temp_rc": {
         "name": "Inside Temperature (Room Controller)"
+      },
+      "inside_temp_rc_hc2": {
+        "name": "Inside Temperature (Room Controller) HC2"
       },
       "season_mode": {
         "name": "Season Mode"

@@ -237,7 +237,8 @@ class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"thz_{device_id}_current_cop"
         self._attr_device_class = SensorDeviceClass.POWER_FACTOR
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_icon = "mdi:calculator"
+        # Icon comes from icons.json (icon translations), not a hardcoded
+        # _attr_icon, per HA's icon-translations quality-scale rule.
         self._attr_native_unit_of_measurement = None  # COP is dimensionless
         self._attr_suggested_display_precision = 2
         self._attr_translation_key = "current_cop"
@@ -337,7 +338,8 @@ class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
         self._device_id = device_id
         self._attr_device_class = SensorDeviceClass.POWER_FACTOR
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_icon = "mdi:calculator"
+        # Icon comes from icons.json (icon translations), not a hardcoded
+        # _attr_icon, per HA's icon-translations quality-scale rule.
         self._attr_native_unit_of_measurement = None  # COP is dimensionless
         self._attr_suggested_display_precision = 2
         self._attr_has_entity_name = True

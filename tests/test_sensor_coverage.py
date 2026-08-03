@@ -183,7 +183,9 @@ class TestAsyncSetupEntry:
         assert sensor.native_unit_of_measurement == "°C"
         assert sensor.device_class == "temperature"
         assert sensor.state_class == "measurement"
-        assert sensor.icon == "mdi:thermometer"
+        # translation_key is set -> icon comes from icons.json instead of
+        # the hardcoded "icon" metadata field.
+        assert sensor.icon is None
         assert sensor._attr_translation_key == "outside_temp"
 
     @pytest.mark.asyncio

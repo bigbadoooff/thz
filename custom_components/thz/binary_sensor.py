@@ -196,7 +196,6 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         self._offset = entry["offset"]
         self._length = entry["length"]
         self._decode_type = entry["decode"]
-        self._icon = entry.get("icon")
         self._device_id = device_id
         self._entity_name = entry["name"]
 
@@ -206,8 +205,12 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         if translation_key is not None:
             self._attr_translation_key = translation_key
             self._attr_has_entity_name = True
+            # Icon comes from icons.json (icon translations) instead of a
+            # hardcoded value, per HA's icon-translations quality-scale rule.
+            self._icon = None
         else:
             self._attr_name = entry["name"]
+            self._icon = entry.get("icon")
 
         # Device class improves UI representation and enables automations
         self._attr_device_class = _get_device_class(self._entity_name)

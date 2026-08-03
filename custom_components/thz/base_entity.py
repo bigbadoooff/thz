@@ -50,7 +50,9 @@ class THZBaseEntity(Entity):
             command: The hex command string for device communication.
             device: The THZ device instance.
             device_id: The device identifier for registry linking.
-            icon: Optional icon override (defaults to "mdi:eye").
+            icon: Optional icon override, used only when translation_key is
+                None (defaults to "mdi:eye"). Translated entities get their
+                icon from icons.json instead.
             unique_id: Optional unique ID (auto-generated if not provided).
             scan_interval: Update interval in seconds (uses DEFAULT_UPDATE_INTERVAL if
                 not provided).
@@ -59,7 +61,6 @@ class THZBaseEntity(Entity):
         self._command = command
         self._device = device
         self._device_id = device_id
-        self._attr_icon = icon or "mdi:eye"
         self._attr_available = True
 
         # Per Home Assistant documentation, has_entity_name=True is MANDATORY for
@@ -70,12 +71,18 @@ class THZBaseEntity(Entity):
         # The fix: Only set _attr_translation_key (not _attr_name) when translation
         # is available.
         # When no translation: set _attr_name as fallback.
+        #
+        # Icon: entities with a translation_key get their icon from
+        # icons.json (icon translations) instead of a hardcoded _attr_icon,
+        # per HA's icon-translations quality-scale rule. Entities without a
+        # translation_key fall back to the icon passed in (or "mdi:eye").
         if translation_key is not None:
             self._attr_translation_key = translation_key
             self._attr_has_entity_name = True
             # Do NOT set _attr_name - it blocks translation lookup!
         else:
             self._attr_name = name
+            self._attr_icon = icon or "mdi:eye"
             # has_entity_name not set for legacy entities without translations
 
         # Generate unique ID if not provided

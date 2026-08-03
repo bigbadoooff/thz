@@ -1,0 +1,1077 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "booster_hc": {
+        "default": "mdi:flash"
+      },
+      "compressor": {
+        "default": "mdi:engine"
+      },
+      "cooling": {
+        "default": "mdi:snowflake"
+      },
+      "defrost": {
+        "default": "mdi:snowflake-melt"
+      },
+      "dhw_pump": {
+        "default": "mdi:pump"
+      },
+      "diverter_valve": {
+        "default": "mdi:valve"
+      },
+      "filter_both": {
+        "default": "mdi:air-filter"
+      },
+      "filter_down": {
+        "default": "mdi:air-filter"
+      },
+      "filter_up": {
+        "default": "mdi:air-filter"
+      },
+      "heat_pipe_valve": {
+        "default": "mdi:valve"
+      },
+      "heating_circuit_pump": {
+        "default": "mdi:pump"
+      },
+      "heating_dhw": {
+        "default": "mdi:water-boiler"
+      },
+      "heating_hc": {
+        "default": "mdi:radiator"
+      },
+      "mixer_closed": {
+        "default": "mdi:gate"
+      },
+      "mixer_open": {
+        "default": "mdi:gate-open"
+      },
+      "pump_hc": {
+        "default": "mdi:pump"
+      },
+      "quick_air_vent": {
+        "default": "mdi:fan-speed-3"
+      },
+      "service": {
+        "default": "mdi:tools"
+      },
+      "solar_pump": {
+        "default": "mdi:weather-sunny"
+      },
+      "switching_prog": {
+        "default": "mdi:calendar-clock"
+      },
+      "vent_stage": {
+        "default": "mdi:fan"
+      },
+      "window_open": {
+        "default": "mdi:window-open"
+      }
+    },
+    "button": {
+      "z_reset_last10errors": {
+        "default": "mdi:trash-can-outline"
+      }
+    },
+    "number": {
+      "booster_timeout_dhw": {
+        "default": "mdi:clock-outline"
+      },
+      "booster_timeout_hc": {
+        "default": "mdi:clock-outline"
+      },
+      "clock_day": {
+        "default": "mdi:clock-outline"
+      },
+      "clock_hour": {
+        "default": "mdi:clock-outline"
+      },
+      "clock_minutes": {
+        "default": "mdi:clock-outline"
+      },
+      "clock_month": {
+        "default": "mdi:clock-outline"
+      },
+      "clock_year": {
+        "default": "mdi:clock-outline"
+      },
+      "compressor_restart_delay": {
+        "default": "mdi:swap-horizontal"
+      },
+      "cooling_hc1_hyster_flow_temp": {
+        "default": "mdi:thermometer-lines"
+      },
+      "cooling_hc1_hyster_room_temp": {
+        "default": "mdi:thermometer-lines"
+      },
+      "cooling_hc1_set_temp": {
+        "default": "mdi:thermometer"
+      },
+      "cooling_hc2_hyster_flow_temp": {
+        "default": "mdi:thermometer-lines"
+      },
+      "cooling_hc2_hyster_room_temp": {
+        "default": "mdi:thermometer-lines"
+      },
+      "cooling_hc2_set_temp": {
+        "default": "mdi:thermometer"
+      },
+      "defrost_start_threshold": {
+        "default": "mdi:cog"
+      },
+      "dhw_eco": {
+        "default": "mdi:cog"
+      },
+      "dhw_max_flow_temp": {
+        "default": "mdi:thermometer"
+      },
+      "dhw_temp_day": {
+        "default": "mdi:thermometer"
+      },
+      "dhw_temp_manual": {
+        "default": "mdi:thermometer"
+      },
+      "dhw_temp_night": {
+        "default": "mdi:thermometer"
+      },
+      "dhw_temp_solar_mode": {
+        "default": "mdi:thermometer"
+      },
+      "dhw_temp_standby": {
+        "default": "mdi:thermometer"
+      },
+      "dual_mode_point": {
+        "default": "mdi:swap-horizontal"
+      },
+      "enable_solar": {
+        "default": "mdi:solar-power"
+      },
+      "fan_stage1_airflow_inlet": {
+        "default": "mdi:fan"
+      },
+      "fan_stage1_airflow_outlet": {
+        "default": "mdi:fan"
+      },
+      "fan_stage2_airflow_inlet": {
+        "default": "mdi:fan"
+      },
+      "fan_stage2_airflow_outlet": {
+        "default": "mdi:fan"
+      },
+      "fan_stage3_airflow_inlet": {
+        "default": "mdi:fan"
+      },
+      "fan_stage3_airflow_outlet": {
+        "default": "mdi:fan"
+      },
+      "fan_stage_day": {
+        "default": "mdi:fan"
+      },
+      "fan_stage_manual": {
+        "default": "mdi:swap-horizontal"
+      },
+      "fan_stage_night": {
+        "default": "mdi:fan"
+      },
+      "fan_stage_party": {
+        "default": "mdi:fan"
+      },
+      "fan_stage_standby": {
+        "default": "mdi:fan"
+      },
+      "filter_speed": {
+        "default": "mdi:thermometer"
+      },
+      "flow_proportion_hc1": {
+        "default": "mdi:cog"
+      },
+      "flow_proportion_hc2": {
+        "default": "mdi:swap-horizontal"
+      },
+      "frost_protection_boost": {
+        "default": "mdi:cog"
+      },
+      "frost_protection_cancel": {
+        "default": "mdi:cog"
+      },
+      "gradient_hc1": {
+        "default": "mdi:chart-line"
+      },
+      "gradient_hc2": {
+        "default": "mdi:chart-line"
+      },
+      "hc1_max_flow_temp": {
+        "default": "mdi:thermometer"
+      },
+      "hc_temp_manual": {
+        "default": "mdi:swap-horizontal"
+      },
+      "holiday_begin_day": {
+        "default": "mdi:beach"
+      },
+      "holiday_begin_month": {
+        "default": "mdi:beach"
+      },
+      "holiday_begin_year": {
+        "default": "mdi:beach"
+      },
+      "holiday_end_day": {
+        "default": "mdi:beach"
+      },
+      "holiday_end_month": {
+        "default": "mdi:beach"
+      },
+      "holiday_end_year": {
+        "default": "mdi:beach"
+      },
+      "hysteresis_1": {
+        "default": "mdi:swap-horizontal"
+      },
+      "hysteresis_2": {
+        "default": "mdi:swap-horizontal"
+      },
+      "hysteresis_3": {
+        "default": "mdi:swap-horizontal"
+      },
+      "hysteresis_4": {
+        "default": "mdi:swap-horizontal"
+      },
+      "hysteresis_5": {
+        "default": "mdi:swap-horizontal"
+      },
+      "hysteresis_asymmetry": {
+        "default": "mdi:swap-horizontal"
+      },
+      "hysteresis_dhw": {
+        "default": "mdi:swap-horizontal"
+      },
+      "integral_component": {
+        "default": "mdi:cog"
+      },
+      "low_end_hc1": {
+        "default": "mdi:cog"
+      },
+      "low_end_hc2": {
+        "default": "mdi:cog"
+      },
+      "main_fan_speed": {
+        "default": "mdi:swap-horizontal"
+      },
+      "max_boost_stages": {
+        "default": "mdi:flash"
+      },
+      "max_defrost_duration": {
+        "default": "mdi:cog"
+      },
+      "max_duration_dhw_load": {
+        "default": "mdi:clock-outline"
+      },
+      "max_pump_cycles": {
+        "default": "mdi:pump"
+      },
+      "min_pump_cycles": {
+        "default": "mdi:pump"
+      },
+      "out_temp_correction": {
+        "default": "mdi:eye"
+      },
+      "out_temp_filter_time": {
+        "default": "mdi:clock-outline"
+      },
+      "out_temp_max_pump_cycles": {
+        "default": "mdi:thermometer"
+      },
+      "out_temp_min_pump_cycles": {
+        "default": "mdi:thermometer"
+      },
+      "oven_fireplace": {
+        "default": "mdi:cog"
+      },
+      "passive_cooling": {
+        "default": "mdi:swap-horizontal"
+      },
+      "pasteurisation_temp": {
+        "default": "mdi:thermometer"
+      },
+      "pasteurization_interval": {
+        "default": "mdi:cog"
+      },
+      "prog_dhw_enable": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_dhw_friday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_dhw_monday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_dhw_saturday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_dhw_sunday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_dhw_thursday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_dhw_tuesday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_dhw_wednesday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan1_enable": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan1_friday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan1_monday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan1_saturday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan1_sunday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan1_thursday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan1_tuesday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan1_wednesday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan2_enable": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan2_friday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan2_monday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan2_saturday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan2_sunday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan2_thursday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan2_tuesday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_fan2_wednesday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc1_enable": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc1_friday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc1_monday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc1_saturday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc1_sunday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc1_thursday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc1_tuesday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc1_wednesday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc2_enable": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc2_friday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc2_monday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc2_saturday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc2_sunday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc2_thursday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc2_tuesday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "prog_hc2_wednesday": {
+        "default": "mdi:swap-horizontal"
+      },
+      "pump_rate_dhw": {
+        "default": "mdi:pump"
+      },
+      "pump_rate_hc": {
+        "default": "mdi:pump"
+      },
+      "room_influence_hc1": {
+        "default": "mdi:cog"
+      },
+      "room_influence_hc2": {
+        "default": "mdi:cog"
+      },
+      "room_temp_day": {
+        "default": "mdi:swap-horizontal"
+      },
+      "room_temp_day_hc1": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_day_hc1_summer": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_day_hc2": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_day_hc2_summer": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_night": {
+        "default": "mdi:swap-horizontal"
+      },
+      "room_temp_night_hc1": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_night_hc1_summer": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_night_hc2": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_night_hc2_summer": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_standby": {
+        "default": "mdi:swap-horizontal"
+      },
+      "room_temp_standby_hc1": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_standby_hc1_summer": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_standby_hc2": {
+        "default": "mdi:thermometer"
+      },
+      "room_temp_standby_hc2_summer": {
+        "default": "mdi:thermometer"
+      },
+      "room_therm_correction": {
+        "default": "mdi:cog"
+      },
+      "start_unsched_vent": {
+        "default": "mdi:air-filter"
+      },
+      "summer_mode_hysteresis": {
+        "default": "mdi:swap-horizontal"
+      },
+      "summer_mode_temp": {
+        "default": "mdi:thermometer"
+      },
+      "suppress_temp_capt_pump_start": {
+        "default": "mdi:thermometer"
+      },
+      "temp_limit_boost_dhw": {
+        "default": "mdi:thermometer"
+      },
+      "unsched_vent_0": {
+        "default": "mdi:air-filter"
+      },
+      "unsched_vent_1": {
+        "default": "mdi:air-filter"
+      },
+      "unsched_vent_2": {
+        "default": "mdi:air-filter"
+      },
+      "unsched_vent_3": {
+        "default": "mdi:air-filter"
+      }
+    },
+    "select": {
+      "op_mode": {
+        "default": "mdi:swap-horizontal"
+      },
+      "passive_cooling": {
+        "default": "mdi:snowflake"
+      },
+      "z_control_valve_dhw": {
+        "default": "mdi:eye"
+      },
+      "z_pump_dhw": {
+        "default": "mdi:eye"
+      },
+      "z_pump_hc": {
+        "default": "mdi:eye"
+      }
+    },
+    "sensor": {
+      "actual_power_pel": {
+        "default": "mdi:flash"
+      },
+      "actual_power_qc": {
+        "default": "mdi:flash"
+      },
+      "booster_runtime_dhw": {
+        "default": "mdi:timer-outline"
+      },
+      "booster_runtime_heating": {
+        "default": "mdi:timer-outline"
+      },
+      "collector_temp": {
+        "default": "mdi:solar-power"
+      },
+      "compressor_runtime_cooling": {
+        "default": "mdi:timer-outline"
+      },
+      "compressor_runtime_dhw": {
+        "default": "mdi:timer-outline"
+      },
+      "compressor_runtime_heating": {
+        "default": "mdi:timer-outline"
+      },
+      "condenser_temp": {
+        "default": "mdi:radiator"
+      },
+      "current_cop": {
+        "default": "mdi:calculator"
+      },
+      "daily_cop_dhw": {
+        "default": "mdi:calculator"
+      },
+      "daily_cop_hc": {
+        "default": "mdi:calculator"
+      },
+      "daily_cop_total": {
+        "default": "mdi:calculator"
+      },
+      "dew_point": {
+        "default": "mdi:weather-fog"
+      },
+      "dhw_set_temp": {
+        "default": "mdi:thermometer"
+      },
+      "dhw_temp": {
+        "default": "mdi:water-boiler"
+      },
+      "dual_mode_point": {
+        "default": "mdi:thermometer"
+      },
+      "evaporator_temp": {
+        "default": "mdi:snowflake"
+      },
+      "flow_rate": {
+        "default": "mdi:water-pump"
+      },
+      "flow_temp": {
+        "default": "mdi:thermometer"
+      },
+      "flow_temp_hc2": {
+        "default": "mdi:thermometer"
+      },
+      "hc2_mixer_valve": {
+        "default": "mdi:pipe-valve"
+      },
+      "hc2_setpoint_temp": {
+        "default": "mdi:thermometer"
+      },
+      "hc_booster_stage": {
+        "default": "mdi:fire"
+      },
+      "hc_op_mode": {
+        "default": "mdi:radiator"
+      },
+      "heat_set_temp": {
+        "default": "mdi:thermometer"
+      },
+      "heat_temp": {
+        "default": "mdi:thermometer"
+      },
+      "hotgas_temp": {
+        "default": "mdi:thermometer"
+      },
+      "humidity_air_out": {
+        "default": "mdi:water-percent"
+      },
+      "input_ventilator_power": {
+        "default": "mdi:fan"
+      },
+      "input_ventilator_speed": {
+        "default": "mdi:speedometer"
+      },
+      "inside_temp": {
+        "default": "mdi:home-thermometer"
+      },
+      "inside_temp_rc": {
+        "default": "mdi:home-thermometer"
+      },
+      "inside_temp_rc_hc2": {
+        "default": "mdi:home-thermometer"
+      },
+      "integral_heat": {
+        "default": "mdi:chart-line"
+      },
+      "integral_switch": {
+        "default": "mdi:chart-line"
+      },
+      "lifetime_cop_dhw": {
+        "default": "mdi:calculator"
+      },
+      "lifetime_cop_hc": {
+        "default": "mdi:calculator"
+      },
+      "lifetime_cop_total": {
+        "default": "mdi:calculator"
+      },
+      "main_ventilator_power": {
+        "default": "mdi:fan"
+      },
+      "main_ventilator_speed": {
+        "default": "mdi:speedometer"
+      },
+      "off_hysteresis_no": {
+        "default": "mdi:tune"
+      },
+      "on_hysteresis_no": {
+        "default": "mdi:tune"
+      },
+      "output_ventilator_power": {
+        "default": "mdi:fan"
+      },
+      "output_ventilator_speed": {
+        "default": "mdi:speedometer"
+      },
+      "outside_temp": {
+        "default": "mdi:thermometer"
+      },
+      "outside_temp_filtered": {
+        "default": "mdi:thermometer"
+      },
+      "pressure_hc": {
+        "default": "mdi:gauge"
+      },
+      "pressure_hd": {
+        "default": "mdi:gauge"
+      },
+      "pressure_nd": {
+        "default": "mdi:gauge"
+      },
+      "rel_humidity": {
+        "default": "mdi:water-percent"
+      },
+      "rel_humidity_hc2": {
+        "default": "mdi:water-percent"
+      },
+      "return_temp": {
+        "default": "mdi:thermometer"
+      },
+      "room_set_temp": {
+        "default": "mdi:thermostat"
+      },
+      "season_mode": {
+        "default": "mdi:weather-sunny"
+      },
+      "solar_pump": {
+        "default": "mdi:weather-sunny"
+      },
+      "temp_limit_boost_dhw": {
+        "default": "mdi:thermometer"
+      }
+    },
+    "switch": {
+      "cooling_hc1_switch": {
+        "default": "mdi:toggle-switch"
+      },
+      "cooling_hc2_switch": {
+        "default": "mdi:toggle-switch"
+      }
+    },
+    "time": {
+      "holiday_begin_time": {
+        "default": "mdi:clock-outline"
+      },
+      "holiday_end_time": {
+        "default": "mdi:clock-outline"
+      },
+      "party_time": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_fr_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_fr_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_fr_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_mo_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_mo_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_mo_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_mo_fr_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_mo_fr_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_mo_fr_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_mo_so_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_mo_so_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_mo_so_2": {
+        "default": "mdi:fan"
+      },
+      "programdhw_sa_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_sa_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_sa_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_sa_so_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_sa_so_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_sa_so_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_so_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_so_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_so_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_th_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_th_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_th_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_tu_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_tu_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_tu_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_we_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_we_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programdhw_we_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programfan_fr_0": {
+        "default": "mdi:fan"
+      },
+      "programfan_fr_1": {
+        "default": "mdi:fan"
+      },
+      "programfan_fr_2": {
+        "default": "mdi:fan"
+      },
+      "programfan_mo_0": {
+        "default": "mdi:fan"
+      },
+      "programfan_mo_1": {
+        "default": "mdi:fan"
+      },
+      "programfan_mo_2": {
+        "default": "mdi:fan"
+      },
+      "programfan_mo_fr_0": {
+        "default": "mdi:fan"
+      },
+      "programfan_mo_fr_1": {
+        "default": "mdi:fan"
+      },
+      "programfan_mo_fr_2": {
+        "default": "mdi:fan"
+      },
+      "programfan_mo_so_0": {
+        "default": "mdi:fan"
+      },
+      "programfan_mo_so_1": {
+        "default": "mdi:fan"
+      },
+      "programfan_mo_so_2": {
+        "default": "mdi:cog"
+      },
+      "programfan_sa_0": {
+        "default": "mdi:fan"
+      },
+      "programfan_sa_1": {
+        "default": "mdi:fan"
+      },
+      "programfan_sa_2": {
+        "default": "mdi:fan"
+      },
+      "programfan_sa_so_0": {
+        "default": "mdi:fan"
+      },
+      "programfan_sa_so_1": {
+        "default": "mdi:fan"
+      },
+      "programfan_sa_so_2": {
+        "default": "mdi:fan"
+      },
+      "programfan_so_0": {
+        "default": "mdi:fan"
+      },
+      "programfan_so_1": {
+        "default": "mdi:fan"
+      },
+      "programfan_so_2": {
+        "default": "mdi:fan"
+      },
+      "programfan_th_0": {
+        "default": "mdi:fan"
+      },
+      "programfan_th_1": {
+        "default": "mdi:fan"
+      },
+      "programfan_th_2": {
+        "default": "mdi:fan"
+      },
+      "programfan_tu_0": {
+        "default": "mdi:fan"
+      },
+      "programfan_tu_1": {
+        "default": "mdi:fan"
+      },
+      "programfan_tu_2": {
+        "default": "mdi:fan"
+      },
+      "programfan_we_0": {
+        "default": "mdi:fan"
+      },
+      "programfan_we_1": {
+        "default": "mdi:fan"
+      },
+      "programfan_we_2": {
+        "default": "mdi:fan"
+      },
+      "programhc1_fr_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_fr_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_fr_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_mo_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_mo_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_mo_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_mo_fr_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_mo_fr_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_mo_fr_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_mo_so_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_mo_so_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_mo_so_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_sa_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_sa_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_sa_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_sa_so_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_sa_so_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_sa_so_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_so_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_so_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_so_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_th_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_th_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_th_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_tu_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_tu_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_tu_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_we_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_we_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc1_we_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_fr_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_fr_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_fr_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_mo_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_mo_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_mo_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_mo_fr_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_mo_fr_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_mo_fr_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_mo_so_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_mo_so_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_mo_so_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_sa_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_sa_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_sa_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_sa_so_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_sa_so_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_sa_so_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_so_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_so_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_so_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_th_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_th_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_th_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_tu_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_tu_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_tu_2": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_we_0": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_we_1": {
+        "default": "mdi:calendar-clock"
+      },
+      "programhc2_we_2": {
+        "default": "mdi:calendar-clock"
+      }
+    }
+  }
+}

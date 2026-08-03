@@ -68,15 +68,23 @@ class TestAsyncSetupEntry:
 class TestTHZButtonInit:
     """Tests for THZButton initialization."""
 
-    def test_init_default_icon(self):
+    def test_init_default_icon_without_translation_key(self):
         entry = _button_entry()
         entry["icon"] = None
-        entity = _make_entity(entry=entry)
+        entity = _make_entity(name="customUntranslatedButton", entry=entry)
         assert entity._attr_icon == "mdi:gesture-tap-button"
 
-    def test_init_custom_icon(self):
-        entity = _make_entity()
+    def test_init_custom_icon_without_translation_key(self):
+        entry = _button_entry()
+        entry["icon"] = "mdi:trash-can-outline"
+        entity = _make_entity(name="customUntranslatedButton", entry=entry)
         assert entity._attr_icon == "mdi:trash-can-outline"
+
+    def test_init_icon_from_translation_key_leaves_no_attr_icon(self):
+        # "zResetLast10errors" has a known translation key -> icon comes
+        # from icons.json (icon translations) instead of a hardcoded value.
+        entity = _make_entity()
+        assert not hasattr(entity, "_attr_icon")
 
 
 class TestTHZButtonLifecycle:

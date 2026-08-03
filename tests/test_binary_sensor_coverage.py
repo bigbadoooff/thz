@@ -121,7 +121,9 @@ class TestAsyncSetupEntry:
 
         entities, _ = async_add_entities.call_args[0]
         entity = entities[0]
-        assert entity.icon == "mdi:engine"
+        # translation_key is set -> icon comes from icons.json instead of
+        # the hardcoded "icon" metadata field.
+        assert entity.icon is None
         assert entity._attr_translation_key == "compressor"
 
     @pytest.mark.asyncio

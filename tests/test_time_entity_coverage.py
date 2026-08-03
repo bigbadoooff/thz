@@ -134,15 +134,26 @@ class TestTHZTime:
             device=device,
             device_id="dev1",
         )
-        assert entity._attr_icon == "mdi:clock"
         assert entity._attr_has_entity_name is True
         assert entity.native_value is None
         assert entity._command == "0A0601"
 
-    def test_init_custom_icon(self):
+    def test_init_icon_from_translation_key_leaves_no_attr_icon(self):
+        # Names with a known translation key rely on icons.json (icon
+        # translations) instead of a hardcoded _attr_icon.
         device = _make_device()
         entity = THZTime(
             name="pHolidayBeginTime",
+            entry={"command": "0A0601", "type": "time", "icon": "mdi:custom"},
+            device=device,
+            device_id="dev1",
+        )
+        assert not hasattr(entity, "_attr_icon")
+
+    def test_init_custom_icon_without_translation_key(self):
+        device = _make_device()
+        entity = THZTime(
+            name="customUntranslatedTime",
             entry={"command": "0A0601", "type": "time", "icon": "mdi:custom"},
             device=device,
             device_id="dev1",
@@ -280,16 +291,17 @@ class TestTHZScheduleTime:
             time_type="start",
         )
         assert entity._time_type == "start"
-        assert entity._attr_icon == "mdi:calendar-clock"
+        # base_name has a known translation key -> icon comes from icons.json
+        assert not hasattr(entity, "_attr_icon")
         assert entity._attr_unique_id.endswith("_start")
 
-    def test_init_end_custom_icon(self):
+    def test_init_end_custom_icon_without_translation_key(self):
         device = _make_device()
         entry = _schedule_entry()
         entry["icon"] = "mdi:custom-clock"
         entity = THZScheduleTime(
-            name="programHC1_Mo_0 End",
-            base_name="programHC1_Mo_0",
+            name="totallyUnknownSchedule_Mo_0 End",
+            base_name="totallyUnknownSchedule_Mo_0",
             entry=entry,
             device=device,
             device_id="dev1",

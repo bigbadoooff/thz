@@ -281,7 +281,6 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         self._unit = e.get("unit")
         self._device_class = e.get("device_class")
         self._state_class = e.get("state_class")
-        self._icon = e.get("icon")
         self._device_id = device_id
 
         # Store the name for later use in unique_id and visibility checks
@@ -293,9 +292,13 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         if translation_key is not None:
             self._attr_translation_key = translation_key
             self._attr_has_entity_name = True
+            # Icon comes from icons.json (icon translations) instead of a
+            # hardcoded value, per HA's icon-translations quality-scale rule.
+            self._icon = None
         else:
             # No translation available: use name as fallback
             self._attr_name = e["name"]
+            self._icon = e.get("icon")
 
         # Set default visibility based on entity naming conventions
         # Uses HA's standard _attr_ pattern – no explicit @property override.
