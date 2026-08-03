@@ -185,4 +185,6 @@ class TestTimeValidation:
             for minute in range(0, 60, 15):
                 t = time(hour, minute)
                 quarters = time_to_quarters(t)
-                assert 0 <= quarters <= 95, f"Invalid quarters {quarters} for {hour}:{minute}"
+                assert 0 <= quarters <= 95, (
+                    f"Invalid quarters {quarters} for {hour}:{minute}"
+                )

@@ -129,7 +129,10 @@ class TestModuleConstants:
 
     def test_number_uses_write_register_constants(self):
         """Test that number module uses write register constants."""
-        from custom_components.thz.number import WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH
+        from custom_components.thz.number import (
+            WRITE_REGISTER_LENGTH,
+            WRITE_REGISTER_OFFSET,
+        )
         assert WRITE_REGISTER_OFFSET == 4
         assert WRITE_REGISTER_LENGTH == 2
 
@@ -260,7 +263,7 @@ class TestEntityRegistryEnabledDefault:
         }
 
     def test_schedule_time_program_entities_disabled_by_default(self):
-        """Test that THZScheduleTime entities with 'program' names are disabled by default."""
+        """THZScheduleTime entities with 'program' names are disabled by default."""
         from custom_components.thz.time import THZScheduleTime
 
         device = self._make_mock_device()
@@ -291,7 +294,7 @@ class TestEntityRegistryEnabledDefault:
                 )
 
     def test_schedule_time_non_program_entities_enabled_by_default(self):
-        """Test that THZScheduleTime entities without hide keywords are enabled by default."""
+        """THZScheduleTime entities without hide keywords are enabled by default."""
         from custom_components.thz.time import THZScheduleTime
 
         device = self._make_mock_device()
@@ -440,7 +443,7 @@ class TestEntityRegistryEnabledDefault:
                         time_type=time_type,
                     )
                     assert entity.entity_registry_enabled_default is False, (
-                        f"Write map entry '{name} {suffix}' should be disabled by default"
+                        f"Write map entry '{name} {suffix}' should be disabled"
                     )
 
         # Sanity: write_map_439_539 has exactly 120 program schedule entries
@@ -489,7 +492,8 @@ class TestBinarySensorModule:
         from custom_components.thz.binary_sensor import _get_device_class
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
         assert _get_device_class("dhwPump") == BinarySensorDeviceClass.RUNNING
-        assert _get_device_class("heatingCircuitPump") == BinarySensorDeviceClass.RUNNING
+        pump_class = _get_device_class("heatingCircuitPump")
+        assert pump_class == BinarySensorDeviceClass.RUNNING
 
     def test_get_device_class_filter(self):
         """Test device class mapping for filter entities."""

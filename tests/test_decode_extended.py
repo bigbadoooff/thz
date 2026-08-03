@@ -210,9 +210,9 @@ class TestDecodeValueExtended:
             result = decode_value(raw, decode_type)
             assert result == "deadbeef"
 
-        # These try to extract bits and return boolean
-        # bit8 and nbit8 would try to extract bit 8, which causes an error or unexpected behavior
-        # Let's test that they at least return something without crashing
+        # These try to extract bits and return boolean. bit8/nbit8 would try to
+        # extract bit 8, which causes an error or unexpected behavior — just
+        # test that they at least return something without crashing.
         raw_single = b'\xff'
         try:
             result = decode_value(raw_single, "bit8")
@@ -305,6 +305,6 @@ class TestDecode8Party:
         assert decode_value(raw, "8party") == 1439
 
     def test_factor_applied(self):
-        """Test that factor is applied, consistent with unsigned integer decode types."""
+        """Test that factor is applied, consistent with unsigned int decode types."""
         raw = b'\x00\x00\x00\x3c'  # 60
         assert decode_value(raw, "8party", 10) == 6.0

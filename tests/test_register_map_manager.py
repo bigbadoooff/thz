@@ -218,7 +218,7 @@ class TestBaseRegisterMapManager:
         assert "pxx0A0648" not in manager.get_paired_blocks()
 
     def test_non_cooling_539_keeps_non_cooling_write_entries(self):
-        """Test non-cooling 5.39 keeps shared write entries and removes cooling-only ones."""
+        """Non-cooling 5.39 keeps shared write entries, removes cooling-only ones."""
         manager = RegisterMapManagerWrite("539", has_cooling=False)
 
         assert "write_map_539" in manager.write_map_names
@@ -286,7 +286,7 @@ class TestRegisterMapManagerWrite2xxEnrichment:
         )
 
     def test_2xx_entries_get_offset_and_length(self):
-        """Test that 2xx write entries get byte offset and length converted from nibbles.
+        """2xx write entries get byte offset/length converted from nibbles.
 
         p01RoomTempDay has nibble offset=4, nibble length=4 in register_map_206.
         After conversion (nibble//2): byte offset=2, byte length=2.
@@ -333,7 +333,7 @@ class TestRegisterMapManagerWrite2xxEnrichment:
         assert entry.get("type") == "number"
 
     def test_2xx_ptime_type_not_changed(self):
-        """Test that 'ptime' type entries are NOT converted (different encoding needed)."""
+        """'ptime' type entries are NOT converted (different encoding needed)."""
         manager = RegisterMapManagerWrite("206")
         registers = manager.get_all_registers()
 

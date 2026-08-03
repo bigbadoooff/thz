@@ -166,7 +166,9 @@ class TestTHZNumberSetNativeValue:
     @pytest.mark.asyncio
     async def test_async_set_native_value_success(self):
         device = _make_device()
-        entity = _make_entity(entry=_number_entry(decode_type="hex2int", step=0.5), device=device)
+        entity = _make_entity(
+            entry=_number_entry(decode_type="hex2int", step=0.5), device=device
+        )
         entity.hass = MagicMock()
         entity.async_write_ha_state = MagicMock()
 

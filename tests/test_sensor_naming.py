@@ -44,7 +44,9 @@ class TestSensorMetadataLookup:
 
         # Original name from register map (with colon)
         pxx_fb = REGISTER_MAP["pxxFB"]
-        outside_temp = next(t for t in pxx_fb if t[0].strip().rstrip(":") == "outsideTemp")
+        outside_temp = next(
+            t for t in pxx_fb if t[0].strip().rstrip(":") == "outsideTemp"
+        )
 
         # 6th element should exist and have translation_key
         assert len(outside_temp) == 6
@@ -117,15 +119,17 @@ class TestEntityHiding:
             "pOpMode"
         ]
         for entity in basic_entities:
-            assert not should_hide_entity_by_default(entity), f"{entity} should be visible"
+            assert not should_hide_entity_by_default(entity), (
+                f"{entity} should be visible"
+            )
 
 
 class TestSensorUniqueIdExtraction:
-    """Test extraction of internal sensor name from unique_id for visibility checks.
+    r"""Test extraction of the internal sensor name from unique_id.
 
     Sensor unique_ids have the format:
         thz_{block}_{int_offset}_{entity_name_lower}
-    where {block} is a Python bytes repr (e.g. b'\\n\\t(') that may itself contain
+    where {block} is a Python bytes repr (e.g. b'\n\t(') that may itself contain
     underscores or special characters.  The regex used in
     _async_enable_integration_disabled_entities must correctly extract the entity
     name so that should_hide_entity_by_default() returns the right value even when

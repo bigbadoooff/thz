@@ -83,15 +83,21 @@ def _make_port(device: str, description: str) -> MagicMock:
 class TestListSerialPorts:
     """Unit tests for THZConfigFlow._list_serial_ports()."""
 
-    def _call(self, ports, by_id_dir_exists, by_id_entries, realpath_map, current_device=None):
+    def _call(
+        self, ports, by_id_dir_exists, by_id_entries, realpath_map,
+        current_device=None,
+    ):
         """Call _list_serial_ports with mocked OS / pyserial."""
 
         def fake_realpath(path):
             return realpath_map.get(path, path)
 
+        def fake_isdir(p):
+            return p == "/dev/serial/by-id" and by_id_dir_exists
+
         with (
             patch("serial.tools.list_ports.comports", return_value=ports),
-            patch("os.path.isdir", side_effect=lambda p: p == "/dev/serial/by-id" and by_id_dir_exists),
+            patch("os.path.isdir", side_effect=fake_isdir),
             patch("os.listdir", return_value=[e[0] for e in by_id_entries]),
             patch("os.path.realpath", side_effect=fake_realpath),
             patch("os.path.join", side_effect=lambda *parts: "/".join(parts)),
@@ -117,7 +123,7 @@ class TestListSerialPorts:
         assert canonical == "/dev/ttyUSB0"
 
     def test_no_ports_with_current_device_uses_current_as_canonical(self):
-        """When no ports detected and current_device given, it becomes the canonical default."""
+        """No ports detected: current_device (if given) becomes canonical default."""
         result, canonical = self._call(
             ports=[],
             by_id_dir_exists=False,
@@ -199,8 +205,10 @@ class TestListSerialPorts:
     # ------------------------------------------------------------------ #
 
     def test_stored_ttyusb_upgraded_to_by_id_canonical(self):
-        """If the stored path is /dev/ttyUSB0 but a by-id symlink exists for the same
-        device, the canonical default should be the by-id key, not /dev/ttyUSB0.
+        """A stored /dev/ttyUSB0 path upgrades to its by-id canonical key.
+
+        When a by-id symlink exists for the same device, the canonical
+        default should be the by-id key, not /dev/ttyUSB0.
         """
         port = _make_port("/dev/ttyUSB0", "Silicon Labs CP2102")
         by_id_name = "usb-Silicon_Labs_0001-if00-port0"
@@ -245,8 +253,10 @@ class TestListSerialPorts:
     # ------------------------------------------------------------------ #
 
     def test_disconnected_stored_device_remains_selectable(self):
-        """If the stored device is not currently connected, add it to the options
-        dict so the reconfigure form can still display and select it.
+        """A disconnected stored device stays selectable in the options dict.
+
+        If the stored device is not currently connected, add it to the
+        options dict so the reconfigure form can still display and select it.
         """
         # No ports currently connected
         result, canonical = self._call(
@@ -282,7 +292,7 @@ class TestListSerialPorts:
     # ------------------------------------------------------------------ #
 
     def test_multiple_ports_first_is_default_when_no_current_device(self):
-        """Without a current_device, the first detected port is the canonical default."""
+        """No current_device: the first detected port is the canonical default."""
         ports = [
             _make_port("/dev/ttyUSB0", "Device A"),
             _make_port("/dev/ttyUSB1", "Device B"),

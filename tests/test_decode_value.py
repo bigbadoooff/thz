@@ -273,9 +273,9 @@ class TestDecodeHex2Time:
 
 
 class TestDecodeHex2Error:
-    """Tests for hex2error decoding (4-byte LSB-first bitmap → fault list).
+    r"""Tests for hex2error decoding (4-byte LSB-first bitmap → fault list).
 
-    Matches FHEM: bitmap2string(unpack('b32', pack('H*',$value)), \\%faultmap)
+    Matches FHEM: bitmap2string(unpack('b32', pack('H*',$value)), \%faultmap)
     Bit position N (0-indexed, LSB-first within each byte) maps to
     fault key str(N+1) in SELECT_MAP['faultmap'].
     """
@@ -314,7 +314,7 @@ class TestDecodeHex2Error:
         assert decode_value(raw, "hex2error") == "n.a."
 
     def test_f11_low_pressure_sensor(self):
-        """Test bit 10 of 32-bit bitmap (byte 1 bit 2 = 0x04) → F11_LowPreasureSensorFault."""
+        """Test bit 10 (byte 1 bit 2 = 0x04) decodes to F11_LowPreasureSensorFault."""
         # bit 10 = byte 1 bit 2 = 0x04 in byte 1 → key "11"
         raw = b'\x00\x04\x00\x00'
         assert decode_value(raw, "hex2error") == "F11_LowPreasureSensorFault"

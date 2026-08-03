@@ -158,7 +158,9 @@ class TestConnectionTimeoutRestoration:
 
         # Create a mock serial object with only serial-like attributes
         # Using spec to limit available attributes
-        mock_serial = Mock(spec=['is_open', 'in_waiting', 'read', 'write', 'flush', 'close'])
+        mock_serial = Mock(
+            spec=['is_open', 'in_waiting', 'read', 'write', 'flush', 'close']
+        )
         mock_serial.is_open = True
         mock_serial.in_waiting = 5
         mock_serial.read.return_value = b'\xaa\xbb\xcc\xdd\xee'

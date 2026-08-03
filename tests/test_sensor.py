@@ -78,8 +78,10 @@ class TestNormalizeEntry:
 
     def test_normalize_six_element_tuple(self):
         """Test normalizing a 6-element tuple with metadata dict."""
-        meta = {"unit": "°C", "device_class": "temperature", "state_class": "measurement",
-                "icon": "mdi:thermometer", "translation_key": "outside_temp"}
+        meta = {
+            "unit": "°C", "device_class": "temperature", "state_class": "measurement",
+            "icon": "mdi:thermometer", "translation_key": "outside_temp",
+        }
         entry = ("outsideTemp:", 8, 4, "hex2int", 10, meta)
         result = normalize_entry(entry)
 
@@ -138,7 +140,9 @@ class TestSensorMetadataIntegration:
 
         # Check outsideTemp in pxxFB has temperature metadata
         pxx_fb = REGISTER_MAP["pxxFB"]
-        outside_temp = next(t for t in pxx_fb if t[0].strip().rstrip(":") == "outsideTemp")
+        outside_temp = next(
+            t for t in pxx_fb if t[0].strip().rstrip(":") == "outsideTemp"
+        )
         meta = outside_temp[5]
         assert meta.get("device_class") == "temperature"
         assert meta.get("unit") == "°C"
@@ -148,7 +152,9 @@ class TestSensorMetadataIntegration:
         from custom_components.thz.register_maps.register_map_all import REGISTER_MAP
 
         pxx_fb = REGISTER_MAP["pxxFB"]
-        outside_temp = next(t for t in pxx_fb if t[0].strip().rstrip(":") == "outsideTemp")
+        outside_temp = next(
+            t for t in pxx_fb if t[0].strip().rstrip(":") == "outsideTemp"
+        )
         meta = outside_temp[5]
         assert meta.get("translation_key") == "outside_temp"
 

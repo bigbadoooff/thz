@@ -28,8 +28,10 @@ class FakeRegisterManager:
 
 def _make_hass_and_entry(registers, coordinators, unsupported_blocks=None,
                           device_id="dev1", firmware_version="2.06"):
-    """Build a (hass, config_entry) pair with entry_data populated for
-    both sensor.async_setup_entry and the cop_sensor setup it delegates to.
+    """Build a (hass, config_entry) pair with entry_data for both platforms.
+
+    Populates entry_data for sensor.async_setup_entry and the cop_sensor
+    setup it delegates to.
     """
     device = MagicMock()
     device.firmware_version = firmware_version
@@ -359,7 +361,8 @@ class TestTHZGenericSensor:
         coord = MagicMock()
         coord.data = None
         sensor = THZGenericSensor(
-            coord, entry=self._make_entry(), block=bytes.fromhex("FB"), device_id="my_device"
+            coord, entry=self._make_entry(), block=bytes.fromhex("FB"),
+            device_id="my_device",
         )
         info = sensor.device_info
         assert (DOMAIN, "my_device") in info["identifiers"]

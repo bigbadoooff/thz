@@ -106,7 +106,9 @@ class TestAsyncSetupWritePlatformDefaultFactory:
     @pytest.mark.asyncio
     async def test_write_interval_defaults_when_missing(self):
         registers = {"reg1": {"type": "time", "command": "cmd"}}
-        hass, config_entry, _, _ = _make_hass_and_entry(registers, write_interval_data={})
+        hass, config_entry, _, _ = _make_hass_and_entry(
+            registers, write_interval_data={}
+        )
         async_add_entities = MagicMock()
 
         await async_setup_write_platform(
