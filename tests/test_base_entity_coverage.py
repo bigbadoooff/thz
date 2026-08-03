@@ -80,6 +80,20 @@ class TestInit:
         assert entity._attr_entity_registry_enabled_default is True
 
 
+class TestEntityCategory:
+    """Tests for THZBaseEntity's EntityCategory tagging."""
+
+    def test_advanced_entity_gets_config_category(self):
+        from homeassistant.const import EntityCategory
+
+        entity = _make_entity(name="p13GradientHC1")
+        assert entity._attr_entity_category == EntityCategory.CONFIG
+
+    def test_normal_entity_has_no_entity_category(self):
+        entity = _make_entity(name="pOpMode")
+        assert getattr(entity, "_attr_entity_category", None) is None
+
+
 class TestAvailable:
     """Tests for THZBaseEntity.available."""
 

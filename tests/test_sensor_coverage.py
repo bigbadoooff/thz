@@ -260,6 +260,25 @@ class TestTHZGenericSensor:
         )
         assert sensor._attr_name == "outsideTemp"
 
+    def test_advanced_sensor_gets_diagnostic_category(self):
+        from homeassistant.const import EntityCategory
+
+        coord = MagicMock()
+        coord.data = None
+        entry = self._make_entry(name="p13GradientHC1")
+        sensor = THZGenericSensor(
+            coord, entry=entry, block=bytes.fromhex("FB"), device_id="dev1"
+        )
+        assert sensor._attr_entity_category == EntityCategory.DIAGNOSTIC
+
+    def test_normal_sensor_has_no_entity_category(self):
+        coord = MagicMock()
+        coord.data = None
+        sensor = THZGenericSensor(
+            coord, entry=self._make_entry(), block=bytes.fromhex("FB"), device_id="dev1"
+        )
+        assert getattr(sensor, "_attr_entity_category", None) is None
+
     def test_native_value_none_when_no_data(self):
         coord = MagicMock()
         coord.data = None

@@ -25,6 +25,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.typing import StateType
@@ -303,6 +304,11 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         self._attr_entity_registry_enabled_default = (
             not should_hide_entity_by_default(self._entity_name)
         )
+
+        # Advanced/technician-mode sensors (also hidden by default above)
+        # are diagnostic information rather than primary readings.
+        if should_hide_entity_by_default(self._entity_name):
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def native_value(self) -> StateType | int | float | bool | str | None:

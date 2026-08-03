@@ -11,6 +11,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.const import EntityCategory
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
 
@@ -104,6 +105,11 @@ class THZBaseEntity(Entity):
         self._attr_entity_registry_enabled_default = not should_hide_entity_by_default(
             name
         )
+
+        # Advanced/technician-mode parameters (also hidden by default above)
+        # are configuration values from the user's point of view.
+        if should_hide_entity_by_default(name):
+            self._attr_entity_category = EntityCategory.CONFIG
 
         _LOGGER.debug(
             "Entity %s: entity_registry_enabled_default=%s (hide=%s)",

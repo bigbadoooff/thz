@@ -214,6 +214,44 @@ class TestTHZBinarySensorAdditional:
         assert entity._attr_translation_key == "compressor"
         assert entity._attr_has_entity_name is True
 
+    def test_advanced_sensor_gets_diagnostic_category(self):
+        from homeassistant.const import EntityCategory
+
+        coord = MagicMock()
+        coord.data = None
+        entity = THZBinarySensor(
+            coord,
+            entry={
+                "name": "p13GradientHC1",
+                "offset": 0,
+                "length": 1,
+                "decode": "bit3",
+                "icon": None,
+                "translation_key": None,
+            },
+            block=bytes.fromhex("FB"),
+            device_id="dev1",
+        )
+        assert entity._attr_entity_category == EntityCategory.DIAGNOSTIC
+
+    def test_normal_sensor_has_no_entity_category(self):
+        coord = MagicMock()
+        coord.data = None
+        entity = THZBinarySensor(
+            coord,
+            entry={
+                "name": "compressor",
+                "offset": 0,
+                "length": 1,
+                "decode": "bit3",
+                "icon": None,
+                "translation_key": None,
+            },
+            block=bytes.fromhex("FB"),
+            device_id="dev1",
+        )
+        assert getattr(entity, "_attr_entity_category", None) is None
+
     def test_is_on_payload_too_short_returns_none(self):
         coord = MagicMock()
         coord.data = bytes(0)

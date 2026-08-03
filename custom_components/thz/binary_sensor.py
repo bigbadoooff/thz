@@ -20,6 +20,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -215,6 +216,11 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_entity_registry_enabled_default = (
             not should_hide_entity_by_default(self._entity_name)
         )
+
+        # Advanced/technician-mode sensors (also hidden by default above)
+        # are diagnostic information rather than primary readings.
+        if should_hide_entity_by_default(self._entity_name):
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def is_on(self) -> bool | None:
