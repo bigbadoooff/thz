@@ -18,6 +18,9 @@ A176_COOLING_BYTE = 5
 A176_COOLING_BIT = 3
 A176_COMPRESSOR_BIT = 1
 
+HEAT_ENTRY = {"command": "0B0005", "step": 0.1, "decode_type": "5temp"}
+COOL_SETPOINT_ENTRY = {"command": "0B0582", "step": 0.1, "decode_type": "5temp"}
+
 
 class TestClimateModule:
     """Test that climate module imports and has the expected structure."""
@@ -224,7 +227,11 @@ class TestTHZClimateEntity:
         device.lock = MagicMock()
         device.lock.__aenter__ = AsyncMock(return_value=None)
         device.lock.__aexit__ = AsyncMock(return_value=None)
-        device.async_execute = AsyncMock(side_effect=lambda hass, func, *a, **kw: func(*a, **kw) if not _is_coro(func) else None)
+        device.async_execute = AsyncMock(
+            side_effect=lambda hass, func, *a, **kw: (
+                None if _is_coro(func) else func(*a, **kw)
+            )
+        )
         return device
 
     @staticmethod
@@ -288,7 +295,7 @@ class TestTHZClimateEntity:
 
     def test_cooling_not_supported_when_only_switch_missing(self):
         """Cooling requires both switch AND setpoint entries."""
-        cool_setpoint = {"command": "0B0582", "step": 0.1, "decode_type": "5temp"}
+        cool_setpoint = COOL_SETPOINT_ENTRY
         entity = self._make_hc1_entity(cool_setpoint_entry=cool_setpoint)
         assert HVACMode.COOL not in entity.hvac_modes
 
@@ -296,7 +303,8 @@ class TestTHZClimateEntity:
         """No TARGET_TEMPERATURE feature when there's no writable setpoint at all."""
         from homeassistant.components.climate import ClimateEntityFeature
         entity = self._make_hc1_entity()
-        assert not (entity._attr_supported_features & ClimateEntityFeature.TARGET_TEMPERATURE)
+        features = entity._attr_supported_features
+        assert not (features & ClimateEntityFeature.TARGET_TEMPERATURE)
 
     def test_preset_mode_feature_enabled_with_opmode_entry(self):
         from homeassistant.components.climate import ClimateEntityFeature
@@ -380,7 +388,7 @@ class TestTHZClimateEntity:
     def test_target_temperature_returns_cooling_cache_in_cool_mode(self):
         """In COOL mode, target_temperature returns the cached cooling setpoint."""
         cool_switch = {"command": "0B0287", "decode_type": "1clean"}
-        cool_setpoint = {"command": "0B0582", "step": 0.1, "decode_type": "5temp"}
+        cool_setpoint = COOL_SETPOINT_ENTRY
         a176_data = bytearray(10)
         a176_data[A176_COOLING_BYTE] = 1 << A176_COOLING_BIT
         cooling_coordinator = self._make_coordinator(bytes(a176_data))
@@ -440,9 +448,9 @@ class TestTHZClimateEntity:
         assert entity.hvac_mode == HVACMode.COOL
 
     def test_hvac_mode_not_cool_when_cooling_coordinator_has_no_data(self):
-        """hvac_mode falls back to opmode when the cooling coordinator has no data yet."""
+        """hvac_mode falls back to opmode when cooling coordinator has no data."""
         cool_switch = {"command": "0B0287", "decode_type": "1clean"}
-        cool_setpoint = {"command": "0B0582", "step": 0.1, "decode_type": "5temp"}
+        cool_setpoint = COOL_SETPOINT_ENTRY
         hc1_data = bytearray(60)
         hc1_data[F4_HC_OP_MODE_OFFSET] = 0x01
         cooling_coordinator = self._make_coordinator(None)
@@ -466,7 +474,7 @@ class TestTHZClimateEntity:
 
     def test_hvac_action_cooling_when_cooling_bit_set(self):
         cool_switch = {"command": "0B0287", "decode_type": "1clean"}
-        cool_setpoint = {"command": "0B0582", "step": 0.1, "decode_type": "5temp"}
+        cool_setpoint = COOL_SETPOINT_ENTRY
         a176_data = bytearray(10)
         a176_data[A176_COOLING_BYTE] = 1 << A176_COOLING_BIT
         entity = self._make_hc1_entity(
@@ -724,7 +732,7 @@ class TestTHZClimateServiceCalls:
 
     @pytest.mark.asyncio
     async def test_set_temperature_no_value_is_noop(self):
-        entity = self._entity(heat_entry={"command": "0B0005", "step": 0.1, "decode_type": "5temp"})
+        entity = self._entity(heat_entry=HEAT_ENTRY)
         entity.hass = MagicMock()
         await entity.async_set_temperature()
         entity._device.async_execute.assert_not_called()
@@ -734,7 +742,7 @@ class TestTHZClimateServiceCalls:
         device = MagicMock()
         device.async_execute = AsyncMock(return_value=None)
         entity = self._entity(
-            heat_entry={"command": "0B0005", "step": 0.1, "decode_type": "5temp"},
+            heat_entry=HEAT_ENTRY,
             device=device,
         )
         entity.hass = MagicMock()
@@ -758,7 +766,7 @@ class TestTHZClimateServiceCalls:
             return_value=(200).to_bytes(2, byteorder="big", signed=True)
         )
         cool_switch = {"command": "0B0287", "decode_type": "1clean"}
-        cool_setpoint = {"command": "0B0582", "step": 0.1, "decode_type": "5temp"}
+        cool_setpoint = COOL_SETPOINT_ENTRY
         a176_data = bytearray(10)
         a176_data[A176_COOLING_BYTE] = 1 << A176_COOLING_BIT
         entity = self._entity(
@@ -776,7 +784,7 @@ class TestTHZClimateServiceCalls:
         device = MagicMock()
         device.async_execute = AsyncMock(side_effect=ConnectionError("boom"))
         entity = self._entity(
-            heat_entry={"command": "0B0005", "step": 0.1, "decode_type": "5temp"},
+            heat_entry=HEAT_ENTRY,
             device=device,
         )
         entity.hass = MagicMock()
@@ -788,7 +796,7 @@ class TestTHZClimateServiceCalls:
         device = MagicMock()
         device.async_execute = AsyncMock(return_value=None)
         cool_switch = {"command": "0B0287", "decode_type": "1clean"}
-        cool_setpoint = {"command": "0B0582", "step": 0.1, "decode_type": "5temp"}
+        cool_setpoint = COOL_SETPOINT_ENTRY
         cooling_coordinator = TestTHZClimateEntity._make_coordinator(bytes(10))
         entity = self._entity(
             cool_switch_entry=cool_switch,
@@ -817,7 +825,7 @@ class TestTHZClimateServiceCalls:
         device = MagicMock()
         device.async_execute = AsyncMock(return_value=None)
         cool_switch = {"command": "0B0287", "decode_type": "1clean"}
-        cool_setpoint = {"command": "0B0582", "step": 0.1, "decode_type": "5temp"}
+        cool_setpoint = COOL_SETPOINT_ENTRY
         entity = self._entity(
             cool_switch_entry=cool_switch,
             cool_setpoint_entry=cool_setpoint,
@@ -897,7 +905,10 @@ class TestTHZClimateServiceCalls:
                 (1).to_bytes(2, byteorder="big", signed=True),
             ]
         )
-        entity = self._entity(fan_stage_entry={"command": "070001", "decode_type": "1clean"}, device=device)
+        entity = self._entity(
+            fan_stage_entry={"command": "070001", "decode_type": "1clean"},
+            device=device,
+        )
         entity.hass = MagicMock()
         entity.async_write_ha_state = MagicMock()
         await entity.async_set_fan_mode("low")
@@ -932,7 +943,7 @@ class TestTHZClimateServiceCalls:
         device = MagicMock()
         device.async_execute = AsyncMock(side_effect=ConnectionError("boom"))
         entity = self._entity(
-            cool_setpoint_entry={"command": "0B0582", "step": 0.1, "decode_type": "5temp"},
+            cool_setpoint_entry=COOL_SETPOINT_ENTRY,
             device=device,
         )
         entity.hass = MagicMock()
@@ -944,7 +955,7 @@ class TestTHZClimateServiceCalls:
         device = MagicMock()
         device.async_execute = AsyncMock(return_value=b"")
         entity = self._entity(
-            cool_setpoint_entry={"command": "0B0582", "step": 0.1, "decode_type": "5temp"},
+            cool_setpoint_entry=COOL_SETPOINT_ENTRY,
             device=device,
         )
         entity.hass = MagicMock()
@@ -981,13 +992,23 @@ class TestClimateAsyncSetupEntry:
 
     @staticmethod
     def _entry_data(register_manager, coordinators, write_registers):
+        write_manager = MagicMock(
+            get_all_registers=MagicMock(return_value=write_registers)
+        )
         return {
             "coordinators": coordinators,
             "device": MagicMock(),
             "device_id": "test_device",
-            "write_manager": MagicMock(get_all_registers=MagicMock(return_value=write_registers)),
+            "write_manager": write_manager,
             "register_manager": register_manager,
         }
+
+    @classmethod
+    def _make_hass(cls, register_manager, coordinators, write_registers):
+        hass = MagicMock()
+        entry_data = cls._entry_data(register_manager, coordinators, write_registers)
+        hass.data = {"thz": {"entry1": entry_data}}
+        return hass
 
     _F4_ENTRIES = [
         ("insideTempRC:", 68, 4, "hex2int", 10, {}),
@@ -1012,22 +1033,25 @@ class TestClimateAsyncSetupEntry:
     async def test_creates_hc1_and_dhw_entities(self):
         from custom_components.thz.climate import async_setup_entry
 
-        register_manager = self._register_manager(
-            {"pxxF4": self._F4_ENTRIES, "pxxF3": self._F3_ENTRIES, "pxx0A0176": self._A176_ENTRIES}
-        )
+        register_manager = self._register_manager({
+            "pxxF4": self._F4_ENTRIES,
+            "pxxF3": self._F3_ENTRIES,
+            "pxx0A0176": self._A176_ENTRIES,
+        })
         coordinators = {
             "pxxF4": MagicMock(),
             "pxxF3": MagicMock(),
             "pxx0A0176": MagicMock(),
         }
         write_registers = {
-            "p01RoomTempDayHC1": {"command": "0B0005", "step": 0.1, "decode_type": "5temp"},
-            "p04DHWsetDayTemp": {"command": "0B0006", "step": 0.1, "decode_type": "5temp"},
+            "p01RoomTempDayHC1": HEAT_ENTRY,
+            "p04DHWsetDayTemp": {
+                "command": "0B0006", "step": 0.1, "decode_type": "5temp",
+            },
         }
-        hass = MagicMock()
+        hass = self._make_hass(register_manager, coordinators, write_registers)
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
-        hass.data = {"thz": {"entry1": self._entry_data(register_manager, coordinators, write_registers)}}
 
         added = []
         async_add_entities = MagicMock(side_effect=lambda ents, *a: added.extend(ents))
@@ -1046,14 +1070,13 @@ class TestClimateAsyncSetupEntry:
         )
         coordinators = {"pxxF4": MagicMock(), "pxx0A0176": MagicMock()}
         write_registers = {
-            "p01RoomTempDayHC1": {"command": "0B0005", "step": 0.1, "decode_type": "5temp"},
+            "p01RoomTempDayHC1": HEAT_ENTRY,
             "p99CoolingHC1Switch": {"command": "0B0287", "decode_type": "1clean"},
-            "p99CoolingHC1SetTemp": {"command": "0B0582", "step": 0.1, "decode_type": "5temp"},
+            "p99CoolingHC1SetTemp": COOL_SETPOINT_ENTRY,
         }
-        hass = MagicMock()
+        hass = self._make_hass(register_manager, coordinators, write_registers)
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
-        hass.data = {"thz": {"entry1": self._entry_data(register_manager, coordinators, write_registers)}}
 
         added = []
         async_add_entities = MagicMock(side_effect=lambda ents, *a: added.extend(ents))
@@ -1069,12 +1092,13 @@ class TestClimateAsyncSetupEntry:
         register_manager = self._register_manager({"pxxF5": self._F5_ENTRIES})
         coordinators = {"pxxF5": MagicMock()}
         write_registers = {
-            "p01RoomTempDayHC2": {"command": "0B0007", "step": 0.1, "decode_type": "5temp"},
+            "p01RoomTempDayHC2": {
+                "command": "0B0007", "step": 0.1, "decode_type": "5temp",
+            },
         }
-        hass = MagicMock()
+        hass = self._make_hass(register_manager, coordinators, write_registers)
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
-        hass.data = {"thz": {"entry1": self._entry_data(register_manager, coordinators, write_registers)}}
 
         added = []
         async_add_entities = MagicMock(side_effect=lambda ents, *a: added.extend(ents))
@@ -1089,10 +1113,9 @@ class TestClimateAsyncSetupEntry:
 
         register_manager = self._register_manager({"pxxF5": self._F5_ENTRIES})
         coordinators = {"pxxF5": MagicMock()}
-        hass = MagicMock()
+        hass = self._make_hass(register_manager, coordinators, {})
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
-        hass.data = {"thz": {"entry1": self._entry_data(register_manager, coordinators, {})}}
 
         async_add_entities = MagicMock()
         await async_setup_entry(hass, config_entry, async_add_entities)
@@ -1104,10 +1127,9 @@ class TestClimateAsyncSetupEntry:
 
         register_manager = self._register_manager({"pxxF4": []})  # missing fields
         coordinators = {"pxxF4": MagicMock()}
-        hass = MagicMock()
+        hass = self._make_hass(register_manager, coordinators, {})
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
-        hass.data = {"thz": {"entry1": self._entry_data(register_manager, coordinators, {})}}
 
         async_add_entities = MagicMock()
         await async_setup_entry(hass, config_entry, async_add_entities)
@@ -1118,10 +1140,9 @@ class TestClimateAsyncSetupEntry:
         from custom_components.thz.climate import async_setup_entry
 
         register_manager = self._register_manager({})
-        hass = MagicMock()
+        hass = self._make_hass(register_manager, {}, {})
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
-        hass.data = {"thz": {"entry1": self._entry_data(register_manager, {}, {})}}
 
         async_add_entities = MagicMock()
         await async_setup_entry(hass, config_entry, async_add_entities)
