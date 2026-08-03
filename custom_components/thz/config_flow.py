@@ -515,6 +515,14 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             await device.async_initialize(self.hass)
 
+            unique_id = (
+                getattr(device, "unique_id", None)
+                or getattr(device, "serial", None)
+                or f"{conn_type}-{data.get(CONF_HOST) or data.get(CONF_DEVICE)}"
+            )
+            await self.async_set_unique_id(unique_id)
+            self._abort_if_unique_id_configured()
+
             firmware = device.firmware_version
             _LOGGER.info("Firmware detected: %s", firmware)
 

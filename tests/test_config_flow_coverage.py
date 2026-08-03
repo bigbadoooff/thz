@@ -18,6 +18,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.thz.const import DOMAIN
+
 
 # ---------------------------------------------------------------------------
 # Module-level setup, mirroring tests/test_config_flow_ports.py's approach:
@@ -37,15 +39,30 @@ class _FakeConfigFlowMeta(type):
         return super().__new__(mcs, name, bases, namespace)
 
 
+class AbortFlow(Exception):
+    """Stand-in for homeassistant.data_entry_flow.AbortFlow.
+
+    Real HA's FlowManager catches this and converts it to the abort result;
+    our fakes call the steps directly, so tests that need to observe a
+    duplicate-unique_id abort should catch this and inspect `.result`.
+    """
+
+    def __init__(self, result):
+        super().__init__(result)
+        self.result = result
+
+
 class _FakeConfigFlow(metaclass=_FakeConfigFlowMeta):
     """Stand-in base class for config_entries.ConfigFlow.
 
     Implements just enough of the real API surface (async_show_form,
-    async_abort, async_create_entry) for THZConfigFlow's steps to run and
+    async_abort, async_create_entry, async_set_unique_id,
+    _abort_if_unique_id_configured) for THZConfigFlow's steps to run and
     return inspectable results.
     """
 
     context: dict = {}
+    unique_id: str | None = None
 
     def async_show_form(self, *, step_id, data_schema=None, errors=None,
                          description_placeholders=None):
@@ -62,6 +79,16 @@ class _FakeConfigFlow(metaclass=_FakeConfigFlowMeta):
 
     def async_create_entry(self, *, title, data):
         return {"type": "create_entry", "title": title, "data": data}
+
+    async def async_set_unique_id(self, unique_id):
+        self.unique_id = unique_id
+        return None
+
+    def _abort_if_unique_id_configured(self):
+        entries = self.hass.config_entries.async_entries(DOMAIN)
+        for entry in entries:
+            if getattr(entry, "unique_id", None) == self.unique_id:
+                raise AbortFlow(self.async_abort(reason="already_configured"))
 
 
 _ha_mock = sys.modules.get("homeassistant")
@@ -124,6 +151,7 @@ class FakeHass:
 
     def __init__(self):
         self.config_entries = MagicMock()
+        self.config_entries.async_entries = MagicMock(return_value=[])
 
     async def async_add_executor_job(self, func, *args):
         return func(*args)
@@ -333,6 +361,64 @@ class TestAsyncStepDetectBlocks:
             baudrate=DEFAULT_BAUDRATE,
         )
         assert result["step_id"] == "select_groups"
+
+    @pytest.mark.asyncio
+    async def test_sets_unique_id_from_device_serial(self, flow):
+        flow.connection_data = {
+            "connection_type": "usb",
+            CONF_DEVICE: "/dev/ttyUSB0",
+        }
+        mock_device = MagicMock()
+        mock_device.async_initialize = AsyncMock()
+        mock_device.firmware_version = "319"
+        mock_device.available_reading_blocks = ["p01"]
+        mock_device.unique_id = "thz-serial-123"
+
+        with patch.object(config_flow_module, "THZDevice", return_value=mock_device):
+            await flow.async_step_detect_blocks()
+
+        assert flow.unique_id == "thz-serial-123"
+
+    @pytest.mark.asyncio
+    async def test_unique_id_falls_back_to_connection_string(self, flow):
+        flow.connection_data = {
+            "connection_type": "usb",
+            CONF_DEVICE: "/dev/ttyUSB0",
+        }
+        mock_device = MagicMock()
+        mock_device.async_initialize = AsyncMock()
+        mock_device.firmware_version = "319"
+        mock_device.available_reading_blocks = ["p01"]
+        mock_device.unique_id = None
+        mock_device.serial = None
+
+        with patch.object(config_flow_module, "THZDevice", return_value=mock_device):
+            await flow.async_step_detect_blocks()
+
+        assert flow.unique_id == "usb-/dev/ttyUSB0"
+
+    @pytest.mark.asyncio
+    async def test_aborts_when_unique_id_already_configured(self, flow):
+        flow.connection_data = {
+            "connection_type": "usb",
+            CONF_DEVICE: "/dev/ttyUSB0",
+        }
+        mock_device = MagicMock()
+        mock_device.async_initialize = AsyncMock()
+        mock_device.firmware_version = "319"
+        mock_device.available_reading_blocks = ["p01"]
+        mock_device.unique_id = "thz-serial-123"
+
+        existing_entry = MagicMock(unique_id="thz-serial-123")
+        flow.hass.config_entries.async_entries = MagicMock(
+            return_value=[existing_entry]
+        )
+
+        with patch.object(config_flow_module, "THZDevice", return_value=mock_device):
+            with pytest.raises(AbortFlow) as exc_info:
+                await flow.async_step_detect_blocks()
+
+        assert exc_info.value.result["reason"] == "already_configured"
 
     @pytest.mark.asyncio
     async def test_oserror_aborts(self, flow):

@@ -314,6 +314,11 @@
     }
   },
   "entity": {
+    "button": {
+      "z_reset_last10errors": {
+        "name": "Fehlerprotokoll zurücksetzen"
+      }
+    },
     "sensor": {
       "outside_temp": {
         "name": "Außentemperatur"
