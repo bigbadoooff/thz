@@ -20,10 +20,16 @@ class MockEntity:
     def name(self):
         """Return a simplified stand-in for HA's entity name resolution."""
         return (
-            getattr(self, "_attr_name", None)
+            getattr(self, "_name_override", None)
+            or getattr(self, "_attr_name", None)
             or getattr(self, "_attr_translation_key", None)
             or self.__class__.__name__
         )
+
+    @name.setter
+    def name(self, value):
+        """Allow tests to override the resolved name directly."""
+        self._name_override = value
 
 class MockCoordinatorEntity(MockEntity):
     """Mock coordinator entity."""
@@ -68,7 +74,15 @@ class MockButtonEntity(MockEntity):
 sys.modules['homeassistant'] = MagicMock()
 sys.modules['homeassistant.config_entries'] = MagicMock()
 sys.modules['homeassistant.core'] = MagicMock()
-sys.modules['homeassistant.exceptions'] = MagicMock()
+
+
+class HomeAssistantError(Exception):
+    """Real exception stand-in so `pytest.raises(HomeAssistantError)` works."""
+
+
+exceptions_mock = MagicMock()
+exceptions_mock.HomeAssistantError = HomeAssistantError
+sys.modules['homeassistant.exceptions'] = exceptions_mock
 sys.modules['homeassistant.helpers'] = MagicMock()
 sys.modules['homeassistant.helpers.config_validation'] = MagicMock()
 
