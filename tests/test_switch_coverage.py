@@ -128,6 +128,33 @@ class TestTHZSwitchUpdate:
         assert entity.is_on is False  # unchanged on error
 
 
+class TestTHZSwitchAvailability:
+    """Tests for THZSwitch availability tracking on connectivity errors."""
+
+    @pytest.mark.asyncio
+    async def test_becomes_unavailable_on_connection_error(self):
+        entity = _make_entity()
+        entity.hass = MagicMock()
+        assert entity.available is True
+        entity._device.async_execute = AsyncMock(side_effect=OSError("lost"))
+
+        await entity.async_update()
+
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_becomes_available_again_after_recovery(self):
+        entity = _make_entity()
+        entity._attr_available = False
+        entity.hass = MagicMock()
+        entity._device.async_execute = AsyncMock(return_value=bytes([0, 1]))
+
+        await entity.async_update()
+
+        assert entity.available is True
+        assert entity.is_on is True
+
+
 class TestTHZSwitchTurnOnOff:
     """Tests for THZSwitch.async_turn_on / async_turn_off."""
 

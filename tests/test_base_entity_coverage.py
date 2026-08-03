@@ -80,6 +80,19 @@ class TestInit:
         assert entity._attr_entity_registry_enabled_default is True
 
 
+class TestAvailable:
+    """Tests for THZBaseEntity.available."""
+
+    def test_available_true_by_default(self):
+        entity = _make_entity()
+        assert entity.available is True
+
+    def test_available_reflects_attr_available(self):
+        entity = _make_entity()
+        entity._attr_available = False
+        assert entity.available is False
+
+
 class TestGenerateUniqueId:
     """Tests for THZBaseEntity._generate_unique_id."""
 

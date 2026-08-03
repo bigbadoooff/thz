@@ -160,6 +160,36 @@ class TestTHZNumberUpdate:
         assert entity.native_value == 5.0
 
 
+class TestTHZNumberAvailability:
+    """Tests for THZNumber availability tracking on connectivity errors."""
+
+    @pytest.mark.asyncio
+    async def test_becomes_unavailable_on_connection_error(self):
+        entity = _make_entity()
+        entity.hass = MagicMock()
+        assert entity.available is True
+        entity._device.async_execute = AsyncMock(side_effect=ConnectionError("lost"))
+
+        await entity.async_update()
+
+        assert entity.available is False
+        assert entity.native_value is None
+
+    @pytest.mark.asyncio
+    async def test_becomes_available_again_after_recovery(self):
+        entity = _make_entity(entry=_number_entry(decode_type="hex2int", step=0.5))
+        entity.hass = MagicMock()
+        entity._attr_available = False
+        entity._device.async_execute = AsyncMock(
+            return_value=(40).to_bytes(2, "big", signed=True)
+        )
+
+        await entity.async_update()
+
+        assert entity.available is True
+        assert entity.native_value == 20.0
+
+
 class TestTHZNumberSetNativeValue:
     """Tests for THZNumber.async_set_native_value."""
 

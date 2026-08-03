@@ -59,6 +59,7 @@ class THZBaseEntity(Entity):
         self._device = device
         self._device_id = device_id
         self._attr_icon = icon or "mdi:eye"
+        self._attr_available = True
 
         # Per Home Assistant documentation, has_entity_name=True is MANDATORY for
         # new integrations.
@@ -160,6 +161,11 @@ class THZBaseEntity(Entity):
     # class's descriptor to ignore _attr_entity_registry_enabled_default
     # and default to True.  Letting HA resolve the _attr_ pattern natively
     # is the correct approach for HA >= 2023.
+
+    @property
+    def available(self) -> bool:
+        """Return True if the device was reachable on the last update."""
+        return self._attr_available
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

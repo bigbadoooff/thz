@@ -196,6 +196,43 @@ class TestTHZTime:
         assert entity.native_value == dtime(5, 0)
 
     @pytest.mark.asyncio
+    async def test_becomes_unavailable_on_connection_error(self):
+        device = _make_device()
+        entity = THZTime(
+            name="pHolidayBeginTime",
+            entry=_time_entry(),
+            device=device,
+            device_id="dev1",
+        )
+        entity.name = "pHolidayBeginTime"
+        entity.hass = _make_hass()
+        assert entity.available is True
+        device.async_execute = AsyncMock(side_effect=ConnectionError("lost"))
+
+        await entity.async_update()
+
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_becomes_available_again_after_recovery(self):
+        device = _make_device()
+        entity = THZTime(
+            name="pHolidayBeginTime",
+            entry=_time_entry(),
+            device=device,
+            device_id="dev1",
+        )
+        entity.name = "pHolidayBeginTime"
+        entity._attr_available = False
+        entity.hass = _make_hass()
+        device.async_execute = AsyncMock(return_value=b"\x06\x00")
+
+        await entity.async_update()
+
+        assert entity.available is True
+        assert entity.native_value == dtime(1, 30)
+
+    @pytest.mark.asyncio
     async def test_async_set_native_value(self):
         device = _make_device()
         device.write_value = MagicMock()
@@ -365,6 +402,47 @@ class TestTHZScheduleTime:
         await entity.async_update()
 
         assert entity.native_value == dtime(9, 0)
+
+    @pytest.mark.asyncio
+    async def test_becomes_unavailable_on_connection_error(self):
+        device = _make_device()
+        entity = THZScheduleTime(
+            name="programHC1_Mo_0 Start",
+            base_name="programHC1_Mo_0",
+            entry=_schedule_entry(),
+            device=device,
+            device_id="dev1",
+            time_type="start",
+        )
+        entity.name = "programHC1_Mo_0 Start"
+        entity.hass = _make_hass()
+        assert entity.available is True
+        device.async_execute = AsyncMock(side_effect=RuntimeError("comm error"))
+
+        await entity.async_update()
+
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_becomes_available_again_after_recovery(self):
+        device = _make_device()
+        entity = THZScheduleTime(
+            name="programHC1_Mo_0 Start",
+            base_name="programHC1_Mo_0",
+            entry=_schedule_entry(),
+            device=device,
+            device_id="dev1",
+            time_type="start",
+        )
+        entity.name = "programHC1_Mo_0 Start"
+        entity._attr_available = False
+        entity.hass = _make_hass()
+        device.async_execute = AsyncMock(return_value=bytes([8, 16]))
+
+        await entity.async_update()
+
+        assert entity.available is True
+        assert entity.native_value == dtime(2, 0)
 
     @pytest.mark.asyncio
     async def test_async_set_native_value_start(self):

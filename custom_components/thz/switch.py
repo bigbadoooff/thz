@@ -80,14 +80,23 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             "Updating switch %s with command %s", self.name, self._command
         )
 
-        value_bytes = await self._device.async_execute(
-            self.hass,
-            self._device.read_value,
-            bytes.fromhex(self._command),
-            "get",
-            WRITE_REGISTER_OFFSET,
-            WRITE_REGISTER_LENGTH,
-        )
+        try:
+            value_bytes = await self._device.async_execute(
+                self.hass,
+                self._device.read_value,
+                bytes.fromhex(self._command),
+                "get",
+                WRITE_REGISTER_OFFSET,
+                WRITE_REGISTER_LENGTH,
+            )
+        except (ConnectionError, RuntimeError, OSError) as err:
+            if self._attr_available:
+                _LOGGER.warning(
+                    "Switch %s became unavailable: %s", self.name, err
+                )
+            self._attr_available = False
+            return
+        self._attr_available = True
 
         # Validate that we received data
         if not value_bytes:

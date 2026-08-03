@@ -147,6 +147,35 @@ class TestTHZSelectUpdate:
         assert entity.current_option == "standby"
 
 
+class TestTHZSelectAvailability:
+    """Tests for THZSelect availability tracking on connectivity errors."""
+
+    @pytest.mark.asyncio
+    async def test_becomes_unavailable_on_connection_error(self):
+        entity = _make_entity(entry=_select_entry(decode_type="2opmode"))
+        entity.hass = MagicMock()
+        assert entity.available is True
+        entity._device.async_execute = AsyncMock(
+            side_effect=RuntimeError("comm error")
+        )
+
+        await entity.async_update()
+
+        assert entity.available is False
+
+    @pytest.mark.asyncio
+    async def test_becomes_available_again_after_recovery(self):
+        entity = _make_entity(entry=_select_entry(decode_type="2opmode"))
+        entity._attr_available = False
+        entity.hass = MagicMock()
+        entity._device.async_execute = AsyncMock(return_value=bytes([11, 0]))
+
+        await entity.async_update()
+
+        assert entity.available is True
+        assert entity.current_option == "automatic"
+
+
 class TestTHZSelectSelectOption:
     """Tests for THZSelect.async_select_option."""
 

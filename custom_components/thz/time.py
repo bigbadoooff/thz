@@ -246,14 +246,21 @@ class THZTime(THZBaseEntity, TimeEntity):
 
     async def async_update(self):
         """Fetch new state data for the time."""
-        value_bytes = await self._device.async_execute(
-            self.hass,
-            self._device.read_value,
-            bytes.fromhex(self._command),
-            "get",
-            WRITE_REGISTER_OFFSET,
-            WRITE_REGISTER_LENGTH,
-        )
+        try:
+            value_bytes = await self._device.async_execute(
+                self.hass,
+                self._device.read_value,
+                bytes.fromhex(self._command),
+                "get",
+                WRITE_REGISTER_OFFSET,
+                WRITE_REGISTER_LENGTH,
+            )
+        except (ConnectionError, RuntimeError, OSError) as err:
+            if self._attr_available:
+                _LOGGER.warning("Time %s became unavailable: %s", self.name, err)
+            self._attr_available = False
+            return
+        self._attr_available = True
 
         # Time values are stored as single bytes (0-95 quarters)
         if not value_bytes:
@@ -377,14 +384,23 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
 
     async def async_update(self):
         """Fetch new state data for the schedule time."""
-        value_bytes = await self._device.async_execute(
-            self.hass,
-            self._device.read_value,
-            bytes.fromhex(self._command),
-            "get",
-            4,
-            4,
-        )
+        try:
+            value_bytes = await self._device.async_execute(
+                self.hass,
+                self._device.read_value,
+                bytes.fromhex(self._command),
+                "get",
+                4,
+                4,
+            )
+        except (ConnectionError, RuntimeError, OSError) as err:
+            if self._attr_available:
+                _LOGGER.warning(
+                    "Schedule time %s became unavailable: %s", self.name, err
+                )
+            self._attr_available = False
+            return
+        self._attr_available = True
 
         # Schedule data format (from FHEM 7prog):
         # - Bytes 0-3: header/other data
