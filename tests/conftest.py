@@ -16,12 +16,25 @@ class MockEntity:
         """Return entity_registry_enabled_default via HA's _attr_ pattern."""
         return getattr(self, "_attr_entity_registry_enabled_default", True)
 
+    @property
+    def name(self):
+        """Return a simplified stand-in for HA's entity name resolution."""
+        return (
+            getattr(self, "_attr_name", None)
+            or getattr(self, "_attr_translation_key", None)
+            or self.__class__.__name__
+        )
+
 class MockCoordinatorEntity(MockEntity):
     """Mock coordinator entity."""
 
     def __init__(self, coordinator):
         """Initialise with a coordinator reference."""
         self.coordinator = coordinator
+
+    async def async_added_to_hass(self) -> None:
+        """No-op stand-in for CoordinatorEntity's listener subscription."""
+        return None
 
 class MockSensorEntity(MockEntity):
     """Mock sensor entity."""
@@ -129,6 +142,8 @@ class MockClimateEntityFeature:
     """Minimal ClimateEntityFeature stand-in that supports the | operator."""
     TARGET_TEMPERATURE = 1
     TARGET_TEMPERATURE_RANGE = 2
+    FAN_MODE = 8
+    PRESET_MODE = 16
 
     def __init__(self, value=0):
         """Initialise with a numeric feature bitmask."""
@@ -139,9 +154,18 @@ class MockClimateEntityFeature:
         v = other.value if isinstance(other, MockClimateEntityFeature) else int(other)
         return MockClimateEntityFeature(self.value | v)
 
+    def __and__(self, other):
+        """Intersect feature flags with bitwise AND."""
+        v = other.value if isinstance(other, MockClimateEntityFeature) else int(other)
+        return MockClimateEntityFeature(self.value & v)
+
     def __int__(self):
         """Return the integer value of the feature flags."""
         return self.value
+
+    def __bool__(self):
+        """Return whether any feature flag is set."""
+        return bool(self.value)
 
 class MockClimateEntity(MockEntity):
     """Mock ClimateEntity base class."""
