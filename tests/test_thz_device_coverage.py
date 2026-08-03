@@ -197,24 +197,6 @@ class TestIsConnectionAliveExtra:
         device.ser = Mock(spec=[])
         assert device._is_connection_alive() is False
 
-    def test_serial_is_open_raises_attribute_error_on_access(self):
-        """hasattr() succeeds but the actual .is_open access then fails."""
-        device = _make_device()
-
-        class FlakyIsOpen:
-            def __init__(self):
-                self.calls = 0
-
-            @property
-            def is_open(self):
-                self.calls += 1
-                if self.calls == 1:
-                    return True
-                raise AttributeError("gone")
-
-        device.ser = FlakyIsOpen()
-        assert device._is_connection_alive() is False
-
 
 # ---------------------------------------------------------------------------
 # _reconnect
@@ -548,10 +530,16 @@ class TestWriteBytes:
         mock_serial.write.assert_called_once_with(b"\x02")
         mock_serial.flush.assert_called_once()
 
-    def test_write_bytes_unknown_type_raises(self):
+    def test_write_bytes_mismatched_ser_raises_connection_error(self):
+        """Dispatch trusts self.connection; a ser lacking the expected
+
+        interface (e.g. a bad mock) surfaces as a wrapped ConnectionError
+        via the AttributeError clause rather than a distinct "unknown type"
+        path.
+        """
         device = _make_device()
         device.ser = Mock(spec=[])
-        with pytest.raises(ConnectionError, match="Unknown connection type"):
+        with pytest.raises(ConnectionError, match="Connection closed during write"):
             device._write_bytes(b"\x02")
 
     def test_write_bytes_oserror_raises_connection_error(self):

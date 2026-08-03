@@ -170,18 +170,13 @@ class THZDevice:
         if self.ser is None:
             return False
 
-        # Check if it's a socket - use hasattr to avoid issues with mocks
-        if hasattr(self.ser, 'fileno') and hasattr(self.ser, 'recv'):
-            # This is likely a socket
+        if self.connection == "ip":
             try:
                 # Check if socket is still valid
                 if self.ser.fileno() == -1:
                     return False
 
                 # Save original timeout to restore after the check.
-                # mypy only narrows the exact attributes named in the hasattr()
-                # check above, not gettimeout/setblocking/settimeout, so these
-                # accesses need an explicit ignore despite being runtime-safe.
                 original_timeout = self.ser.gettimeout()  # type: ignore[union-attr]
 
                 # Try a quick peek without blocking to detect closed connections
@@ -190,7 +185,7 @@ class THZDevice:
                 try:
                     # recv with MSG_PEEK doesn't remove data from buffer
                     # Empty return on non-blocking socket just means no data available
-                    self.ser.recv(1, socket.MSG_PEEK)
+                    self.ser.recv(1, socket.MSG_PEEK)  # type: ignore[union-attr]
                 except BlockingIOError:
                     # No data available but connection is alive
                     pass
@@ -208,15 +203,12 @@ class THZDevice:
                 return True
             except (OSError, socket.error, AttributeError):
                 return False
-        elif hasattr(self.ser, 'is_open'):
-            # This is likely a serial connection
-            try:
-                return self.ser.is_open
-            except AttributeError:
-                return False
 
-        # Unknown connection type or uninitialized
-        return False
+        # Serial connection
+        try:
+            return self.ser.is_open  # type: ignore[union-attr]
+        except AttributeError:
+            return False
 
     def _reconnect(self):
         """Attempt to reconnect if connection was lost."""
@@ -450,20 +442,16 @@ class THZDevice:
             ConnectionError: If the connection is closed or broken
         """
         try:
-            # Use hasattr to check connection type instead of isinstance
-            # This is more robust when modules are mocked in tests
-            # mypy can't narrow away None (or Serial/socket) through hasattr();
+            # self.connection is the authoritative discriminator (set once in
+            # __init__ and never mutated); mypy can't narrow self.ser's union
+            # type from it, so these accesses need an explicit ignore.
             # self.ser turning None mid-call is a real, accepted race handled
             # by the AttributeError clause below.
-            if hasattr(self.ser, 'send') and hasattr(self.ser, 'recv'):
-                # This is a socket
+            if self.connection == "ip":
                 self.ser.send(data)  # type: ignore[union-attr]
-            elif hasattr(self.ser, 'write') and hasattr(self.ser, 'flush'):
-                # This is serial
+            else:
                 self.ser.write(data)  # type: ignore[union-attr]
                 self.ser.flush()  # type: ignore[union-attr]
-            else:
-                raise ConnectionError("Unknown connection type")
         except (OSError, socket.error, BrokenPipeError) as e:
             # Connection reset, broken pipe, or other socket/serial errors
             _LOGGER.error("Connection error during write: %s", e)
@@ -472,7 +460,7 @@ class THZDevice:
             # Raised by select.select() when the fd is closed mid-write (pyserial sets
             # fd=None on close, so fileno() returns None, which is not an int).
             # Also catches AttributeError if self.ser is set to None by _force_close()
-            # between the hasattr check and the actual send/write call.
+            # between the check above and the actual send/write call.
             raise ConnectionError(f"Connection closed during write: {e}") from e
 
     def _read_exact(self, size: int, timeout: float) -> bytes:
@@ -493,23 +481,21 @@ class THZDevice:
         Raises:
             ConnectionError: If the connection is closed or broken
         """
-        # Use hasattr to check connection type instead of isinstance
-        # This is more robust when modules are mocked in tests
-        # mypy can't narrow away None (or Serial/socket) through hasattr();
+        # self.connection is the authoritative discriminator (set once in
+        # __init__ and never mutated); mypy can't narrow self.ser's union
+        # type from it, so these accesses need an explicit ignore.
         # self.ser turning None mid-call is a real, accepted race handled by
         # the AttributeError clauses below.
-        if hasattr(self.ser, 'recv') and hasattr(self.ser, 'setblocking'):
-            # This is a socket
-            # Save original timeout to restore after reading
-            original_timeout = self.ser.gettimeout()  # type: ignore[union-attr]
+        if self.ser is None:
+            return b""
+
+        if self.connection == "ip":
             try:
+                # Save original timeout to restore after reading
+                original_timeout = self.ser.gettimeout()  # type: ignore[union-attr]
                 self.ser.setblocking(False)  # type: ignore[union-attr]
                 data = self.ser.recv(1024)  # type: ignore[union-attr]
-                if (
-                    not data
-                    and hasattr(self.ser, 'fileno')
-                    and self.ser.fileno() == -1  # type: ignore[union-attr]
-                ):
+                if not data and self.ser.fileno() == -1:
                     # Socket is closed
                     raise ConnectionError("TCP socket connection closed")
                 return data
@@ -522,32 +508,32 @@ class THZDevice:
             except (ValueError, AttributeError) as e:
                 # select.select() raises ValueError when the socket fd is closed
                 # (fileno() returns None after close); AttributeError if self.ser
-                # becomes None between the hasattr check and the recv call.
+                # becomes None between the check above and the recv call.
                 raise ConnectionError(f"Connection closed during read: {e}") from e
             finally:
-                # Always restore the original timeout
+                # Always restore the original timeout. UnboundLocalError covers
+                # the case where gettimeout() itself raised above, so
+                # original_timeout was never assigned.
                 try:
                     self.ser.settimeout(original_timeout)  # type: ignore[union-attr]
-                except (OSError, socket.error, AttributeError):
+                except (OSError, socket.error, AttributeError, UnboundLocalError):
                     # Socket may be in bad state or already None, ignore
                     pass
-        elif hasattr(self.ser, 'in_waiting') and hasattr(self.ser, 'read'):
-            # This is serial
-            try:
-                waiting = getattr(self.ser, "in_waiting", 0)
-                if waiting > 0:
-                    return self.ser.read(waiting)  # type: ignore[union-attr]
-                return b""
-            except (OSError, serial.SerialException) as e:
-                raise ConnectionError(f"Serial read error: {e}") from e
-            except (ValueError, AttributeError) as e:
-                # pyserial's select.select() raises ValueError when the port fd
-                # is None (set by close()); AttributeError if self.ser is None.
-                raise ConnectionError(
-                    f"Connection closed during serial read: {e}"
-                ) from e
-        else:
+
+        # Serial connection
+        try:
+            waiting = getattr(self.ser, "in_waiting", 0)
+            if waiting > 0:
+                return self.ser.read(waiting)  # type: ignore[union-attr]
             return b""
+        except (OSError, serial.SerialException) as e:
+            raise ConnectionError(f"Serial read error: {e}") from e
+        except (ValueError, AttributeError) as e:
+            # pyserial's select.select() raises ValueError when the port fd
+            # is None (set by close()); AttributeError if self.ser is None.
+            raise ConnectionError(
+                f"Connection closed during serial read: {e}"
+            ) from e
 
     def _reset_input_buffer(self):
         """Delete any existing input buffer.
