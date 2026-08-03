@@ -13,7 +13,11 @@ import random
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import (
+    ConfigEntryNotReady,
+    HomeAssistantError,
+    ServiceValidationError,
+)
 from homeassistant.core import (
     HomeAssistant,
     ServiceCall,
@@ -47,12 +51,14 @@ PLATFORMS = [
 ]
 
 
-def _resolve_target_device(
+def _require_target_entry_data(
     hass: HomeAssistant, requested_entry_id: str | None
-) -> THZDevice | None:
-    """Resolve target THZ device from service call context.
+) -> tuple[str, dict]:
+    """Resolve the target THZ config-entry id and data for a service call.
 
-    Returns None when target resolution fails.
+    Raises ServiceValidationError when entry_id is invalid or omitted while
+    ambiguous (multiple entries loaded), or HomeAssistantError when no THZ
+    device is initialized at all.
     """
     available_entries: dict[str, dict] = {
         eid: ed
@@ -61,18 +67,23 @@ def _resolve_target_device(
     }
 
     if requested_entry_id:
-        entry_data_for_cmd = available_entries.get(requested_entry_id)
-        if entry_data_for_cmd is None:
-            return None
-        return entry_data_for_cmd["device"]
+        entry_data = available_entries.get(requested_entry_id)
+        if entry_data is None:
+            raise ServiceValidationError(
+                f"No THZ entry found for entry_id '{requested_entry_id}'"
+            )
+        return requested_entry_id, entry_data
 
     if len(available_entries) > 1:
-        return None
+        raise ServiceValidationError(
+            "Multiple THZ config entries found. "
+            "Provide 'entry_id' to target a specific device."
+        )
 
     if available_entries:
-        return next(iter(available_entries.values()))["device"]
+        return next(iter(available_entries.items()))
 
-    return None
+    raise HomeAssistantError("THZ device not initialized")
 
 
 def _expand_scan_pattern(pattern: str) -> list[str]:
@@ -506,48 +517,14 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 },
                 blocking=True,
             )
-            return {
-                "success": False,
-                "error": error_msg,
-                "command": command_str,
-            }
+            raise ServiceValidationError(error_msg) from err
 
         # Locate the target device. With a single entry no entry_id is needed.
-        # With multiple entries, entry_id is required — return an error if omitted.
-        device = _resolve_target_device(hass, requested_entry_id)
-        if device is None:
-            available_entries: dict[str, dict] = {
-                eid: ed
-                for eid, ed in hass.data.get(DOMAIN, {}).items()
-                if isinstance(ed, dict) and "device" in ed
-            }
-            if requested_entry_id and requested_entry_id not in available_entries:
-                error_msg = (
-                    f"No THZ entry found for entry_id '{requested_entry_id}'"
-                )
-                _LOGGER.error(error_msg)
-                await hass.services.async_call(
-                    "persistent_notification",
-                    "create",
-                    {
-                        "title": "THZ Raw Register Read Error",
-                        "message": error_msg,
-                        "notification_id": f"thz_raw_{command_str}",
-                    },
-                    blocking=True,
-                )
-                return {
-                    "success": False,
-                    "error": error_msg,
-                    "command": command_str,
-                }
-            if len(available_entries) > 1 and not requested_entry_id:
-                error_msg = (
-                    "Multiple THZ config entries found. "
-                    "Provide 'entry_id' to target a specific device."
-                )
-            else:
-                error_msg = "THZ device not initialized"
+        # With multiple entries, entry_id is required — raise if omitted.
+        try:
+            _, entry_data = _require_target_entry_data(hass, requested_entry_id)
+        except (ServiceValidationError, HomeAssistantError) as err:
+            error_msg = str(err)
             _LOGGER.error(error_msg)
             await hass.services.async_call(
                 "persistent_notification",
@@ -559,11 +536,8 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 },
                 blocking=True,
             )
-            return {
-                "success": False,
-                "error": error_msg,
-                "command": command_str,
-            }
+            raise
+        device = entry_data["device"]
 
         # Read the register
         try:
@@ -624,11 +598,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 },
                 blocking=True,
             )
-            return {
-                "success": False,
-                "error": str(err),
-                "command": command_str,
-            }
+            raise HomeAssistantError(error_msg) from err
 
     async def _async_handle_scan_raw_registers(call: ServiceCall) -> ServiceResponse:
         """Handle the scan_raw_registers service call."""
@@ -642,18 +612,14 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         preview_limit = int(call.data.get("preview_limit", 20))
 
         if max_results <= 0:
-            return {
-                "success": False,
-                "error": "max_results must be greater than 0",
-            }
+            raise ServiceValidationError("max_results must be greater than 0")
 
         use_pattern = bool(pattern)
         use_range = bool(start) or bool(end)
         if use_pattern == use_range:
-            return {
-                "success": False,
-                "error": "Provide either 'pattern' or both 'start' and 'end'",
-            }
+            raise ServiceValidationError(
+                "Provide either 'pattern' or both 'start' and 'end'"
+            )
 
         try:
             if use_pattern:
@@ -665,38 +631,13 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 commands = _expand_scan_range(start, end)
                 scan_mode = f"range:{start.strip().upper()}-{end.strip().upper()}"
         except ValueError as err:
-            return {
-                "success": False,
-                "error": str(err),
-            }
+            raise ServiceValidationError(str(err)) from err
 
         if len(commands) > max_results:
             commands = commands[:max_results]
 
-        device = _resolve_target_device(hass, requested_entry_id)
-        if device is None:
-            available_entries: dict[str, dict] = {
-                eid: ed
-                for eid, ed in hass.data.get(DOMAIN, {}).items()
-                if isinstance(ed, dict) and "device" in ed
-            }
-            if requested_entry_id and requested_entry_id not in available_entries:
-                return {
-                    "success": False,
-                    "error": f"No THZ entry found for entry_id '{requested_entry_id}'",
-                }
-            if len(available_entries) > 1 and not requested_entry_id:
-                return {
-                    "success": False,
-                    "error": (
-                        "Multiple THZ config entries found. "
-                        "Provide 'entry_id' to target a specific device."
-                    ),
-                }
-            return {
-                "success": False,
-                "error": "THZ device not initialized",
-            }
+        _, entry_data = _require_target_entry_data(hass, requested_entry_id)
+        device = entry_data["device"]
 
         result_value = str | int | bool | dict[str, int | float | bool | str]
         results: list[dict[str, result_value]] = []
@@ -799,30 +740,24 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         max_results = int(call.data.get("max_results", 65535))
 
         if duration_seconds < 1:
-            return {
-                "success": False,
-                "error": "duration_seconds must be greater than or equal to 1",
-            }
+            raise ServiceValidationError(
+                "duration_seconds must be greater than or equal to 1"
+            )
 
         if interval_seconds < 0:
-            return {
-                "success": False,
-                "error": "interval_seconds must be greater than or equal to 0",
-            }
+            raise ServiceValidationError(
+                "interval_seconds must be greater than or equal to 0"
+            )
 
         if max_results <= 0:
-            return {
-                "success": False,
-                "error": "max_results must be greater than 0",
-            }
+            raise ServiceValidationError("max_results must be greater than 0")
 
         use_pattern = bool(pattern)
         use_range = bool(start) or bool(end)
         if use_pattern == use_range:
-            return {
-                "success": False,
-                "error": "Provide either 'pattern' or both 'start' and 'end'",
-            }
+            raise ServiceValidationError(
+                "Provide either 'pattern' or both 'start' and 'end'"
+            )
 
         try:
             if use_pattern:
@@ -834,38 +769,13 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 commands = _expand_scan_range(start, end)
                 scan_mode = f"range:{start.strip().upper()}-{end.strip().upper()}"
         except ValueError as err:
-            return {
-                "success": False,
-                "error": str(err),
-            }
+            raise ServiceValidationError(str(err)) from err
 
         if len(commands) > max_results:
             commands = commands[:max_results]
 
-        device = _resolve_target_device(hass, requested_entry_id)
-        if device is None:
-            available_entries: dict[str, dict] = {
-                eid: ed
-                for eid, ed in hass.data.get(DOMAIN, {}).items()
-                if isinstance(ed, dict) and "device" in ed
-            }
-            if requested_entry_id and requested_entry_id not in available_entries:
-                return {
-                    "success": False,
-                    "error": f"No THZ entry found for entry_id '{requested_entry_id}'",
-                }
-            if len(available_entries) > 1 and not requested_entry_id:
-                return {
-                    "success": False,
-                    "error": (
-                        "Multiple THZ config entries found. "
-                        "Provide 'entry_id' to target a specific device."
-                    ),
-                }
-            return {
-                "success": False,
-                "error": "THZ device not initialized",
-            }
+        _, entry_data = _require_target_entry_data(hass, requested_entry_id)
+        device = entry_data["device"]
 
         valid_registers: dict[str, str] = {}
         for command_str in commands:
@@ -943,7 +853,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         requested_entry_id: str | None = call.data.get("entry_id")
 
         if not block:
-            return {"success": False, "error": "block parameter is required"}
+            raise ServiceValidationError("block parameter is required")
 
         normalized = _normalize_block_name(block)
         found = await async_refresh_block(hass, block, requested_entry_id)
@@ -954,7 +864,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         error_msg = f"Block '{normalized}' not found in any active coordinator"
         _LOGGER.warning(error_msg)
-        return {"success": False, "error": error_msg, "block": normalized}
+        raise ServiceValidationError(error_msg)
 
     async def _async_handle_set_diverter_valve(call: ServiceCall) -> ServiceResponse:
         """Handle the set_diverter_valve service call.
@@ -969,32 +879,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         position: str = call.data["position"]
         requested_entry_id: str | None = call.data.get("entry_id")
 
-        # Locate entry (same pattern as other services)
-        available_entries: dict[str, dict] = {
-            eid: ed
-            for eid, ed in hass.data.get(DOMAIN, {}).items()
-            if isinstance(ed, dict) and "device" in ed
-        }
-
-        if requested_entry_id:
-            entry_data = available_entries.get(requested_entry_id)
-            if entry_data is None:
-                return {
-                    "success": False,
-                    "error": f"No THZ entry for entry_id '{requested_entry_id}'",
-                }
-        elif len(available_entries) > 1:
-            return {
-                "success": False,
-                "error": (
-                    "Multiple THZ entries found. Provide 'entry_id' to target "
-                    "a specific device."
-                ),
-            }
-        elif available_entries:
-            entry_data = next(iter(available_entries.values()))
-        else:
-            return {"success": False, "error": "THZ device not initialised"}
+        _, entry_data = _require_target_entry_data(hass, requested_entry_id)
 
         # Safety guard: no valve movement in the wrong direction under pressure.
         # diverterValve bit = 1 → flow is to DHW; bit = 0 → flow is to heating circuit.
@@ -1002,38 +887,28 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         if position in ("dhw", "heating"):
             coordinator = entry_data.get("coordinators", {}).get(_DIVERTER_BLOCK)
             if coordinator is None or coordinator.data is None:
-                return {
-                    "success": False,
-                    "error": (
-                        f"Cannot verify valve state: {_DIVERTER_BLOCK} coordinator "
-                        "data not available"
-                    ),
-                }
+                raise HomeAssistantError(
+                    f"Cannot verify valve state: {_DIVERTER_BLOCK} coordinator "
+                    "data not available"
+                )
             data: bytes = coordinator.data
             if len(data) <= _DIVERTER_BYTE:
-                return {
-                    "success": False,
-                    "error": f"Insufficient data from {_DIVERTER_BLOCK} block",
-                }
+                raise HomeAssistantError(
+                    f"Insufficient data from {_DIVERTER_BLOCK} block"
+                )
             diverter_active = bool((data[_DIVERTER_BYTE] >> _DIVERTER_BIT) & 0x01)
             if position == "dhw" and not diverter_active:
-                return {
-                    "success": False,
-                    "error": (
-                        "Heat pump is not in DHW mode (diverterValve bit = 0 in "
-                        "pxxF2). Moving valve to DHW refused — heating circuit is "
-                        "under pressure."
-                    ),
-                }
+                raise HomeAssistantError(
+                    "Heat pump is not in DHW mode (diverterValve bit = 0 in "
+                    "pxxF2). Moving valve to DHW refused — heating circuit is "
+                    "under pressure."
+                )
             if position == "heating" and diverter_active:
-                return {
-                    "success": False,
-                    "error": (
-                        "Heat pump is in DHW mode (diverterValve bit = 1 in "
-                        "pxxF2). Moving valve to heating refused — DHW circuit "
-                        "is under pressure."
-                    ),
-                }
+                raise HomeAssistantError(
+                    "Heat pump is in DHW mode (diverterValve bit = 1 in "
+                    "pxxF2). Moving valve to heating refused — DHW circuit "
+                    "is under pressure."
+                )
 
         device: THZDevice = entry_data["device"]
 
@@ -1091,7 +966,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         except (RuntimeError, ConnectionError, OSError) as err:
             error_msg = f"Error sending diverter valve command: {err}"
             _LOGGER.error(error_msg)
-            return {"success": False, "error": error_msg}
+            raise HomeAssistantError(error_msg) from err
 
         _LOGGER.info(
             "Diverter valve command sent: position=%s confirmed_off=%s",
@@ -1106,31 +981,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         requested_entry_id: str | None = call.data.get("entry_id")
         backup_file: str | None = call.data.get("backup_file")
 
-        available_entries = {
-            eid: ed
-            for eid, ed in hass.data.get(DOMAIN, {}).items()
-            if isinstance(ed, dict) and "device" in ed
-        }
-        if requested_entry_id:
-            if requested_entry_id not in available_entries:
-                return {
-                    "success": False,
-                    "error": (
-                        f"No THZ entry found for entry_id '{requested_entry_id}'"
-                    ),
-                }
-            entry_id = requested_entry_id
-        elif len(available_entries) == 1:
-            entry_id = next(iter(available_entries))
-        elif len(available_entries) > 1:
-            return {
-                "success": False,
-                "error": "Multiple THZ devices found; provide 'entry_id'",
-            }
-        else:
-            return {"success": False, "error": "THZ device not initialized"}
-
-        entry_data = available_entries[entry_id]
+        entry_id, entry_data = _require_target_entry_data(hass, requested_entry_id)
         device: THZDevice = entry_data["device"]
         write_manager = entry_data["write_manager"]
 
@@ -1189,7 +1040,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             await hass.async_add_executor_job(_write)
         except OSError as exc:
             _LOGGER.error("Backup: could not write %s: %s", backup_file, exc)
-            return {"success": False, "error": f"Could not write backup file: {exc}"}
+            raise HomeAssistantError(f"Could not write backup file: {exc}") from exc
 
         _LOGGER.info(
             "THZ settings backup: %d parameters saved to %s (%d read errors)",
@@ -1208,31 +1059,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
         requested_entry_id: str | None = call.data.get("entry_id")
         backup_file: str | None = call.data.get("backup_file")
 
-        available_entries = {
-            eid: ed
-            for eid, ed in hass.data.get(DOMAIN, {}).items()
-            if isinstance(ed, dict) and "device" in ed
-        }
-        if requested_entry_id:
-            if requested_entry_id not in available_entries:
-                return {
-                    "success": False,
-                    "error": (
-                        f"No THZ entry found for entry_id '{requested_entry_id}'"
-                    ),
-                }
-            entry_id = requested_entry_id
-        elif len(available_entries) == 1:
-            entry_id = next(iter(available_entries))
-        elif len(available_entries) > 1:
-            return {
-                "success": False,
-                "error": "Multiple THZ devices found; provide 'entry_id'",
-            }
-        else:
-            return {"success": False, "error": "THZ device not initialized"}
-
-        entry_data = available_entries[entry_id]
+        _, entry_data = _require_target_entry_data(hass, requested_entry_id)
         device: THZDevice = entry_data["device"]
         write_manager = entry_data["write_manager"]
 
@@ -1247,10 +1074,9 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                     return json.load(fh)
             backup_data = await hass.async_add_executor_job(_read)
         except (OSError, json.JSONDecodeError) as exc:
-            return {
-                "success": False,
-                "error": f"Could not read backup file '{backup_file}': {exc}",
-            }
+            raise HomeAssistantError(
+                f"Could not read backup file '{backup_file}': {exc}"
+            ) from exc
 
         saved_settings: dict = backup_data.get("settings", {})
         current_registers = write_manager.get_all_registers()

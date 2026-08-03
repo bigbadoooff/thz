@@ -84,9 +84,14 @@ class ConfigEntryNotReady(HomeAssistantError):
     """Real exception stand-in so `pytest.raises(ConfigEntryNotReady)` works."""
 
 
+class ServiceValidationError(HomeAssistantError):
+    """Real exception stand-in so `pytest.raises(ServiceValidationError)` works."""
+
+
 exceptions_mock = MagicMock()
 exceptions_mock.HomeAssistantError = HomeAssistantError
 exceptions_mock.ConfigEntryNotReady = ConfigEntryNotReady
+exceptions_mock.ServiceValidationError = ServiceValidationError
 sys.modules['homeassistant.exceptions'] = exceptions_mock
 sys.modules['homeassistant.helpers'] = MagicMock()
 sys.modules['homeassistant.helpers.config_validation'] = MagicMock()

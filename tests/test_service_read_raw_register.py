@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.thz.const import DOMAIN
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 
 class TestReadRawRegisterService:
@@ -124,11 +125,8 @@ class TestReadRawRegisterService:
         call = MagicMock()
         call.data = {"command": "INVALID"}
 
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "error" in result
-        assert result["command"] == "INVALID"
+        with pytest.raises(ServiceValidationError, match="INVALID"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_read_raw_register_no_device(self, mock_hass):
@@ -142,11 +140,8 @@ class TestReadRawRegisterService:
         call = MagicMock()
         call.data = {"command": "FB"}
 
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "error" in result
-        assert "not initialized" in result["error"]
+        with pytest.raises(HomeAssistantError, match="not initialized"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_read_raw_register_multiple_entries_no_entry_id(
@@ -165,10 +160,9 @@ class TestReadRawRegisterService:
         call = MagicMock()
         call.data = {"command": "FB"}
 
-        result = await handler(call)
-
-        assert result["success"] is False
-        err = result["error"].lower()
+        with pytest.raises(ServiceValidationError) as exc_info:
+            await handler(call)
+        err = str(exc_info.value).lower()
         assert "entry_id" in err or "multiple" in err
 
     @pytest.mark.asyncio
@@ -209,10 +203,8 @@ class TestReadRawRegisterService:
         call = MagicMock()
         call.data = {"command": "FB", "entry_id": "nonexistent"}
 
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "nonexistent" in result["error"]
+        with pytest.raises(ServiceValidationError, match="nonexistent"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_read_raw_register_device_error(self, mock_hass, mock_device):
@@ -232,11 +224,8 @@ class TestReadRawRegisterService:
         call = MagicMock()
         call.data = {"command": "FB"}
 
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "error" in result
-        assert "Communication error" in result["error"]
+        with pytest.raises(HomeAssistantError, match="Communication error"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_formatted_hex_output(self, mock_hass, mock_device):

@@ -11,6 +11,7 @@ import pytest
 
 from custom_components.thz import _async_setup_services
 from custom_components.thz.const import DOMAIN
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 
 def _mock_hass():
@@ -76,10 +77,8 @@ class TestScanRawRegisters:
 
         call = MagicMock()
         call.data = {"pattern": "0A017X", "max_results": 0}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "max_results" in result["error"]
+        with pytest.raises(ServiceValidationError, match="max_results"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_requires_pattern_xor_range(self):
@@ -89,10 +88,8 @@ class TestScanRawRegisters:
 
         call = MagicMock()
         call.data = {}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "pattern" in result["error"]
+        with pytest.raises(ServiceValidationError, match="pattern"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_invalid_pattern_returns_error(self):
@@ -102,9 +99,8 @@ class TestScanRawRegisters:
 
         call = MagicMock()
         call.data = {"pattern": "ZZZZZZ"}
-        result = await handler(call)
-
-        assert result["success"] is False
+        with pytest.raises(ServiceValidationError):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_no_device_returns_error(self):
@@ -114,10 +110,8 @@ class TestScanRawRegisters:
 
         call = MagicMock()
         call.data = {"pattern": "0A0176"}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "not initialized" in result["error"]
+        with pytest.raises(HomeAssistantError, match="not initialized"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_successful_scan_with_pattern(self):
@@ -174,10 +168,8 @@ class TestScanRawRegisters:
 
         call = MagicMock()
         call.data = {"pattern": "0A0176"}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "Multiple" in result["error"]
+        with pytest.raises(ServiceValidationError, match="Multiple"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_unknown_entry_id_errors(self):
@@ -189,10 +181,8 @@ class TestScanRawRegisters:
 
         call = MagicMock()
         call.data = {"pattern": "0A0176", "entry_id": "nope"}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "nope" in result["error"]
+        with pytest.raises(ServiceValidationError, match="nope"):
+            await handler(call)
 
 
 class TestWatchRawRegistersChanges:
@@ -204,10 +194,8 @@ class TestWatchRawRegistersChanges:
 
         call = MagicMock()
         call.data = {"pattern": "0A0176", "duration_seconds": 0}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "duration_seconds" in result["error"]
+        with pytest.raises(ServiceValidationError, match="duration_seconds"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_interval_must_be_non_negative(self):
@@ -221,10 +209,8 @@ class TestWatchRawRegistersChanges:
             "duration_seconds": 1,
             "interval_seconds": -1,
         }
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "interval_seconds" in result["error"]
+        with pytest.raises(ServiceValidationError, match="interval_seconds"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_no_device_returns_error(self):
@@ -234,10 +220,8 @@ class TestWatchRawRegistersChanges:
 
         call = MagicMock()
         call.data = {"pattern": "0A0176", "duration_seconds": 1}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "not initialized" in result["error"]
+        with pytest.raises(HomeAssistantError, match="not initialized"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_detects_a_change_across_iterations(self):
@@ -280,10 +264,8 @@ class TestRefreshBlockService:
 
         call = MagicMock()
         call.data = {"block": ""}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "required" in result["error"]
+        with pytest.raises(ServiceValidationError, match="required"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_found_returns_success(self):
@@ -312,10 +294,8 @@ class TestRefreshBlockService:
 
         call = MagicMock()
         call.data = {"block": "FB"}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert result["block"] == "pxxFB"
+        with pytest.raises(ServiceValidationError, match="pxxFB"):
+            await handler(call)
 
 
 class TestSetDiverterValveService:
@@ -333,10 +313,8 @@ class TestSetDiverterValveService:
 
         call = MagicMock()
         call.data = {"position": "off"}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "not initialised" in result["error"]
+        with pytest.raises(HomeAssistantError, match="not initialized"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_multiple_entries_without_entry_id_errors(self):
@@ -349,10 +327,8 @@ class TestSetDiverterValveService:
 
         call = MagicMock()
         call.data = {"position": "off"}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "Multiple" in result["error"]
+        with pytest.raises(ServiceValidationError, match="Multiple"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_off_position_stops_and_confirms(self):
@@ -395,10 +371,8 @@ class TestSetDiverterValveService:
 
         call = MagicMock()
         call.data = {"position": "dhw"}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "refused" in result["error"]
+        with pytest.raises(HomeAssistantError, match="refused"):
+            await handler(call)
         device.async_execute.assert_not_awaited()
 
     @pytest.mark.asyncio
@@ -413,10 +387,10 @@ class TestSetDiverterValveService:
 
         call = MagicMock()
         call.data = {"position": "off"}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "Error sending diverter valve command" in result["error"]
+        with pytest.raises(
+            HomeAssistantError, match="Error sending diverter valve command"
+        ):
+            await handler(call)
 
 
 class TestBackupSettingsService:
@@ -428,10 +402,8 @@ class TestBackupSettingsService:
 
         call = MagicMock()
         call.data = {}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "not initialized" in result["error"]
+        with pytest.raises(HomeAssistantError, match="not initialized"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_backs_up_writable_registers(self):
@@ -506,10 +478,8 @@ class TestBackupSettingsService:
         handler = _handler_for(hass, "backup_settings")
         call = MagicMock()
         call.data = {"backup_file": "custom.json"}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "disk full" in result["error"]
+        with pytest.raises(HomeAssistantError, match="disk full"):
+            await handler(call)
 
 
 class TestRestoreSettingsService:
@@ -521,10 +491,8 @@ class TestRestoreSettingsService:
 
         call = MagicMock()
         call.data = {}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "not initialized" in result["error"]
+        with pytest.raises(HomeAssistantError, match="not initialized"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_read_failure_returns_error(self):
@@ -538,10 +506,8 @@ class TestRestoreSettingsService:
         handler = _handler_for(hass, "restore_settings")
         call = MagicMock()
         call.data = {}
-        result = await handler(call)
-
-        assert result["success"] is False
-        assert "no file" in result["error"]
+        with pytest.raises(HomeAssistantError, match="no file"):
+            await handler(call)
 
     @pytest.mark.asyncio
     async def test_restores_matching_entries_and_skips_others(self):

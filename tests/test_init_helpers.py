@@ -9,27 +9,31 @@ from custom_components.thz import (
     _format_hex_dump,
     _guess_decode_candidates,
     _normalize_block_name,
-    _resolve_target_device,
+    _require_target_entry_data,
     async_refresh_block,
 )
 from custom_components.thz.const import DOMAIN
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 
-class TestResolveTargetDevice:
-    """Tests for _resolve_target_device."""
+class TestRequireTargetEntryData:
+    """Tests for _require_target_entry_data."""
 
-    def test_returns_none_when_no_entries(self):
+    def test_raises_home_assistant_error_when_no_entries(self):
         hass = MagicMock()
         hass.data = {DOMAIN: {}}
-        assert _resolve_target_device(hass, None) is None
+        with pytest.raises(HomeAssistantError, match="not initialized"):
+            _require_target_entry_data(hass, None)
 
-    def test_single_entry_no_entry_id_returns_device(self):
+    def test_single_entry_no_entry_id_returns_it(self):
         hass = MagicMock()
-        device = MagicMock()
-        hass.data = {DOMAIN: {"entry1": {"device": device}}}
-        assert _resolve_target_device(hass, None) is device
+        entry_data = {"device": MagicMock()}
+        hass.data = {DOMAIN: {"entry1": entry_data}}
+        entry_id, result = _require_target_entry_data(hass, None)
+        assert entry_id == "entry1"
+        assert result is entry_data
 
-    def test_multiple_entries_no_entry_id_returns_none(self):
+    def test_multiple_entries_no_entry_id_raises_validation_error(self):
         hass = MagicMock()
         hass.data = {
             DOMAIN: {
@@ -37,29 +41,34 @@ class TestResolveTargetDevice:
                 "entry2": {"device": MagicMock()},
             }
         }
-        assert _resolve_target_device(hass, None) is None
+        with pytest.raises(ServiceValidationError, match="Multiple THZ config entries"):
+            _require_target_entry_data(hass, None)
 
     def test_multiple_entries_with_valid_entry_id(self):
         hass = MagicMock()
-        device1 = MagicMock()
-        device2 = MagicMock()
+        entry_data1 = {"device": MagicMock()}
+        entry_data2 = {"device": MagicMock()}
         hass.data = {
             DOMAIN: {
-                "entry1": {"device": device1},
-                "entry2": {"device": device2},
+                "entry1": entry_data1,
+                "entry2": entry_data2,
             }
         }
-        assert _resolve_target_device(hass, "entry2") is device2
+        entry_id, result = _require_target_entry_data(hass, "entry2")
+        assert entry_id == "entry2"
+        assert result is entry_data2
 
-    def test_entry_id_not_found_returns_none(self):
+    def test_entry_id_not_found_raises_validation_error(self):
         hass = MagicMock()
         hass.data = {DOMAIN: {"entry1": {"device": MagicMock()}}}
-        assert _resolve_target_device(hass, "nonexistent") is None
+        with pytest.raises(ServiceValidationError, match="No THZ entry found"):
+            _require_target_entry_data(hass, "nonexistent")
 
     def test_ignores_entries_without_device_key(self):
         hass = MagicMock()
         hass.data = {DOMAIN: {"entry1": {"not_a_device_entry": True}}}
-        assert _resolve_target_device(hass, None) is None
+        with pytest.raises(HomeAssistantError, match="not initialized"):
+            _require_target_entry_data(hass, None)
 
 
 class TestExpandScanPattern:
