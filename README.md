@@ -176,6 +176,25 @@ The report includes firmware version, connection status, coordinator last-update
 2. Search for **"Stiebel Eltron LWZ / Tecalor THZ Integration"**
 3. Choose your connection type (USB or Network/ser2net) and follow the wizard
 
+## Removal
+
+1. Go to **Settings** → **Devices & Services** → **THZ**
+2. Click the three-dot menu on the integration entry and choose **Delete**
+3. Confirm the removal — this stops all polling, unregisters the `thz.*`
+   services, and removes the device and its entities from Home Assistant
+
+After deleting the integration in the UI, also remove the files depending on
+how it was installed:
+
+- **HACS**: open HACS → **Integrations**, find "Stiebel Eltron LWZ / Tecalor
+  THZ", and click **Remove**
+- **Manual installation**: delete the `<config_dir>/custom_components/thz/`
+  folder
+
+Then restart Home Assistant. No credentials or external accounts are created
+by this integration, so there is nothing else to revoke — only the local
+serial/network connection to the heat pump is released.
+
 ## Troubleshooting
 
 ### USB connection stops working after host reboot
