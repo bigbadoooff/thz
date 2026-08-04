@@ -3,6 +3,16 @@
 [![Validate](https://github.com/bigbadoooff/thz/actions/workflows/validate.yml/badge.svg)](https://github.com/bigbadoooff/thz/actions/workflows/validate.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/bigbadoooff/thz)](https://github.com/bigbadoooff/thz/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+
+[![GitHub last commit](https://img.shields.io/github/last-commit/bigbadoooff/thz)](https://github.com/bigbadoooff/thz/commits)
+[![GitHub issues](https://img.shields.io/github/issues/bigbadoooff/thz)](https://github.com/bigbadoooff/thz/issues)
+[![GitHub contributors](https://img.shields.io/github/contributors/bigbadoooff/thz)](https://github.com/bigbadoooff/thz/graphs/contributors)
+[![GitHub Repo stars](https://img.shields.io/github/stars/bigbadoooff/thz?style=social)](https://github.com/bigbadoooff/thz/stargazers)
+
+[![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bigbadoooff&repository=thz&category=integration)
+[![Open your Home Assistant instance and start setting up this integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=thz)
 
 > **Version 0.4.0** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
 > features and breaking changes in this release.
@@ -224,6 +234,38 @@ Contributions are welcome!
 - **Bugs**: Open an issue with HA version, heat pump model, firmware version, and relevant log entries
 - **Compatibility reports**: Let us know which devices work (or don't)
 - **Code**: Fork → feature branch → PR with a clear description
+
+## Contributors
+
+Thanks to everyone who has helped build and improve this integration:
+
+<table>
+<tr>
+<td align="center">
+<a href="https://github.com/bigbadoooff">
+<img src="https://github.com/bigbadoooff.png?size=80" width="80" height="80" alt="bigbadoooff"><br>
+<sub><b>bigbadoooff</b></sub>
+</a>
+</td>
+<td align="center">
+<a href="https://github.com/Largelos">
+<img src="https://github.com/Largelos.png?size=80" width="80" height="80" alt="Largelos"><br>
+<sub><b>Largelos</b></sub>
+</a>
+</td>
+<td align="center">
+<a href="https://github.com/MartinDomig">
+<img src="https://github.com/MartinDomig.png?size=80" width="80" height="80" alt="MartinDomig"><br>
+<sub><b>MartinDomig</b></sub>
+</a>
+</td>
+</tr>
+</table>
+
+See the full [contributor graph](https://github.com/bigbadoooff/thz/graphs/contributors)
+for everyone who has opened issues, filed compatibility reports, or submitted
+PRs. Parts of this software have also been developed with the help of AI
+(GitHub Copilot, Claude).
 
 ## License
 

@@ -187,6 +187,48 @@ All notable changes to the THZ integration are documented here.
   "SchnellLüftung" (ventilation), matching the English "Quick Air Vent". Corrected
   to "Schnelllüftung".
 
+### Improvements
+
+Several Home Assistant Integration Quality Scale gaps have been closed:
+
+- **Action exceptions**: Service handlers now raise `ServiceValidationError` /
+  `HomeAssistantError` on failure instead of returning `{success: false}`,
+  matching HA's expected service-call contract.
+- **Entity unavailable**: Write entities (`number`, `switch`, `select`, `time`)
+  now report `available = False` when a register read fails, instead of
+  silently keeping a stale value.
+- **`ConfigEntry.runtime_data`**: Per-entry state moved off `hass.data` and
+  onto the config entry's `runtime_data`, the current HA-recommended pattern.
+- **`PARALLEL_UPDATES`**: Declared per platform so HA correctly serializes
+  concurrent polls/service calls against each device.
+- **Icon translations**: Icons now come from `icons.json` instead of being
+  hardcoded per entity.
+- **Strict typing**: The integration ships a `py.typed` marker and passes a
+  dedicated mypy CI gate (`warn_return_any`, `strict_equality`,
+  `check_untyped_defs`, and friends).
+- **EntityCategory**: Advanced/technician-mode parameters are now tagged
+  `EntityCategory.CONFIG` so they group correctly in the HA UI.
+- Removal/uninstallation instructions added to the README.
+
+### Code Quality
+
+- Simplified several duplicated code paths found during an internal read-path
+  audit:
+  - A shared `_resolve_scan_commands` helper now backs both
+    `scan_raw_registers` and `watch_raw_registers_changes`, replacing two
+    copies of the same pattern/range validation and expansion logic.
+  - A shared `_async_read_register` helper on `THZBaseEntity` replaces
+    near-identical `async_update` boilerplate across `number`, `switch`,
+    `select`, and `time`.
+  - 120 hand-maintained `program*` entries in the entity-translation table
+    were replaced with a two-line computed rule (verified by AST analysis
+    that every removed entry followed the same `lower()` + `-` → `_` pattern).
+  - `THZDevice`'s socket-vs-serial dispatch (`_is_connection_alive`,
+    `_write_bytes`, `_read_available`) now branches on the already-set
+    `self.connection` field instead of probing `self.ser` with `hasattr()`.
+  - Removed an unused `entity_factory` override parameter from
+    `async_setup_write_platform`.
+
 ---
 
 ## [0.4.1] – 2026-06-29
