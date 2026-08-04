@@ -228,6 +228,22 @@ Several Home Assistant Integration Quality Scale gaps have been closed:
     `self.connection` field instead of probing `self.ser` with `hasattr()`.
   - Removed an unused `entity_factory` override parameter from
     `async_setup_write_platform`.
+- **Extracted `custom_components/thz/services.py`**: The 725-line
+  `_async_setup_services` function — all seven `thz.*` service handlers plus
+  their shared helpers (scan/range expansion, decode-candidate guessing,
+  hex-dump formatting, entry resolution, block-name normalization, and
+  `async_refresh_block`) — moved out of `__init__.py` into a dedicated
+  module. `__init__.py` shrinks from ~1470 lines to ~420 and now only
+  contains config-entry setup/teardown and coordinator wiring; behavior and
+  the public `async_refresh_block` re-export are unchanged.
+- **Traceback-preserving logging**: 17 `_LOGGER.error()` calls inside
+  `except` blocks (mostly in `thz_device.py`) discarded the exception
+  traceback because they didn't pass `exc_info`. Switched to
+  `_LOGGER.exception()`, which logs at the same level plus the traceback.
+- **Line-ending normalization**: Added `.gitattributes` (`* text=auto
+  eol=lf`) and normalized all tracked text files to LF; the repo previously
+  had an undocumented mix of CRLF and LF depending on when a file was last
+  touched.
 
 ---
 

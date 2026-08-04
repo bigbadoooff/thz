@@ -1,9 +1,9 @@
-"""Coverage tests for the pure/near-pure helper functions in __init__.py."""
+"""Coverage tests for the pure/near-pure helper functions in services.py."""
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.thz import (
+from custom_components.thz.services import (
     _expand_scan_pattern,
     _expand_scan_range,
     _format_hex_dump,

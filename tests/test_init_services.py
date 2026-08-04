@@ -1,4 +1,4 @@
-"""Coverage tests for the service handlers registered by _async_setup_services.
+"""Coverage tests for the service handlers registered by async_setup_services.
 
 read_raw_register is already covered by test_service_read_raw_register.py.
 This file covers scan_raw_registers, watch_raw_registers_changes,
@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import pytest
 
-from custom_components.thz import _async_setup_services
+from custom_components.thz.services import async_setup_services
 from custom_components.thz.const import DOMAIN
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
@@ -65,7 +65,7 @@ class TestServiceRegistration:
     @pytest.mark.asyncio
     async def test_all_services_registered(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
 
         registered = {
             call[0][1] for call in hass.services.async_register.call_args_list
@@ -84,7 +84,7 @@ class TestServiceRegistration:
     async def test_skips_registration_if_service_exists(self):
         hass = _mock_hass()
         hass.services.has_service = MagicMock(return_value=True)
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         hass.services.async_register.assert_not_called()
 
 
@@ -92,7 +92,7 @@ class TestScanRawRegisters:
     @pytest.mark.asyncio
     async def test_max_results_must_be_positive(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -103,7 +103,7 @@ class TestScanRawRegisters:
     @pytest.mark.asyncio
     async def test_requires_pattern_xor_range(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -114,7 +114,7 @@ class TestScanRawRegisters:
     @pytest.mark.asyncio
     async def test_invalid_pattern_returns_error(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -125,7 +125,7 @@ class TestScanRawRegisters:
     @pytest.mark.asyncio
     async def test_no_device_returns_error(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -140,7 +140,7 @@ class TestScanRawRegisters:
         device.async_execute = AsyncMock(return_value=bytes.fromhex("0100" + "1234"))
         hass.data[DOMAIN]["entry1"] = {"device": device}
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -161,7 +161,7 @@ class TestScanRawRegisters:
         device.async_execute = AsyncMock(side_effect=RuntimeError("boom"))
         hass.data[DOMAIN]["entry1"] = {"device": device}
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -183,7 +183,7 @@ class TestScanRawRegisters:
         hass.data[DOMAIN]["entry1"] = {"device": _mock_device()}
         hass.data[DOMAIN]["entry2"] = {"device": _mock_device()}
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -196,7 +196,7 @@ class TestScanRawRegisters:
         hass = _mock_hass()
         hass.data[DOMAIN]["entry1"] = {"device": _mock_device()}
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -209,7 +209,7 @@ class TestWatchRawRegistersChanges:
     @pytest.mark.asyncio
     async def test_duration_must_be_at_least_one(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "watch_raw_registers_changes")
 
         call = MagicMock()
@@ -220,7 +220,7 @@ class TestWatchRawRegistersChanges:
     @pytest.mark.asyncio
     async def test_interval_must_be_non_negative(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "watch_raw_registers_changes")
 
         call = MagicMock()
@@ -235,7 +235,7 @@ class TestWatchRawRegistersChanges:
     @pytest.mark.asyncio
     async def test_no_device_returns_error(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "watch_raw_registers_changes")
 
         call = MagicMock()
@@ -259,7 +259,7 @@ class TestWatchRawRegistersChanges:
         )
         hass.data[DOMAIN]["entry1"] = {"device": device}
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "watch_raw_registers_changes")
 
         call = MagicMock()
@@ -279,7 +279,7 @@ class TestRefreshBlockService:
     @pytest.mark.asyncio
     async def test_missing_block_param_errors(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "refresh_block")
 
         call = MagicMock()
@@ -294,7 +294,7 @@ class TestRefreshBlockService:
         coordinator.async_request_refresh = AsyncMock()
         hass.data[DOMAIN]["entry1"] = {"coordinators": {"pxxFB": coordinator}}
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "refresh_block")
 
         call = MagicMock()
@@ -309,7 +309,7 @@ class TestRefreshBlockService:
         hass = _mock_hass()
         hass.data[DOMAIN]["entry1"] = {"coordinators": {}}
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "refresh_block")
 
         call = MagicMock()
@@ -328,7 +328,7 @@ class TestSetDiverterValveService:
     @pytest.mark.asyncio
     async def test_no_entries_returns_error(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -342,7 +342,7 @@ class TestSetDiverterValveService:
         hass.data[DOMAIN]["entry1"] = {"device": _mock_device(), "coordinators": {}}
         hass.data[DOMAIN]["entry2"] = {"device": _mock_device(), "coordinators": {}}
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -365,7 +365,7 @@ class TestSetDiverterValveService:
         )
         hass.data[DOMAIN]["entry1"] = {"device": device, "coordinators": {}}
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -386,7 +386,7 @@ class TestSetDiverterValveService:
             "coordinators": {"pxxF2": cooling_coord},
         }
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -402,7 +402,7 @@ class TestSetDiverterValveService:
         device.async_execute = AsyncMock(side_effect=ConnectionError("lost"))
         hass.data[DOMAIN]["entry1"] = {"device": device, "coordinators": {}}
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -417,7 +417,7 @@ class TestBackupSettingsService:
     @pytest.mark.asyncio
     async def test_no_device_returns_error(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "backup_settings")
 
         call = MagicMock()
@@ -446,7 +446,7 @@ class TestBackupSettingsService:
         hass.async_add_executor_job = AsyncMock(side_effect=_run_executor)
 
         with patch("builtins.open", mock_open()) as mocked_open:
-            await _async_setup_services(hass)
+            await async_setup_services(hass)
             handler = _handler_for(hass, "backup_settings")
             call = MagicMock()
             call.data = {}
@@ -476,7 +476,7 @@ class TestBackupSettingsService:
         hass.async_add_executor_job = AsyncMock(side_effect=_run_executor)
 
         with patch("builtins.open", mock_open()):
-            await _async_setup_services(hass)
+            await async_setup_services(hass)
             handler = _handler_for(hass, "backup_settings")
             call = MagicMock()
             call.data = {}
@@ -494,7 +494,7 @@ class TestBackupSettingsService:
         hass.data[DOMAIN]["entry1"] = {"device": device, "write_manager": write_manager}
         hass.async_add_executor_job = AsyncMock(side_effect=OSError("disk full"))
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "backup_settings")
         call = MagicMock()
         call.data = {"backup_file": "custom.json"}
@@ -506,7 +506,7 @@ class TestRestoreSettingsService:
     @pytest.mark.asyncio
     async def test_no_device_returns_error(self):
         hass = _mock_hass()
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "restore_settings")
 
         call = MagicMock()
@@ -522,7 +522,7 @@ class TestRestoreSettingsService:
         }
         hass.async_add_executor_job = AsyncMock(side_effect=OSError("no file"))
 
-        await _async_setup_services(hass)
+        await async_setup_services(hass)
         handler = _handler_for(hass, "restore_settings")
         call = MagicMock()
         call.data = {}
@@ -571,7 +571,7 @@ class TestRestoreSettingsService:
         hass.async_add_executor_job = AsyncMock(side_effect=_run_executor)
 
         with patch("builtins.open", mock_open(read_data=json.dumps(backup_payload))):
-            await _async_setup_services(hass)
+            await async_setup_services(hass)
             handler = _handler_for(hass, "restore_settings")
             call = MagicMock()
             call.data = {}
@@ -604,7 +604,7 @@ class TestRestoreSettingsService:
         hass.async_add_executor_job = AsyncMock(side_effect=_run_executor)
 
         with patch("builtins.open", mock_open(read_data=json.dumps(backup_payload))):
-            await _async_setup_services(hass)
+            await async_setup_services(hass)
             handler = _handler_for(hass, "restore_settings")
             call = MagicMock()
             call.data = {}
@@ -635,7 +635,7 @@ class TestRestoreSettingsService:
         hass.async_add_executor_job = AsyncMock(side_effect=_run_executor)
 
         with patch("builtins.open", mock_open(read_data=json.dumps(backup_payload))):
-            await _async_setup_services(hass)
+            await async_setup_services(hass)
             handler = _handler_for(hass, "restore_settings")
             call = MagicMock()
             call.data = {}

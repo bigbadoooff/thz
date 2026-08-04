@@ -56,7 +56,7 @@ class TestReadRawRegisterService:
     def _handler_for(mock_hass, service_name: str):
         """Return the registered handler callback for a given service name.
 
-        _async_setup_services registers several services (read_raw_register,
+        async_setup_services registers several services (read_raw_register,
         scan_raw_registers, watch_raw_registers_changes, refresh_block, ...),
         so the desired handler must be looked up by name rather than assumed
         to be the most recent (or only) call.
@@ -69,9 +69,9 @@ class TestReadRawRegisterService:
     @pytest.mark.asyncio
     async def test_service_registration(self, mock_hass):
         """Test that service is registered correctly."""
-        from custom_components.thz import _async_setup_services
+        from custom_components.thz.services import async_setup_services
 
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
 
         # Verify read_raw_register was registered among the services
         registered = [
@@ -84,22 +84,22 @@ class TestReadRawRegisterService:
     @pytest.mark.asyncio
     async def test_service_idempotent(self, mock_hass):
         """Test that service registration is idempotent."""
-        from custom_components.thz import _async_setup_services
+        from custom_components.thz.services import async_setup_services
 
         # First call should register
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
         first_count = mock_hass.services.async_register.call_count
         assert first_count > 0
 
         # Second call should not register (already exists)
         mock_hass.services.has_service = MagicMock(return_value=True)
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
         assert mock_hass.services.async_register.call_count == first_count  # Unchanged
 
     @pytest.mark.asyncio
     async def test_read_raw_register_success(self, mock_hass, mock_device):
         """Test successful read of raw register."""
-        from custom_components.thz import _async_setup_services
+        from custom_components.thz.services import async_setup_services
 
         # Setup device in hass.data (per-entry)
         mock_hass.data[DOMAIN]["test_entry"] = {"device": mock_device}
@@ -107,7 +107,7 @@ class TestReadRawRegisterService:
         mock_device.async_execute = AsyncMock(return_value=test_data)
 
         # Register service and get handler
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         # Create service call
@@ -134,11 +134,11 @@ class TestReadRawRegisterService:
     @pytest.mark.asyncio
     async def test_read_raw_register_invalid_hex(self, mock_hass, mock_device):
         """Test read with invalid hex command."""
-        from custom_components.thz import _async_setup_services
+        from custom_components.thz.services import async_setup_services
 
         mock_hass.data[DOMAIN]["test_entry"] = {"device": mock_device}
 
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -150,10 +150,10 @@ class TestReadRawRegisterService:
     @pytest.mark.asyncio
     async def test_read_raw_register_no_device(self, mock_hass):
         """Test read when device is not initialized."""
-        from custom_components.thz import _async_setup_services
+        from custom_components.thz.services import async_setup_services
 
         # No device in hass.data
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -167,13 +167,13 @@ class TestReadRawRegisterService:
         self, mock_hass, mock_device
     ):
         """Test error when multiple entries exist and entry_id is not supplied."""
-        from custom_components.thz import _async_setup_services
+        from custom_components.thz.services import async_setup_services
 
         # Two config entries present
         mock_hass.data[DOMAIN]["entry_a"] = {"device": mock_device}
         mock_hass.data[DOMAIN]["entry_b"] = {"device": mock_device}
 
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -189,7 +189,7 @@ class TestReadRawRegisterService:
         self, mock_hass, mock_device
     ):
         """Test success when multiple entries exist and correct entry_id is given."""
-        from custom_components.thz import _async_setup_services
+        from custom_components.thz.services import async_setup_services
 
         test_data = bytes.fromhex("010a070503001234ff")
         mock_device.async_execute = AsyncMock(return_value=test_data)
@@ -197,7 +197,7 @@ class TestReadRawRegisterService:
         mock_hass.data[DOMAIN]["entry_a"] = {"device": mock_device}
         mock_hass.data[DOMAIN]["entry_b"] = {"device": mock_device}
 
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -212,11 +212,11 @@ class TestReadRawRegisterService:
         self, mock_hass, mock_device
     ):
         """Test error when entry_id does not match any loaded entry."""
-        from custom_components.thz import _async_setup_services
+        from custom_components.thz.services import async_setup_services
 
         mock_hass.data[DOMAIN]["entry_a"] = {"device": mock_device}
 
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -228,7 +228,7 @@ class TestReadRawRegisterService:
     @pytest.mark.asyncio
     async def test_read_raw_register_device_error(self, mock_hass, mock_device):
         """Test read when device raises an error."""
-        from custom_components.thz import _async_setup_services
+        from custom_components.thz.services import async_setup_services
 
         mock_hass.data[DOMAIN]["test_entry"] = {"device": mock_device}
 
@@ -237,7 +237,7 @@ class TestReadRawRegisterService:
             side_effect=RuntimeError("Communication error")
         )
 
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -249,7 +249,7 @@ class TestReadRawRegisterService:
     @pytest.mark.asyncio
     async def test_formatted_hex_output(self, mock_hass, mock_device):
         """Test that formatted hex output is correct."""
-        from custom_components.thz import _async_setup_services
+        from custom_components.thz.services import async_setup_services
 
         mock_hass.data[DOMAIN]["test_entry"] = {"device": mock_device}
 
@@ -257,7 +257,7 @@ class TestReadRawRegisterService:
         test_data = bytes(range(32))
         mock_device.async_execute = AsyncMock(return_value=test_data)
 
-        await _async_setup_services(mock_hass)
+        await async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
