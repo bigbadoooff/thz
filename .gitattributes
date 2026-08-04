@@ -1,0 +1,8 @@
+# Normalize all text files to LF in the repository; Git still checks them
+# out using the platform's native line ending unless core.autocrlf=false.
+* text=auto eol=lf
+
+# Diff/merge as binary — do not attempt line-ending or textual normalization.
+*.png binary
+*.jpg binary
+*.ico binary
