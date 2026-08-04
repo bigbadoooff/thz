@@ -227,7 +227,7 @@ class THZDevice:
 
             _LOGGER.info("Reconnection successful")
         except OSError as e:
-            _LOGGER.error("Reconnection failed: %s", e)
+            _LOGGER.exception("Reconnection failed: %s", e)
             raise
 
     def _do_handshake_1(self, timeout: float) -> None:
@@ -396,7 +396,7 @@ class THZDevice:
 
             except ConnectionError as e:
                 last_error = e
-                _LOGGER.error(
+                _LOGGER.exception(
                     "Connection error in send_request (attempt %d/%d): %s",
                     attempt + 1, max_retries + 1, e,
                 )
@@ -405,7 +405,7 @@ class THZDevice:
                         self._reconnect()
                         continue
                     except OSError as reconnect_error:
-                        _LOGGER.error("Reconnect failed: %s", reconnect_error)
+                        _LOGGER.exception("Reconnect failed: %s", reconnect_error)
                 raise ConnectionError(
                     f"Connection failed after {max_retries + 1} attempts: {e}"
                 ) from e
@@ -415,18 +415,18 @@ class THZDevice:
 
             except RuntimeError as e:
                 last_error = e
-                _LOGGER.error("Protocol error in send_request: %s", e)
+                _LOGGER.exception("Protocol error in send_request: %s", e)
                 if attempt < max_retries:
                     try:
                         self._reconnect()
                         continue
                     except OSError as reconnect_error:
-                        _LOGGER.error("Reconnect failed: %s", reconnect_error)
+                        _LOGGER.exception("Reconnect failed: %s", reconnect_error)
                 raise
 
             except Exception as e:  # noqa: BLE001
                 last_error = e
-                _LOGGER.error("Unexpected error in send_request: %s", e)
+                _LOGGER.exception("Unexpected error in send_request: %s", e)
                 raise RuntimeError(f"Device communication failed: {e}") from e
 
         # Should not reach here, but just in case
@@ -454,7 +454,7 @@ class THZDevice:
                 self.ser.flush()  # type: ignore[union-attr]
         except (OSError, socket.error, BrokenPipeError) as e:
             # Connection reset, broken pipe, or other socket/serial errors
-            _LOGGER.error("Connection error during write: %s", e)
+            _LOGGER.exception("Connection error during write: %s", e)
             raise ConnectionError(f"Failed to write to connection: {e}") from e
         except (ValueError, AttributeError) as e:
             # Raised by select.select() when the fd is closed mid-write (pyserial sets
@@ -503,7 +503,7 @@ class THZDevice:
                 return b""
             except (OSError, socket.error) as e:
                 # Connection reset, broken pipe, or other socket errors
-                _LOGGER.error("TCP socket error during read: %s", e)
+                _LOGGER.exception("TCP socket error during read: %s", e)
                 raise ConnectionError(f"TCP connection error: {e}") from e
             except (ValueError, AttributeError) as e:
                 # select.select() raises ValueError when the socket fd is closed
@@ -604,7 +604,7 @@ class THZDevice:
             )
         except asyncio.TimeoutError:
             # Future was pending (never ran); our call_later may also have fired.
-            _LOGGER.error(
+            _LOGGER.exception(
                 "Device call timed out after %.1fs; closing connection", timeout
             )
             self._force_close()
@@ -738,7 +738,7 @@ class THZDevice:
         except THZRegisterNotSupportedError:
             raise  # propagate — not a decode error, not a connection failure
         except Exception as e:  # noqa: BLE001
-            _LOGGER.error("Error decoding response: %s", e)
+            _LOGGER.exception("Error decoding response: %s", e)
             return None
 
     def read_write_register(
@@ -813,7 +813,7 @@ class THZDevice:
             _LOGGER.debug("Firmware-Version gelesen: %s", firmware_version)
             return str(firmware_version)
         except (OSError, RuntimeError) as e:
-            _LOGGER.error("Firmware-Version konnte nicht gelesen werden: %s", e)
+            _LOGGER.exception("Firmware-Version konnte nicht gelesen werden: %s", e)
             return ""
 
     def _probe_cooling_support(self) -> bool:

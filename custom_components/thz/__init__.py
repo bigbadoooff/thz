@@ -560,7 +560,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             command_bytes = bytes.fromhex(command_str)
         except ValueError as err:
             error_msg = f"Invalid hex command: {command_str} - {err}"
-            _LOGGER.error(error_msg)
+            _LOGGER.exception(error_msg)
             # Create persistent notification for the error
             await hass.services.async_call(
                 "persistent_notification",
@@ -580,7 +580,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
             _, entry_data = _require_target_entry_data(hass, requested_entry_id)
         except (ServiceValidationError, HomeAssistantError) as err:
             error_msg = str(err)
-            _LOGGER.error(error_msg)
+            _LOGGER.exception(error_msg)
             await hass.services.async_call(
                 "persistent_notification",
                 "create",
@@ -974,7 +974,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
 
         except (RuntimeError, ConnectionError, OSError) as err:
             error_msg = f"Error sending diverter valve command: {err}"
-            _LOGGER.error(error_msg)
+            _LOGGER.exception(error_msg)
             raise HomeAssistantError(error_msg) from err
 
         _LOGGER.info(
@@ -1048,7 +1048,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                     json.dump(backup_data, fh, indent=2)
             await hass.async_add_executor_job(_write)
         except OSError as exc:
-            _LOGGER.error("Backup: could not write %s: %s", backup_file, exc)
+            _LOGGER.exception("Backup: could not write %s: %s", backup_file, exc)
             raise HomeAssistantError(f"Could not write backup file: {exc}") from exc
 
         _LOGGER.info(
@@ -1140,7 +1140,7 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
                 )
                 skipped += 1
             except (ConnectionError, RuntimeError, OSError) as exc:
-                _LOGGER.error("Restore: failed to write %s: %s", name, exc)
+                _LOGGER.exception("Restore: failed to write %s: %s", name, exc)
                 errors[name] = str(exc)
 
         _LOGGER.info(

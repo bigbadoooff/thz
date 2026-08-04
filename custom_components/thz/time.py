@@ -417,7 +417,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
                     )
                 t_value = time(hour, minute)
             except (ValueError, AttributeError) as e:
-                _LOGGER.error("Failed to parse time value '%s': %s", value, e)
+                _LOGGER.exception("Failed to parse time value '%s': %s", value, e)
                 raise
 
         new_num = time_to_quarters(t_value, is_end_time=(self._time_type == "end"))
