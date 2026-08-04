@@ -14,7 +14,7 @@
 [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bigbadoooff&repository=thz&category=integration)
 [![Open your Home Assistant instance and start setting up this integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=thz)
 
-> **Version 0.4.1** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
+> **Version 0.4.3** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
 > features and breaking changes in this release.
 
 ## Introduction

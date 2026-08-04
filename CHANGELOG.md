@@ -6,6 +6,8 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+## [0.4.3] – 2026-08-04
+
 ### New Features
 
 - **`thz.backup_settings` / `thz.restore_settings` services**: Snapshot all
