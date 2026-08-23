@@ -73,10 +73,22 @@ FIRMWARE_MAPS = {
         "write": ["write_map_439_539", "write_map_439"],
         "read": ["readings_map_439"],
     },
-    # default fallback is treated as 539-like
-    "default": {
+    # Real 5.39 hardware gets its own explicit entry (previously this was the
+    # only thing behind "default", conflating "genuine 5.39" with "unrecognized
+    # firmware string" below).
+    "539": {
         "write": ["write_map_439_539", "write_map_539"],
         "read": ["readings_map_439", "readings_map_539"],
+    },
+    # Fallback for any firmware string not listed above (e.g. "438", "437",
+    # "440" — off-by-a-point-release 4.3x builds we don't have a dedicated
+    # entry for). This mirrors the reference FHEM 00_THZ.pm module's own
+    # fallback ("in all other cases I assume $attrVal eq '4.39'", see
+    # docs/legacy/00_THZ.pm around line 2021) rather than guessing 5.39-like,
+    # which pulls in register offsets/fields that don't exist on 4.3x devices.
+    "default": {
+        "write": ["write_map_439_539", "write_map_439"],
+        "read": ["readings_map_439"],
     },
 }
 
