@@ -351,6 +351,42 @@
       "collector_temp": {
         "name": "Collector Temperature"
       },
+      "solar_collector_temp": {
+        "name": "Solar Collector Temperature"
+      },
+      "solar_dhw_temp": {
+        "name": "Solar DHW Temperature"
+      },
+      "solar_flow_temp": {
+        "name": "Solar Flow Temperature"
+      },
+      "solar_pump_hours": {
+        "name": "Solar Pump Runtime Hours"
+      },
+      "solar_out": {
+        "name": "Solar Output"
+      },
+      "solar_status": {
+        "name": "Solar Status"
+      },
+      "input_fan_speed": {
+        "name": "Input Fan Speed"
+      },
+      "output_fan_speed": {
+        "name": "Output Fan Speed"
+      },
+      "fan_stage_airflow_inlet": {
+        "name": "Fan Stage Airflow Inlet"
+      },
+      "fan_stage_airflow_outlet": {
+        "name": "Fan Stage Airflow Outlet"
+      },
+      "input_fan_power": {
+        "name": "Input Fan Power"
+      },
+      "output_fan_power": {
+        "name": "Output Fan Power"
+      },
       "inside_temp": {
         "name": "Inside Temperature"
       },
