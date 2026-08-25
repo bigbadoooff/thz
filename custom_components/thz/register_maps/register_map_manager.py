@@ -37,6 +37,7 @@ _COOLING_WRITE_KEYS: frozenset[str] = frozenset(
     {
         "p75passiveCooling",
         "p99CoolingHC1Switch",
+        "p99CoolingHC1AreaFan",
         "p99CoolingHC1SetTemp",
         "p99CoolingHC1HysterFlowTemp",
         "p99CoolingHC1HysterRoomTemp",

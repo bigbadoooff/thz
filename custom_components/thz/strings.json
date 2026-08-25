@@ -1713,6 +1713,9 @@
       "cooling_hc1_switch": {
         "name": "Cooling HC1 Switch"
       },
+      "cooling_hc1_area_fan": {
+        "name": "Cooling HC1 Area Fan"
+      },
       "cooling_hc2_switch": {
         "name": "Cooling HC2 Switch"
       }
