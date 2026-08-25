@@ -128,6 +128,8 @@ class MockClimateEntityFeature:
     """Minimal ClimateEntityFeature stand-in that supports the | operator."""
     TARGET_TEMPERATURE = 1
     TARGET_TEMPERATURE_RANGE = 2
+    FAN_MODE = 8
+    PRESET_MODE = 16
 
     def __init__(self, value=0):
         """Initialise with a numeric feature bitmask."""

@@ -20,9 +20,18 @@ entities are created when the required data blocks are available:
 All HC entities expose:
 
 - ``hvac_action`` (HEATING / COOLING / IDLE) when ``pxx0A0176`` is available.
-- ``preset_mode`` (comfort / sleep / away) when ``pOpMode`` is writable.
+- ``preset_mode`` when ``pOpMode`` is writable, using the device's own
+  operating-mode names (``automatic``/``DAYmode``/``DHWmode``/``emergency``/
+  ``manual``/``setback``/``standby`` -- see ``SELECT_MAP["2opmode"]`` in
+  value_maps.py, matching FHEM's ``%OpMode`` in docs/legacy/00_THZ.pm)
+  instead of HA's generic comfort/sleep/away vocabulary.
 - HC1 additionally exposes ``fan_mode`` (off / low / medium / high) when
   ``p07FanStageDay`` is writable.
+
+``hvac_mode`` only ever offers ``HEAT`` (plus ``COOL`` when the device
+supports active cooling) -- there is no working ``OFF`` for an individual
+circuit. The heat pump's only real "off" is the global ``pOpMode`` standby
+state, which is already reachable through ``preset_mode``.
 
 For firmware versions that do not include writable setpoint commands (e.g.
 older 2.06 maps that omit the ``command`` field) the entity is created in
@@ -39,9 +48,6 @@ from homeassistant.components.climate import (
     ClimateEntityFeature,
     HVACAction,
     HVACMode,
-    PRESET_AWAY,
-    PRESET_COMFORT,
-    PRESET_SLEEP,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PRECISION_TENTHS, UnitOfTemperature
@@ -54,6 +60,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from .const import DOMAIN, WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
 from .value_codec import THZValueCodec, decode_raw_value
+from .value_maps import SELECT_MAP
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -76,6 +83,15 @@ _HC2_COOL_SETPOINT_NAME = "p99CoolingHC2SetTemp"
 _OPMODE_NAME = "pOpMode"
 _FAN_STAGE_DAY_NAME = "p07FanStageDay"
 
+# decode_type key for pOpMode in SELECT_MAP (value_maps.py) -- the device's
+# own global operating-mode names ("standby", "automatic", "DAYmode",
+# "setback", "DHWmode", "manual", "emergency"), matching FHEM's %OpMode in
+# docs/legacy/00_THZ.pm. Used directly as HA preset_mode values below instead
+# of translating into HA's generic comfort/sleep/away vocabulary, so the
+# dashboard shows the same names this device (and FHEM before it) always
+# used.
+_OPMODE_DECODE_TYPE = "2opmode"
+
 # OpModeHC string value → HVACMode
 _OP_MODE_TO_HVAC: dict[str, HVACMode] = {
     "normal": HVACMode.HEAT,
@@ -87,19 +103,6 @@ _OP_MODE_TO_HVAC: dict[str, HVACMode] = {
 # Default temperature bounds used when no write entry is available
 _DEFAULT_MIN_TEMP = 10.0
 _DEFAULT_MAX_TEMP = 60.0
-
-# Preset mode: HA preset name → pOpMode device option string
-_PRESET_TO_OPMODE: dict[str, str] = {
-    PRESET_COMFORT: "DAYmode",
-    PRESET_SLEEP: "setback",
-    PRESET_AWAY: "standby",
-}
-# hcOpMode device option string → HA preset name
-_HC_OPMODE_TO_PRESET: dict[str, str] = {
-    "normal": PRESET_COMFORT,
-    "setback": PRESET_SLEEP,
-    "standby": PRESET_AWAY,
-}
 
 # Fan stage ↔ HA fan mode names  (stage 0 = off/bypass, 1–3 = low/medium/high)
 _FAN_MODES: list[str] = ["off", "low", "medium", "high"]
@@ -524,6 +527,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         self._opmode_entry = opmode_entry
         self._fan_stage_entry = fan_stage_entry
         self._fan_stage_cache: int | None = None
+        self._op_mode_cache: str | None = None
 
         self._attr_translation_key = translation_key
 
@@ -531,14 +535,21 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         safe_key = translation_key.lower().replace(" ", "_")
         self._attr_unique_id = f"thz_{device_id}_climate_{safe_key}"
 
-        # Determine supported HVAC modes and features
+        # Determine supported HVAC modes and features.
+        #
+        # OFF is deliberately not offered: this entity has no way to actually
+        # turn a single circuit off. Without cooling support, HEAT/OFF would
+        # both be pure no-ops (see async_set_hvac_mode). With cooling support,
+        # OFF would only ever disable the cooling switch -- not stop heating.
+        # The device's real "off" is the global pOpMode standby state, which
+        # is exposed via preset_mode instead.
         self._supports_cooling = (
             cool_switch_entry is not None and cool_setpoint_entry is not None
         )
         if self._supports_cooling:
-            self._attr_hvac_modes = [HVACMode.HEAT, HVACMode.COOL, HVACMode.OFF]
+            self._attr_hvac_modes = [HVACMode.HEAT, HVACMode.COOL]
         else:
-            self._attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
+            self._attr_hvac_modes = [HVACMode.HEAT]
 
         # TARGET_TEMPERATURE feature is available whenever we have a heat
         # setpoint command OR cooling is supported (then both heat/cool temps
@@ -550,7 +561,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         if opmode_entry is not None:
             self._attr_supported_features |= ClimateEntityFeature.PRESET_MODE
-            self._attr_preset_modes = [PRESET_COMFORT, PRESET_SLEEP, PRESET_AWAY]
+            # Use the device's own mode names directly (sorted the same way
+            # FHEM's setList did: case-insensitively) instead of mapping onto
+            # HA's generic comfort/sleep/away presets.
+            self._attr_preset_modes = sorted(
+                SELECT_MAP[_OPMODE_DECODE_TYPE].values(), key=str.lower
+            )
 
         if fan_stage_entry is not None:
             self._attr_supported_features |= ClimateEntityFeature.FAN_MODE
@@ -589,6 +605,10 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         # Populate the fan stage cache on startup
         if self._fan_stage_entry is not None:
             await self._async_read_fan_stage()
+
+        # Populate the global operating-mode (pOpMode) cache on startup
+        if self._opmode_entry is not None:
+            await self._async_read_op_mode()
 
     @callback
     def _handle_cooling_coordinator_update(self) -> None:
@@ -720,23 +740,24 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
     @property
     def preset_mode(self) -> str | None:
-        """Return the current preset mode.
+        """Return the current global operating mode (pOpMode).
 
-        Maps the HC op-mode from coordinator data to a HA preset name:
-        ``normal`` → ``comfort``, ``setback`` → ``sleep``,
-        ``standby`` → ``away``.
+        This reflects the last known value of the ``pOpMode`` register itself
+        (cached via ``_async_read_op_mode``), using the device's own mode
+        name -- e.g. ``"DAYmode"``, ``"setback"``, ``"standby"``,
+        ``"automatic"``, ``"DHWmode"``, ``"manual"``, or ``"emergency"``. Note
+        this is a device-wide setting shared by HC1, HC2, and DHW alike (not
+        derived from this entity's own per-circuit ``hcOpMode``/``dhwOpMode``
+        block, which only distinguishes normal/setback/standby/restart and
+        can't represent all seven pOpMode states).
 
         Returns:
-            Current preset name, or ``None`` if unavailable or unsupported.
+            Current operating-mode name, or ``None`` if unavailable or
+            unsupported.
         """
         if self._opmode_entry is None:
             return None
-        if self.coordinator.data is None:
-            return None
-        op_str = _read_op_mode_raw(
-            self.coordinator.data, self._op_mode_offset, self._op_mode_length
-        )
-        return _HC_OPMODE_TO_PRESET.get(op_str or "", None)
+        return self._op_mode_cache
 
     @property
     def fan_mode(self) -> str | None:
@@ -779,10 +800,11 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         - ``COOL``: enables the cooling switch (only available when the
           write-register map contains the cooling entries).
-        - ``HEAT`` / ``OFF``: disables the cooling switch (if present).
-          Switching the global operating mode off is intentionally not
-          supported here because ``pOpMode`` is a device-level register
-          shared by both heating circuits and DHW.
+        - ``HEAT``: disables the cooling switch (if present).
+
+        ``OFF`` is not offered in ``hvac_modes`` -- there is no per-circuit
+        "off" on this device; use ``preset_mode`` (``"standby"``) instead,
+        which writes the actual global ``pOpMode`` register.
 
         Args:
             hvac_mode: The requested :class:`HVACMode`.
@@ -799,47 +821,47 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 await self._cooling_coordinator.async_request_refresh()
             await self.coordinator.async_request_refresh()
 
-        elif hvac_mode in (HVACMode.HEAT, HVACMode.OFF):
+        elif hvac_mode == HVACMode.HEAT:
             if self._supports_cooling:
                 await self._async_set_cooling_switch(enabled=False)
-            if hvac_mode == HVACMode.OFF:
-                _LOGGER.info(
-                    "OFF mode requested on %s — switching to OFF requires changing "
-                    "the global pOpMode register which is not yet supported; "
-                    "cooling has been disabled.",
-                    self.name,
-                )
             await self.coordinator.async_request_refresh()
 
+        else:
+            _LOGGER.warning(
+                "Unsupported hvac_mode '%s' requested for %s", hvac_mode, self.name
+            )
+
     async def async_set_preset_mode(self, preset_mode: str) -> None:
-        """Set the preset operating mode.
+        """Set the global operating mode (pOpMode).
 
-        Writes the global ``pOpMode`` register with the device value that
-        corresponds to the requested HA preset:
-
-        - ``comfort`` → ``DAYmode`` (full heat / day schedule)
-        - ``sleep``   → ``setback`` (reduced setback temperature)
-        - ``away``    → ``standby`` (minimal / standby mode)
+        ``preset_mode`` is one of the device's own mode names (see
+        ``_attr_preset_modes``, sourced from ``SELECT_MAP["2opmode"]``) and is
+        written to the ``pOpMode`` register as-is -- no translation table
+        needed, since these already are the device's real option strings.
 
         Args:
-            preset_mode: One of ``comfort``, ``sleep``, or ``away``.
+            preset_mode: One of ``automatic``, ``DAYmode``, ``DHWmode``,
+                ``emergency``, ``manual``, ``setback``, or ``standby``.
         """
         if self._opmode_entry is None:
             return
-        opmode_str = _PRESET_TO_OPMODE.get(preset_mode)
-        if opmode_str is None:
+        if preset_mode not in (self._attr_preset_modes or []):
             _LOGGER.warning(
                 "Unknown preset mode '%s' for %s", preset_mode, self.name
             )
             return
         try:
-            value_bytes = THZValueCodec.encode_select(opmode_str, "2opmode")
+            value_bytes = THZValueCodec.encode_select(
+                preset_mode, _OPMODE_DECODE_TYPE
+            )
             async with self._device.lock:
                 await self.hass.async_add_executor_job(
                     self._device.write_value,
                     bytes.fromhex(self._opmode_entry["command"]),
                     value_bytes,
                 )
+            self._op_mode_cache = preset_mode
+            self.async_write_ha_state()
             await self.coordinator.async_request_refresh()
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
             _LOGGER.error(
@@ -1037,6 +1059,32 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
             _LOGGER.warning(
                 "Could not read fan stage for %s: %s", self.name, err
+            )
+
+    async def _async_read_op_mode(self) -> None:
+        """Read and cache the current global operating mode (pOpMode)."""
+        if self._opmode_entry is None:
+            return
+        entry = self._opmode_entry
+        try:
+            async with self._device.lock:
+                value_bytes = await self.hass.async_add_executor_job(
+                    self._device.read_value,
+                    bytes.fromhex(entry["command"]),
+                    "get",
+                    WRITE_REGISTER_OFFSET,
+                    WRITE_REGISTER_LENGTH,
+                )
+            if value_bytes:
+                self._op_mode_cache = THZValueCodec.decode_select(
+                    value_bytes, _OPMODE_DECODE_TYPE
+                )
+                _LOGGER.debug(
+                    "Cached operating mode for %s: %s", self.name, self._op_mode_cache
+                )
+        except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
+            _LOGGER.warning(
+                "Could not read operating mode for %s: %s", self.name, err
             )
 
     # ── Device registry ─────────────────────────────────────────────────────
