@@ -9,7 +9,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable
 
-from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN
+from .const import (
+    DEFAULT_UPDATE_INTERVAL,
+    DOMAIN,
+    ENTITY_ID_STYLE_DEFAULT,
+    ENTITY_VISIBILITY_DEFAULT,
+)
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -50,6 +55,9 @@ async def async_setup_write_platform(
     write_manager: RegisterMapManagerWrite = entry_data["write_manager"]
     device: THZDevice = entry_data["device"]
     device_id = entry_data["device_id"]
+    entity_id_style = entry_data.get("entity_id_style", ENTITY_ID_STYLE_DEFAULT)
+    entity_visibility = entry_data.get("entity_visibility", ENTITY_VISIBILITY_DEFAULT)
+    entity_id_prefix = entry_data.get("entity_id_prefix")
 
     # Get write interval from config, default to DEFAULT_UPDATE_INTERVAL
     write_interval = config_entry.data.get("write_interval", DEFAULT_UPDATE_INTERVAL)
@@ -85,6 +93,9 @@ async def async_setup_write_platform(
                     device=device,
                     device_id=device_id,
                     scan_interval=write_interval,
+                    entity_id_style=entity_id_style,
+                    entity_visibility=entity_visibility,
+                    entity_id_prefix=entity_id_prefix,
                 )
                 entities.append(entity)
 

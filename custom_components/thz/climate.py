@@ -52,7 +52,13 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from .const import DOMAIN, WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
+from .const import (
+    DOMAIN,
+    ENTITY_ID_STYLE_DEFAULT,
+    WRITE_REGISTER_LENGTH,
+    WRITE_REGISTER_OFFSET,
+)
+from .entity_id_style import resolve_suggested_object_id
 from .value_codec import THZValueCodec, decode_raw_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -200,6 +206,8 @@ async def async_setup_entry(
     device_id: str = entry_data["device_id"]
     write_registers: dict = entry_data["write_manager"].get_all_registers()
     register_manager = entry_data["register_manager"]
+    entity_id_style = entry_data.get("entity_id_style", ENTITY_ID_STYLE_DEFAULT)
+    entity_id_prefix = entry_data.get("entity_id_prefix")
 
     # Derive field byte-offsets and lengths from the active firmware's register map.
     # Returns None when a field is absent; the entity is skipped in that case.
@@ -268,6 +276,8 @@ async def async_setup_entry(
                     cool_setpoint_entry=cool_setpoint_entry,
                     opmode_entry=opmode_entry,
                     fan_stage_entry=fan_stage_entry,
+                    entity_id_style=entity_id_style,
+                    entity_id_prefix=entity_id_prefix,
                 )
             )
 
@@ -310,6 +320,8 @@ async def async_setup_entry(
                         cool_switch_entry=hc2_cool_switch_entry,
                         cool_setpoint_entry=hc2_cool_setpoint_entry,
                         opmode_entry=opmode_entry,
+                        entity_id_style=entity_id_style,
+                        entity_id_prefix=entity_id_prefix,
                     )
                 )
 
@@ -336,6 +348,8 @@ async def async_setup_entry(
                     heat_setpoint_entry=dhw_entry,
                     cool_switch_entry=None,
                     cool_setpoint_entry=None,
+                    entity_id_style=entity_id_style,
+                    entity_id_prefix=entity_id_prefix,
                 )
             )
 
@@ -473,6 +487,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         cooling_byte: int | None = None,
         cooling_bit: int | None = None,
         compressor_bit: int | None = None,
+        entity_id_style: str = ENTITY_ID_STYLE_DEFAULT,
+        entity_id_prefix: str | None = None,
     ) -> None:
         """Initialise a THZ climate entity.
 
@@ -496,6 +512,18 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 register (``pOpMode``).  Enables preset mode when provided.
             fan_stage_entry: Write-register metadata for the day fan-stage
                 register (``p07FanStageDay``).  Enables fan mode when provided.
+            entity_id_style: One of the ``ENTITY_ID_STYLE_*`` values from
+                const.py. "fhem" sets ``self.entity_id`` directly (using
+                ``translation_key`` as the raw name, since a climate entity
+                is a synthesized composite of several registers rather than
+                one single FHEM parameter) so a brand-new entity's entity_id
+                doesn't fall back to Home Assistant's own device/area-based
+                naming. See entity_id_style.py and base_entity.py's
+                THZBaseEntity.__init__ for why this can't just be
+                "_attr_suggested_object_id".
+            entity_id_prefix: Optional device name/alias (e.g. "lwz") to
+                prepend to the FHEM-style entity_id. Only used when
+                entity_id_style is "fhem"; ignored otherwise.
         """
         super().__init__(coordinator)
 
@@ -526,6 +554,19 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         self._fan_stage_cache: int | None = None
 
         self._attr_translation_key = translation_key
+
+        # Entity-ID naming style: independent of translation_key/unique_id.
+        # NOTE: Home Assistant has no "_attr_suggested_object_id" hook --
+        # Entity.suggested_object_id is a read-only @property, never backed by
+        # an "_attr_*" instance attribute. Setting self.entity_id directly
+        # (before this entity is added to hass) is the actually-supported way
+        # to seed a custom initial object_id -- see base_entity.py's
+        # THZBaseEntity.__init__ for the full explanation.
+        suggested_object_id = resolve_suggested_object_id(
+            translation_key, entity_id_style, device_prefix=entity_id_prefix
+        )
+        if suggested_object_id:
+            self.entity_id = f"climate.{suggested_object_id}"
 
         # Unique ID based on coordinator name and translation key
         safe_key = translation_key.lower().replace(" ", "_")

@@ -11,6 +11,13 @@ class MockEntity:
     integration's entity classes.
     """
 
+    # Real HA's Entity class defines this as a class attribute defaulting to
+    # None (only set once the entity is actually added to hass, or earlier by
+    # the entity itself to suggest an object_id -- see base_entity.py's
+    # THZBaseEntity.__init__). Mirrored here so tests can assert on it the
+    # same way they would against the real Entity class.
+    entity_id: str | None = None
+
     @property
     def entity_registry_enabled_default(self) -> bool:
         """Return entity_registry_enabled_default via HA's _attr_ pattern."""
