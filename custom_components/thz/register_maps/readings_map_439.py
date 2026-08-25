@@ -310,4 +310,33 @@ REGISTER_MAP = {
             {"icon": "mdi:calendar", "translation_key": "fault3_date"},
         ),
     ],
+    # Live pump-running status ("sGlobal", command FB). Firmware 2.06/2.14
+    # already expose these as part of their own pxxFB block; firmware
+    # 4.39/5.39 simply never had them wired up here, even though the device
+    # supports the FB command and this block's offsets are already relied on
+    # elsewhere (cop_sensor.py reads raw FB bytes for the COP calculation).
+    # Offsets/bits are copied verbatim from FHEM's "FBglob" table (as opposed
+    # to "FBglob206"/"FBglob214", which use different bit positions).
+    # This is intentionally just the 3 pump bits, not the full ~30-field
+    # FBglob table -- temperatures and other status for 4.39/5.39 are
+    # already covered by their own dedicated blocks (pxxF2/F3/F4/F5/0A0176).
+    "pxxFB": [
+        ("dhwPump:", 44, 1, "bit0", 1, {"icon": "mdi:pump", "translation_key": "dhw_pump"}),
+        (
+            " heatingCircuitPump:",
+            44,
+            1,
+            "bit1",
+            1,
+            {"icon": "mdi:pump", "translation_key": "heating_circuit_pump"},
+        ),
+        (
+            " solarPump:",
+            44,
+            1,
+            "bit3",
+            1,
+            {"icon": "mdi:weather-sunny", "translation_key": "solar_pump"},
+        ),
+    ],
 }
