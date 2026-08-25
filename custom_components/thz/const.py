@@ -33,6 +33,26 @@ DEFAULT_PORT = 2323
 DEFAULT_UPDATE_INTERVAL = 600  # in seconds
 DEFAULT_WRITE_INTERVAL = 3600  # in seconds, for write entities (number/switch/select/time)
 
+# Firmware profile override (config-flow "firmware_override" field).
+# "auto" keeps whatever firmware string the device itself reports; any other
+# value here is a FHEM-style profile key from register_map_manager's
+# FIRMWARE_MAPS, forced regardless of what the device reports. Useful when
+# auto-detection lands on an unlisted firmware string (e.g. an LWZ 403
+# reporting "438" instead of "439"), or when a user wants a specific profile
+# such as the technician variant independent of the raw detected value.
+CONF_FIRMWARE_OVERRIDE = "firmware_override"
+FIRMWARE_OVERRIDE_AUTO = "auto"
+FIRMWARE_PROFILE_LABELS: dict[str, str] = {
+    FIRMWARE_OVERRIDE_AUTO: "Auto-detect",
+    "206": "2.06",
+    "214": "2.14",
+    "214j": "2.14j",
+    "439": "4.39",
+    "439technician": "4.39 Technician",
+    "539": "5.39",
+    "539technician": "5.39 Technician",
+}
+
 # Write register offsets and lengths
 # These values are used when reading/writing individual parameters
 WRITE_REGISTER_OFFSET = 4  # Byte offset in response for parameter value

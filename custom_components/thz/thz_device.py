@@ -42,6 +42,7 @@ class THZDevice:
         tcp_port: int | None = None,
         baudrate: int = const.DEFAULT_BAUDRATE,
         read_timeout: float = const.TIMEOUT,
+        firmware_override: str | None = None,
     ) -> None:
         """Initialize basic configuration – no communication yet."""
         self.connection = connection
@@ -50,6 +51,7 @@ class THZDevice:
         self.tcp_port = tcp_port
         self.baudrate = baudrate
         self.read_timeout = read_timeout
+        self._firmware_override = firmware_override
         self._initialized = False
 
         # Placeholders
@@ -88,11 +90,21 @@ class THZDevice:
         if self._firmware_version is None:
             raise RuntimeError("Firmware version could not be determined")
 
+        effective_firmware = self._resolve_effective_firmware()
+        if effective_firmware != self._firmware_version:
+            _LOGGER.info(
+                "Firmware profile overridden: detected %s, forcing %s",
+                self._firmware_version,
+                effective_firmware,
+            )
+
         # Probe for cooling support on 539-like firmware (v5.00+).
         # Devices like the LWZ404 run 539 firmware but lack cooling hardware;
         # they reply to cooling registers with an all-zero payload.
         # If detected, exclude the 539 cooling maps to avoid spurious entities.
-        fw_int = int(self._firmware_version) if self._firmware_version.isdigit() else 0
+        # This is keyed off the *effective* (possibly overridden) firmware,
+        # since that's what actually determines whether 539 cooling maps load.
+        fw_int = int(effective_firmware) if effective_firmware.isdigit() else 0
         if fw_int >= 500:
             self.has_cooling = await hass.async_add_executor_job(
                 self._probe_cooling_support
@@ -103,13 +115,28 @@ class THZDevice:
                 )
 
         self.register_map_manager = RegisterMapManager(
-            self._firmware_version, has_cooling=self.has_cooling
+            effective_firmware, has_cooling=self.has_cooling
         )
         self.write_register_map_manager = RegisterMapManagerWrite(
-            self._firmware_version, has_cooling=self.has_cooling
+            effective_firmware, has_cooling=self.has_cooling
         )
 
         self._initialized = True
+
+    def _resolve_effective_firmware(self) -> str:
+        """Return the firmware string to use for register-map selection.
+
+        Normally this is whatever the device itself reported
+        (``self._firmware_version``, kept as-is for display/diagnostics).
+        If a ``firmware_override`` was configured to anything other than
+        "auto", that value is used for register-map selection instead —
+        e.g. forcing "439technician" independent of the raw detected
+        value, or working around an auto-detected string with no dedicated
+        entry in ``FIRMWARE_MAPS``.
+        """
+        if self._firmware_override and self._firmware_override != const.FIRMWARE_OVERRIDE_AUTO:
+            return self._firmware_override
+        return self._firmware_version
 
     def _connect_serial(self):
         """Open the USB/Serial connection."""

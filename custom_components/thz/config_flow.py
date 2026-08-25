@@ -16,6 +16,7 @@ from homeassistant.helpers import area_registry as ar
 
 from .const import (
     CONF_CONNECTION_TYPE,
+    CONF_FIRMWARE_OVERRIDE,
     CONNECTION_IP,
     CONNECTION_USB,
     DEFAULT_BAUDRATE,
@@ -23,6 +24,8 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_WRITE_INTERVAL,
     DOMAIN,
+    FIRMWARE_OVERRIDE_AUTO,
+    FIRMWARE_PROFILE_LABELS,
 )
 from .thz_device import THZDevice
 
@@ -245,6 +248,15 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "area",
             default=defaults.get("area", ""),
         )] = vol.In(areas)
+
+        # Firmware profile override: "auto" keeps whatever the device itself
+        # reports; any other choice forces a specific FHEM-style profile
+        # (e.g. to add technician-level write entities, or to work around an
+        # auto-detected firmware string with no dedicated register-map entry).
+        schema_dict[vol.Optional(
+            CONF_FIRMWARE_OVERRIDE,
+            default=defaults.get(CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO),
+        )] = vol.In(FIRMWARE_PROFILE_LABELS)
 
         # Refresh intervals for each block
         refresh_intervals = defaults.get("refresh_intervals", {})
@@ -479,10 +491,14 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             refresh_intervals = {b: user_input[f"refresh_{b}"] for b in blocks}
             write_interval = user_input.get("write_interval", DEFAULT_WRITE_INTERVAL)
+            firmware_override = user_input.get(
+                CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO
+            )
             data = {
                 **self.connection_data,
                 "refresh_intervals": refresh_intervals,
                 "write_interval": write_interval,
+                CONF_FIRMWARE_OVERRIDE: firmware_override,
             }
             conn_target = data.get("host") or data.get("device")
             title = f"THZ ({data['connection_type']}: {conn_target})"
@@ -499,6 +515,18 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema_dict[write_key] = vol.All(
             int, vol.Range(min=5, max=86400)
         )
+
+        # Optional firmware profile override (defaults to auto-detect; the
+        # blocks listed above always reflect the auto-detected firmware,
+        # since block detection has to happen before an override could be
+        # chosen — switching to a profile from a different firmware family
+        # here won't retroactively change which blocks were detected. This
+        # is safe for same-family choices like plain "439" -> "439technician",
+        # which only adds write entities. To pick a different family's
+        # profile, use Reconfigure after initial setup instead.)
+        schema_dict[vol.Optional(
+            CONF_FIRMWARE_OVERRIDE, default=FIRMWARE_OVERRIDE_AUTO
+        )] = vol.In(FIRMWARE_PROFILE_LABELS)
 
         schema = vol.Schema(schema_dict)
         return self.async_show_form(
