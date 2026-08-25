@@ -5,13 +5,20 @@ entities are created when the required data blocks are available:
 
 - **Heating Circuit 1 (HC1)**: reads current / target room temperature from
   the ``pxxF4`` coordinator.  HC1 has independently-scheduled day
-  (``p01RoomTempDayHC1``) and night (``p02RoomTempNightHC1``) setpoints; the
-  device itself decides which one is active at any given moment. Setting a
-  new temperature reads both registers fresh and writes to whichever one
-  currently matches the live ``roomSetTemp`` reading, so the change actually
-  takes effect regardless of whether day or night mode is currently active
-  (falls back to the day register if neither matches closely enough, e.g.
-  right at a day/night transition). When the write-register map contains both
+  (``p01RoomTempDayHC1``) and night (``p02RoomTempNightHC1``) *room*
+  setpoints; the device itself decides which one is active at any given
+  moment (AUTOMATIC mode follows the time program, DAY MODE/SETBACK MODE
+  force one or the other). Setting a new temperature reads both registers
+  fresh and writes to whichever one currently matches the live
+  ``roomSetTemp`` reading, so the change actually takes effect regardless of
+  whether day or setback is currently active (falls back to the day register
+  if neither matches, e.g. right at a transition). Note: the device's global
+  MANUAL MODE sets a *flow* temperature directly (``MANUAL SET HC`` in the
+  operating manual), bypassing the weather-compensated curve entirely --
+  that is a different physical quantity from the room-temperature day/night
+  setpoints this entity manages, not a third candidate for the matching
+  above, and isn't handled by this entity. When the write-register map
+  contains both
   ``p99CoolingHC1Switch`` and ``p99CoolingHC1SetTemp`` (present on devices
   that support active cooling), the entity also exposes ``COOL`` mode.
   Cooling-active status is read from the ``pxx0A0176`` coordinator
@@ -28,8 +35,11 @@ entities are created when the required data blocks are available:
 - **Domestic Hot Water (DHW)**: reads current / target water temperature from
   the ``pxxF3`` coordinator and supports ``HEAT`` mode only.  Like HC1, DHW
   has independently-scheduled day (``p04DHWsetDayTemp``) and night
-  (``p05DHWsetNightTemp``) setpoints, and setting a new temperature writes to
-  whichever register is currently active, using the same logic as HC1.
+  (``p05DHWsetNightTemp``) setpoints, plus a distinct manual-mode setpoint
+  (``p11DHWsetManualTemp``) that -- unlike HC1's manual register -- *is*
+  present on 439/539-series maps. Setting a new temperature writes to
+  whichever of the three registers is currently active, using the same
+  logic as HC1.
 
 All HC entities expose:
 
@@ -78,6 +88,7 @@ _HC1_HEAT_SETPOINT_NAMES = ["p01RoomTempDayHC1", "p01RoomTempDay"]
 _HC1_NIGHT_SETPOINT_NAMES = ["p02RoomTempNightHC1", "p02RoomTempNight"]
 _DHW_SETPOINT_NAMES = ["p04DHWsetDayTemp", "p04DHWsetTempDay"]
 _DHW_NIGHT_SETPOINT_NAMES = ["p05DHWsetNightTemp", "p05DHWsetTempNight"]
+_DHW_MANUAL_SETPOINT_NAMES = ["p11DHWsetManualTemp", "p11DHWsetTempManual"]
 
 # Write-register names for HC1 cooling (present on devices with active cooling support)
 _HC1_COOL_SWITCH_NAME = "p99CoolingHC1Switch"
@@ -342,6 +353,7 @@ async def async_setup_entry(
         else:
             dhw_entry = _find_entry(write_registers, _DHW_SETPOINT_NAMES)
             dhw_night_entry = _find_entry(write_registers, _DHW_NIGHT_SETPOINT_NAMES)
+            dhw_manual_entry = _find_entry(write_registers, _DHW_MANUAL_SETPOINT_NAMES)
             entities.append(
                 THZClimate(
                     coordinator=dhw_coordinator,
@@ -357,6 +369,7 @@ async def async_setup_entry(
                     op_mode_length=f3_opmode[1],
                     heat_setpoint_entry=dhw_entry,
                     night_setpoint_entry=dhw_night_entry,
+                    manual_setpoint_entry=dhw_manual_entry,
                     cool_switch_entry=None,
                     cool_setpoint_entry=None,
                 )
@@ -497,6 +510,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         cooling_bit: int | None = None,
         compressor_bit: int | None = None,
         night_setpoint_entry: dict | None = None,
+        manual_setpoint_entry: dict | None = None,
     ) -> None:
         """Initialise a THZ climate entity.
 
@@ -536,6 +550,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         self._heat_setpoint_entry = heat_setpoint_entry
         self._night_setpoint_entry = night_setpoint_entry
+        self._manual_setpoint_entry = manual_setpoint_entry
         self._cool_switch_entry = cool_switch_entry
         self._cool_setpoint_entry = cool_setpoint_entry
         self._cooling_byte = cooling_byte
@@ -933,29 +948,48 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
     async def _async_write_heat_setpoint(self, temperature: float) -> None:
         """Write the heating setpoint that is currently driving roomSetTemp.
 
-        HC1/HC2/DHW each have independently-scheduled day/night setpoints;
-        the device itself decides which one is active. Always writing the
-        day register silently no-ops from the user's point of view whenever
-        night is the one actually in effect. Instead, read both registers
-        fresh and write to whichever one currently matches the live
-        roomSetTemp reading, falling back to day if neither matches closely
-        enough (e.g. right at a day/night transition).
+        HC1/HC2/DHW each have multiple independently-writable setpoint
+        registers -- day and night always, plus a distinct manual-mode
+        register on firmware maps that have one (e.g. DHW's
+        p11DHWsetManualTemp -- HC1/HC2 have no such register wired up here,
+        since their MANUAL MODE sets a flow temperature, a different
+        physical quantity from the room-temperature day/night setpoints,
+        not a valid matching candidate at all). The
+        device itself decides which register is currently in effect; always
+        writing the day register silently no-ops from the user's point of
+        view whenever a different one is actually active. Instead, read
+        every candidate register fresh and write to whichever single one
+        currently matches the live roomSetTemp/dhwTemp target reading,
+        falling back to day if none match unambiguously (e.g. right at a
+        day/night transition, or if the active mode uses a register this
+        integration doesn't know about).
 
         Args:
             temperature: Target temperature in °C.
         """
         active_temp = self.target_temperature
         day_entry = self._heat_setpoint_entry
-        night_entry = self._night_setpoint_entry
-        target_entry = day_entry
+        candidates: list[tuple[str, dict]] = []
+        if day_entry is not None:
+            candidates.append(("day", day_entry))
+        if self._night_setpoint_entry is not None:
+            candidates.append(("night", self._night_setpoint_entry))
+        if self._manual_setpoint_entry is not None:
+            candidates.append(("manual", self._manual_setpoint_entry))
 
-        if night_entry is not None and day_entry is not None and active_temp is not None:
-            day_value = await self._async_read_setpoint(day_entry)
-            night_value = await self._async_read_setpoint(night_entry)
-            day_matches = day_value is not None and abs(day_value - active_temp) < 0.05
-            night_matches = night_value is not None and abs(night_value - active_temp) < 0.05
-            if night_matches and not day_matches:
-                target_entry = night_entry
+        target_label, target_entry = "day", day_entry
+
+        if len(candidates) > 1 and active_temp is not None:
+            matches: list[tuple[str, dict]] = []
+            for label, entry in candidates:
+                value = await self._async_read_setpoint(entry)
+                if value is not None and abs(value - active_temp) < 0.05:
+                    matches.append((label, entry))
+            if len(matches) == 1:
+                target_label, target_entry = matches[0]
+            # 0 matches (active mode uses an unmapped register) or >1
+            # matches (day/night/manual values happen to coincide) are both
+            # ambiguous -- keep the day fallback rather than guess wrong.
 
         if target_entry is None:
             _LOGGER.warning(
@@ -969,8 +1003,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         _LOGGER.debug(
             "Writing heat setpoint %.1f °C to %s (cmd=%s, step=%s, register=%s)",
-            temperature, self.name, target_entry["command"], step,
-            "night" if target_entry is night_entry else "day",
+            temperature, self.name, target_entry["command"], step, target_label,
         )
         try:
             value_bytes = THZValueCodec.encode_number(temperature, step, decode_type)
