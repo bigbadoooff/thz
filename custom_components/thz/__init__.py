@@ -707,16 +707,33 @@ async def _async_migrate_disable_hidden_entities(
 async def _async_cleanup_orphaned_entities(hass: HomeAssistant) -> None:
     """Remove orphaned THZ entities from the entity registry.
 
-    Orphaned entities are those with platform="thz" but config_entry_id=None.
-    These can occur when the integration is deleted but HA doesn't fully clean up
-    the entity registry entries, leaving "ghost" entities with broken names.
+    An entity is orphaned if it has platform="thz" and its config_entry_id
+    either is None, or no longer refers to any config entry that actually
+    exists. Both cases can occur when the integration is deleted:
+
+    - config_entry_id=None: HA nulled the reference out (the case this
+      function originally handled).
+    - config_entry_id=<stale id>: HA left the entity pointing at the
+      now-deleted entry's id instead of nulling it. This is the more common
+      case in practice, and the original None-only check missed it entirely
+      -- the entity registry row (including its unique_id) survives every
+      "Delete integration" cycle, and the *next* time the integration is
+      added, entity_registry.async_get_or_create() matches the pre-existing
+      unique_id and silently reattaches to this same old, stale row instead
+      of creating a fresh one for the new config entry.
     """
     entity_reg = er.async_get(hass)
     orphaned_count = 0
 
     # Get all entities and filter for orphaned THZ entities
     for entity in list(entity_reg.entities.values()):
-        if entity.platform == "thz" and entity.config_entry_id is None:
+        if entity.platform != "thz":
+            continue
+        config_entry_id = entity.config_entry_id
+        is_orphaned = config_entry_id is None or (
+            hass.config_entries.async_get_entry(config_entry_id) is None
+        )
+        if is_orphaned:
             entity_reg.async_remove(entity.entity_id)
             _LOGGER.debug("Removed orphaned THZ entity: %s", entity.entity_id)
             orphaned_count += 1
