@@ -28,6 +28,12 @@ _ENERGY_TOTAL = {
     "state_class": "total_increasing",
 }
 _RUNTIME = {"unit": "h", "device_class": "duration", "state_class": "total_increasing", "icon": "mdi:timer-outline"}
+_TEMP = {
+    "unit": "°C",
+    "device_class": "temperature",
+    "state_class": "measurement",
+    "icon": "mdi:thermometer",
+}
 
 # Paired register blocks: maps cmd2 block key to cmd3 block key.
 # The coordinator reads both registers and combines them:
@@ -308,6 +314,140 @@ REGISTER_MAP = {
             "turnhexdate",
             1,
             {"icon": "mdi:calendar", "translation_key": "fault3_date"},
+        ),
+    ],
+    # NOTE: live pump-running status (dhwPump/heatingCircuitPump/solarPump,
+    # "sGlobal" command FB, bits 0/1/3) is NOT defined here. It was briefly
+    # added in this spot and then removed again: register_map_all.py (the
+    # universal base map merged in for every firmware family, see
+    # RegisterMapManager's base_map_name="register_map_all") already defines
+    # an identical "pxxFB" block at the same offsets, so 4.39/5.39 already had
+    # this data available -- adding it again here was pure duplication with
+    # nothing behind it. See CHANGELOG.md's "Correction" entry.
+    #
+    # Solar circuit readings ("sSol", command 16). Distinct from p80EnableSolar
+    # (the on/off master switch, already implemented) and from the solar_pump
+    # running-status bit (already implemented, part of the base pxxFB block) --
+    # this is the solar-circuit-specific temperature/runtime data FHEM exposes
+    # under its own command, and it was entirely unported for this firmware
+    # family. Offsets copied verbatim from FHEM's "16sol" parsing table;
+    # nibbles 18-25 are an unused gap in FHEM's own table, not an omission
+    # here. "out"/"status" use decode_type "raw" (falls through to a plain
+    # hex-string representation -- same as the existing "out"/dhw_out_mode
+    # entry in pxxF3) since FHEM never documents what they decode to.
+    "pxx16": [
+        (
+            "collectorTemp:",
+            4,
+            4,
+            "hex2int",
+            10,
+            {**_TEMP, "icon": "mdi:solar-power", "translation_key": "solar_collector_temp"},
+        ),
+        (
+            " dhwTemp:",
+            8,
+            4,
+            "hex2int",
+            10,
+            {**_TEMP, "icon": "mdi:water-boiler", "translation_key": "solar_dhw_temp"},
+        ),
+        (
+            " flowTemp:",
+            12,
+            4,
+            "hex2int",
+            10,
+            {**_TEMP, "translation_key": "solar_flow_temp"},
+        ),
+        (
+            " edSolPump:",
+            16,
+            2,
+            "hex2int",
+            1,
+            {"icon": "mdi:pump", "translation_key": "solar_pump_hours"},
+        ),
+        (
+            " out:",
+            26,
+            4,
+            "raw",
+            1,
+            {"translation_key": "solar_out"},
+        ),
+        (
+            " status:",
+            30,
+            2,
+            "raw",
+            1,
+            {"translation_key": "solar_status"},
+        ),
+    ],
+    # Ventilation/fan readings ("sFan", command E8). Distinct from the
+    # p07/p08/p09/p12/p43-46/p99 fan-stage *settings* (already implemented as
+    # write entities) -- this is the live fan speed/airflow/power data FHEM
+    # exposes under its own command, entirely unported for this firmware
+    # family. Note this is a DIFFERENT byte layout from register_map_206.py's
+    # own pxxE8 block ("E8fan206" in FHEM), which does not apply to 4.39/5.39.
+    # Offsets copied verbatim from FHEM's "E8fan" parsing table.
+    "pxxE8": [
+        (
+            "inputFanSpeed:",
+            58,
+            2,
+            "hex",
+            1,
+            {"icon": "mdi:fan", "translation_key": "input_fan_speed"},
+        ),
+        (
+            " outputFanSpeed:",
+            60,
+            2,
+            "hex",
+            1,
+            {"icon": "mdi:fan", "translation_key": "output_fan_speed"},
+        ),
+        (
+            " pFanstageXAirflowInlet:",
+            62,
+            4,
+            "hex",
+            1,
+            {
+                "unit": "m³/h",
+                "icon": "mdi:air-filter",
+                "translation_key": "fan_stage_airflow_inlet",
+            },
+        ),
+        (
+            " pFanstageXAirflowOutlet:",
+            66,
+            4,
+            "hex",
+            1,
+            {
+                "unit": "m³/h",
+                "icon": "mdi:air-filter",
+                "translation_key": "fan_stage_airflow_outlet",
+            },
+        ),
+        (
+            " inputFanPower:",
+            70,
+            2,
+            "hex",
+            1,
+            {"unit": "%", "icon": "mdi:fan", "translation_key": "input_fan_power"},
+        ),
+        (
+            " outputFanPower:",
+            72,
+            2,
+            "hex",
+            1,
+            {"unit": "%", "icon": "mdi:fan", "translation_key": "output_fan_power"},
         ),
     ],
 }

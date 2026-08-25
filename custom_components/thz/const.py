@@ -71,8 +71,9 @@ BLOCK_LABELS: dict[str, str] = {
     "pxx0E":      "Setback Settings",
     "pxx0F":      "Absence Program",
     "pxx10":      "Dry Heat Settings",
+    "pxx16":      "Solar Circuit",
     "pxx17":      "Setpoint Temperatures",
-    "pxxE8":      "Air Flow Calibration",
+    "pxxE8":      "Fan Status & Air Flow",
     "pxxEE":      "Operating Mode & Programs",
     "pxxF6":      "Fan Stage & Error Log",
     # Firmware 4.39 energy sensors
