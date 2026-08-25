@@ -610,6 +610,16 @@ class THZDevice:
                 raise THZRegisterNotSupportedError("Register not supported by device firmware")
             _LOGGER.error("Unknown response: %s", data.hex())
             return None
+        except THZRegisterNotSupportedError:
+            # Deliberately raised above for a clean "01 04" response — must
+            # propagate as-is so callers can treat it as "not supported by
+            # this firmware" rather than a generic decode failure. Catching
+            # it here (as the blanket except below used to) would silently
+            # downgrade it to a plain `None` return, indistinguishable from
+            # a genuine CRC/framing error, and callers further up would then
+            # raise a hard "Failed to decode device response" for a register
+            # that just isn't supported on this firmware/hardware.
+            raise
         except Exception as e:  # noqa: BLE001
             _LOGGER.error("Error decoding response: %s", e)
             return None
