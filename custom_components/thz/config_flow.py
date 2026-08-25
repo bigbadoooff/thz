@@ -260,6 +260,18 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             default=defaults.get("write_interval", DEFAULT_WRITE_INTERVAL),
         )] = vol.All(int, vol.Range(min=5, max=86400))
 
+        # Auto-sync the device's real-time clock. Off by default: the clock
+        # is always checked every 15 minutes and drift beyond a minute is
+        # logged either way, but this only enables actually WRITING a
+        # correction back to the device on that periodic check. (Independent
+        # of the backup_parameters / restore_parameters services, which
+        # always correct/sync the clock outright — this only governs the
+        # ongoing background check.)
+        schema_dict[vol.Optional(
+            "auto_sync_clock",
+            default=defaults.get("auto_sync_clock", False),
+        )] = bool
+
         return vol.Schema(schema_dict)
 
     async def get_ports(

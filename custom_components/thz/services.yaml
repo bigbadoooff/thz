@@ -72,3 +72,83 @@ read_raw_register:
       example: "FB"
       selector:
         text:
+
+backup_parameters:
+  name: Backup Parameters
+  description: >
+    Save the current value of every writable LWZ/THZ parameter (heating
+    curves, schedules, DHW settings, and other number/switch/select/time
+    registers) to a timestamped JSON file under config/thz_backups/.
+    That folder lives inside the Home Assistant config directory, so it is
+    automatically included in — and brought back by — Home Assistant's own
+    Backup feature, with no separate export step. Use restore_parameters
+    afterwards to actually push a saved snapshot's values back onto the
+    heat pump (for example after a full factory reset).
+  fields:
+    label:
+      name: Label
+      description: >
+        Optional short label appended to the backup's filename, e.g.
+        "before_reset". Letters, numbers, "-" and "_" only.
+      required: false
+      example: "before_reset"
+      selector:
+        text:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID. Only required when multiple THZ devices are configured.
+      required: false
+      selector:
+        text:
+
+restore_parameters:
+  name: Restore Parameters
+  description: >
+    Push the values from a saved parameter backup back onto the heat pump.
+    Each parameter is written using the integration's current register map,
+    so a restore keeps working even if the integration has been updated
+    since the backup was taken — parameters no longer present are skipped
+    and reported rather than failing the whole restore. Set dry_run to
+    preview what would be written without touching the device.
+  fields:
+    filename:
+      name: Backup file
+      description: >
+        Filename of the backup to restore, as returned by
+        list_parameter_backups (e.g. "thz_backup_20260825-120000.json").
+        If omitted, the most recent backup is used.
+      required: false
+      example: "thz_backup_20260825-120000.json"
+      selector:
+        text:
+    dry_run:
+      name: Dry run
+      description: >
+        If enabled, nothing is written to the device — the response reports
+        what would have been restored instead.
+      required: false
+      selector:
+        boolean:
+    only:
+      name: Only these parameters
+      description: >
+        Optional list of parameter names to restore, restricting the
+        operation to a subset of the backup (e.g. just the heating curve
+        parameters). Leave empty to restore everything in the backup.
+      required: false
+      selector:
+        text:
+          multiple: true
+    entry_id:
+      name: Entry ID
+      description: Config entry ID. Only required when multiple THZ devices are configured.
+      required: false
+      selector:
+        text:
+
+list_parameter_backups:
+  name: List Parameter Backups
+  description: >
+    List the parameter backup files saved under config/thz_backups/, newest
+    first, with each one's creation time and parameter count — use this to
+    find the filename to pass to restore_parameters.
