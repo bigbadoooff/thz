@@ -26,7 +26,7 @@ from .const import (
     WRITE_REGISTER_OFFSET,
     should_hide_entity_by_default,
 )
-from .thz_device import THZDevice
+from .thz_device import THZDevice, THZRegisterNotSupportedError
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -779,6 +779,18 @@ async def _async_update_block(
                 result = bytes(buf)
 
             return result
+    except THZRegisterNotSupportedError:
+        # The device cleanly reported "register not supported" (01 04).
+        # Returning None (rather than raising) lets the caller's
+        # `if coordinator.data is None: unsupported_blocks.add(block)`
+        # handling — already written for exactly this case — actually run,
+        # instead of this one block's unsupported-ness taking down the
+        # whole config entry's first refresh.
+        _LOGGER.info(
+            "Register %s not supported by this device/firmware; skipping.",
+            block_name,
+        )
+        return None
     except Exception as err:  # noqa: BLE001
         raise UpdateFailed(f"Error reading {block_name}: {err}") from err
 
