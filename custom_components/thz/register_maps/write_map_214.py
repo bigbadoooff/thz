@@ -17,9 +17,9 @@ WRITE_MAP = {
         "max": "0",
         "unit": "",
         "step": "",
-        "type": "0clean",
+        "type": "button",
         "device_class": "",
-        "icon": "",
-        "decode_type": "",
+        "icon": "mdi:trash-can-outline",
+        "decode_type": "0clean",
     },
 }
