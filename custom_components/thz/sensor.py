@@ -174,6 +174,8 @@ def decode_value(
             - "faultmap": Big-endian unsigned int looked up in faultmap table.
             - "hex2time": Big-endian decimal-encoded time → "HH:MM".
             - "hex2error": 4-byte LSB-first bitmap → comma-separated fault list.
+            - "turnhexdate"/"turnhex2time": Byte-swapped date/time, used for
+              the firmware 4.39/5.39 fault log (see value_codec for details).
             - Any other: Returns hexadecimal representation.
         factor: The divisor for "hex2int" and "hex" decoding. Defaults to 1.0.
 
