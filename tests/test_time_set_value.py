@@ -121,6 +121,28 @@ class TestTHZTimeSetValue:
             bytes.fromhex("0B0005"), bytes([0, 0])
         )
 
+    @pytest.mark.asyncio
+    async def test_set_value_native_value_reflects_quantized_time_not_raw_input(self):
+        """The device only stores 15-minute increments (quarters); the
+        entity's displayed value after a write must reflect what was
+        actually written (floored to the quarter), not the raw value the
+        caller passed in. Previously this used the raw value directly, so
+        e.g. writing 14:37 would briefly display "14:37" even though the
+        device only ever stored "14:30" -- until the next poll corrected it.
+        """
+        device = _make_device()
+        device.write_value = MagicMock()
+        entity = self._make_entity(device)
+
+        await entity.async_set_value(time(14, 37))  # 14*4 + 37//15 = 58 quarters
+
+        device.write_value.assert_called_once_with(
+            bytes.fromhex("0B0005"), bytes([58, 0])
+        )
+        assert entity.native_value == time(14, 30), (
+            f"expected the quantized 14:30, got {entity.native_value}"
+        )
+
 
 class TestTHZScheduleTimeSetValue:
     """Tests for THZScheduleTime.async_set_value() (start and end)."""
@@ -203,3 +225,37 @@ class TestTHZScheduleTimeSetValue:
 
         assert entity.native_value == time(3, 45)
         entity.async_write_ha_state.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_set_value_native_value_reflects_quantized_time_not_raw_input(self):
+        """Same quantization guarantee as THZTime: displayed value matches
+        what was actually written (the nearest 15-minute quarter), not the
+        raw input.
+        """
+        device = _make_device(read_return=bytes([10, 20, 0, 0]))
+        device.write_value = MagicMock()
+        entity = self._make_entity(device, "start")
+
+        await entity.async_set_value(time(1, 44))  # 1*4 + 44//15 = 6 quarters -> 01:30
+
+        device.write_value.assert_called_once_with(
+            bytes.fromhex("0B0100"), bytes([6, 20, 0, 0])
+        )
+        assert entity.native_value == time(1, 30), (
+            f"expected the quantized 01:30, got {entity.native_value}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_end_time_midnight_native_value_matches_read_path(self):
+        """An end-time slot set to 00:00 encodes as end-of-day (96); the
+        displayed native_value must match what async_update() would read
+        back for that same encoded byte (00:00), not the raw midnight
+        value taken at face value in some other way.
+        """
+        device = _make_device(read_return=bytes([10, 20, 0, 0]))
+        device.write_value = MagicMock()
+        entity = self._make_entity(device, "end")
+
+        await entity.async_set_value(time(0, 0))
+
+        assert entity.native_value == time(0, 0)

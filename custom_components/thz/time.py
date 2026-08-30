@@ -318,7 +318,12 @@ class THZTime(THZBaseEntity, TimeEntity):
                 self._device.write_value, bytes.fromhex(self._command), num_bytes
             )
 
-        self._attr_native_value = t_value
+        # Reflect what was actually written (quantized to a 15-minute
+        # "quarter"), not the raw value passed in -- the device can only
+        # store 15-minute increments, so e.g. 14:37 is stored as 14:30.
+        # Round-tripping through quarters_to_time() keeps this in sync with
+        # what the next poll's async_update() would read back anyway.
+        self._attr_native_value = quarters_to_time(num)
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
 
     async def async_clear_value(self) -> None:
@@ -488,7 +493,10 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
                 bytes(schedule_bytes)
             )
 
-        self._attr_native_value = t_value
+        # Reflect what was actually written (quantized to a 15-minute
+        # "quarter", with the same end-of-day 96 -> 00:00 handling
+        # async_update()'s read path applies), not the raw value passed in.
+        self._attr_native_value = quarters_to_time(new_num)
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
 
     async def async_clear_value(self) -> None:
