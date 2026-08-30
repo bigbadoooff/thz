@@ -16,6 +16,17 @@ class MockEntity:
         """Return entity_registry_enabled_default via HA's _attr_ pattern."""
         return getattr(self, "_attr_entity_registry_enabled_default", True)
 
+    @property
+    def name(self):
+        """Return _attr_name via HA's _attr_ pattern.
+
+        Simplified: no translation-key resolution, just the same fallback
+        attribute real Entity.name reads when no translation is in play.
+        Needed by any entity method that logs or uses ``self.name``
+        directly, e.g. THZTime/THZScheduleTime.async_set_value().
+        """
+        return getattr(self, "_attr_name", None)
+
 class MockCoordinatorEntity(MockEntity):
     """Mock coordinator entity."""
 
@@ -40,8 +51,29 @@ class MockSelectEntity(MockEntity):
     pass
 
 class MockTimeEntity(MockEntity):
-    """Mock time entity."""
-    pass
+    """Mock time entity.
+
+    Mirrors homeassistant.components.time.TimeEntity's real dispatch
+    contract closely enough to catch a subclass that overrides the wrong
+    method name. Real HA's ``time.set_value`` service calls
+    ``entity.async_set_value(value)`` directly; the base ``TimeEntity``
+    only implements that as a fallback to a synchronous ``set_value()``
+    that raises ``NotImplementedError``. A subclass is expected to
+    override ``async_set_value`` (NOT ``async_set_native_value`` --
+    that's the NumberEntity/SelectEntity convention). Without this mock
+    reproducing that fallback, a subclass that overrides the wrong method
+    name would still "pass" under test even though every real write would
+    raise NotImplementedError before ever reaching the device (see
+    custom_components/thz/time.py's git history for exactly this bug).
+    """
+
+    async def async_set_value(self, value) -> None:
+        """Real TimeEntity's default implementation: delegate to set_value()."""
+        self.set_value(value)
+
+    def set_value(self, value) -> None:
+        """Real TimeEntity's unimplemented base -- must be overridden."""
+        raise NotImplementedError
 
 class MockBinarySensorEntity(MockEntity):
     """Mock binary sensor entity."""
@@ -75,6 +107,21 @@ sys.modules['homeassistant.helpers.event'] = MagicMock()
 sys.modules['homeassistant.helpers.typing'] = MagicMock()
 sys.modules['homeassistant.helpers.device_registry'] = MagicMock()
 sys.modules['homeassistant.helpers.area_registry'] = MagicMock()
+sys.modules['homeassistant.helpers.entity_registry'] = MagicMock()
+
+# Mock homeassistant.util (and its "dt" submodule, e.g. dt_util.now()/.utcnow()
+# used by __init__.py). Without an explicit sys.modules entry for the
+# submodule itself, "from homeassistant.util import dt as dt_util" tries to
+# resolve "util" as a real submodule of the mocked (pathless) "homeassistant"
+# package and fails with "ModuleNotFoundError: 'homeassistant' is not a
+# package" -- this used to break collection of every test module that
+# imports anything under custom_components.thz, since that always runs
+# custom_components/thz/__init__.py first.
+util_mock = MagicMock()
+dt_util_mock = MagicMock()
+util_mock.dt = dt_util_mock
+sys.modules['homeassistant.util'] = util_mock
+sys.modules['homeassistant.util.dt'] = dt_util_mock
 
 # Mock components
 components_mock = MagicMock()

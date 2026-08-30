@@ -273,14 +273,23 @@ class THZTime(THZBaseEntity, TimeEntity):
             self._attr_native_value,
         )
 
-    async def async_set_native_value(self, value: str):
-        """Set new value for the time."""
-        # Convert string (e.g., "12:30") to datetime.time
-        if value is None:
-            t_value = None
-        else:
-            hour, minute = map(int, value.split(":"))
-            t_value = time(hour, minute)
+    async def async_set_value(self, value: time) -> None:
+        """Set new value for the time.
+
+        Home Assistant's ``time.set_value`` service already validates and
+        parses its ``time`` field into a ``datetime.time`` object before
+        calling this method (see the service's voluptuous schema), so
+        ``value`` arrives ready to use -- no string parsing needed.
+
+        Note: ``TimeEntity``'s override point is ``async_set_value``
+        (unlike ``NumberEntity``/``SelectEntity``, which use
+        ``async_set_native_value``/``async_select_option``). A previous
+        version of this method was named ``async_set_native_value``, which
+        is not a method ``TimeEntity`` calls at all -- every write silently
+        fell through to the base class's own unimplemented ``set_value``
+        and raised ``NotImplementedError`` before ever reaching the device.
+        """
+        t_value = value
 
         num = time_to_quarters(t_value)
         _LOGGER.debug("Setting time %s to %s (%s quarters)", self.name, t_value, num)
@@ -402,25 +411,20 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             self.name, self._time_type, num, self._attr_native_value
         )
 
-    async def async_set_native_value(self, value: str):
-        """Set new value for the schedule time."""
-        # Convert string (e.g., "12:30") to datetime.time
-        if value is None:
-            t_value = None
-        else:
-            try:
-                parts = value.split(":")
-                if len(parts) != 2:
-                    raise ValueError(f"Invalid time format: {value}")
-                hour, minute = int(parts[0]), int(parts[1])
-                if not (0 <= hour <= 23 and 0 <= minute <= 59):
-                    raise ValueError(
-                        f"Invalid time values: hour={hour}, minute={minute}"
-                    )
-                t_value = time(hour, minute)
-            except (ValueError, AttributeError) as e:
-                _LOGGER.error("Failed to parse time value '%s': %s", value, e)
-                raise
+    async def async_set_value(self, value: time) -> None:
+        """Set new value for the schedule time.
+
+        Home Assistant's ``time.set_value`` service already validates and
+        parses its ``time`` field into a ``datetime.time`` object before
+        calling this method, so ``value`` arrives ready to use -- no string
+        parsing needed. See ``THZTime.async_set_value`` above for why this
+        method must be named ``async_set_value`` (not
+        ``async_set_native_value``): that's the override point
+        ``TimeEntity`` actually calls, and the previous name was silently
+        never invoked at all, raising ``NotImplementedError`` on every
+        write attempt before ever reaching the device.
+        """
+        t_value = value
 
         new_num = time_to_quarters(t_value, is_end_time=(self._time_type == "end"))
         _LOGGER.debug(
