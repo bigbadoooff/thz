@@ -7,6 +7,7 @@ from datetime import time
 from homeassistant.components.time import TimeEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZBaseEntity
@@ -200,6 +201,18 @@ async def async_setup_entry(
     _LOGGER.info("Created %d time entities", len(entities))
     async_add_entities(entities, True)
 
+    # Home Assistant's built-in time.set_value service cannot represent "no
+    # time" -- its schema requires a real datetime.time -- so there is no
+    # way to send the device's own "unset" state through it. Expose a
+    # dedicated entity service instead, targetable at any of this
+    # platform's entities, that calls async_clear_value() directly.
+    platform = entity_platform.async_get_current_platform()
+    platform.async_register_entity_service(
+        "clear_value",
+        {},
+        "async_clear_value",
+    )
+
 
 
 
@@ -306,6 +319,28 @@ class THZTime(THZBaseEntity, TimeEntity):
             )
 
         self._attr_native_value = t_value
+        self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+
+    async def async_clear_value(self) -> None:
+        """Clear this time back to the device's own "unset" state.
+
+        Exposed as the ``thz.clear_value`` entity service (see
+        async_setup_entry above) rather than through HA's built-in
+        ``time.set_value`` service, since that service's schema requires a
+        real ``datetime.time`` and has no way to express "no time set".
+        """
+        _LOGGER.debug("Clearing time %s to unset", self.name)
+
+        # Same 2-byte payload shape as async_set_value, with the sentinel
+        # value in place of a real quarters count.
+        num_bytes = bytes([TIME_VALUE_UNSET, 0])
+
+        async with self._device.lock:
+            await self.hass.async_add_executor_job(
+                self._device.write_value, bytes.fromhex(self._command), num_bytes
+            )
+
+        self._attr_native_value = None
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
 
 
@@ -454,4 +489,38 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             )
 
         self._attr_native_value = t_value
+        self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+
+    async def async_clear_value(self) -> None:
+        """Clear this schedule start/end time to the device's own "unset" state.
+
+        Exposed as the ``thz.clear_value`` entity service -- see
+        ``THZTime.async_clear_value`` for why this can't go through HA's
+        built-in ``time.set_value`` service.
+        """
+        _LOGGER.debug(
+            "Clearing schedule time %s (%s) to unset", self.name, self._time_type
+        )
+
+        # Read the current schedule data (4 bytes total) so only the
+        # relevant byte (start or end) is touched, same as async_set_value.
+        async with self._device.lock:
+            current_bytes = await self.hass.async_add_executor_job(
+                self._device.read_value, bytes.fromhex(self._command), "get", 4, 4
+            )
+
+        schedule_bytes = bytearray(current_bytes)
+        if self._time_type == "start":
+            schedule_bytes[0] = TIME_VALUE_UNSET
+        else:  # "end"
+            schedule_bytes[1] = TIME_VALUE_UNSET
+
+        async with self._device.lock:
+            await self.hass.async_add_executor_job(
+                self._device.write_value,
+                bytes.fromhex(self._command),
+                bytes(schedule_bytes)
+            )
+
+        self._attr_native_value = None
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
