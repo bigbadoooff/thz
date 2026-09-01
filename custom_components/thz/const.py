@@ -79,8 +79,14 @@ ENTITY_VISIBILITY_ALL = "all"
 ENTITY_VISIBILITY_LABELS: dict[str, str] = {
     ENTITY_VISIBILITY_DEFAULT: "Default (hide HC2, schedules, and advanced parameters)",
     ENTITY_VISIBILITY_EXTENDED: "Extended (enable everything except schedule/program entities)",
-    ENTITY_VISIBILITY_ALL: "All (enable everything, including schedules)",
+    ENTITY_VISIBILITY_ALL: "All (enable schedules and advanced parameters; HC2 is a separate option below)",
 }
+
+# Independent of the entity_visibility tier above: Heating Circuit 2 (HC2)
+# entities are only relevant to installs with a second heating circuit, so
+# they default to hidden regardless of tier, and are only shown when this
+# is explicitly enabled.
+CONF_ENABLE_HC2 = "enable_hc2"
 
 # Write register offsets and lengths
 # These values are used when reading/writing individual parameters
@@ -159,21 +165,23 @@ BLOCK_LABELS: dict[str, str] = {
 def _classify_hidden_category(entity_name: str) -> str | None:
     """Classify entity_name into a hiding category, or None if never hidden.
 
-    Two categories, matched in this order:
+    Three categories, matched in this order:
         "schedule" - time plan/program entities (there are ~120+ of these per
             firmware -- one per day-of-week/time-slot combination -- which is
             what makes them "lengthy").
-        "advanced" - HC2 (heating circuit 2) entities, and advanced technical
-            parameters (p13 and above, plus keyword-matched settings like
-            hysteresis, gradient, booster timing, etc.) that most users don't
-            need to see or adjust day-to-day.
+        "hc2" - Heating Circuit 2 entities. Gated independently of the
+            entity_visibility tier via the separate enable_hc2 option, since
+            most installs only have one heating circuit.
+        "advanced" - advanced technical parameters (p13 and above, plus
+            keyword-matched settings like hysteresis, gradient, booster
+            timing, etc.) that most users don't need to see or adjust
+            day-to-day.
 
     Args:
         entity_name: The name of the entity to classify.
 
     Returns:
-        "schedule", "advanced", or None if the entity is never hidden by any
-        visibility tier.
+        "schedule", "hc2", "advanced", or None if the entity is never hidden.
     """
     name_lower = entity_name.lower()
 
@@ -183,7 +191,7 @@ def _classify_hidden_category(entity_name: str) -> str | None:
 
     # HC2-related entities
     if "hc2" in name_lower:
-        return "advanced"
+        return "hc2"
 
     # Advanced technical parameters: p13-p99 which are technical settings
     # that most users don't need to adjust
@@ -227,8 +235,8 @@ def should_hide_entity_by_default(entity_name: str) -> bool:
     """Determine if an entity should be hidden under the "default" visibility tier.
 
     Kept for backward compatibility (equivalent to
-    ``should_hide_entity(entity_name, ENTITY_VISIBILITY_DEFAULT)``). Entities
-    are hidden if they:
+    ``should_hide_entity(entity_name, ENTITY_VISIBILITY_DEFAULT)`` with
+    ``enable_hc2=False``). Entities are hidden if they:
     - Are related to HC2 (heating circuit 2)
     - Are time plan/program schedules
     - Are advanced technical parameters that most users don't need
@@ -243,24 +251,33 @@ def should_hide_entity_by_default(entity_name: str) -> bool:
 
 
 def should_hide_entity(
-    entity_name: str, visibility: str = ENTITY_VISIBILITY_DEFAULT
+    entity_name: str,
+    visibility: str = ENTITY_VISIBILITY_DEFAULT,
+    enable_hc2: bool = False,
 ) -> bool:
-    """Determine if an entity should be hidden under the given visibility tier.
+    """Determine if an entity should be hidden given the current settings.
 
     Args:
         entity_name: The name of the entity to check.
         visibility: One of the ``ENTITY_VISIBILITY_*`` values. Any
             unrecognized value is treated as ``ENTITY_VISIBILITY_DEFAULT``.
+            Governs the "schedule" and "advanced" categories only.
+        enable_hc2: Independent of ``visibility`` -- whether Heating Circuit 2
+            entities should be shown. Defaults to hidden (False), since most
+            installs only have one heating circuit.
 
     Returns:
-        True if the entity should be hidden under this tier, False otherwise.
+        True if the entity should be hidden under these settings, False
+        otherwise.
     """
     category = _classify_hidden_category(entity_name)
     if category is None:
         return False
+    if category == "hc2":
+        return not enable_hc2
     if visibility == ENTITY_VISIBILITY_ALL:
         return False
     if visibility == ENTITY_VISIBILITY_EXTENDED:
         return category == "schedule"
-    # "default" (or any unrecognized value) hides both categories.
+    # "default" (or any unrecognized value) hides both remaining categories.
     return True

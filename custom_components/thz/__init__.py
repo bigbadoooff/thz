@@ -20,6 +20,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    CONF_ENABLE_HC2,
     CONF_ENTITY_ID_STYLE,
     CONF_ENTITY_VISIBILITY,
     DEFAULT_UPDATE_INTERVAL,
@@ -662,7 +663,9 @@ async def _async_setup_services(hass: HomeAssistant) -> None:
     _LOGGER.info("THZ services registered")
 
 
-def _entity_should_be_hidden(uid: str, name: str, visibility: str) -> bool:
+def _entity_should_be_hidden(
+    uid: str, name: str, visibility: str, enable_hc2: bool = False
+) -> bool:
     """Determine whether an existing registry entity should be hidden.
 
     Checks both the unique_id and the display/original name against the
@@ -674,8 +677,12 @@ def _entity_should_be_hidden(uid: str, name: str, visibility: str) -> bool:
         uid: The entity's unique_id, lower-cased.
         name: The entity's original/display name, lower-cased.
         visibility: "default"/"extended"/"all" (see const.should_hide_entity).
+        enable_hc2: Whether Heating Circuit 2 entities should be shown,
+            independent of visibility.
     """
-    if should_hide_entity(uid, visibility) or should_hide_entity(name, visibility):
+    if should_hide_entity(uid, visibility, enable_hc2) or should_hide_entity(
+        name, visibility, enable_hc2
+    ):
         return True
     if "program" in uid and visibility != ENTITY_VISIBILITY_ALL:
         # Schedules are hidden in both "default" and "extended" tiers; this
@@ -711,6 +718,7 @@ async def _async_apply_entity_visibility_tier(
     visibility = config_entry.data.get(
         CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT
     )
+    enable_hc2 = config_entry.data.get(CONF_ENABLE_HC2, False)
 
     last_applied = config_entry.data.get("_entity_visibility_applied")
     if last_applied is None and config_entry.data.get("_hidden_entities_migrated"):
@@ -719,7 +727,12 @@ async def _async_apply_entity_visibility_tier(
         # to having applied the "default" tier once.
         last_applied = ENTITY_VISIBILITY_DEFAULT
 
-    if last_applied == visibility:
+    # enable_hc2 defaults to False for entries that predate this option, which
+    # is also the hidden-by-default behavior it should be equivalent to -- no
+    # separate backward-compatibility sentinel needed here.
+    last_applied_hc2 = config_entry.data.get("_entity_hc2_applied", False)
+
+    if last_applied == visibility and last_applied_hc2 == enable_hc2:
         return
 
     ent_reg = er.async_get(hass)
@@ -731,7 +744,7 @@ async def _async_apply_entity_visibility_tier(
     for entity_entry in entries:
         uid = (entity_entry.unique_id or "").lower()
         name = (entity_entry.original_name or entity_entry.name or "").lower()
-        should_hide = _entity_should_be_hidden(uid, name, visibility)
+        should_hide = _entity_should_be_hidden(uid, name, visibility, enable_hc2)
 
         if should_hide and entity_entry.disabled_by is None:
             ent_reg.async_update_entity(
@@ -761,10 +774,14 @@ async def _async_apply_entity_visibility_tier(
             visibility, disabled_count, enabled_count,
         )
 
-    # Store the applied tier so this only re-runs when the tier changes
+    # Store the applied tier/HC2 state so this only re-runs when either changes
     hass.config_entries.async_update_entry(
         config_entry,
-        data={**config_entry.data, "_entity_visibility_applied": visibility},
+        data={
+            **config_entry.data,
+            "_entity_visibility_applied": visibility,
+            "_entity_hc2_applied": enable_hc2,
+        },
     )
 
 

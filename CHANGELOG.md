@@ -6,6 +6,14 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`enable_hc2` config option**: A separate checkbox for showing Heating Circuit 2
+  entities, independent of the `entity_visibility` tier. Previously HC2 entities were
+  lumped into the same "advanced" category as technical parameters, so there was no
+  way to show advanced parameters without also showing HC2 (or vice versa). HC2 now
+  defaults to hidden regardless of tier -- even "All" -- until explicitly enabled.
+
 ---
 
 ## [0.4.1] – 2026-06-29

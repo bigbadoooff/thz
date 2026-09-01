@@ -16,6 +16,7 @@ from homeassistant.helpers import area_registry as ar
 
 from .const import (
     CONF_CONNECTION_TYPE,
+    CONF_ENABLE_HC2,
     CONF_ENTITY_ID_STYLE,
     CONF_ENTITY_VISIBILITY,
     CONNECTION_IP,
@@ -53,6 +54,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.blocks = []
         self.entity_id_style = ENTITY_ID_STYLE_DEFAULT
         self.entity_visibility = ENTITY_VISIBILITY_DEFAULT
+        self.enable_hc2 = False
         self.alias = ""
 
     async def async_step_user(self, user_input=None) -> config_entries.ConfigFlowResult:
@@ -64,6 +66,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self.entity_visibility = user_input.get(
                 CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT
             )
+            self.enable_hc2 = user_input.get(CONF_ENABLE_HC2, False)
             self.alias = user_input.get("alias", "").strip()
             if user_input["connection_type"] == CONNECTION_IP:
                 return await self.async_step_setup_ip()
@@ -99,6 +102,11 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(
                     CONF_ENTITY_VISIBILITY, default=ENTITY_VISIBILITY_DEFAULT
                 ): vol.In(ENTITY_VISIBILITY_LABELS),
+                # Heating Circuit 2 entities: independent of the tier above,
+                # since most installs only have one heating circuit. Off by
+                # default; can be changed later via Reconfigure, which
+                # retroactively bulk enables/disables existing entities.
+                vol.Optional(CONF_ENABLE_HC2, default=False): bool,
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema)
@@ -303,6 +311,14 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_ENTITY_VISIBILITY,
             default=defaults.get(CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT),
         )] = vol.In(ENTITY_VISIBILITY_LABELS)
+
+        # Heating Circuit 2 entities: independent of the tier above. Like
+        # entity_visibility, changing this retroactively bulk enables/
+        # disables entities already in the registry.
+        schema_dict[vol.Optional(
+            CONF_ENABLE_HC2,
+            default=defaults.get(CONF_ENABLE_HC2, False),
+        )] = bool
 
         # Refresh intervals for each block
         refresh_intervals = defaults.get("refresh_intervals", {})
@@ -547,6 +563,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_ENTITY_VISIBILITY: getattr(
                     self, "entity_visibility", ENTITY_VISIBILITY_DEFAULT
                 ),
+                CONF_ENABLE_HC2: getattr(self, "enable_hc2", False),
                 "alias": getattr(self, "alias", ""),
             }
             conn_target = data.get("host") or data.get("device")

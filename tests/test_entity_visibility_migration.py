@@ -109,8 +109,10 @@ class TestApplyEntityVisibilityTier:
         hass.config_entries.async_update_entry.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_retroactive_switch_to_extended_reenables_advanced_only(self):
-        """Switching default -> extended re-enables advanced params, keeps schedules hidden."""
+    async def test_retroactive_switch_to_extended_reenables_advanced_not_hc2(self):
+        """Switching default -> extended re-enables advanced params, but NOT
+        HC2 (gated independently by enable_hc2, which defaults to False and
+        isn't set here) and keeps schedules hidden."""
         hass = _make_hass()
         config_entry = _make_config_entry({
             "entity_visibility": "extended",
@@ -127,6 +129,10 @@ class TestApplyEntityVisibilityTier:
                 "number.hc2_flow_setpoint", "thz_..._hc2_flow",
                 "HC2 Flow Setpoint", disabled_by=integration_disabled,
             ),
+            _entity(
+                "number.p21_hyst1", "thz_..._p21hyst1",
+                "p21Hyst1", disabled_by=integration_disabled,
+            ),
         ]
 
         fake_ent_reg = MagicMock()
@@ -139,13 +145,74 @@ class TestApplyEntityVisibilityTier:
         ent_reg = fake_ent_reg
         calls = {call.args[0]: call.kwargs.get("disabled_by") for call in ent_reg.async_update_entity.call_args_list}
 
-        # HC2 (advanced) gets re-enabled under "extended"
-        assert calls.get("number.hc2_flow_setpoint") is None
+        # A true advanced-technical-parameter entity gets re-enabled under "extended"
+        assert calls.get("number.p21_hyst1") is None  # value None -> re-enabled (disabled_by=None)
+        assert "number.p21_hyst1" in calls
+        # HC2 stays hidden -- "extended" alone doesn't touch it, so it's
+        # already correctly disabled and needs no registry update at all.
+        assert "number.hc2_flow_setpoint" not in calls
         # The schedule entry is already correctly disabled under "extended"
         # (schedules only show under "all"), so it needs no registry update
         # at all -- confirming the reconciliation doesn't touch entities that
         # are already in the right state.
         assert "time.programhc1_mo_0_start" not in calls
+
+    @pytest.mark.asyncio
+    async def test_enabling_hc2_flag_alone_reenables_hc2_even_with_tier_unchanged(self):
+        """Toggling enable_hc2 True with the tier UNCHANGED must still trigger
+        reconciliation and re-enable HC2 entities -- the tier/flag change
+        detection has to track both independently."""
+        hass = _make_hass()
+        config_entry = _make_config_entry({
+            "entity_visibility": "default",
+            "_entity_visibility_applied": "default",
+            "enable_hc2": True,
+            # _entity_hc2_applied intentionally omitted -> defaults to False
+        })
+
+        integration_disabled = er.RegistryEntryDisabler.INTEGRATION
+        entries = [
+            _entity(
+                "number.hc2_flow_setpoint", "thz_..._hc2_flow",
+                "HC2 Flow Setpoint", disabled_by=integration_disabled,
+            ),
+        ]
+
+        fake_ent_reg = MagicMock()
+        with (
+            patch.object(er, "async_get", return_value=fake_ent_reg),
+            patch.object(er, "async_entries_for_config_entry", return_value=entries),
+        ):
+            await thz_module._async_apply_entity_visibility_tier(hass, config_entry)
+
+        ent_reg = fake_ent_reg
+        ent_reg.async_update_entity.assert_called_once_with(
+            "number.hc2_flow_setpoint", disabled_by=None
+        )
+        _, kwargs = hass.config_entries.async_update_entry.call_args
+        assert kwargs["data"]["_entity_visibility_applied"] == "default"
+        assert kwargs["data"]["_entity_hc2_applied"] is True
+
+    @pytest.mark.asyncio
+    async def test_same_tier_and_hc2_flag_is_a_noop(self):
+        """Re-running with both the tier AND the hc2 flag unchanged touches nothing."""
+        hass = _make_hass()
+        config_entry = _make_config_entry({
+            "entity_visibility": "extended",
+            "_entity_visibility_applied": "extended",
+            "enable_hc2": True,
+            "_entity_hc2_applied": True,
+        })
+
+        with (
+            patch.object(er, "async_get") as mock_async_get,
+            patch.object(er, "async_entries_for_config_entry") as mock_entries,
+        ):
+            await thz_module._async_apply_entity_visibility_tier(hass, config_entry)
+
+        mock_async_get.assert_not_called()
+        mock_entries.assert_not_called()
+        hass.config_entries.async_update_entry.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_never_touches_user_disabled_entity(self):
