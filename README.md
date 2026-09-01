@@ -78,9 +78,9 @@ data:
 
 To provide a cleaner initial setup experience, the following entity types are hidden by default:
 
-- **Time plan/programme entities**: Advanced schedule configuration entities (`programDHW_*`, `programHC1_*`, `programHC2_*`)
+- **Time plan/programme entities**: Advanced schedule configuration entities (`programDHW_*`, `programHC1_*`)
 - **Advanced technical parameters**: Parameters like gradient, hysteresis, integral components (typically p13 and higher)
-- **HC2 (Heating Circuit 2) entities**: Only needed if you have a second heating circuit installed. Gated separately from the two categories above (see below).
+- **HC2 (Heating Circuit 2) entities**: Only needed if you have a second heating circuit installed, including HC2's own schedule entities (`programHC2_*`). Gated separately from the two categories above (see below).
 
 Two independent settings control this, both asked during setup and changeable later via **Settings → Devices & Services → THZ → Configure**. Changing either retroactively bulk enables/disables the matching entities already in the registry, not just newly-created ones — any entity you've individually re-enabled or disabled by hand is left alone.
 

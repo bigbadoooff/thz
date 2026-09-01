@@ -15,19 +15,22 @@ from custom_components.thz.const import (
     should_hide_entity_by_default,
 )
 
-# Names classified "schedule" (program/time-plan entities)
+# Names classified "schedule" (program/time-plan entities). Note HC2's own
+# program entities (e.g. "programHC2_We_2") are NOT here -- "hc2" is matched
+# before "schedule", so they fall under HC2_NAMES below instead.
 SCHEDULE_NAMES = [
     "programDHW_Mo_0",
     "programHC1_Tu_1",
-    "programHC2_We_2",
     "programFan_Sa-So_0",
 ]
 
 # Names classified "hc2" (Heating Circuit 2) -- gated by the independent
-# enable_hc2 flag, NOT by the entity_visibility tier. See TestShouldHideEntityHC2Flag.
+# enable_hc2 flag, NOT by the entity_visibility tier, regardless of whether
+# they are also schedule/program entities. See TestShouldHideEntityHC2Flag.
 HC2_NAMES = [
     "flowTempHC2",
     "p01RoomTempDayHC2",
+    "programHC2_We_2",
 ]
 
 # Names classified "advanced" (technical parameters/keywords, excluding HC2)
@@ -150,13 +153,25 @@ class TestShouldHideEntityHC2Flag:
 
 
 class TestMixedCategoryNames:
-    """A name matching BOTH categories stays hidden under 'extended' too."""
+    """A name matching both "program" and "hc2" keywords is classified "hc2",
+    not "schedule" -- "hc2" is checked first, so these entities are gated
+    purely by enable_hc2, independent of the entity_visibility tier. This
+    guards against the entity_visibility="all" case in particular, where an
+    "hc2" classification is the only thing keeping the entity hidden."""
 
-    def test_program_and_hc2_combined_name_treated_as_schedule(self):
-        # "programHC2_Mo_0" matches both "program" and "hc2" -- since it's a
-        # schedule entry, it should remain hidden under "extended" (only the
-        # bare "advanced" category becomes visible there).
-        name = "programHC2_Mo_0"
-        assert should_hide_entity(name, ENTITY_VISIBILITY_DEFAULT) is True
-        assert should_hide_entity(name, ENTITY_VISIBILITY_EXTENDED) is True
-        assert should_hide_entity(name, ENTITY_VISIBILITY_ALL) is False
+    NAME = "programHC2_Mo_0"
+
+    @pytest.mark.parametrize(
+        "visibility",
+        [ENTITY_VISIBILITY_DEFAULT, ENTITY_VISIBILITY_EXTENDED, ENTITY_VISIBILITY_ALL],
+    )
+    def test_hidden_without_the_flag_regardless_of_tier(self, visibility):
+        assert should_hide_entity(self.NAME, visibility) is True
+        assert should_hide_entity(self.NAME, visibility, enable_hc2=False) is True
+
+    @pytest.mark.parametrize(
+        "visibility",
+        [ENTITY_VISIBILITY_DEFAULT, ENTITY_VISIBILITY_EXTENDED, ENTITY_VISIBILITY_ALL],
+    )
+    def test_visible_with_the_flag_regardless_of_tier(self, visibility):
+        assert should_hide_entity(self.NAME, visibility, enable_hc2=True) is False

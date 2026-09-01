@@ -166,12 +166,15 @@ def _classify_hidden_category(entity_name: str) -> str | None:
     """Classify entity_name into a hiding category, or None if never hidden.
 
     Three categories, matched in this order:
-        "schedule" - time plan/program entities (there are ~120+ of these per
-            firmware -- one per day-of-week/time-slot combination -- which is
-            what makes them "lengthy").
-        "hc2" - Heating Circuit 2 entities. Gated independently of the
-            entity_visibility tier via the separate enable_hc2 option, since
-            most installs only have one heating circuit.
+        "hc2" - Heating Circuit 2 entities, including HC2-specific schedule
+            entities (e.g. "programHC2_Mo_0"). Checked before "schedule" so
+            that HC2 program/time-plan entities are classified as "hc2", not
+            "schedule" -- they are gated purely by the independent enable_hc2
+            option, regardless of the entity_visibility tier, since most
+            installs only have one heating circuit.
+        "schedule" - remaining time plan/program entities (there are ~120+ of
+            these per firmware -- one per day-of-week/time-slot combination
+            -- which is what makes them "lengthy").
         "advanced" - advanced technical parameters (p13 and above, plus
             keyword-matched settings like hysteresis, gradient, booster
             timing, etc.) that most users don't need to see or adjust
@@ -181,17 +184,19 @@ def _classify_hidden_category(entity_name: str) -> str | None:
         entity_name: The name of the entity to classify.
 
     Returns:
-        "schedule", "hc2", "advanced", or None if the entity is never hidden.
+        "hc2", "schedule", "advanced", or None if the entity is never hidden.
     """
     name_lower = entity_name.lower()
+
+    # HC2-related entities, including HC2 schedules -- checked first so these
+    # are gated purely by enable_hc2, independent of the entity_visibility
+    # tier (see docstring above).
+    if "hc2" in name_lower:
+        return "hc2"
 
     # Time plan/program entities
     if "program" in name_lower:
         return "schedule"
-
-    # HC2-related entities
-    if "hc2" in name_lower:
-        return "hc2"
 
     # Advanced technical parameters: p13-p99 which are technical settings
     # that most users don't need to adjust
