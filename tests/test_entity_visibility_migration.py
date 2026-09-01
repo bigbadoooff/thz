@@ -194,6 +194,68 @@ class TestApplyEntityVisibilityTier:
         assert kwargs["data"]["_entity_hc2_applied"] is True
 
     @pytest.mark.asyncio
+    async def test_upgrader_disabling_hc2_with_tier_unchanged_is_reconciled(self):
+        """Regression test: an entry that predates the hc2/advanced split, with
+        HC2 entities already enabled under the old "extended"/"all" behavior
+        (no _entity_hc2_applied recorded yet), must still disable HC2 when the
+        user explicitly submits enable_hc2=False while leaving the tier
+        unchanged -- this must NOT be treated as a no-op just because
+        enable_hc2's naive default (False) happens to match what was
+        submitted."""
+        hass = _make_hass()
+        config_entry = _make_config_entry({
+            "entity_visibility": "extended",
+            "_entity_visibility_applied": "extended",
+            "enable_hc2": False,
+            # _entity_hc2_applied intentionally absent -- simulates an entry
+            # that has never gone through hc2-aware reconciliation before.
+        })
+
+        entries = [
+            _entity(
+                "number.hc2_flow_setpoint", "thz_..._hc2_flow",
+                "HC2 Flow Setpoint", disabled_by=None,  # currently enabled
+            ),
+        ]
+
+        fake_ent_reg = MagicMock()
+        with (
+            patch.object(er, "async_get", return_value=fake_ent_reg),
+            patch.object(er, "async_entries_for_config_entry", return_value=entries),
+        ):
+            await thz_module._async_apply_entity_visibility_tier(hass, config_entry)
+
+        ent_reg = fake_ent_reg
+        ent_reg.async_update_entity.assert_called_once_with(
+            "number.hc2_flow_setpoint", disabled_by=er.RegistryEntryDisabler.INTEGRATION
+        )
+        _, kwargs = hass.config_entries.async_update_entry.call_args
+        assert kwargs["data"]["_entity_hc2_applied"] is False
+
+    @pytest.mark.asyncio
+    async def test_upgrader_with_default_tier_and_hc2_flag_absent_is_still_a_noop(self):
+        """An entry that predates the split, previously applied under "default"
+        (which never enabled HC2 even in the old code), must still no-op when
+        nothing has actually changed -- the backward-compat inference must not
+        cause spurious reconciliation for entries that were never affected."""
+        hass = _make_hass()
+        config_entry = _make_config_entry({
+            "entity_visibility": "default",
+            "_entity_visibility_applied": "default",
+            # enable_hc2 and _entity_hc2_applied both absent -> both infer False
+        })
+
+        with (
+            patch.object(er, "async_get") as mock_async_get,
+            patch.object(er, "async_entries_for_config_entry") as mock_entries,
+        ):
+            await thz_module._async_apply_entity_visibility_tier(hass, config_entry)
+
+        mock_async_get.assert_not_called()
+        mock_entries.assert_not_called()
+        hass.config_entries.async_update_entry.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_same_tier_and_hc2_flag_is_a_noop(self):
         """Re-running with both the tier AND the hc2 flag unchanged touches nothing."""
         hass = _make_hass()

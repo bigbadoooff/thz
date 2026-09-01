@@ -28,6 +28,7 @@ from .const import (
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_ALL,
     ENTITY_VISIBILITY_DEFAULT,
+    ENTITY_VISIBILITY_EXTENDED,
     WRITE_REGISTER_LENGTH,
     WRITE_REGISTER_OFFSET,
     should_hide_entity,
@@ -727,10 +728,19 @@ async def _async_apply_entity_visibility_tier(
         # to having applied the "default" tier once.
         last_applied = ENTITY_VISIBILITY_DEFAULT
 
-    # enable_hc2 defaults to False for entries that predate this option, which
-    # is also the hidden-by-default behavior it should be equivalent to -- no
-    # separate backward-compatibility sentinel needed here.
-    last_applied_hc2 = config_entry.data.get("_entity_hc2_applied", False)
+    last_applied_hc2 = config_entry.data.get("_entity_hc2_applied")
+    if last_applied_hc2 is None:
+        # Backward compatibility: entries that predate the hc2/advanced
+        # category split had HC2 entities bundled into "advanced", so they
+        # were already enabled whenever the previously-applied tier was
+        # "extended" or "all" -- NOT hidden, despite enable_hc2 defaulting to
+        # False. Infer that effective prior state from the tier so a real
+        # change (e.g. explicitly setting enable_hc2=False on first upgrade)
+        # is correctly detected and reconciled, instead of being skipped as
+        # a false no-op.
+        last_applied_hc2 = last_applied in (
+            ENTITY_VISIBILITY_EXTENDED, ENTITY_VISIBILITY_ALL,
+        )
 
     if last_applied == visibility and last_applied_hc2 == enable_hc2:
         return
