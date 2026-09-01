@@ -77,9 +77,9 @@ ENTITY_VISIBILITY_DEFAULT = "default"
 ENTITY_VISIBILITY_EXTENDED = "extended"
 ENTITY_VISIBILITY_ALL = "all"
 ENTITY_VISIBILITY_LABELS: dict[str, str] = {
-    ENTITY_VISIBILITY_DEFAULT: "Default (hide HC2, schedules, and advanced parameters)",
-    ENTITY_VISIBILITY_EXTENDED: "Extended (enable everything except schedule/program entities)",
-    ENTITY_VISIBILITY_ALL: "All (enable schedules and advanced parameters; HC2 is a separate option below)",
+    ENTITY_VISIBILITY_DEFAULT: "Default (hide schedules and advanced parameters)",
+    ENTITY_VISIBILITY_EXTENDED: "Extended (enable everything except schedules)",
+    ENTITY_VISIBILITY_ALL: "All (enable all parameters)",
 }
 
 # Independent of the entity_visibility tier above: Heating Circuit 2 (HC2)
