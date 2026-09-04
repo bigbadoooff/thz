@@ -3,6 +3,10 @@ __pycache__/
 *.pyc
 *.egg-info/
 
+.claude
+.github
+.vscode
+
 # Testing
 .pytest_cache/
 htmlcov/
