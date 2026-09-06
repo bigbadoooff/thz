@@ -119,9 +119,9 @@ class TestGetPairedBlocks:
         assert paired["pxx0A092A"] == "pxx0A092B"
 
     def test_get_paired_blocks_for_539(self):
-        """get_paired_blocks includes 539-specific entries for default firmware."""
-        # Default firmware loads both 439 and 539 readings maps
-        manager = RegisterMapManager("default")
+        """get_paired_blocks includes 539-specific entries for explicit 539 firmware."""
+        # Explicit 539 firmware loads both 439 and 539 readings maps
+        manager = RegisterMapManager("539")
         paired = manager.get_paired_blocks()
         # Should contain 439 entries
         assert "pxx0A092A" in paired

@@ -147,17 +147,24 @@ class TestRegisterMapManagerHasCooling:
             manager_with.readings_map_names == manager_without.readings_map_names
         )
 
-    def test_default_firmware_no_cooling_filters_539_entries(self):
-        """Unknown firmware (default) keeps 5.39 maps but filters cooling entries."""
-        manager = RegisterMapManager("unknown_fw", has_cooling=False)
+    def test_539_firmware_no_cooling_filters_539_entries(self):
+        """Explicit 5.39 firmware keeps 5.39 maps but filters cooling entries."""
+        manager = RegisterMapManager("539", has_cooling=False)
         assert "readings_map_539" in manager.readings_map_names
         assert "readings_map_439" in manager.readings_map_names
         assert "pxx0A0648" not in manager.get_all_registers()
 
+    def test_default_firmware_no_cooling_stays_439_only(self):
+        """Unrecognized firmware (default) is 4.39-like and has no 5.39 entries to filter."""
+        manager = RegisterMapManager("unknown_fw", has_cooling=False)
+        assert "readings_map_539" not in manager.readings_map_names
+        assert "readings_map_439" in manager.readings_map_names
+        assert "pxx0A0648" not in manager.get_all_registers()
+
     def test_select_maps_for_firmware_no_cooling(self):
-        """_select_maps_for_firmware still returns the 5.39 maps."""
+        """_select_maps_for_firmware still returns the 5.39 maps for explicit 539."""
         manager = RegisterMapManager("206")
-        write, read = manager._select_maps_for_firmware("default", has_cooling=False)
+        write, read = manager._select_maps_for_firmware("539", has_cooling=False)
         assert "readings_map_539" in read
         assert "write_map_539" in write
         assert "readings_map_439" in read
