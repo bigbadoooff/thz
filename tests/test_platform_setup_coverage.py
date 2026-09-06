@@ -19,12 +19,25 @@ from custom_components.thz.const import DEFAULT_UPDATE_INTERVAL
 class FakeEntity:
     """Stand-in entity class capturing the kwargs it was built with."""
 
-    def __init__(self, name, entry, device, device_id, scan_interval):
+    def __init__(
+        self,
+        name,
+        entry,
+        device,
+        device_id,
+        scan_interval,
+        entity_id_style="default",
+        entity_visibility="default",
+        entity_id_prefix=None,
+    ):
         self.name = name
         self.entry = entry
         self.device = device
         self.device_id = device_id
         self.scan_interval = scan_interval
+        self.entity_id_style = entity_id_style
+        self.entity_visibility = entity_visibility
+        self.entity_id_prefix = entity_id_prefix
 
 
 def _make_hass_and_entry(registers, write_interval_data=None):

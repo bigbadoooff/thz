@@ -22,6 +22,7 @@ from .const import (
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
     should_hide_entity,
+    should_hide_entity_by_default,
 )
 from .entity_id_style import resolve_suggested_object_id
 

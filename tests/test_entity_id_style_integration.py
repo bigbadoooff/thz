@@ -308,33 +308,28 @@ class TestPlatformSetupPassesEntityIdStyle:
         """entry_data without 'entity_id_style' key doesn't crash and defaults safely."""
         from custom_components.thz.platform_setup import async_setup_write_platform
         from custom_components.thz.switch import THZSwitch
-        from custom_components.thz.const import DOMAIN
 
         hass = MagicMock()
         entry_id = "test_entry"
-        hass.data = {
-            DOMAIN: {
-                entry_id: {
-                    "write_manager": MagicMock(
-                        get_all_registers=MagicMock(
-                            return_value={
-                                "zPumpHC": {
-                                    "command": "0A0052",
-                                    "type": "switch",
-                                    "icon": "",
-                                }
-                            }
-                        )
-                    ),
-                    "device": _make_mock_device(),
-                    "device_id": "test_device",
-                    # deliberately no "entity_id_style" key
-                }
-            }
-        }
         config_entry = MagicMock()
         config_entry.entry_id = entry_id
         config_entry.data = {}
+        config_entry.runtime_data = {
+            "write_manager": MagicMock(
+                get_all_registers=MagicMock(
+                    return_value={
+                        "zPumpHC": {
+                            "command": "0A0052",
+                            "type": "switch",
+                            "icon": "",
+                        }
+                    }
+                )
+            ),
+            "device": _make_mock_device(),
+            "device_id": "test_device",
+            # deliberately no "entity_id_style" key
+        }
 
         added = []
         async_add_entities = MagicMock(side_effect=lambda entities, *_a, **_kw: added.extend(entities))
@@ -357,35 +352,30 @@ class TestPlatformSetupPassesEntityIdStyle:
         code path)."""
         from custom_components.thz.platform_setup import async_setup_write_platform
         from custom_components.thz.button import THZButton
-        from custom_components.thz.const import DOMAIN
 
         hass = MagicMock()
         entry_id = "test_entry"
-        hass.data = {
-            DOMAIN: {
-                entry_id: {
-                    "write_manager": MagicMock(
-                        get_all_registers=MagicMock(
-                            return_value={
-                                "zResetLast10errors": {
-                                    "command": "0A0700",
-                                    "type": "button",
-                                    "icon": "",
-                                }
-                            }
-                        )
-                    ),
-                    "device": _make_mock_device(),
-                    "device_id": "test_device",
-                    "entity_id_style": "fhem",
-                    "entity_visibility": "default",
-                    "entity_id_prefix": "lwz",
-                }
-            }
-        }
         config_entry = MagicMock()
         config_entry.entry_id = entry_id
         config_entry.data = {}
+        config_entry.runtime_data = {
+            "write_manager": MagicMock(
+                get_all_registers=MagicMock(
+                    return_value={
+                        "zResetLast10errors": {
+                            "command": "0A0700",
+                            "type": "button",
+                            "icon": "",
+                        }
+                    }
+                )
+            ),
+            "device": _make_mock_device(),
+            "device_id": "test_device",
+            "entity_id_style": "fhem",
+            "entity_visibility": "default",
+            "entity_id_prefix": "lwz",
+        }
 
         added = []
         async_add_entities = MagicMock(side_effect=lambda entities, *_a, **_kw: added.extend(entities))
@@ -528,34 +518,29 @@ class TestEntityIdPrefix:
         """async_setup_write_platform reads entity_id_prefix from entry_data."""
         from custom_components.thz.platform_setup import async_setup_write_platform
         from custom_components.thz.switch import THZSwitch
-        from custom_components.thz.const import DOMAIN
 
         hass = MagicMock()
         entry_id = "test_entry"
-        hass.data = {
-            DOMAIN: {
-                entry_id: {
-                    "write_manager": MagicMock(
-                        get_all_registers=MagicMock(
-                            return_value={
-                                "zPumpHC": {
-                                    "command": "0A0052",
-                                    "type": "switch",
-                                    "icon": "",
-                                }
-                            }
-                        )
-                    ),
-                    "device": _make_mock_device(),
-                    "device_id": "test_device",
-                    "entity_id_style": "fhem",
-                    "entity_id_prefix": "lwz",
-                }
-            }
-        }
         config_entry = MagicMock()
         config_entry.entry_id = entry_id
         config_entry.data = {}
+        config_entry.runtime_data = {
+            "write_manager": MagicMock(
+                get_all_registers=MagicMock(
+                    return_value={
+                        "zPumpHC": {
+                            "command": "0A0052",
+                            "type": "switch",
+                            "icon": "",
+                        }
+                    }
+                )
+            ),
+            "device": _make_mock_device(),
+            "device_id": "test_device",
+            "entity_id_style": "fhem",
+            "entity_id_prefix": "lwz",
+        }
 
         added = []
         async_add_entities = MagicMock(side_effect=lambda entities, *_a, **_kw: added.extend(entities))
