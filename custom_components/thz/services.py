@@ -15,7 +15,7 @@ import itertools
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, cast
 
 import voluptuous as vol
 
@@ -99,7 +99,7 @@ def _backups_dir(hass: HomeAssistant) -> str:
     creating an HA backup backs these files up too, and restoring one
     brings them back, with no extra steps.
     """
-    return hass.config.path(BACKUP_SUBDIR)
+    return str(hass.config.path(BACKUP_SUBDIR))
 
 
 def _sanitize_label(label: str | None) -> str:
@@ -603,7 +603,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             blocking=True,
         )
 
-        return response
+        return cast("ServiceResponse", response)
 
     async def _async_handle_watch_raw_registers_changes(
         call: ServiceCall,
@@ -686,7 +686,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             len(changed_registers),
         )
 
-        return {
+        return cast("ServiceResponse", {
             "success": True,
             "summary": {
                 "mode": scan_mode,
@@ -699,7 +699,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "changes_detected": len(changed_registers),
             },
             "changed_registers": changed_registers,
-        }
+        })
 
     # Register the service
     async def _async_handle_refresh_block(call: ServiceCall) -> ServiceResponse:
@@ -895,7 +895,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         t = quarters_to_time(value_bytes[0])
                         value = t.strftime("%H:%M") if t else None
 
-                parameters[name] = {"type": reg_type, "command": command, "value": value}
+                parameters[name] = {
+                    "type": reg_type, "command": command, "value": value,
+                }
             except THZRegisterNotSupportedError as err:
                 read_errors.append(f"{name}: {err}")
                 _LOGGER.debug(
@@ -1030,7 +1032,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         def _read_backup() -> dict:
             with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                return cast("dict", json.load(f))
 
         try:
             backup_doc = await hass.async_add_executor_job(_read_backup)
@@ -1062,7 +1064,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
             reg_type = entry["type"]
             command = entry["command"]
-            value = saved.get("value")
+            value: Any = saved.get("value")
 
             try:
                 if reg_type == "number":
@@ -1151,7 +1153,10 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             + (
                 f"Clock synced to: {local_now.isoformat(timespec='minutes')}"
                 if clock_synced
-                else f"Clock: would be synced to {local_now.isoformat(timespec='minutes')} (dry run)"
+                else (
+                    f"Clock: would be synced to "
+                    f"{local_now.isoformat(timespec='minutes')} (dry run)"
+                )
                 if dry_run
                 else "Clock: not synced (write failed, see failed list)"
             )
@@ -1160,14 +1165,17 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "persistent_notification",
             "create",
             {
-                "title": f"THZ Parameter Restore {'(dry run) ' if dry_run else ''}Complete",
+                "title": (
+                    f"THZ Parameter Restore "
+                    f"{'(dry run) ' if dry_run else ''}Complete"
+                ),
                 "message": notification_message,
                 "notification_id": "thz_restore_parameters",
             },
             blocking=True,
         )
 
-        return {
+        return cast("ServiceResponse", {
             "success": True,
             "dry_run": dry_run,
             "file": os.path.basename(path),
@@ -1180,9 +1188,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "failed_count": len(failed),
             "clock_synced": clock_synced,
             "clock_target": local_now.isoformat(timespec="minutes"),
-        }
+        })
 
-    async def _async_handle_list_parameter_backups(call: ServiceCall) -> ServiceResponse:
+    async def _async_handle_list_parameter_backups(
+        call: ServiceCall,
+    ) -> ServiceResponse:
         """Handle the list_parameter_backups service call.
 
         Lists the parameter backup files under config/thz_backups/, newest
@@ -1215,7 +1225,10 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             return results
 
         backups = await hass.async_add_executor_job(_list)
-        return {"success": True, "count": len(backups), "backups": backups}
+        return cast(
+            "ServiceResponse",
+            {"success": True, "count": len(backups), "backups": backups},
+        )
 
     # Register services
     hass.services.async_register(

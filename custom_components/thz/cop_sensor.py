@@ -239,11 +239,7 @@ class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
 
         self._device_id = device_id
         self._attr_unique_id = f"thz_{device_id}_current_cop"
-        # SensorDeviceClass members are mistyped as plain `str` in some
-        # older homeassistant-stubs snapshots; not a real type error.
-        self._attr_device_class = (
-            SensorDeviceClass.POWER_FACTOR  # type: ignore[assignment]
-        )
+        self._attr_device_class = SensorDeviceClass.POWER_FACTOR
         self._attr_state_class = SensorStateClass.MEASUREMENT
         # Icon comes from icons.json (icon translations), not a hardcoded
         # _attr_icon, per HA's icon-translations quality-scale rule.
@@ -344,11 +340,7 @@ class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
         super().__init__(primary_coordinator)
 
         self._device_id = device_id
-        # SensorDeviceClass members are mistyped as plain `str` in some
-        # older homeassistant-stubs snapshots; not a real type error.
-        self._attr_device_class = (
-            SensorDeviceClass.POWER_FACTOR  # type: ignore[assignment]
-        )
+        self._attr_device_class = SensorDeviceClass.POWER_FACTOR
         self._attr_state_class = SensorStateClass.MEASUREMENT
         # Icon comes from icons.json (icon translations), not a hardcoded
         # _attr_icon, per HA's icon-translations quality-scale rule.

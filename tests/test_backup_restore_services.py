@@ -10,7 +10,6 @@ device clock via the dedicated pClock* helper rather than pulling it out of
 the "restorable parameters" dict (which filters out "pclean"-typed
 registers and would silently never see the clock at all).
 """
-import asyncio
 import json
 from datetime import datetime, time as dt_time
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -350,7 +349,8 @@ class TestClockDriftCheck:
         call_args = hass.services.async_call.call_args
         assert call_args[0][0] == "persistent_notification"
         assert call_args[0][1] == "create"
-        assert "drift" in call_args[0][2]["message"].lower() or "off by" in call_args[0][2]["message"].lower()
+        message = call_args[0][2]["message"].lower()
+        assert "drift" in message or "off by" in message
 
     @pytest.mark.asyncio
     async def test_drift_check_no_notification_when_within_threshold(self):
@@ -463,7 +463,9 @@ def _sample_write_registers():
         "pClockMonth": {"command": "0A0102", "type": "pclean", "decode_type": "0clean"},
         "pClockDay": {"command": "0A0103", "type": "pclean", "decode_type": "0clean"},
         "pClockHour": {"command": "0A0104", "type": "pclean", "decode_type": "0clean"},
-        "pClockMinutes": {"command": "0A0105", "type": "pclean", "decode_type": "0clean"},
+        "pClockMinutes": {
+            "command": "0A0105", "type": "pclean", "decode_type": "0clean",
+        },
         "HeatingCurve": {
             "command": "0A0200",
             "type": "number",

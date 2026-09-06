@@ -1,5 +1,4 @@
-"""Tests for THZTime/THZScheduleTime's async_clear_value() and the
-``thz.clear_value`` entity service that exposes it.
+"""Tests for async_clear_value() and the ``thz.clear_value`` service that exposes it.
 
 Home Assistant's built-in ``time.set_value`` service cannot represent "no
 time" -- its schema requires a real ``datetime.time`` -- so there is no way

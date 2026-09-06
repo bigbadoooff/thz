@@ -57,10 +57,22 @@ class TestApplyEntityVisibilityTier:
         config_entry = _make_config_entry({"entity_visibility": "default"})
 
         entries = [
-            _entity("time.programhc1_mo_0_start", "thz_..._programhc1_mo_0", "programHC1_Mo_0"),
-            _entity("number.hc2_flow_setpoint", "thz_..._hc2_flow", "HC2 Flow Setpoint"),
-            _entity("number.booster_stage_1_timer", "thz_..._booster1", "Booster Stage 1 Timer"),
-            _entity("sensor.outside_temp", "thz_pxxfb_0_outside_temp", "Outside Temperature"),
+            _entity(
+                "time.programhc1_mo_0_start",
+                "thz_..._programhc1_mo_0",
+                "programHC1_Mo_0",
+            ),
+            _entity(
+                "number.hc2_flow_setpoint", "thz_..._hc2_flow", "HC2 Flow Setpoint"
+            ),
+            _entity(
+                "number.booster_stage_1_timer",
+                "thz_..._booster1",
+                "Booster Stage 1 Timer",
+            ),
+            _entity(
+                "sensor.outside_temp", "thz_pxxfb_0_outside_temp", "Outside Temperature"
+            ),
         ]
 
         fake_ent_reg = MagicMock()
@@ -110,9 +122,11 @@ class TestApplyEntityVisibilityTier:
 
     @pytest.mark.asyncio
     async def test_retroactive_switch_to_extended_reenables_advanced_not_hc2(self):
-        """Switching default -> extended re-enables advanced params, but NOT
-        HC2 (gated independently by enable_hc2, which defaults to False and
-        isn't set here) and keeps schedules hidden."""
+        """Switching default -> extended re-enables advanced params, but not HC2.
+
+        HC2 is gated independently by enable_hc2, which defaults to False
+        and isn't set here; schedules stay hidden.
+        """
         hass = _make_hass()
         config_entry = _make_config_entry({
             "entity_visibility": "extended",
@@ -143,10 +157,14 @@ class TestApplyEntityVisibilityTier:
             await thz_module._async_apply_entity_visibility_tier(hass, config_entry)
 
         ent_reg = fake_ent_reg
-        calls = {call.args[0]: call.kwargs.get("disabled_by") for call in ent_reg.async_update_entity.call_args_list}
+        calls = {
+            call.args[0]: call.kwargs.get("disabled_by")
+            for call in ent_reg.async_update_entity.call_args_list
+        }
 
         # A true advanced-technical-parameter entity gets re-enabled under "extended"
-        assert calls.get("number.p21_hyst1") is None  # value None -> re-enabled (disabled_by=None)
+        # value None -> re-enabled (disabled_by=None)
+        assert calls.get("number.p21_hyst1") is None
         assert "number.p21_hyst1" in calls
         # HC2 stays hidden -- "extended" alone doesn't touch it, so it's
         # already correctly disabled and needs no registry update at all.
@@ -159,9 +177,10 @@ class TestApplyEntityVisibilityTier:
 
     @pytest.mark.asyncio
     async def test_enabling_hc2_flag_alone_reenables_hc2_even_with_tier_unchanged(self):
-        """Toggling enable_hc2 True with the tier UNCHANGED must still trigger
-        reconciliation and re-enable HC2 entities -- the tier/flag change
-        detection has to track both independently."""
+        """Toggling enable_hc2 True with the tier unchanged must still reconcile.
+
+        The tier/flag change detection has to track both independently.
+        """
         hass = _make_hass()
         config_entry = _make_config_entry({
             "entity_visibility": "default",
@@ -195,13 +214,15 @@ class TestApplyEntityVisibilityTier:
 
     @pytest.mark.asyncio
     async def test_upgrader_disabling_hc2_with_tier_unchanged_is_reconciled(self):
-        """Regression test: an entry that predates the hc2/advanced split, with
-        HC2 entities already enabled under the old "extended"/"all" behavior
-        (no _entity_hc2_applied recorded yet), must still disable HC2 when the
-        user explicitly submits enable_hc2=False while leaving the tier
-        unchanged -- this must NOT be treated as a no-op just because
-        enable_hc2's naive default (False) happens to match what was
-        submitted."""
+        """Disabling HC2 with the tier unchanged, on a pre-split entry, must reconcile.
+
+        The entry predates the hc2/advanced split, with HC2 entities already
+        enabled under the old "extended"/"all" behavior (no
+        _entity_hc2_applied recorded yet). Explicitly submitting
+        enable_hc2=False while leaving the tier unchanged must NOT be
+        treated as a no-op just because enable_hc2's naive default (False)
+        happens to match what was submitted.
+        """
         hass = _make_hass()
         config_entry = _make_config_entry({
             "entity_visibility": "extended",
@@ -234,10 +255,12 @@ class TestApplyEntityVisibilityTier:
 
     @pytest.mark.asyncio
     async def test_upgrader_with_default_tier_and_hc2_flag_absent_is_still_a_noop(self):
-        """An entry that predates the split, previously applied under "default"
-        (which never enabled HC2 even in the old code), must still no-op when
-        nothing has actually changed -- the backward-compat inference must not
-        cause spurious reconciliation for entries that were never affected."""
+        """A pre-split entry applied under "default" still no-ops when unchanged.
+
+        "default" never enabled HC2 even in the old code, so the
+        backward-compat inference must not cause spurious reconciliation
+        for entries that were never affected.
+        """
         hass = _make_hass()
         config_entry = _make_config_entry({
             "entity_visibility": "default",
@@ -308,8 +331,7 @@ class TestApplyEntityVisibilityTier:
 
     @pytest.mark.asyncio
     async def test_legacy_migrated_flag_treated_as_default_tier_applied(self):
-        """A pre-existing _hidden_entities_migrated=True entry with visibility
-        still 'default' is treated as already reconciled -- no-op."""
+        """A migrated=True entry still on 'default' is already reconciled."""
         hass = _make_hass()
         config_entry = _make_config_entry({
             "entity_visibility": "default",
@@ -327,8 +349,7 @@ class TestApplyEntityVisibilityTier:
 
     @pytest.mark.asyncio
     async def test_legacy_migrated_flag_still_reconciles_on_tier_change(self):
-        """A pre-existing _hidden_entities_migrated=True entry that has since
-        been switched to 'all' must still trigger reconciliation."""
+        """A migrated=True entry switched to 'all' must still trigger reconciliation."""
         hass = _make_hass()
         config_entry = _make_config_entry({
             "entity_visibility": "all",

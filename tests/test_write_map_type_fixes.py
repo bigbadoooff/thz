@@ -1,5 +1,4 @@
-"""Regression coverage for WRITE_MAP entries typed with a decode_type instead
-of a real entity platform.
+"""Regression coverage for WRITE_MAP entries typed with a decode_type, not a platform.
 
 Each write-platform module (number.py, switch.py, select.py, button.py, ...)
 builds its entities by filtering WRITE_MAP entries on ``entry["type"] ==
@@ -58,9 +57,12 @@ class TestWriteMap206PcleanFix:
         assert entry["decode_type"] == "pClean"
 
     def test_previously_pclean_entries_are_now_number_or_ptime(self):
-        """Every entry that used to say 'pclean' is either 'number' now,
-        except the handful whose decode_type is time-flavored and which
-        were already correctly typed 'ptime' (untouched by this fix)."""
+        """Every entry that used to say 'pclean' is now 'number' or 'ptime'.
+
+        The exceptions are the handful whose decode_type is time-flavored
+        and which were already correctly typed 'ptime' (untouched by this
+        fix).
+        """
         for name, entry in WRITE_MAP_206.items():
             if name in _METADATA_KEYS:
                 continue
@@ -83,9 +85,11 @@ class TestWriteMap214ResetErrorsFix:
 
 
 class TestWriteMapX39techPumpFix:
-    """write_map_X39tech.py: zPumpHC/zPumpDHW were typed 'select' with an
-    unregistered decode_type, guaranteeing empty options and a ValueError
-    on any read/write."""
+    """write_map_X39tech.py: zPumpHC/zPumpDHW typed 'select' with a bad decode_type.
+
+    The unregistered decode_type guaranteed empty options and a ValueError
+    on any read/write.
+    """
 
     def test_zPumpHC_is_number_type(self):
         entry = WRITE_MAP_X39TECH["zPumpHC"]
@@ -98,17 +102,18 @@ class TestWriteMapX39techPumpFix:
         assert entry["decode_type"] == "0clean"
 
     def test_zControlValveDHW_untouched(self):
-        """zControlValveDHW was not part of this fix -- confirm it's
-        unaffected (still 'select', decode_type '1clean')."""
+        """ZControlValveDHW was not part of this fix -- confirm it's unaffected."""
         entry = WRITE_MAP_X39TECH["zControlValveDHW"]
         assert entry["type"] == "select"
         assert entry["decode_type"] == "1clean"
 
 
 class TestNoDecodeTypeTokenMisusedAsPlatform:
-    """Standing invariant: a WRITE_MAP entry's "type" must never be a bare
-    decode_type token. This is what let all three bugs above go unnoticed --
-    the entries were simply skipped at platform setup instead of raising."""
+    """Standing invariant: a WRITE_MAP entry's "type" must never be a bare decode_type.
+
+    This is what let all three bugs above go unnoticed -- the entries were
+    simply skipped at platform setup instead of raising.
+    """
 
     def _assert_map_clean(self, write_map, map_name):
         offenders = [

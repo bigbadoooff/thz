@@ -1,5 +1,4 @@
-"""Tests for THZClimate's hvac_mode/preset_mode handling around the global
-pOpMode register.
+"""Tests for THZClimate's hvac_mode/preset_mode handling around pOpMode.
 
 Regression coverage for two related bugs:
 
@@ -75,7 +74,8 @@ class TestHvacModesExcludeOff:
     def test_heat_only_without_cooling(self):
         entity = _make_entity()
         assert entity.hvac_modes == [entity.hvac_modes[0]]  # single entry
-        assert "off" not in [m.value if hasattr(m, "value") else m for m in entity.hvac_modes]
+        mode_values = [m.value if hasattr(m, "value") else m for m in entity.hvac_modes]
+        assert "off" not in mode_values
         from homeassistant.components.climate import HVACMode
         assert entity.hvac_modes == [HVACMode.HEAT]
 
@@ -181,8 +181,7 @@ class TestAsyncSetHvacMode:
 
     @pytest.mark.asyncio
     async def test_off_is_not_a_supported_mode(self):
-        """OFF is no longer in hvac_modes; requesting it must not crash and
-        must not silently reinterpret it as anything else."""
+        """OFF is no longer in hvac_modes; requesting it must not crash."""
         from homeassistant.components.climate import HVACMode
 
         entity = _make_entity()

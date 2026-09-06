@@ -729,7 +729,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             title = f"THZ ({data['connection_type']}: {conn_target})"
             return self.async_create_entry(title=title, data=data)
 
-        schema_dict = {}
+        schema_dict: dict[vol.Marker, Any] = {}
         for block in blocks:
             refresh_key = vol.Optional(
                 f"refresh_{block}", default=DEFAULT_UPDATE_INTERVAL

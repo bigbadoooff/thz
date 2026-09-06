@@ -14,20 +14,23 @@ if TYPE_CHECKING:
     try:
         # Real name since HA 2024.6. Older homeassistant-stubs snapshots
         # (as pinned by some dev mirrors) predate it.
-        from homeassistant.config_entries import (  # type: ignore[attr-defined]
-            ConfigFlowResult,
-        )
+        from homeassistant.config_entries import ConfigFlowResult
     except ImportError:
-        from homeassistant.data_entry_flow import FlowResult as ConfigFlowResult
+        # mypy considers the two branches' ConfigFlowResult incompatible
+        # when the stub defines it as a generic FlowResult[...] alias;
+        # harmless for this TYPE_CHECKING-only compat shim.
+        from homeassistant.data_entry_flow import (  # type: ignore[assignment]
+            FlowResult as ConfigFlowResult,
+        )
 
     try:
         # Real name since HA 2024.6; functionally identical to the older
         # generic AddEntitiesCallback used as a fallback below.
-        from homeassistant.helpers.entity_platform import (  # type: ignore[attr-defined]
+        from homeassistant.helpers.entity_platform import (
             AddConfigEntryEntitiesCallback,
         )
     except ImportError:
-        from homeassistant.helpers.entity_platform import (
+        from homeassistant.helpers.entity_platform import (  # type: ignore[assignment]
             AddEntitiesCallback as AddConfigEntryEntitiesCallback,
         )
 

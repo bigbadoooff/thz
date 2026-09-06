@@ -1077,48 +1077,21 @@
       "heating_circuit": {
         "state_attributes": {
           "preset_mode": {
-            "default": "mdi:thermostat",
-            "state": {
-              "standby": "mdi:power-standby",
-              "automatic": "mdi:calendar-sync",
-              "DAYmode": "mdi:white-balance-sunny",
-              "setback": "mdi:weather-night",
-              "DHWmode": "mdi:water-boiler",
-              "manual": "mdi:hand-back-right",
-              "emergency": "mdi:alert-octagon"
-            }
+            "default": "mdi:thermostat"
           }
         }
       },
       "heating_circuit_2": {
         "state_attributes": {
           "preset_mode": {
-            "default": "mdi:thermostat",
-            "state": {
-              "standby": "mdi:power-standby",
-              "automatic": "mdi:calendar-sync",
-              "DAYmode": "mdi:white-balance-sunny",
-              "setback": "mdi:weather-night",
-              "DHWmode": "mdi:water-boiler",
-              "manual": "mdi:hand-back-right",
-              "emergency": "mdi:alert-octagon"
-            }
+            "default": "mdi:thermostat"
           }
         }
       },
       "dhw_heating": {
         "state_attributes": {
           "preset_mode": {
-            "default": "mdi:thermostat",
-            "state": {
-              "standby": "mdi:power-standby",
-              "automatic": "mdi:calendar-sync",
-              "DAYmode": "mdi:white-balance-sunny",
-              "setback": "mdi:weather-night",
-              "DHWmode": "mdi:water-boiler",
-              "manual": "mdi:hand-back-right",
-              "emergency": "mdi:alert-octagon"
-            }
+            "default": "mdi:thermostat"
           }
         }
       }

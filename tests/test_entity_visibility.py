@@ -75,9 +75,11 @@ class TestShouldHideEntityDefaultTier:
 
 
 class TestShouldHideEntityExtendedTier:
-    """"extended" tier hides ONLY schedule/program entities. HC2 is gated
-    separately by enable_hc2, independent of the tier -- see
-    TestShouldHideEntityHC2Flag."""
+    """"extended" tier hides ONLY schedule/program entities.
+
+    HC2 is gated separately by enable_hc2, independent of the tier -- see
+    TestShouldHideEntityHC2Flag.
+    """
 
     @pytest.mark.parametrize("name", SCHEDULE_NAMES)
     def test_schedule_names_still_hidden(self, name):
@@ -97,8 +99,11 @@ class TestShouldHideEntityExtendedTier:
 
 
 class TestShouldHideEntityAllTier:
-    """"all" tier hides nothing EXCEPT HC2, which is gated independently by
-    enable_hc2 regardless of tier -- see TestShouldHideEntityHC2Flag."""
+    """"all" tier hides nothing EXCEPT HC2.
+
+    HC2 is gated independently by enable_hc2 regardless of tier -- see
+    TestShouldHideEntityHC2Flag.
+    """
 
     @pytest.mark.parametrize("name", SCHEDULE_NAMES + ADVANCED_NAMES + VISIBLE_NAMES)
     def test_nothing_is_hidden(self, name):
@@ -145,7 +150,9 @@ class TestShouldHideEntityHC2Flag:
     def test_flag_never_affects_non_hc2_names(self, name):
         """enable_hc2 must not change classification for anything else."""
         for visibility in (
-            ENTITY_VISIBILITY_DEFAULT, ENTITY_VISIBILITY_EXTENDED, ENTITY_VISIBILITY_ALL,
+            ENTITY_VISIBILITY_DEFAULT,
+            ENTITY_VISIBILITY_EXTENDED,
+            ENTITY_VISIBILITY_ALL,
         ):
             assert should_hide_entity(name, visibility, enable_hc2=False) == (
                 should_hide_entity(name, visibility, enable_hc2=True)
@@ -153,11 +160,13 @@ class TestShouldHideEntityHC2Flag:
 
 
 class TestMixedCategoryNames:
-    """A name matching both "program" and "hc2" keywords is classified "hc2",
-    not "schedule" -- "hc2" is checked first, so these entities are gated
-    purely by enable_hc2, independent of the entity_visibility tier. This
-    guards against the entity_visibility="all" case in particular, where an
-    "hc2" classification is the only thing keeping the entity hidden."""
+    """A name matching both "program" and "hc2" is classified "hc2", not "schedule".
+
+    "hc2" is checked first, so these entities are gated purely by
+    enable_hc2, independent of the entity_visibility tier. This guards
+    against the entity_visibility="all" case in particular, where an "hc2"
+    classification is the only thing keeping the entity hidden.
+    """
 
     NAME = "programHC2_Mo_0"
 

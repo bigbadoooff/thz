@@ -290,27 +290,27 @@ class TestDecodeTurnHex2Time:
         assert decode_value(raw, "turnhex2time") == "00:00"
 
     def test_noon(self):
-        """Test 12:00 (noon). Unswapped 1200 = 0x04B0 → swapped bytes b'\\xb0\\x04'."""
+        r"""Test 12:00 (noon). Unswapped 1200 = 0x04B0 → swapped bytes b'\xb0\x04'."""
         raw = b'\xb0\x04'
         assert decode_value(raw, "turnhex2time") == "12:00"
 
     def test_half_past_twelve(self):
-        """Test 12:30. Unswapped 1230 = 0x04CE → swapped bytes b'\\xce\\x04'."""
+        r"""Test 12:30. Unswapped 1230 = 0x04CE → swapped bytes b'\xce\x04'."""
         raw = b'\xce\x04'
         assert decode_value(raw, "turnhex2time") == "12:30"
 
     def test_end_of_day(self):
-        """Test 23:45. Unswapped 2345 = 0x0929 → swapped bytes b'\\x29\\x09'."""
+        r"""Test 23:45. Unswapped 2345 = 0x0929 → swapped bytes b'\x29\x09'."""
         raw = b'\x29\x09'
         assert decode_value(raw, "turnhex2time") == "23:45"
 
     def test_one_minute_past_midnight(self):
-        """Test 00:01. Unswapped 1 = 0x0001 → swapped bytes b'\\x01\\x00'."""
+        r"""Test 00:01. Unswapped 1 = 0x0001 → swapped bytes b'\x01\x00'."""
         raw = b'\x01\x00'
         assert decode_value(raw, "turnhex2time") == "00:01"
 
     def test_single_digit_hour(self):
-        """Test 06:30 — hour must be zero-padded. Unswapped 630 = 0x0276 → swapped bytes b'\\x76\\x02'."""
+        r"""Test 06:30, hour zero-padded. 630 = 0x0276 -> swapped b'\x76\x02'."""
         raw = b'\x76\x02'
         assert decode_value(raw, "turnhex2time") == "06:30"
 
@@ -334,12 +334,12 @@ class TestDecodeTurnHexDate:
         assert decode_value(raw, "turnhexdate") == "00.00"
 
     def test_fifth_of_january(self):
-        """Test 05.01. Unswapped 501 = 0x01F5 → swapped bytes b'\\xf5\\x01'."""
+        r"""Test 05.01. Unswapped 501 = 0x01F5 → swapped bytes b'\xf5\x01'."""
         raw = b'\xf5\x01'
         assert decode_value(raw, "turnhexdate") == "05.01"
 
     def test_new_years_eve(self):
-        """Test 31.12. Unswapped 3112 = 0x0C28 → swapped bytes b'\\x28\\x0c'."""
+        r"""Test 31.12. Unswapped 3112 = 0x0C28 → swapped bytes b'\x28\x0c'."""
         raw = b'\x28\x0c'
         assert decode_value(raw, "turnhexdate") == "31.12"
 

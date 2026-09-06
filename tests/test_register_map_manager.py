@@ -225,9 +225,7 @@ class TestBaseRegisterMapManager:
         assert isinstance(read_maps, list)
 
     def test_unrecognized_43x_firmware_uses_439_maps(self):
-        """Regression test: firmware "438" (LWZ 403, off-by-a-point-release
-        from the "439" entry) must load 439-style maps, not 539-style ones.
-        """
+        """Firmware "438" (off-by-a-point from "439") must load 439-style maps."""
         manager = RegisterMapManager("438")
         assert "readings_map_439" in manager.readings_map_names
         assert "readings_map_539" not in manager.readings_map_names

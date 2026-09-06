@@ -68,8 +68,7 @@ class TestCleanupOrphanedEntities:
 
     @pytest.mark.asyncio
     async def test_keeps_entity_with_valid_config_entry_id(self):
-        """An entity whose config_entry_id refers to a real, live entry is
-        left alone."""
+        """An entity with a config_entry_id pointing at a live entry is left alone."""
         entity = _make_entity("number.thz_live", "thz", "live_entry_id")
         registry = MagicMock()
         registry.entities.values.return_value = [entity]
@@ -85,8 +84,7 @@ class TestCleanupOrphanedEntities:
 
     @pytest.mark.asyncio
     async def test_ignores_entities_from_other_platforms(self):
-        """An orphaned-looking entity from a different platform is never
-        touched, even with a dangling config_entry_id."""
+        """An orphaned-looking entity from another platform is never touched."""
         entity = _make_entity("sensor.other_thing", "some_other_platform", None)
         registry = MagicMock()
         registry.entities.values.return_value = [entity]
@@ -102,8 +100,7 @@ class TestCleanupOrphanedEntities:
 
     @pytest.mark.asyncio
     async def test_mixed_batch_removes_only_orphaned_thz_entities(self):
-        """A realistic mixed batch: live thz entity kept, dangling thz
-        entity removed, non-thz entity untouched."""
+        """Mixed batch: live thz kept, dangling thz removed, non-thz untouched."""
         live = _make_entity("number.thz_live", "thz", "live_entry_id")
         stale = _make_entity("number.thz_stale", "thz", "deleted_entry_id")
         other = _make_entity("sensor.other", "voip", None)

@@ -478,11 +478,9 @@ def _read_op_mode(data: bytes, offset: int, length: int) -> HVACMode:
         The corresponding :class:`HVACMode`, defaulting to ``HEAT``.
     """
     mode_str = _read_op_mode_raw(data, offset, length)
-    # HVACMode members are mistyped as plain `str` in some older
-    # homeassistant-stubs snapshots; not a real type error.
     if mode_str is not None:
-        return _OP_MODE_TO_HVAC.get(mode_str, HVACMode.HEAT)  # type: ignore[arg-type]
-    return HVACMode.HEAT  # type: ignore[return-value]
+        return _OP_MODE_TO_HVAC.get(mode_str, HVACMode.HEAT)
+    return HVACMode.HEAT
 
 
 def _bit_active(data: bytes, byte_idx: int, bit_idx: int) -> bool:
@@ -583,6 +581,11 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 ``cooling_byte``, or ``None`` if unavailable.
             compressor_bit: Bit index of the compressor-active flag within
                 ``cooling_byte``, or ``None`` if unavailable.
+            night_setpoint_entry: Write-register metadata for the night
+                setpoint sharing this circuit's heat setpoint, or ``None``
+                if the circuit has no separate night register.
+            manual_setpoint_entry: Write-register metadata for the circuit's
+                manual-mode setpoint, or ``None`` if not available.
             entity_id_style: One of the ``ENTITY_ID_STYLE_*`` values from
                 const.py. "fhem" sets ``self.entity_id`` directly (using
                 ``translation_key`` as the raw name, since a climate entity
@@ -669,9 +672,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         # setpoint command OR cooling is supported (then both heat/cool temps
         # are settable depending on the current mode)
         if heat_setpoint_entry is not None or self._supports_cooling:
-            self._attr_supported_features = (
-                ClimateEntityFeature.TARGET_TEMPERATURE  # type: ignore[assignment]
-            )
+            self._attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
         else:
             self._attr_supported_features = ClimateEntityFeature(0)
 
@@ -802,20 +803,20 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         """
         # Check cooling-active bit first (only when cooling entries are present)
         if self._supports_cooling and self._cooling_coordinator is not None:
-            cool_data = self._cooling_coordinator.data
+            # The cooling coordinator's DataUpdateCoordinator is untyped
+            # generic; its .data is always bytes at runtime for this entity.
+            cool_data = cast("bytes | None", self._cooling_coordinator.data)
             if (
                 cool_data is not None
                 and self._cooling_byte is not None
                 and self._cooling_bit is not None
                 and _bit_active(cool_data, self._cooling_byte, self._cooling_bit)
             ):
-                # HVACMode members are mistyped as plain `str` in some older
-                # homeassistant-stubs snapshots; not a real type error.
-                return HVACMode.COOL  # type: ignore[return-value]
+                return HVACMode.COOL
 
         # Fall back to hcOpMode / dhwOpMode
         if self.coordinator.data is None:
-            return HVACMode.HEAT  # type: ignore[return-value]
+            return HVACMode.HEAT
         return _read_op_mode(
             self.coordinator.data,
             self._op_mode_offset,
@@ -838,7 +839,9 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         """
         if self._cooling_coordinator is None:
             return None
-        cool_data = self._cooling_coordinator.data
+        # The cooling coordinator's DataUpdateCoordinator is untyped
+        # generic; its .data is always bytes at runtime for this entity.
+        cool_data = cast("bytes | None", self._cooling_coordinator.data)
         if cool_data is None:
             return None
         if (
@@ -847,16 +850,14 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             and self._cooling_bit is not None
             and _bit_active(cool_data, self._cooling_byte, self._cooling_bit)
         ):
-            # HVACAction members are mistyped as plain `str` in some older
-            # homeassistant-stubs snapshots; not a real type error.
-            return HVACAction.COOLING  # type: ignore[return-value]
+            return HVACAction.COOLING
         if (
             self._cooling_byte is not None
             and self._compressor_bit is not None
             and _bit_active(cool_data, self._cooling_byte, self._compressor_bit)
         ):
-            return HVACAction.HEATING  # type: ignore[return-value]
-        return HVACAction.IDLE  # type: ignore[return-value]
+            return HVACAction.HEATING
+        return HVACAction.IDLE
 
     @property
     def preset_mode(self) -> str | None:
@@ -1044,7 +1045,9 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             if value_bytes:
                 return THZValueCodec.decode_number(value_bytes, step, decode_type)
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
-            _LOGGER.warning("Could not read setpoint register for %s: %s", self.name, err)
+            _LOGGER.warning(
+                "Could not read setpoint register for %s: %s", self.name, err
+            )
         return None
 
     async def _async_write_heat_setpoint(self, temperature: float) -> None:

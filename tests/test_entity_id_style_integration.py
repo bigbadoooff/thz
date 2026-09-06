@@ -80,7 +80,12 @@ class TestWriteEntityIdStyle:
 
         entity = THZSelect(
             name="pOpMode",
-            entry={"command": "0A0900", "type": "select", "icon": "", "decode_type": "opmode"},
+            entry={
+                "command": "0A0900",
+                "type": "select",
+                "icon": "",
+                "decode_type": "opmode",
+            },
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="fhem",
@@ -146,7 +151,8 @@ class TestWriteEntityIdStyle:
             device_id="test_device",
             entity_id_style="fhem",
         )
-        assert entity.entity_id == f"button.{fhem_style_object_id('zResetLast10errors')}"
+        expected = fhem_style_object_id('zResetLast10errors')
+        assert entity.entity_id == f"button.{expected}"
 
     def test_button_default_style_leaves_suggested_object_id_unset(self):
         from custom_components.thz.button import THZButton
@@ -210,7 +216,9 @@ class TestClimateEntityIdStyle:
         assert entity.entity_id == "climate.heating_circuit"
 
     def test_climate_fhem_style_with_prefix(self):
-        entity = self._make_climate_entity(entity_id_style="fhem", entity_id_prefix="lwz")
+        entity = self._make_climate_entity(
+            entity_id_style="fhem", entity_id_prefix="lwz"
+        )
         assert entity.entity_id == "climate.lwz_heating_circuit"
 
 
@@ -305,7 +313,7 @@ class TestPlatformSetupPassesEntityIdStyle:
 
     @pytest.mark.asyncio
     async def test_write_platform_defaults_to_default_style_when_absent(self):
-        """entry_data without 'entity_id_style' key doesn't crash and defaults safely."""
+        """Missing 'entity_id_style' key doesn't crash and defaults safely."""
         from custom_components.thz.platform_setup import async_setup_write_platform
         from custom_components.thz.switch import THZSwitch
 
@@ -332,7 +340,9 @@ class TestPlatformSetupPassesEntityIdStyle:
         }
 
         added = []
-        async_add_entities = MagicMock(side_effect=lambda entities, *_a, **_kw: added.extend(entities))
+        async_add_entities = MagicMock(
+            side_effect=lambda entities, *_a, **_kw: added.extend(entities)
+        )
 
         await async_setup_write_platform(
             hass, config_entry, async_add_entities, THZSwitch, "switch"
@@ -343,13 +353,16 @@ class TestPlatformSetupPassesEntityIdStyle:
 
     @pytest.mark.asyncio
     async def test_write_platform_creates_button_entities_without_error(self):
-        """Regression test: async_setup_write_platform always passes
+        """Regression test for a TypeError that silently killed the button platform.
+
+        async_setup_write_platform always passes
         entity_id_style/entity_visibility/entity_id_prefix to every write
         platform's entity class, including button. THZButton.__init__ once
         lacked these kwargs, which raised a TypeError at runtime and silently
         killed the whole button platform (caught via live HA logs, not by
         this test suite, since no prior test exercised button through this
-        code path)."""
+        code path).
+        """
         from custom_components.thz.platform_setup import async_setup_write_platform
         from custom_components.thz.button import THZButton
 
@@ -378,7 +391,9 @@ class TestPlatformSetupPassesEntityIdStyle:
         }
 
         added = []
-        async_add_entities = MagicMock(side_effect=lambda entities, *_a, **_kw: added.extend(entities))
+        async_add_entities = MagicMock(
+            side_effect=lambda entities, *_a, **_kw: added.extend(entities)
+        )
 
         await async_setup_write_platform(
             hass, config_entry, async_add_entities, THZButton, "button"
@@ -543,7 +558,9 @@ class TestEntityIdPrefix:
         }
 
         added = []
-        async_add_entities = MagicMock(side_effect=lambda entities, *_a, **_kw: added.extend(entities))
+        async_add_entities = MagicMock(
+            side_effect=lambda entities, *_a, **_kw: added.extend(entities)
+        )
 
         await async_setup_write_platform(
             hass, config_entry, async_add_entities, THZSwitch, "switch"

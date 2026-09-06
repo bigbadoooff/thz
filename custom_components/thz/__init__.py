@@ -300,11 +300,7 @@ async def _async_migrate_disable_hidden_entities(
         )
 
         if should_hide and entity_entry.disabled_by is None:
-            # RegistryEntryDisabler members are mistyped as plain `str` in
-            # some older homeassistant-stubs snapshots; not a real type error.
-            disabler: er.RegistryEntryDisabler = (
-                er.RegistryEntryDisabler.INTEGRATION  # type: ignore[assignment]
-            )
+            disabler: er.RegistryEntryDisabler = er.RegistryEntryDisabler.INTEGRATION
             ent_reg.async_update_entity(
                 entity_entry.entity_id,
                 disabled_by=disabler,
@@ -421,11 +417,7 @@ async def _async_apply_entity_visibility_tier(
         should_hide = _entity_should_be_hidden(uid, name, visibility, enable_hc2)
 
         if should_hide and entity_entry.disabled_by is None:
-            # RegistryEntryDisabler members are mistyped as plain `str` in
-            # some older homeassistant-stubs snapshots; not a real type error.
-            disabler: er.RegistryEntryDisabler = (
-                er.RegistryEntryDisabler.INTEGRATION  # type: ignore[assignment]
-            )
+            disabler: er.RegistryEntryDisabler = er.RegistryEntryDisabler.INTEGRATION
             ent_reg.async_update_entity(
                 entity_entry.entity_id,
                 disabled_by=disabler,

@@ -72,7 +72,9 @@ ENTITY_ID_STYLE_DEFAULT = "default"
 ENTITY_ID_STYLE_FHEM = "fhem"
 ENTITY_ID_STYLE_LABELS: dict[str, str] = {
     ENTITY_ID_STYLE_DEFAULT: "Default (descriptive)",
-    ENTITY_ID_STYLE_FHEM: "FHEM/technical (matches 00_THZ.pm field names & Stiebel parameter numbers)",
+    ENTITY_ID_STYLE_FHEM: (
+        "FHEM/technical (matches 00_THZ.pm field names & Stiebel parameter numbers)"
+    ),
 }
 
 # Entity visibility tier (config-flow "entity_visibility" field).

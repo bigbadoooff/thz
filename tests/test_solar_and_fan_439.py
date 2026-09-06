@@ -1,5 +1,4 @@
-"""Tests for the solar circuit ("pxx16") and fan status ("pxxE8") blocks
-added for firmware 4.39/5.39.
+"""Tests for the solar circuit ("pxx16") and fan status ("pxxE8") blocks (fw 4.39/5.39).
 
 These were entirely unported gaps found via a systematic audit against
 FHEM's 00_THZ.pm: firmware 4.39/5.39 (and everything read via the shared
@@ -36,9 +35,13 @@ class TestSolarBlockDefinition:
             (5, "status", 30, 2, "raw", 1),
         ],
     )
-    def test_entries_match_fhem_16sol(self, index, name, offset, length, decode, factor):
+    def test_entries_match_fhem_16sol(
+        self, index, name, offset, length, decode, factor
+    ):
         entries = readings_map_439.REGISTER_MAP["pxx16"]
-        entry_name, entry_offset, entry_length, entry_decode, entry_factor = entries[index][:5]
+        entry_name, entry_offset, entry_length, entry_decode, entry_factor = (
+            entries[index][:5]
+        )
         assert entry_name.strip().rstrip(":") == name
         assert (entry_offset, entry_length, entry_decode, entry_factor) == (
             offset,
@@ -71,7 +74,9 @@ class TestFanBlockDefinition:
     )
     def test_entries_match_fhem_e8fan(self, index, name, offset, length):
         entries = readings_map_439.REGISTER_MAP["pxxE8"]
-        entry_name, entry_offset, entry_length, entry_decode, _factor = entries[index][:5]
+        entry_name, entry_offset, entry_length, entry_decode, _factor = (
+            entries[index][:5]
+        )
         assert entry_name.strip().rstrip(":") == name
         assert (entry_offset, entry_length, entry_decode) == (offset, length, "hex")
 
@@ -80,7 +85,13 @@ class TestSolarEndToEndDecode:
     """End-to-end decode of a synthetic pxx16 device response."""
 
     @staticmethod
-    def _extract(message_hex: str, offset_nibbles: int, length_nibbles: int, decode_type: str, factor: float):
+    def _extract(
+        message_hex: str,
+        offset_nibbles: int,
+        length_nibbles: int,
+        decode_type: str,
+        factor: float,
+    ):
         byte_offset = offset_nibbles // 2
         byte_length = (length_nibbles + 1) // 2
         raw = bytes.fromhex(message_hex)[byte_offset : byte_offset + byte_length]
@@ -120,7 +131,13 @@ class TestFanEndToEndDecode:
     """End-to-end decode of a synthetic pxxE8 device response."""
 
     @staticmethod
-    def _extract(message_hex: str, offset_nibbles: int, length_nibbles: int, decode_type: str, factor: float):
+    def _extract(
+        message_hex: str,
+        offset_nibbles: int,
+        length_nibbles: int,
+        decode_type: str,
+        factor: float,
+    ):
         byte_offset = offset_nibbles // 2
         byte_length = (length_nibbles + 1) // 2
         raw = bytes.fromhex(message_hex)[byte_offset : byte_offset + byte_length]

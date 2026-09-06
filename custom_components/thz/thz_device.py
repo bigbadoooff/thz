@@ -134,8 +134,13 @@ class THZDevice:
         value, or working around an auto-detected string with no dedicated
         entry in ``FIRMWARE_MAPS``.
         """
-        if self._firmware_override and self._firmware_override != const.FIRMWARE_OVERRIDE_AUTO:
+        if (
+            self._firmware_override
+            and self._firmware_override != const.FIRMWARE_OVERRIDE_AUTO
+        ):
             return self._firmware_override
+        if self._firmware_version is None:
+            raise RuntimeError("Device not initialized or firmware version unknown")
         return self._firmware_version
 
     def _connect_serial(self):

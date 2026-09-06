@@ -13,7 +13,7 @@ native automations and notifications (e.g., filter-change reminders).
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -83,9 +83,7 @@ def _get_device_class(name: str) -> BinarySensorDeviceClass | None:
     else:
         # Default: no device class (shows generic on/off)
         device_class = None
-    # BinarySensorDeviceClass members are mistyped as plain `str` in some
-    # older homeassistant-stubs snapshots; not a real type error.
-    return cast("BinarySensorDeviceClass | None", device_class)
+    return device_class
 
 
 async def async_setup_entry(
@@ -268,11 +266,7 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         # Advanced/technician-mode sensors (also hidden by default above)
         # are diagnostic information rather than primary readings.
         if should_hide_entity_by_default(self._entity_name):
-            # EntityCategory members are mistyped as plain `str` in some
-            # older homeassistant-stubs snapshots; not a real type error.
-            self._attr_entity_category = (
-                EntityCategory.DIAGNOSTIC  # type: ignore[assignment]
-            )
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def is_on(self) -> bool | None:

@@ -155,7 +155,7 @@ class TestRegisterMapManagerHasCooling:
         assert "pxx0A0648" not in manager.get_all_registers()
 
     def test_default_firmware_no_cooling_stays_439_only(self):
-        """Unrecognized firmware (default) is 4.39-like and has no 5.39 entries to filter."""
+        """Unrecognized firmware (default) is 4.39-like -- no 5.39 entries to filter."""
         manager = RegisterMapManager("unknown_fw", has_cooling=False)
         assert "readings_map_539" not in manager.readings_map_names
         assert "readings_map_439" in manager.readings_map_names

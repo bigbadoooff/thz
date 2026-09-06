@@ -360,11 +360,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         # Advanced/technician-mode sensors (also hidden by default above)
         # are diagnostic information rather than primary readings.
         if should_hide_entity_by_default(self._entity_name):
-            # EntityCategory members are mistyped as plain `str` in some
-            # older homeassistant-stubs snapshots; not a real type error.
-            self._attr_entity_category = (
-                EntityCategory.DIAGNOSTIC  # type: ignore[assignment]
-            )
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def native_value(self) -> StateType | int | float | bool | str | None:

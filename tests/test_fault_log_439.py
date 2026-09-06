@@ -80,7 +80,9 @@ class TestFaultLogEndToEndDecode:
     """
 
     @staticmethod
-    def _extract(message_hex: str, offset_nibbles: int, length_nibbles: int, decode_type: str):
+    def _extract(
+        message_hex: str, offset_nibbles: int, length_nibbles: int, decode_type: str
+    ):
         byte_offset = offset_nibbles // 2
         byte_length = (length_nibbles + 1) // 2
         raw = bytes.fromhex(message_hex)[byte_offset : byte_offset + byte_length]

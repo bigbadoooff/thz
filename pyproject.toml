@@ -27,7 +27,7 @@ ignore = [
 convention = "google"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 files = ["custom_components/thz"]
 warn_return_any = true
 warn_unused_ignores = true

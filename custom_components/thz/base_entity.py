@@ -167,9 +167,7 @@ class THZBaseEntity(Entity):
         # Advanced/technician-mode parameters (also hidden by default above)
         # are configuration values from the user's point of view.
         if should_hide_entity_by_default(name):
-            # EntityCategory members are mistyped as plain `str` in some
-            # older homeassistant-stubs snapshots; not a real type error.
-            self._attr_entity_category = EntityCategory.CONFIG  # type: ignore[assignment]
+            self._attr_entity_category = EntityCategory.CONFIG
 
         _LOGGER.debug(
             "Entity %s: entity_registry_enabled_default=%s (hide=%s, visibility=%s)",

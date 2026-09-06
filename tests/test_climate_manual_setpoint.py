@@ -68,8 +68,7 @@ def _mock_read_setpoint(values: dict):
 
 class TestManualCandidateOnlyForDhw:
     def test_hc1_style_entity_never_gets_manual_candidate(self):
-        """HC1/HC2 setup never passes manual_setpoint_entry -- confirm the
-        entity simply has none, rather than accidentally inventing one."""
+        """HC1/HC2 never pass manual_setpoint_entry; confirm none is invented."""
         entity = _make_dhw_entity(night_setpoint_entry=_NIGHT_ENTRY)
         assert entity._manual_setpoint_entry is None
 
@@ -135,8 +134,7 @@ class TestThreeCandidateMatching:
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_multiple_registers_coincide(self):
-        """Two registers happen to report the same value -- stay ambiguous,
-        don't guess."""
+        """Two registers report the same value -- stay ambiguous, don't guess."""
         entity = _make_dhw_entity(
             night_setpoint_entry=_NIGHT_ENTRY, manual_setpoint_entry=_MANUAL_ENTRY
         )
@@ -157,8 +155,7 @@ class TestThreeCandidateMatching:
 
     @pytest.mark.asyncio
     async def test_single_candidate_skips_matching_entirely(self):
-        """Only the day register configured -- no read probes at all,
-        exactly like before day/night support existed."""
+        """Only day register configured -- no read probes needed at all."""
         entity = _make_dhw_entity()
         entity._async_read_setpoint = AsyncMock()
         entity._device.async_execute = AsyncMock(return_value=None)
