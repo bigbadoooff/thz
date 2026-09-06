@@ -56,6 +56,9 @@ class THZButton(THZBaseEntity, ButtonEntity):
         device: THZDevice,
         device_id: str,
         scan_interval: int | None = None,
+        entity_id_style: str = "default",
+        entity_visibility: str = "default",
+        entity_id_prefix: str | None = None,
     ) -> None:
         """Initialize a THZ button entity.
 
@@ -65,6 +68,10 @@ class THZButton(THZBaseEntity, ButtonEntity):
             device: The device instance this button communicates with.
             device_id: The device identifier for registry linking.
             scan_interval: Not used for buttons; accepted for API compatibility.
+            entity_id_style: "default" or "fhem" (see base_entity.py).
+            entity_visibility: "default"/"extended"/"all" (see base_entity.py).
+            entity_id_prefix: Optional device alias prefix for "fhem"-style
+                entity_ids (see base_entity.py).
         """
         super().__init__(
             name=name,
@@ -74,6 +81,10 @@ class THZButton(THZBaseEntity, ButtonEntity):
             icon=entry.get("icon") or "mdi:gesture-tap-button",
             scan_interval=scan_interval,
             translation_key=get_translation_key(name),
+            entity_id_style=entity_id_style,
+            entity_visibility=entity_visibility,
+            entity_id_prefix=entity_id_prefix,
+            domain="button",
         )
 
     async def async_added_to_hass(self) -> None:

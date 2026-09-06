@@ -32,8 +32,15 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._typing_compat import get_runtime_data
-from .const import DOMAIN, should_hide_entity_by_default
+from .const import (
+    DOMAIN,
+    ENTITY_ID_STYLE_DEFAULT,
+    ENTITY_VISIBILITY_DEFAULT,
+    should_hide_entity,
+    should_hide_entity_by_default,
+)
 from .cop_sensor import async_setup_cop_sensors
+from .entity_id_style import resolve_suggested_object_id
 from .register_maps.register_map_manager import RegisterMapManager
 from .value_codec import decode_raw_value
 
@@ -71,6 +78,9 @@ async def async_setup_entry(
     coordinators = entry_data["coordinators"]
     device_id = entry_data["device_id"]
     unsupported_blocks: set[str] = entry_data.get("unsupported_blocks", set())
+    entity_id_style = entry_data.get("entity_id_style", ENTITY_ID_STYLE_DEFAULT)
+    entity_visibility = entry_data.get("entity_visibility", ENTITY_VISIBILITY_DEFAULT)
+    entity_id_prefix = entry_data.get("entity_id_prefix")
 
     # Create sensors
     sensors = []
@@ -155,7 +165,13 @@ async def async_setup_entry(
             }
             sensors.append(
                 THZGenericSensor(
-                    coordinator, entry=entry, block=block_bytes, device_id=device_id
+                    coordinator,
+                    entry=entry,
+                    block=block_bytes,
+                    device_id=device_id,
+                    entity_id_style=entity_id_style,
+                    entity_visibility=entity_visibility,
+                    entity_id_prefix=entity_id_prefix,
                 )
             )
     async_add_entities(sensors, True)
@@ -262,7 +278,16 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         no translation is available.
     """
 
-    def __init__(self, coordinator, entry, block, device_id) -> None:
+    def __init__(
+        self,
+        coordinator,
+        entry,
+        block,
+        device_id,
+        entity_id_style=ENTITY_ID_STYLE_DEFAULT,
+        entity_visibility=ENTITY_VISIBILITY_DEFAULT,
+        entity_id_prefix=None,
+    ) -> None:
         """Initialize a sensor instance with the provided configuration.
 
         Args:
@@ -270,6 +295,11 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             entry: The configuration entry dict for the sensor.
             block: The block associated with the sensor.
             device_id: The unique device identifier.
+            entity_id_style: "default" or "fhem" (see entity_id_style.py).
+            entity_visibility: "default"/"extended"/"all" (see const.py's
+                should_hide_entity()).
+            entity_id_prefix: Optional device alias prefix for "fhem"-style
+                entity_ids (see entity_id_style.py).
 
         Note:
             When translation_key is available, only _attr_translation_key is set.
@@ -311,8 +341,21 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         # See base_entity.py for rationale on avoiding @property overrides
         # for entity_registry_enabled_default.
         self._attr_entity_registry_enabled_default = (
-            not should_hide_entity_by_default(self._entity_name)
+            not should_hide_entity(self._entity_name, entity_visibility)
         )
+
+        # Entity-ID naming style: independent of translation_key/unique_id.
+        # NOTE: Home Assistant has no "_attr_suggested_object_id" hook --
+        # Entity.suggested_object_id is a read-only @property, never backed by
+        # an "_attr_*" instance attribute. Setting self.entity_id directly
+        # (before this entity is added to hass) is the actually-supported way
+        # to seed a custom initial object_id -- see base_entity.py's
+        # THZBaseEntity.__init__ for the full explanation.
+        suggested_object_id = resolve_suggested_object_id(
+            self._entity_name, entity_id_style, device_prefix=entity_id_prefix
+        )
+        if suggested_object_id:
+            self.entity_id = f"sensor.{suggested_object_id}"
 
         # Advanced/technician-mode sensors (also hidden by default above)
         # are diagnostic information rather than primary readings.

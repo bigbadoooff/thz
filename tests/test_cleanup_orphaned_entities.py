@@ -4,9 +4,10 @@ Regression coverage for a real-world bug: an entity registry row survives
 "Delete integration" -> re-add cycles because Home Assistant leaves its
 config_entry_id pointing at the now-deleted entry's id instead of nulling it
 out. The original cleanup only checked for config_entry_id is None, so it
-never caught this -- the stale row (including its unique_id) got silently
-reattached on every subsequent setup instead of a fresh row being created
-for the new config entry.
+never caught this -- the stale row (and its unique_id) got silently
+reattached on every subsequent setup, permanently freezing that entity's
+entity_id to whatever it was the very first time it was ever created,
+regardless of any later entity_id_style/alias changes.
 """
 from unittest.mock import MagicMock, patch
 

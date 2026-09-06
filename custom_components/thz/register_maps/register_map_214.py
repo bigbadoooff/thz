@@ -93,12 +93,21 @@ REGISTER_MAP = {
         (" solarPump: ", 44, 1, "bit2", 1, {"icon": "mdi:weather-sunny", "translation_key": "solar_pump"}),
         (" compressor: ", 44, 1, "bit0", 1, {"icon": "mdi:engine", "translation_key": "compressor"}),
         (" boosterStage2: ", 44, 1, "bit3", 1, {"translation_key": "booster_stage_2"}),
+        # boosterStage3: nibble 44 is fully claimed by compressor/solarPump/
+        # boosterStage1-2 on firmware 2.14 -- FHEM's own FBglob214 table has
+        # the same "n.a." placeholder, with no bit ever assigned. Matches a
+        # known upstream limitation, not a bug in this port.
         (" boosterStage3: ", 44, 1, "n.a.", 1, {"translation_key": "booster_stage_3"}),
         (" boosterStage1: ", 44, 1, "bit1", 1, {"translation_key": "booster_stage_1"}),
         (" highPressureSensor: ", 54, 1, "bit3", 1, {"translation_key": "high_pressure_sensor"}),
         (" lowPressureSensor: ", 54, 1, "bit2", 1, {"translation_key": "low_pressure_sensor"}),
         (" evaporatorIceMonitor: ", 55, 1, "bit3", 1, {"translation_key": "evaporator_ice_monitor"}),
         (" signalAnode: ", 54, 1, "bit1", 1, {"translation_key": "signal_anode"}),
+        # evuRelease / STB: nibble 48 was repurposed on firmware 2.14 to carry
+        # outputVentilatorPower as a 2-nibble value instead of individual
+        # flag bits (see below). FHEM's own FBglob214 table marks both as
+        # "n.a." for exactly this reason -- matching a known upstream
+        # limitation, not a bug in this port.
         (" evuRelease: ", 48, 1, "n.a.", 1, {"translation_key": "evu_release"}),
         (" ovenFireplace: ", 54, 1, "bit0", 1, {"translation_key": "oven_fireplace"}),
         (" STB: ", 48, 1, "n.a.", 1, {"translation_key": "stb"}),

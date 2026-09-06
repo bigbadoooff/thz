@@ -18,6 +18,9 @@ from homeassistant.helpers import area_registry as ar
 
 from .const import (
     CONF_CONNECTION_TYPE,
+    CONF_ENABLE_HC2,
+    CONF_ENTITY_ID_STYLE,
+    CONF_ENTITY_VISIBILITY,
     CONF_FIRMWARE_OVERRIDE,
     CONNECTION_IP,
     CONNECTION_USB,
@@ -26,6 +29,10 @@ from .const import (
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_WRITE_INTERVAL,
     DOMAIN,
+    ENTITY_ID_STYLE_DEFAULT,
+    ENTITY_ID_STYLE_LABELS,
+    ENTITY_VISIBILITY_DEFAULT,
+    ENTITY_VISIBILITY_LABELS,
     FIRMWARE_OVERRIDE_AUTO,
     FIRMWARE_PROFILE_LABELS,
     WRITE_GROUP_LABELS,
@@ -56,10 +63,22 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.connection_data: dict[str, Any] = {}
         self.blocks: list[Any] = []
         self.write_groups_available: list[str] = []
+        self.entity_id_style = ENTITY_ID_STYLE_DEFAULT
+        self.entity_visibility = ENTITY_VISIBILITY_DEFAULT
+        self.enable_hc2 = False
+        self.alias = ""
 
     async def async_step_user(self, user_input=None) -> ConfigFlowResult:
-        """First step, select connection type."""
+        """First step, select connection type and entity naming style."""
         if user_input is not None:
+            self.entity_id_style = user_input.get(
+                CONF_ENTITY_ID_STYLE, ENTITY_ID_STYLE_DEFAULT
+            )
+            self.entity_visibility = user_input.get(
+                CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT
+            )
+            self.enable_hc2 = user_input.get(CONF_ENABLE_HC2, False)
+            self.alias = user_input.get("alias", "").strip()
             if user_input["connection_type"] == CONNECTION_IP:
                 return await self.async_step_setup_ip()
             return await self.async_step_setup_usb()
@@ -72,6 +91,33 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONNECTION_USB: "USB / Serial",
                     }
                 ),
+                # Optional short device name/alias (e.g. "lwz"). Shown as the
+                # device name in HA, and -- when entity_id_style is "fhem" --
+                # prepended to every entity's technical entity_id (e.g.
+                # "lwz_p99start_unsched_vent") so it stays short and
+                # recognisable instead of falling back to a generic default.
+                vol.Optional("alias", default=""): str,
+                # Entity ID naming style, asked up front since it applies to
+                # every entity created during this setup. "fhem" only
+                # changes entity_id (via suggested_object_id) for newly
+                # created entities -- it never touches the displayed name.
+                vol.Optional(
+                    CONF_ENTITY_ID_STYLE, default=ENTITY_ID_STYLE_DEFAULT
+                ): vol.In(ENTITY_ID_STYLE_LABELS),
+                # Entity visibility tier: which less-common entities (HC2,
+                # schedules, advanced technical parameters) start enabled.
+                # "default" hides all of them (matching prior behavior),
+                # "extended" enables everything except schedules, "all"
+                # enables everything. Can be changed later via Reconfigure,
+                # which retroactively bulk enables/disables existing entities.
+                vol.Optional(
+                    CONF_ENTITY_VISIBILITY, default=ENTITY_VISIBILITY_DEFAULT
+                ): vol.In(ENTITY_VISIBILITY_LABELS),
+                # Heating Circuit 2 entities: independent of the tier above,
+                # since most installs only have one heating circuit. Off by
+                # default; can be changed later via Reconfigure, which
+                # retroactively bulk enables/disables existing entities.
+                vol.Optional(CONF_ENABLE_HC2, default=False): bool,
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema)
@@ -298,6 +344,34 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             CONF_FIRMWARE_OVERRIDE,
             default=defaults.get(CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO),
         )] = vol.In(FIRMWARE_PROFILE_LABELS)
+
+        # Entity ID naming style: purely cosmetic, does not affect device
+        # communication. "fhem" only changes HA's suggested_object_id for a
+        # BRAND NEW entity -- it has no effect on entities that already
+        # exist in the registry (their entity_id stays whatever it already
+        # is). Only newly-added blocks/entities, or ones removed and
+        # recreated, pick up the new style after switching this here.
+        schema_dict[vol.Optional(
+            CONF_ENTITY_ID_STYLE,
+            default=defaults.get(CONF_ENTITY_ID_STYLE, ENTITY_ID_STYLE_DEFAULT),
+        )] = vol.In(ENTITY_ID_STYLE_LABELS)
+
+        # Entity visibility tier: unlike entity_id_style, changing this HERE
+        # retroactively bulk enables/disables entities already in the
+        # registry (see _async_apply_entity_visibility_tier in __init__.py),
+        # not just newly-created ones.
+        schema_dict[vol.Optional(
+            CONF_ENTITY_VISIBILITY,
+            default=defaults.get(CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT),
+        )] = vol.In(ENTITY_VISIBILITY_LABELS)
+
+        # Heating Circuit 2 entities: independent of the tier above. Like
+        # entity_visibility, changing this retroactively bulk enables/
+        # disables entities already in the registry.
+        schema_dict[vol.Optional(
+            CONF_ENABLE_HC2,
+            default=defaults.get(CONF_ENABLE_HC2, False),
+        )] = bool
 
         # Refresh intervals for each block
         refresh_intervals = defaults.get("refresh_intervals", {})
@@ -642,6 +716,14 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "refresh_intervals": refresh_intervals,
                 "write_interval": write_interval,
                 CONF_FIRMWARE_OVERRIDE: firmware_override,
+                CONF_ENTITY_ID_STYLE: getattr(
+                    self, "entity_id_style", ENTITY_ID_STYLE_DEFAULT
+                ),
+                CONF_ENTITY_VISIBILITY: getattr(
+                    self, "entity_visibility", ENTITY_VISIBILITY_DEFAULT
+                ),
+                CONF_ENABLE_HC2: getattr(self, "enable_hc2", False),
+                "alias": getattr(self, "alias", ""),
             }
             conn_target = data.get("host") or data.get("device")
             title = f"THZ ({data['connection_type']}: {conn_target})"

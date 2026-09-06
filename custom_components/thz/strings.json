@@ -5,7 +5,8 @@
         "title": "Select Connection Type",
         "description": "Select how to connect to your THZ device",
         "data": {
-          "connection_type": "Connection Type"
+          "connection_type": "Connection Type",
+          "enable_hc2": "Enable HC2 entities"
         }
       },
       "reconfigure": {
@@ -140,7 +141,8 @@
           "refresh_pxx0A0648": "Poll interval: Cooling HC Total (s)",
           "refresh_pxx0B0264": "Poll interval: Dew Point HC1 (s)",
           "refresh_pxx0C0264": "Poll interval: Dew Point HC2 (s)",
-          "refresh_pxx0C0011": "Poll interval: Inside temperature HC2 (Room controller) (s)"
+          "refresh_pxx0C0011": "Poll interval: Inside temperature HC2 (Room controller) (s)",
+          "enable_hc2": "Enable HC2 entities"
         }
       },
       "setup_ip": {

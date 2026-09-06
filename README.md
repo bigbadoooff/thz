@@ -88,11 +88,19 @@ data:
 
 To provide a cleaner initial setup experience, the following entity types are hidden by default:
 
-- **HC2 (Heating Circuit 2) entities**: Only needed if you have a second heating circuit installed
-- **Time plan/programme entities**: Advanced schedule configuration entities (`programDHW_*`, `programHC1_*`, `programHC2_*`)
+- **Time plan/programme entities**: Advanced schedule configuration entities (`programDHW_*`, `programHC1_*`)
 - **Advanced technical parameters**: Parameters like gradient, hysteresis, integral components (typically p13 and higher)
+- **HC2 (Heating Circuit 2) entities**: Only needed if you have a second heating circuit installed, including HC2's own schedule entities (`programHC2_*`). Gated separately from the two categories above (see below).
 
-Hidden entities can be re-enabled via **Settings → Devices & Services → THZ → device → Show disabled entities**.
+Two independent settings control this, both asked during setup and changeable later via **Settings → Devices & Services → THZ → Configure**. Changing either retroactively bulk enables/disables the matching entities already in the registry, not just newly-created ones — any entity you've individually re-enabled or disabled by hand is left alone.
+
+- **Entity visibility** — a three-way tier covering schedules and advanced parameters:
+  - *Default*: hide both.
+  - *Extended*: enable advanced parameters, keep schedules hidden.
+  - *All*: enable both.
+- **Enable HC2 entities** — a separate checkbox, off by default. Independent of the tier above — even the "All" tier leaves HC2 hidden until this is checked, since most installs only have one heating circuit.
+
+Entities can also always be re-enabled individually via **Settings → Devices & Services → THZ → device → Show disabled entities**.
 
 ### COP (Coefficient of Performance) Sensors
 

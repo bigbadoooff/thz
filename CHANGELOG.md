@@ -6,6 +6,34 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **`enable_hc2` config option**: A separate checkbox for showing Heating Circuit 2
+  entities, independent of the `entity_visibility` tier. Previously HC2 entities were
+  lumped into the same "advanced" category as technical parameters, so there was no
+  way to show advanced parameters without also showing HC2 (or vice versa). HC2 now
+  defaults to hidden regardless of tier -- even "All" -- until explicitly enabled.
+
+### Bug Fixes
+
+- **`enable_hc2` not applied on upgrade**: entries that predate the hc2/advanced
+  category split (where HC2 was previously enabled under the "Extended"/"All" tiers)
+  had no recorded HC2 reconciliation state, so the change-detection defaulted the
+  "previous" HC2 state to `False` -- coincidentally matching the checkbox's own
+  default. Explicitly setting "Enable HC2 entities" to off via Reconfigure, with the
+  tier left unchanged, was then wrongly treated as a no-op, leaving already-enabled
+  HC2 entities visible. Now infers the effective prior HC2 state from the
+  previously-applied tier when no HC2 reconciliation has run yet, so this case is
+  correctly detected and reconciled.
+
+- **HC2 schedule entities ignored `enable_hc2`**: entity names matching both the
+  "program" (schedule) and "hc2" keywords -- i.e. HC2's own time-plan entities like
+  `programHC2_Mo_0` -- were classified purely as "schedule", so they were governed
+  only by the `entity_visibility` tier and became visible under "All" regardless of
+  the "Enable HC2 entities" checkbox. HC2 is now matched before "schedule", so any
+  HC2-related entity, program/schedule ones included, is gated purely by
+  `enable_hc2`, independent of the tier.
+
 ## [0.4.3] – 2026-08-04
 
 ### New Features

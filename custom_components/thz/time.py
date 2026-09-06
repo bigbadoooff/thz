@@ -133,7 +133,16 @@ def quarters_to_time(num: int) -> time | None:
 
 
 
-def _create_time_entities(name, entry, device, device_id, write_interval):
+def _create_time_entities(
+    name,
+    entry,
+    device,
+    device_id,
+    write_interval,
+    entity_id_style="default",
+    entity_visibility="default",
+    entity_id_prefix=None,
+):
     """Factory function to create time entities, handling schedule types specially."""
     if entry["type"] == "schedule":
         # Create both start and end time entities for schedule type
@@ -147,6 +156,9 @@ def _create_time_entities(name, entry, device, device_id, write_interval):
                 device_id=device_id,
                 time_type="start",
                 scan_interval=write_interval,
+                entity_id_style=entity_id_style,
+                entity_visibility=entity_visibility,
+                entity_id_prefix=entity_id_prefix,
             ),
             THZScheduleTime(
                 name=f"{name} End",
@@ -156,6 +168,9 @@ def _create_time_entities(name, entry, device, device_id, write_interval):
                 device_id=device_id,
                 time_type="end",
                 scan_interval=write_interval,
+                entity_id_style=entity_id_style,
+                entity_visibility=entity_visibility,
+                entity_id_prefix=entity_id_prefix,
             ),
         ]
     else:
@@ -166,6 +181,9 @@ def _create_time_entities(name, entry, device, device_id, write_interval):
             device=device,
             device_id=device_id,
             scan_interval=write_interval,
+            entity_id_style=entity_id_style,
+            entity_visibility=entity_visibility,
+            entity_id_prefix=entity_id_prefix,
         )
 
 
@@ -180,6 +198,9 @@ async def async_setup_entry(
     write_manager: RegisterMapManagerWrite = entry_data["write_manager"]
     device: THZDevice = entry_data["device"]
     device_id = entry_data["device_id"]
+    entity_id_style = entry_data.get("entity_id_style", "default")
+    entity_visibility = entry_data.get("entity_visibility", "default")
+    entity_id_prefix = entry_data.get("entity_id_prefix")
 
     from .const import DEFAULT_UPDATE_INTERVAL
     write_interval = config_entry.data.get("write_interval", DEFAULT_UPDATE_INTERVAL)
@@ -195,7 +216,14 @@ async def async_setup_entry(
                 name, entry["type"], entry["command"]
             )
             new_entities = _create_time_entities(
-                name, entry, device, device_id, write_interval
+                name,
+                entry,
+                device,
+                device_id,
+                write_interval,
+                entity_id_style,
+                entity_visibility,
+                entity_id_prefix,
             )
             entities.extend(
                 new_entities if isinstance(new_entities, list) else [new_entities]
@@ -216,7 +244,10 @@ class THZTime(THZBaseEntity, TimeEntity):
         entry: dict,
         device: THZDevice,
         device_id: str,
-        scan_interval: int | None = None
+        scan_interval: int | None = None,
+        entity_id_style: str = "default",
+        entity_visibility: str = "default",
+        entity_id_prefix: str | None = None,
     ) -> None:
         """Initialize a THZ time entity.
 
@@ -226,6 +257,10 @@ class THZTime(THZBaseEntity, TimeEntity):
             device: THZ device instance.
             device_id: The device identifier for linking to device.
             scan_interval: The scan interval in seconds for polling updates.
+            entity_id_style: "default" or "fhem" (see base_entity.py).
+            entity_visibility: "default"/"extended"/"all" (see base_entity.py).
+            entity_id_prefix: Optional device alias prefix for "fhem"-style
+                entity_ids (see base_entity.py).
         """
         # Initialize base class with common properties
         super().__init__(
@@ -236,6 +271,10 @@ class THZTime(THZBaseEntity, TimeEntity):
             icon=entry.get("icon", "mdi:clock"),
             scan_interval=scan_interval,
             translation_key=get_translation_key(name),
+            entity_id_style=entity_id_style,
+            entity_visibility=entity_visibility,
+            entity_id_prefix=entity_id_prefix,
+            domain="time",
         )
 
         # Explicitly enable has_entity_name for time entities
@@ -312,7 +351,10 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         device: THZDevice,
         device_id: str,
         time_type: str,
-        scan_interval: int | None = None
+        scan_interval: int | None = None,
+        entity_id_style: str = "default",
+        entity_visibility: str = "default",
+        entity_id_prefix: str | None = None,
     ) -> None:
         """Initialize a THZ schedule time entity.
 
@@ -327,6 +369,13 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             device_id: The device identifier for linking to device.
             time_type: Either "start" or "end".
             scan_interval: The scan interval in seconds for polling updates.
+            entity_id_style: "default" or "fhem" (see base_entity.py). Applied
+                using the full ``name`` (already including the " Start"/" End"
+                suffix), so the FHEM-style entity_id naturally ends in
+                "_start"/"_end" too.
+            entity_visibility: "default"/"extended"/"all" (see base_entity.py).
+            entity_id_prefix: Optional device alias prefix for "fhem"-style
+                entity_ids (see base_entity.py).
 
         Example:
             For base_name="programHC1_Mo_0" and time_type="start", the translation key
@@ -349,6 +398,10 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             icon=entry.get("icon", "mdi:calendar-clock"),
             scan_interval=scan_interval,
             translation_key=translation_key,
+            entity_id_style=entity_id_style,
+            entity_visibility=entity_visibility,
+            entity_id_prefix=entity_id_prefix,
+            domain="time",
         )
 
         # Explicitly enable has_entity_name for time entities

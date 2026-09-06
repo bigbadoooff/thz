@@ -291,6 +291,14 @@ REGISTER_MAP = {
         (" diverterValve: ", 45, 1, "bit2", 1, {"icon": "mdi:valve", "translation_key": "diverter_valve"}),
         (" dhwPump: ", 45, 1, "bit1", 1, {"icon": "mdi:pump", "translation_key": "dhw_pump"}),
         (" heatingCircuitPump: ", 45, 1, "bit0", 1, {"icon": "mdi:pump", "translation_key": "heating_circuit_pump"}),
+        # solarPump: nibble 44 is fully claimed by compressor/boosterStage1-3
+        # below on firmware 2.06 -- FHEM's own FBglob206 table has the exact
+        # same "n.a" placeholder (note: no trailing dot, unlike the "n.a."
+        # used elsewhere -- a pre-existing typo in FHEM's own source, kept
+        # here for fidelity) here too, with no bit ever assigned. This is
+        # matching a known upstream limitation, not a bug in this port --
+        # there is no correct bit number to substitute without new
+        # hardware reverse-engineering.
         (" solarPump: ", 44, 1, "n.a", 1, {"icon": "mdi:weather-sunny", "translation_key": "solar_pump"}),
         (" compressor: ", 44, 1, "bit0", 1, {"icon": "mdi:engine", "translation_key": "compressor"}),
         (" boosterStage3: ", 44, 1, "bit3", 1, {"translation_key": "booster_stage_3"}),
@@ -300,6 +308,11 @@ REGISTER_MAP = {
         (" lowPressureSensor: ", 54, 1, "bit2", 1, {"translation_key": "low_pressure_sensor"}),
         (" evaporatorIceMonitor: ", 55, 1, "bit3", 1, {"translation_key": "evaporator_ice_monitor"}),
         (" signalAnode: ", 54, 1, "bit1", 1, {"translation_key": "signal_anode"}),
+        # evuRelease / STB: nibble 48 was repurposed on firmware 2.06 to carry
+        # outputVentilatorPower as a 2-nibble value instead of individual
+        # flag bits (see below). FHEM's own FBglob206 table marks both as
+        # "n.a." for exactly this reason -- matching a known upstream
+        # limitation, not a bug in this port.
         (" evuRelease: ", 48, 1, "n.a.", 1, {"translation_key": "evu_release"}),
         (" ovenFireplace: ", 54, 1, "bit0", 1, {"translation_key": "oven_fireplace"}),
         (" STB: ", 48, 1, "n.a.", 1, {"translation_key": "stb"}),

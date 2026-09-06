@@ -16,7 +16,14 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_time_interval
 
-from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, should_hide_entity_by_default
+from .const import (
+    DEFAULT_UPDATE_INTERVAL,
+    DOMAIN,
+    ENTITY_ID_STYLE_DEFAULT,
+    ENTITY_VISIBILITY_DEFAULT,
+    should_hide_entity,
+)
+from .entity_id_style import resolve_suggested_object_id
 
 if TYPE_CHECKING:
     from .thz_device import THZDevice
@@ -43,6 +50,10 @@ class THZBaseEntity(Entity):
         unique_id: str | None = None,
         scan_interval: int | None = None,
         translation_key: str | None = None,
+        entity_id_style: str = ENTITY_ID_STYLE_DEFAULT,
+        entity_visibility: str = ENTITY_VISIBILITY_DEFAULT,
+        entity_id_prefix: str | None = None,
+        domain: str | None = None,
     ) -> None:
         """Initialize base THZ entity.
 
@@ -58,6 +69,23 @@ class THZBaseEntity(Entity):
             scan_interval: Update interval in seconds (uses DEFAULT_UPDATE_INTERVAL if
                 not provided).
             translation_key: Optional translation key for localization.
+            entity_id_style: One of the ``ENTITY_ID_STYLE_*`` values from
+                const.py. "fhem" sets ``self.entity_id`` directly from the
+                raw ``name`` so a brand-new entity's entity_id reads like the
+                FHEM/Stiebel field name; the displayed name and unique_id are
+                unaffected either way. See entity_id_style.py.
+            entity_visibility: One of the ``ENTITY_VISIBILITY_*`` values from
+                const.py, controlling whether this entity starts out enabled
+                or disabled in the entity registry. See should_hide_entity().
+            entity_id_prefix: Optional device name/alias (e.g. "lwz") to
+                prepend to the FHEM-style entity_id, e.g.
+                "lwz_p99start_unsched_vent". Only used when entity_id_style
+                is "fhem"; ignored otherwise. See resolve_suggested_object_id().
+            domain: The HA entity platform domain this entity belongs to
+                (e.g. "number", "switch"). Required for entity_id_style
+                "fhem" to take effect -- see the ``self.entity_id`` note
+                below. Each concrete subclass hardcodes its own domain when
+                calling super().__init__().
         """
         self._command = command
         self._device = device
@@ -91,6 +119,26 @@ class THZBaseEntity(Entity):
             unique_id or self._generate_unique_id(command, name)
         )
 
+        # Entity-ID naming style: independent of unique_id/translation_key
+        # (see resolve_suggested_object_id's docstring for details). Only
+        # takes effect the first time HA creates this entity.
+        #
+        # IMPORTANT: Home Assistant's Entity class has no "_attr_suggested_object_id"
+        # hook -- Entity.suggested_object_id is a read-only @property computed from
+        # self.name/translations, and never reads any "_attr_*" instance attribute.
+        # Setting one (as this code used to do) is a silent no-op: HA falls straight
+        # through to its own has_entity_name/device-name/area-based naming instead.
+        #
+        # The actually-supported mechanism (see entity_platform.py's
+        # EntityPlatform._async_add_entity) is to set self.entity_id directly
+        # *before* the entity is added to hass: if entity.entity_id is already set,
+        # HA uses it verbatim as the suggested object_id instead of deriving one.
+        suggested_object_id = resolve_suggested_object_id(
+            name, entity_id_style, device_prefix=entity_id_prefix
+        )
+        if suggested_object_id and domain:
+            self.entity_id = f"{domain}.{suggested_object_id}"
+
         # Debug log entity attributes
         _LOGGER.debug(
             "Entity %s initialized: has_entity_name=%s, name=%s, translation_key=%s",
@@ -106,12 +154,13 @@ class THZBaseEntity(Entity):
         self._update_interval = timedelta(seconds=interval)
         self._unsub_update: Callable[[], None] | None = None
 
-        # Set default visibility based on entity naming conventions
+        # Set default visibility based on entity naming conventions and the
+        # configured entity_visibility tier.
         # Uses HA's standard _attr_ pattern – do NOT add an explicit @property
         # override; it conflicts with HA's __init_subclass__ CachedProperty
         # mechanism and can silently default to True on derived entity classes.
-        self._attr_entity_registry_enabled_default = not should_hide_entity_by_default(
-            name
+        self._attr_entity_registry_enabled_default = not should_hide_entity(
+            name, entity_visibility
         )
 
         # Advanced/technician-mode parameters (also hidden by default above)
@@ -122,10 +171,11 @@ class THZBaseEntity(Entity):
             self._attr_entity_category = EntityCategory.CONFIG  # type: ignore[assignment]
 
         _LOGGER.debug(
-            "Entity %s: entity_registry_enabled_default=%s (hide=%s)",
+            "Entity %s: entity_registry_enabled_default=%s (hide=%s, visibility=%s)",
             name,
             self._attr_entity_registry_enabled_default,
-            should_hide_entity_by_default(name),
+            should_hide_entity(name, entity_visibility),
+            entity_visibility,
         )
 
     def _generate_unique_id(self, command: str, name: str) -> str:
