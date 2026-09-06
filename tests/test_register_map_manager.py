@@ -43,13 +43,31 @@ class TestFirmwareMaps:
         assert "readings_map_439" in config["read"]
 
     def test_539_firmware_config(self):
-        """Test default firmware configuration (539-like)."""
-        assert "default" in FIRMWARE_MAPS
-        config = FIRMWARE_MAPS["default"]
+        """Test explicit 539 firmware configuration (539-like)."""
+        assert "539" in FIRMWARE_MAPS
+        config = FIRMWARE_MAPS["539"]
         assert "write" in config
         assert "read" in config
         assert "write_map_539" in config["write"]
         assert "readings_map_539" in config["read"]
+
+    def test_default_firmware_config_is_439_like(self):
+        """Unrecognized firmware strings must fall back to 4.39-like maps.
+
+        Mirrors the reference FHEM 00_THZ.pm module, which treats any
+        unrecognized ``firmware`` attribute as 4.39 (see docs/legacy/00_THZ.pm,
+        "in all other cases I assume $attrVal eq '4.39'"). Falling back to
+        5.39-like maps instead pulls in register offsets/fields that don't
+        exist on 4.3x devices (e.g. firmware "438" on an LWZ 403).
+        """
+        assert "default" in FIRMWARE_MAPS
+        config = FIRMWARE_MAPS["default"]
+        assert "write" in config
+        assert "read" in config
+        assert "write_map_439" in config["write"]
+        assert "readings_map_439" in config["read"]
+        assert "write_map_539" not in config["write"]
+        assert "readings_map_539" not in config["read"]
 
     def test_technician_mode_configs(self):
         """Test technician mode firmware configurations."""
@@ -205,6 +223,18 @@ class TestBaseRegisterMapManager:
         # Should return default maps
         assert isinstance(write_maps, list)
         assert isinstance(read_maps, list)
+
+    def test_unrecognized_43x_firmware_uses_439_maps(self):
+        """Regression test: firmware "438" (LWZ 403, off-by-a-point-release
+        from the "439" entry) must load 439-style maps, not 539-style ones.
+        """
+        manager = RegisterMapManager("438")
+        assert "readings_map_439" in manager.readings_map_names
+        assert "readings_map_539" not in manager.readings_map_names
+
+        write_manager = RegisterMapManagerWrite("438")
+        assert "write_map_439" in write_manager.write_map_names
+        assert "write_map_539" not in write_manager.write_map_names
 
     def test_non_cooling_539_keeps_non_cooling_read_blocks(self):
         """Test non-cooling 5.39 keeps shared blocks and removes cooling-only ones."""
