@@ -124,7 +124,9 @@ class TestAsyncSetupEntry:
             result = await thz_module.async_setup_entry(hass, entry)
 
         assert result is True
-        mock_cls.assert_called_once_with(connection="usb", port="/dev/ttyUSB0")
+        mock_cls.assert_called_once_with(
+            connection="usb", port="/dev/ttyUSB0", firmware_override="auto"
+        )
         stored = entry.runtime_data
         assert stored["device"] is device
         assert "pxxFB" in stored["coordinators"]
@@ -145,7 +147,7 @@ class TestAsyncSetupEntry:
 
         assert result is True
         mock_cls.assert_called_once_with(
-            connection="ip", host="10.0.0.5", tcp_port=2323
+            connection="ip", host="10.0.0.5", tcp_port=2323, firmware_override="auto"
         )
 
     @pytest.mark.asyncio
