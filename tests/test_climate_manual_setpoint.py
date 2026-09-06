@@ -82,7 +82,7 @@ class TestThreeCandidateMatching:
         )
         values = {id(_DAY_ENTRY): 21.0, id(_NIGHT_ENTRY): 18.0, id(_MANUAL_ENTRY): 45.0}
         entity._async_read_setpoint = _mock_read_setpoint(values)
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         with patch.object(
@@ -91,8 +91,8 @@ class TestThreeCandidateMatching:
             mock_target_temp.return_value = 45.0  # matches manual only
             await entity._async_write_heat_setpoint(50.0)
 
-        write_call = entity.hass.async_add_executor_job.call_args
-        assert write_call[0][1] == bytes.fromhex(_MANUAL_ENTRY["command"])
+        write_call = entity._device.async_execute.call_args
+        assert write_call[0][2] == bytes.fromhex(_MANUAL_ENTRY["command"])
 
     @pytest.mark.asyncio
     async def test_writes_day_register_when_day_is_active(self):
@@ -101,7 +101,7 @@ class TestThreeCandidateMatching:
         )
         values = {id(_DAY_ENTRY): 21.0, id(_NIGHT_ENTRY): 18.0, id(_MANUAL_ENTRY): 45.0}
         entity._async_read_setpoint = _mock_read_setpoint(values)
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         with patch.object(
@@ -110,8 +110,8 @@ class TestThreeCandidateMatching:
             mock_target_temp.return_value = 21.0
             await entity._async_write_heat_setpoint(22.0)
 
-        write_call = entity.hass.async_add_executor_job.call_args
-        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY["command"])
+        write_call = entity._device.async_execute.call_args
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_zero_matches(self):
@@ -121,7 +121,7 @@ class TestThreeCandidateMatching:
         )
         values = {id(_DAY_ENTRY): 21.0, id(_NIGHT_ENTRY): 18.0, id(_MANUAL_ENTRY): 45.0}
         entity._async_read_setpoint = _mock_read_setpoint(values)
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         with patch.object(
@@ -130,8 +130,8 @@ class TestThreeCandidateMatching:
             mock_target_temp.return_value = 30.0  # matches none of the three
             await entity._async_write_heat_setpoint(31.0)
 
-        write_call = entity.hass.async_add_executor_job.call_args
-        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY["command"])
+        write_call = entity._device.async_execute.call_args
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_multiple_registers_coincide(self):
@@ -143,7 +143,7 @@ class TestThreeCandidateMatching:
         # Night and manual coincidentally both read 21.0, same as day.
         values = {id(_DAY_ENTRY): 21.0, id(_NIGHT_ENTRY): 21.0, id(_MANUAL_ENTRY): 45.0}
         entity._async_read_setpoint = _mock_read_setpoint(values)
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         with patch.object(
@@ -152,8 +152,8 @@ class TestThreeCandidateMatching:
             mock_target_temp.return_value = 21.0
             await entity._async_write_heat_setpoint(22.0)
 
-        write_call = entity.hass.async_add_executor_job.call_args
-        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY["command"])
+        write_call = entity._device.async_execute.call_args
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
 
     @pytest.mark.asyncio
     async def test_single_candidate_skips_matching_entirely(self):
@@ -161,7 +161,7 @@ class TestThreeCandidateMatching:
         exactly like before day/night support existed."""
         entity = _make_dhw_entity()
         entity._async_read_setpoint = AsyncMock()
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         with patch.object(
@@ -171,5 +171,5 @@ class TestThreeCandidateMatching:
             await entity._async_write_heat_setpoint(22.0)
 
         entity._async_read_setpoint.assert_not_called()
-        write_call = entity.hass.async_add_executor_job.call_args
-        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY["command"])
+        write_call = entity._device.async_execute.call_args
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
