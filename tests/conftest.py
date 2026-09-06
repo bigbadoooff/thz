@@ -72,6 +72,8 @@ class MockButtonEntity(MockEntity):
 
 # Mock Home Assistant modules
 sys.modules['homeassistant'] = MagicMock()
+sys.modules['homeassistant.util'] = MagicMock()
+sys.modules['homeassistant.util.dt'] = MagicMock()
 sys.modules['homeassistant.config_entries'] = MagicMock()
 sys.modules['homeassistant.core'] = MagicMock()
 

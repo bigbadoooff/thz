@@ -1,4 +1,4 @@
-"""Init file for THZ integration."""
+﻿"""Init file for THZ integration."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from ._typing_compat import get_runtime_data, set_runtime_data
+from .clock_sync import async_setup_clock_check
 from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, should_hide_entity_by_default
 from .services import async_refresh_block as async_refresh_block
 from .services import async_setup_services
@@ -195,6 +196,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         "unsupported_blocks": unsupported_blocks,
     })
 
+    # Periodic clock-drift check (independent of per-entity polling of the
+    # individual pClock* registers — see clock_sync.py). Always runs so
+    # drift is logged; only writes a correction back to the device when the
+    # "auto_sync_clock" option is enabled.
+    entry_data = get_runtime_data(config_entry)
+    entry_data["unsub_clock_check"] = async_setup_clock_check(
+        hass, config_entry, device, write_manager
+    )
+
     # Forward setup to platforms
     await hass.config_entries.async_forward_entry_setups(
         config_entry,
@@ -368,6 +378,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         # Clean up device connection
         entry_data = get_runtime_data(entry)
         if entry_data:
+            unsub_clock_check = entry_data.get("unsub_clock_check")
+            if unsub_clock_check:
+                unsub_clock_check()
             device = entry_data.get("device")
             if device:
                 await hass.async_add_executor_job(device.close)
@@ -384,6 +397,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, "watch_raw_registers_changes")
             hass.services.async_remove(DOMAIN, "refresh_block")
             hass.services.async_remove(DOMAIN, "set_diverter_valve")
+            hass.services.async_remove(DOMAIN, "backup_parameters")
+            hass.services.async_remove(DOMAIN, "restore_parameters")
+            hass.services.async_remove(DOMAIN, "list_parameter_backups")
 
     return unload_ok
 
