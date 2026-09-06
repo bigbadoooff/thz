@@ -1,3 +1,17 @@
+clear_value:
+  name: Clear Time Value
+  description: >
+    Clear a time or schedule start/end entity back to the device's own
+    "unset" state (equivalent to clearing that same slot from the heat
+    pump's own on-device menu). Home Assistant's built-in time.set_value
+    service cannot do this -- it requires a real time value and has no way
+    to express "no time set" -- so this service writes the device's 0x80
+    "unset" sentinel directly instead.
+  target:
+    entity:
+      domain: time
+      integration: thz
+
 refresh_block:
   name: Refresh Block
   description: >

@@ -34,6 +34,34 @@ All notable changes to the THZ integration are documented here.
   HC2-related entity, program/schedule ones included, is gated purely by
   `enable_hc2`, independent of the tier.
 
+- **Time entities never actually wrote to the device**: `THZTime` and
+  `THZScheduleTime` (schedule Start/End) defined `async_set_native_value`,
+  which is the `NumberEntity`/`SelectEntity` override convention -- not
+  `TimeEntity`'s. `TimeEntity` calls `async_set_value` instead, so every
+  `time.set_value` service call (including from the schedule Lovelace card)
+  silently fell through to the base class's own unimplemented `set_value()`
+  and raised `NotImplementedError` before ever reaching the device, shown
+  to the user as "Failed to perform the action time/set_value. unknown
+  error" on every single write attempt. Renamed both methods to
+  `async_set_value(self, value: time) -> None` and dropped the now-dead
+  manual string-to-time parsing, since HA's own `time.set_value` schema
+  already validates and hands the method a real `datetime.time`.
+- **Test suite could not catch this class of bug**: `tests/conftest.py`'s
+  `MockTimeEntity` stand-in didn't simulate `TimeEntity`'s real
+  "unimplemented base method raises `NotImplementedError`" fallback at all,
+  so a subclass overriding the wrong method name would still "pass" under
+  test. `MockTimeEntity` now mirrors that fallback chain.
+
+### New Features
+
+- **`thz.clear_value` service**: clears a time or schedule Start/End entity
+  back to the device's own "unset" state (the 0x80 sentinel), equivalent to
+  clearing that slot from the heat pump's own on-device menu. Home
+  Assistant's built-in `time.set_value` service has no way to express "no
+  time set" -- its schema requires a real time value -- so this is exposed
+  as a dedicated entity service on the `time` platform instead, targetable
+  at any `time.*` entity from this integration.
+
 ## [0.4.3] – 2026-08-04
 
 ### New Features
