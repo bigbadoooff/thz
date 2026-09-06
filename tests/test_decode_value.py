@@ -272,6 +272,88 @@ class TestDecodeHex2Time:
         assert decode_value(raw, "hex2time") == "06:30"
 
 
+class TestDecodeTurnHex2Time:
+    """Tests for turnhex2time decoding (byte-swapped time → HH:MM string).
+
+    Firmware 4.39/5.39 fault-log times swap the two bytes relative to the
+    plain "hex2time" encoding tested above. Matches FHEM's turnhex2time:
+    swap the two hex-character pairs, then value/100 = hours, value%100 =
+    minutes. Reading the raw bytes little-endian instead of big-endian
+    performs the same swap, so each case here is the byte-reversal of the
+    equivalent TestDecodeHex2Time case.
+    """
+
+    def test_midnight(self):
+        """Test 00:00 (midnight); symmetric under swap."""
+        raw = b'\x00\x00'
+        assert decode_value(raw, "turnhex2time") == "00:00"
+
+    def test_noon(self):
+        """Test 12:00 (noon). Unswapped 1200 = 0x04B0 → swapped bytes b'\\xb0\\x04'."""
+        raw = b'\xb0\x04'
+        assert decode_value(raw, "turnhex2time") == "12:00"
+
+    def test_half_past_twelve(self):
+        """Test 12:30. Unswapped 1230 = 0x04CE → swapped bytes b'\\xce\\x04'."""
+        raw = b'\xce\x04'
+        assert decode_value(raw, "turnhex2time") == "12:30"
+
+    def test_end_of_day(self):
+        """Test 23:45. Unswapped 2345 = 0x0929 → swapped bytes b'\\x29\\x09'."""
+        raw = b'\x29\x09'
+        assert decode_value(raw, "turnhex2time") == "23:45"
+
+    def test_one_minute_past_midnight(self):
+        """Test 00:01. Unswapped 1 = 0x0001 → swapped bytes b'\\x01\\x00'."""
+        raw = b'\x01\x00'
+        assert decode_value(raw, "turnhex2time") == "00:01"
+
+    def test_single_digit_hour(self):
+        """Test 06:30 — hour must be zero-padded. Unswapped 630 = 0x0276 → swapped bytes b'\\x76\\x02'."""
+        raw = b'\x76\x02'
+        assert decode_value(raw, "turnhex2time") == "06:30"
+
+    def test_wrong_length_raises(self):
+        """Test that a non-2-byte input raises ValueError."""
+        with pytest.raises(ValueError, match="turnhex2time"):
+            decode_value(b'\x00', "turnhex2time")
+
+
+class TestDecodeTurnHexDate:
+    """Tests for turnhexdate decoding (byte-swapped date → DD.MM string).
+
+    Firmware 4.39/5.39 fault-log dates swap the two bytes relative to the
+    plain "hexdate" encoding. Matches FHEM's turnhexdate: swap the two
+    hex-character pairs, then value/100 = day, value%100 = month.
+    """
+
+    def test_zero_date(self):
+        """Test 00.00; symmetric under swap."""
+        raw = b'\x00\x00'
+        assert decode_value(raw, "turnhexdate") == "00.00"
+
+    def test_fifth_of_january(self):
+        """Test 05.01. Unswapped 501 = 0x01F5 → swapped bytes b'\\xf5\\x01'."""
+        raw = b'\xf5\x01'
+        assert decode_value(raw, "turnhexdate") == "05.01"
+
+    def test_new_years_eve(self):
+        """Test 31.12. Unswapped 3112 = 0x0C28 → swapped bytes b'\\x28\\x0c'."""
+        raw = b'\x28\x0c'
+        assert decode_value(raw, "turnhexdate") == "31.12"
+
+    def test_single_digit_day_and_month(self):
+        """Test 01.02 — both day and month must be zero-padded."""
+        # Unswapped 102 = 0x0066 → swapped bytes b'\x66\x00'
+        raw = b'\x66\x00'
+        assert decode_value(raw, "turnhexdate") == "01.02"
+
+    def test_wrong_length_raises(self):
+        """Test that a non-2-byte input raises ValueError."""
+        with pytest.raises(ValueError, match="turnhexdate"):
+            decode_value(b'\x00\x00\x00', "turnhexdate")
+
+
 class TestDecodeHex2Error:
     r"""Tests for hex2error decoding (4-byte LSB-first bitmap → fault list).
 

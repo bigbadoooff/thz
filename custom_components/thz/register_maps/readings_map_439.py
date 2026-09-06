@@ -195,4 +195,119 @@ REGISTER_MAP = {
             },
         ),
     ],
+    # Fault log ("sLast10errors", command D1). Despite the FHEM name, both
+    # the reference implementation and this port only decode the 4 most
+    # recent entries (fault0..fault3); the device's response evidently only
+    # carries that many. Firmware 4.39/5.39 encode fault0CODE..fault3CODE as
+    # 1 byte each (length 2 nibbles) rather than the 2 bytes (length 4
+    # nibbles) firmware 2.06 uses, and encode fault*TIME/fault*DATE with
+    # their two bytes swapped relative to 2.06's plain "hex2time"/"hexdate"
+    # (see value_codec._dec_turnhex2time / _dec_turnhexdate). Offsets below
+    # are copied verbatim from FHEM's "D1last" parsing table.
+    "pxxD1": [
+        (
+            "number_of_faults:",
+            4,
+            2,
+            "hex",
+            1,
+            {"icon": "mdi:counter", "translation_key": "number_of_faults"},
+        ),
+        (
+            " fault0CODE:",
+            8,
+            2,
+            "faultmap",
+            1,
+            {"icon": "mdi:alert-circle-outline", "translation_key": "fault0_code"},
+        ),
+        (
+            " fault0TIME:",
+            12,
+            4,
+            "turnhex2time",
+            1,
+            {"icon": "mdi:clock-outline", "translation_key": "fault0_time"},
+        ),
+        (
+            " fault0DATE:",
+            16,
+            4,
+            "turnhexdate",
+            1,
+            {"icon": "mdi:calendar", "translation_key": "fault0_date"},
+        ),
+        (
+            " fault1CODE:",
+            20,
+            2,
+            "faultmap",
+            1,
+            {"icon": "mdi:alert-circle-outline", "translation_key": "fault1_code"},
+        ),
+        (
+            " fault1TIME:",
+            24,
+            4,
+            "turnhex2time",
+            1,
+            {"icon": "mdi:clock-outline", "translation_key": "fault1_time"},
+        ),
+        (
+            " fault1DATE:",
+            28,
+            4,
+            "turnhexdate",
+            1,
+            {"icon": "mdi:calendar", "translation_key": "fault1_date"},
+        ),
+        (
+            " fault2CODE:",
+            32,
+            2,
+            "faultmap",
+            1,
+            {"icon": "mdi:alert-circle-outline", "translation_key": "fault2_code"},
+        ),
+        (
+            " fault2TIME:",
+            36,
+            4,
+            "turnhex2time",
+            1,
+            {"icon": "mdi:clock-outline", "translation_key": "fault2_time"},
+        ),
+        (
+            " fault2DATE:",
+            40,
+            4,
+            "turnhexdate",
+            1,
+            {"icon": "mdi:calendar", "translation_key": "fault2_date"},
+        ),
+        (
+            " fault3CODE:",
+            44,
+            2,
+            "faultmap",
+            1,
+            {"icon": "mdi:alert-circle-outline", "translation_key": "fault3_code"},
+        ),
+        (
+            " fault3TIME:",
+            48,
+            4,
+            "turnhex2time",
+            1,
+            {"icon": "mdi:clock-outline", "translation_key": "fault3_time"},
+        ),
+        (
+            " fault3DATE:",
+            52,
+            4,
+            "turnhexdate",
+            1,
+            {"icon": "mdi:calendar", "translation_key": "fault3_date"},
+        ),
+    ],
 }

@@ -97,6 +97,46 @@ def _dec_hex2time(raw: bytes, factor: float) -> str:
     return f"{hours:02d}:{minutes:02d}"
 
 
+def _dec_turnhexdate(raw: bytes, factor: float) -> str:
+    """Decode a byte-swapped device date value to a "DD.MM" string.
+
+    Firmware 4.39/5.39 store the fault-log date with its two bytes in the
+    opposite order to the plain "hexdate" encoding used by firmware 2.06.
+    FHEM handles this by swapping the two hex-character pairs before doing
+    the same day/month math: ``substr($value,2,2).substr($value,0,2)`` then
+    ``sprintf("%02u.%02u", hex($value)/100, hex($value)%100)``. Reading the
+    2 raw bytes little-endian instead of big-endian produces the same swap.
+
+    Example: bytes ``0xF5 0x01`` (hex string "f501") swap to "01f5" = 501
+    decimal → day 5, month 1 → "05.01".
+    """
+    if len(raw) != 2:
+        raise ValueError(
+            f"Invalid turnhexdate length: expected 2 bytes, got {len(raw)}"
+        )
+    swapped = int.from_bytes(raw, byteorder="little")
+    return f"{swapped // 100:02d}.{swapped % 100:02d}"
+
+
+def _dec_turnhex2time(raw: bytes, factor: float) -> str:
+    """Decode a byte-swapped device time value to a "HH:MM" string.
+
+    Firmware 4.39/5.39 store the fault-log time with its two bytes in the
+    opposite order to the plain "hex2time" encoding used by firmware 2.06.
+    Matches FHEM's ``turnhex2time``: swap the two hex-character pairs, then
+    ``sprintf("%02u:%02u", hex($value)/100, hex($value)%100)``. Reading the
+    2 raw bytes little-endian instead of big-endian produces the same swap.
+    """
+    if len(raw) != 2:
+        raise ValueError(
+            f"Invalid turnhex2time length: expected 2 bytes, got {len(raw)}"
+        )
+    swapped = int.from_bytes(raw, byteorder="little")
+    hours = swapped // 100
+    minutes = swapped % 100
+    return f"{hours:02d}:{minutes:02d}"
+
+
 def _dec_hex2error(raw: bytes, factor: float) -> str:
     r"""Decode a 4-byte active-error bitmap to a comma-separated fault list.
 
@@ -137,6 +177,8 @@ _DECODE_DISPATCH: dict[str, Callable[[bytes, float], int | float | bool | str]] 
     "faultmap": _dec_faultmap,
     "hex2time": _dec_hex2time,
     "hex2error": _dec_hex2error,
+    "turnhexdate": _dec_turnhexdate,
+    "turnhex2time": _dec_turnhex2time,
 }
 
 
@@ -165,6 +207,12 @@ def decode_raw_value(
               (value/100 gives hours, value%100 gives minutes).
             - "hex2error": 4-byte LSB-first bitmap of active fault codes →
               comma-separated list of fault names, or "n.a." if none active.
+            - "turnhexdate": Byte-swapped 2-byte date → "DD.MM" (firmware
+              4.39/5.39 fault-log dates; see "hexdate" for the un-swapped
+              2.06 equivalent).
+            - "turnhex2time": Byte-swapped 2-byte time → "HH:MM" (firmware
+              4.39/5.39 fault-log times; see "hex2time" for the un-swapped
+              2.06 equivalent).
             - Any other: Returns hexadecimal representation.
         factor: The divisor for "hex2int", "hex", and "8party" decoding.
             Defaults to 1.0.
