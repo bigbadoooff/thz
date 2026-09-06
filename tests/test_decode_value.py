@@ -1,6 +1,7 @@
 """Tests for sensor decode_value function."""
 import struct
 
+import pytest
 
 from tests.test_helpers import decode_value
 
