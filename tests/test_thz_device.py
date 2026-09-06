@@ -296,3 +296,61 @@ class TestWriteBlockValue:
                 length=2,
                 value=b"\xAA\xBB",
             )
+
+
+class TestFirmwareOverride:
+    """Tests for the firmware_override config option and its resolution.
+
+    _resolve_effective_firmware() decides which firmware string actually
+    drives register-map selection: the auto-detected value, unless an
+    override was configured to force a specific FHEM-style profile (e.g.
+    "439technician") regardless of what the device reports.
+    """
+
+    def test_firmware_override_defaults_to_none(self):
+        """Test that no override is applied unless explicitly configured."""
+        device = THZDevice(connection="usb", port="/dev/null")
+        assert device._firmware_override is None
+
+    def test_firmware_override_stored(self):
+        """Test that a configured override is stored on the device."""
+        device = THZDevice(
+            connection="usb", port="/dev/null", firmware_override="539"
+        )
+        assert device._firmware_override == "539"
+
+    def test_no_override_uses_detected_firmware(self):
+        """Test that effective firmware falls back to the detected value."""
+        device = THZDevice(connection="usb", port="/dev/null")
+        device._firmware_version = "438"
+        assert device._resolve_effective_firmware() == "438"
+
+    def test_auto_override_uses_detected_firmware(self):
+        """Test that an explicit "auto" override behaves like no override."""
+        device = THZDevice(
+            connection="usb", port="/dev/null", firmware_override="auto"
+        )
+        device._firmware_version = "438"
+        assert device._resolve_effective_firmware() == "438"
+
+    def test_explicit_override_wins_over_detected_firmware(self):
+        """Test that a non-"auto" override takes precedence for map selection."""
+        device = THZDevice(
+            connection="usb", port="/dev/null", firmware_override="439technician"
+        )
+        device._firmware_version = "438"
+        assert device._resolve_effective_firmware() == "439technician"
+
+    def test_override_does_not_change_reported_firmware_version(self):
+        """Test that firmware_version still reflects the real detected value.
+
+        The override only affects which register maps get loaded; the
+        displayed/diagnostic firmware_version should stay truthful about
+        what the device actually reported.
+        """
+        device = THZDevice(
+            connection="usb", port="/dev/null", firmware_override="439technician"
+        )
+        device._firmware_version = "438"
+        assert device._resolve_effective_firmware() == "439technician"
+        assert device.firmware_version == "438"

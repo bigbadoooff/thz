@@ -16,7 +16,13 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from ._typing_compat import get_runtime_data, set_runtime_data
 from .clock_sync import async_setup_clock_check
-from .const import DEFAULT_UPDATE_INTERVAL, DOMAIN, should_hide_entity_by_default
+from .const import (
+    CONF_FIRMWARE_OVERRIDE,
+    DEFAULT_UPDATE_INTERVAL,
+    DOMAIN,
+    FIRMWARE_OVERRIDE_AUTO,
+    should_hide_entity_by_default,
+)
 from .services import async_refresh_block as async_refresh_block
 from .services import async_setup_services
 from .thz_device import THZDevice, THZRegisterNotSupportedError
@@ -45,12 +51,22 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     data = config_entry.data
     conn_type = data["connection_type"]
+    firmware_override = data.get(CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO)
 
     # 1. Initialize device
     if conn_type == "ip":
-        device = THZDevice(connection="ip", host=data["host"], tcp_port=data["port"])
+        device = THZDevice(
+            connection="ip",
+            host=data["host"],
+            tcp_port=data["port"],
+            firmware_override=firmware_override,
+        )
     elif conn_type == "usb":
-        device = THZDevice(connection="usb", port=data["device"])
+        device = THZDevice(
+            connection="usb",
+            port=data["device"],
+            firmware_override=firmware_override,
+        )
     else:
         raise ValueError("Invalid connection type")
 
