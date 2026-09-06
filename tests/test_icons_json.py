@@ -32,13 +32,27 @@ class TestIconsJsonStructure:
         assert icons_json["entity"]  # not empty
 
     def test_all_icon_values_are_mdi_strings(self, icons_json):
+        def _assert_mdi(icon, where):
+            assert isinstance(icon, str) and icon.startswith("mdi:"), (
+                f"{where} has a malformed icon: {icon!r}"
+            )
+
         for domain, entities in icons_json["entity"].items():
             for tkey, spec in entities.items():
-                assert "default" in spec, f"{domain}.{tkey} missing 'default'"
-                icon = spec["default"]
-                assert isinstance(icon, str) and icon.startswith("mdi:"), (
-                    f"{domain}.{tkey} has a malformed icon: {icon!r}"
-                )
+                if "default" in spec:
+                    _assert_mdi(spec["default"], f"{domain}.{tkey}")
+                    continue
+                # State-attribute-varying icons (e.g. climate preset_mode)
+                # nest under state_attributes.<attr>.default/state.<value>
+                # instead of a plain top-level "default".
+                state_attributes = spec.get("state_attributes")
+                assert state_attributes, f"{domain}.{tkey} missing 'default'"
+                for attr, attr_spec in state_attributes.items():
+                    where = f"{domain}.{tkey}.state_attributes.{attr}"
+                    assert "default" in attr_spec, f"{where} missing 'default'"
+                    _assert_mdi(attr_spec["default"], where)
+                    for state, icon in attr_spec.get("state", {}).items():
+                        _assert_mdi(icon, f"{where}.state.{state}")
 
     def test_no_duplicate_domains(self, icons_json):
         # json.load already collapses duplicate keys, so this just documents
