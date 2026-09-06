@@ -977,14 +977,14 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         step = _get_step(entry)
         decode_type = entry.get("decode_type", "5temp")
         try:
-            async with self._device.lock:
-                value_bytes = await self.hass.async_add_executor_job(
-                    self._device.read_value,
-                    bytes.fromhex(entry["command"]),
-                    "get",
-                    WRITE_REGISTER_OFFSET,
-                    WRITE_REGISTER_LENGTH,
-                )
+            value_bytes = await self._device.async_execute(
+                self.hass,
+                self._device.read_value,
+                bytes.fromhex(entry["command"]),
+                "get",
+                WRITE_REGISTER_OFFSET,
+                WRITE_REGISTER_LENGTH,
+            )
             if value_bytes:
                 return THZValueCodec.decode_number(value_bytes, step, decode_type)
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:

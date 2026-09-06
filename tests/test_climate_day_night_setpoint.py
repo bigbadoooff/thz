@@ -63,24 +63,24 @@ class TestWriteHeatSetpointWithoutNightRegister:
     @pytest.mark.asyncio
     async def test_writes_day_register(self):
         entity = _make_entity()
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         await entity._async_write_heat_setpoint(21.5)
 
-        entity.hass.async_add_executor_job.assert_called_once()
-        write_call = entity.hass.async_add_executor_job.call_args
-        assert write_call[0][0] == entity._device.write_value
-        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY["command"])
+        entity._device.async_execute.assert_called_once()
+        write_call = entity._device.async_execute.call_args
+        assert write_call[0][1] == entity._device.write_value
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
 
     @pytest.mark.asyncio
     async def test_warns_and_noops_with_no_entries_at_all(self):
         entity = _make_entity(heat_setpoint_entry=None)
-        entity.hass.async_add_executor_job = AsyncMock()
+        entity._device.async_execute = AsyncMock()
 
         await entity._async_write_heat_setpoint(21.5)
 
-        entity.hass.async_add_executor_job.assert_not_called()
+        entity._device.async_execute.assert_not_called()
 
 
 class TestWriteHeatSetpointWithNightRegister:
@@ -96,7 +96,7 @@ class TestWriteHeatSetpointWithNightRegister:
             return 21.0  # day register reads something different
 
         entity._async_read_setpoint = fake_read_setpoint
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         # Live roomSetTemp reports 18.0 -- matches the night setpoint value.
@@ -106,8 +106,8 @@ class TestWriteHeatSetpointWithNightRegister:
             mock_target_temp.return_value = 18.0
             await entity._async_write_heat_setpoint(17.0)
 
-        write_call = entity.hass.async_add_executor_job.call_args
-        assert write_call[0][1] == bytes.fromhex(_NIGHT_ENTRY["command"])
+        write_call = entity._device.async_execute.call_args
+        assert write_call[0][2] == bytes.fromhex(_NIGHT_ENTRY["command"])
 
     @pytest.mark.asyncio
     async def test_writes_day_register_when_day_is_active(self):
@@ -119,7 +119,7 @@ class TestWriteHeatSetpointWithNightRegister:
             return 21.0
 
         entity._async_read_setpoint = fake_read_setpoint
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         with patch.object(
@@ -128,8 +128,8 @@ class TestWriteHeatSetpointWithNightRegister:
             mock_target_temp.return_value = 21.0
             await entity._async_write_heat_setpoint(22.0)
 
-        write_call = entity.hass.async_add_executor_job.call_args
-        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY["command"])
+        write_call = entity._device.async_execute.call_args
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_neither_register_matches(self):
@@ -142,7 +142,7 @@ class TestWriteHeatSetpointWithNightRegister:
             return 21.0
 
         entity._async_read_setpoint = fake_read_setpoint
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         with patch.object(
@@ -151,8 +151,8 @@ class TestWriteHeatSetpointWithNightRegister:
             mock_target_temp.return_value = 19.5  # matches neither register
             await entity._async_write_heat_setpoint(20.0)
 
-        write_call = entity.hass.async_add_executor_job.call_args
-        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY["command"])
+        write_call = entity._device.async_execute.call_args
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_target_temperature_unknown(self):
@@ -160,7 +160,7 @@ class TestWriteHeatSetpointWithNightRegister:
         entity = _make_entity(night_setpoint_entry=_NIGHT_ENTRY)
 
         entity._async_read_setpoint = AsyncMock()
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         with patch.object(
@@ -170,15 +170,15 @@ class TestWriteHeatSetpointWithNightRegister:
             await entity._async_write_heat_setpoint(20.0)
 
         entity._async_read_setpoint.assert_not_called()
-        write_call = entity.hass.async_add_executor_job.call_args
-        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY["command"])
+        write_call = entity._device.async_execute.call_args
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
 
 
 class TestAsyncReadSetpoint:
     @pytest.mark.asyncio
     async def test_decodes_value_from_device(self):
         entity = _make_entity()
-        entity.hass.async_add_executor_job = AsyncMock(
+        entity._device.async_execute = AsyncMock(
             return_value=bytes.fromhex("00d2")  # 210 * step(0.1) -> 21.0
         )
 
@@ -189,7 +189,7 @@ class TestAsyncReadSetpoint:
     @pytest.mark.asyncio
     async def test_returns_none_on_device_error(self):
         entity = _make_entity()
-        entity.hass.async_add_executor_job = AsyncMock(
+        entity._device.async_execute = AsyncMock(
             side_effect=ConnectionError("device unreachable")
         )
 
