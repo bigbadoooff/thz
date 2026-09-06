@@ -1857,6 +1857,9 @@
       "cooling_hc1_switch": {
         "name": "Kühlung HK1 Schalter"
       },
+      "cooling_hc1_area_fan": {
+        "name": "Kühlung HK1 Flächenlüfter"
+      },
       "cooling_hc2_switch": {
         "name": "Kühlung HK2 Schalter"
       }

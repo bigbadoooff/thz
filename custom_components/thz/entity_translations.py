@@ -187,6 +187,7 @@ ENTITY_TRANSLATION_KEYS = {
     # Cooling settings (p99 extended parameters)
     "p99CoolingHC1SetTemp": "cooling_hc1_set_temp",
     "p99CoolingHC1Switch": "cooling_hc1_switch",
+    "p99CoolingHC1AreaFan": "cooling_hc1_area_fan",
     "p99CoolingHC1HysterFlowTemp": "cooling_hc1_hyster_flow_temp",
     "p99CoolingHC1HysterRoomTemp": "cooling_hc1_hyster_room_temp",
     "p99CoolingHC2SetTemp": "cooling_hc2_set_temp",

@@ -121,6 +121,16 @@ WRITE_MAP = {
         "icon": "mdi:toggle-switch",
         "decode_type": "1clean",
     },
+    "p99CoolingHC1AreaFan": {
+        "command": "0B0613",
+        "min": "0",
+        "max": "1",
+        "unit": "",
+        "type": "switch",
+        "device_class": "",
+        "icon": "mdi:toggle-switch",
+        "decode_type": "1clean",
+    },
     "p99CoolingHC1SetTemp": {
         "command": "0B0582",
         "min": "12",
