@@ -152,7 +152,7 @@ class TestClearValueServiceRegistration:
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_registers_clear_value_service(self):
-        from custom_components.thz.time import async_setup_entry, DOMAIN
+        from custom_components.thz.time import async_setup_entry
         from homeassistant.helpers import entity_platform as ep_mock
 
         platform_mock = MagicMock()
@@ -165,21 +165,17 @@ class TestClearValueServiceRegistration:
         device = MagicMock()
         hass = MagicMock()
         entry_id = "test_entry"
-        hass.data = {
-            DOMAIN: {
-                entry_id: {
-                    "write_manager": write_manager,
-                    "device": device,
-                    "device_id": "dev1",
-                    "entity_id_style": "default",
-                    "entity_visibility": "default",
-                    "entity_id_prefix": None,
-                }
-            }
-        }
         config_entry = MagicMock()
         config_entry.entry_id = entry_id
         config_entry.data = {}
+        config_entry.runtime_data = {
+            "write_manager": write_manager,
+            "device": device,
+            "device_id": "dev1",
+            "entity_id_style": "default",
+            "entity_visibility": "default",
+            "entity_id_prefix": None,
+        }
         async_add_entities = MagicMock()
 
         await async_setup_entry(hass, config_entry, async_add_entities)

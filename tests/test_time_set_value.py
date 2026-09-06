@@ -15,7 +15,6 @@ hass, closely following the pattern used in test_async_update_block.py and
 test_climate.py's TestTHZClimateEntity.
 """
 
-import asyncio
 from datetime import time
 from unittest.mock import AsyncMock, MagicMock
 
@@ -23,21 +22,20 @@ import pytest
 
 
 def _make_hass():
-    """Create a mock hass whose async_add_executor_job actually calls through.
-
-    Mirrors the real HomeAssistant.async_add_executor_job contract closely
-    enough that the wrapped device method is genuinely invoked (and its
-    call args captured) rather than merely returning a canned value.
-    """
-    hass = MagicMock()
-    hass.async_add_executor_job = AsyncMock(side_effect=lambda fn, *args: fn(*args))
-    return hass
+    """Create a mock hass; device I/O goes through device.async_execute."""
+    return MagicMock()
 
 
 def _make_device(read_return: bytes | None = None):
-    """Create a minimal mock THZDevice with a real asyncio lock."""
+    """Create a minimal mock THZDevice whose async_execute calls through.
+
+    Mirrors the real THZDevice.async_execute contract closely enough that
+    the wrapped device method (read_value/write_value) is genuinely invoked
+    (and its call args captured) rather than merely returning a canned
+    value.
+    """
     device = MagicMock()
-    device.lock = asyncio.Lock()
+    device.async_execute = AsyncMock(side_effect=lambda hass, fn, *args: fn(*args))
     if read_return is not None:
         device.read_value = MagicMock(return_value=read_return)
     return device
