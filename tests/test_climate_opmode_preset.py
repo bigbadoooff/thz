@@ -129,38 +129,38 @@ class TestAsyncSetPresetMode:
         entity = _make_entity(opmode_entry=_OPMODE_ENTRY)
         entity.async_write_ha_state = MagicMock()
         entity.coordinator.async_request_refresh = AsyncMock()
-        entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
 
         await entity.async_set_preset_mode("standby")
 
         assert entity._op_mode_cache == "standby"
         entity.async_write_ha_state.assert_called_once()
-        entity.hass.async_add_executor_job.assert_called_once()
+        entity._device.async_execute.assert_called_once()
         # No translation table involved -- the write value is the encoded
         # "standby" option itself.
-        call_args = entity.hass.async_add_executor_job.call_args
-        assert call_args[0][0] == entity._device.write_value
+        call_args = entity._device.async_execute.call_args
+        assert call_args[0][1] == entity._device.write_value
 
     @pytest.mark.asyncio
     async def test_rejects_unknown_preset(self):
         entity = _make_entity(opmode_entry=_OPMODE_ENTRY)
-        entity.hass.async_add_executor_job = AsyncMock()
+        entity._device.async_execute = AsyncMock()
 
         # "comfort" was a valid preset under the old HA vocabulary; it is not
         # a real pOpMode option and must be rejected now.
         await entity.async_set_preset_mode("comfort")
 
-        entity.hass.async_add_executor_job.assert_not_called()
+        entity._device.async_execute.assert_not_called()
         assert entity._op_mode_cache is None
 
     @pytest.mark.asyncio
     async def test_noop_without_opmode_entry(self):
         entity = _make_entity()
-        entity.hass.async_add_executor_job = AsyncMock()
+        entity._device.async_execute = AsyncMock()
 
         await entity.async_set_preset_mode("standby")
 
-        entity.hass.async_add_executor_job.assert_not_called()
+        entity._device.async_execute.assert_not_called()
 
 
 class TestAsyncSetHvacMode:

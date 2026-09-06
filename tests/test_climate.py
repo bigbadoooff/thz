@@ -273,13 +273,6 @@ class TestTHZClimateEntity:
 
     # ── hvac_modes ──────────────────────────────────────────────────────────
 
-    def test_hvac_modes_heat_only_without_cooling(self):
-        """Entity without cooling entries supports only HEAT and OFF."""
-        entity = self._make_hc1_entity()
-        assert HVACMode.COOL not in entity.hvac_modes
-        assert HVACMode.HEAT in entity.hvac_modes
-        assert HVACMode.OFF in entity.hvac_modes
-
     def test_hvac_modes_includes_cool_when_entries_provided(self):
         """Entity with both cool switch and setpoint entries supports COOL."""
         cool_switch = {"command": "0B0287", "decode_type": "1clean"}
@@ -509,33 +502,6 @@ class TestTHZClimateEntity:
             opmode_entry={"command": "0A0001"}, coord_data=None
         )
         assert entity.preset_mode is None
-
-    def test_preset_mode_comfort_from_normal(self):
-        from homeassistant.components.climate import PRESET_COMFORT
-        data = bytearray(60)
-        data[F4_HC_OP_MODE_OFFSET] = 0x01  # normal
-        entity = self._make_hc1_entity(
-            opmode_entry={"command": "0A0001"}, coord_data=bytes(data)
-        )
-        assert entity.preset_mode == PRESET_COMFORT
-
-    def test_preset_mode_sleep_from_setback(self):
-        from homeassistant.components.climate import PRESET_SLEEP
-        data = bytearray(60)
-        data[F4_HC_OP_MODE_OFFSET] = 0x02  # setback
-        entity = self._make_hc1_entity(
-            opmode_entry={"command": "0A0001"}, coord_data=bytes(data)
-        )
-        assert entity.preset_mode == PRESET_SLEEP
-
-    def test_preset_mode_away_from_standby(self):
-        from homeassistant.components.climate import PRESET_AWAY
-        data = bytearray(60)
-        data[F4_HC_OP_MODE_OFFSET] = 0x03  # standby
-        entity = self._make_hc1_entity(
-            opmode_entry={"command": "0A0001"}, coord_data=bytes(data)
-        )
-        assert entity.preset_mode == PRESET_AWAY
 
     # ── fan_mode ─────────────────────────────────────────────────────────────
 
@@ -839,12 +805,13 @@ class TestTHZClimateServiceCalls:
         entity.coordinator.async_request_refresh.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_set_hvac_mode_off_logs_info_and_refreshes(self):
+    async def test_set_hvac_mode_off_warns_and_skips(self):
+        """OFF is not offered as an hvac_mode; a request for it is rejected."""
         entity = self._entity()
         entity.hass = MagicMock()
         entity.coordinator.async_request_refresh = AsyncMock()
         await entity.async_set_hvac_mode(HVACMode.OFF)
-        entity.coordinator.async_request_refresh.assert_awaited_once()
+        entity.coordinator.async_request_refresh.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_set_preset_mode_no_entry_is_noop(self):
@@ -862,25 +829,12 @@ class TestTHZClimateServiceCalls:
         entity._device.async_execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_set_preset_mode_writes_and_refreshes(self):
-        from homeassistant.components.climate import PRESET_COMFORT
-        device = MagicMock()
-        device.async_execute = AsyncMock(return_value=None)
-        entity = self._entity(opmode_entry={"command": "0A0001"}, device=device)
-        entity.hass = MagicMock()
-        entity.coordinator.async_request_refresh = AsyncMock()
-        await entity.async_set_preset_mode(PRESET_COMFORT)
-        device.async_execute.assert_awaited_once()
-        entity.coordinator.async_request_refresh.assert_awaited_once()
-
-    @pytest.mark.asyncio
     async def test_set_preset_mode_handles_device_error(self):
-        from homeassistant.components.climate import PRESET_COMFORT
         device = MagicMock()
         device.async_execute = AsyncMock(side_effect=RuntimeError("boom"))
         entity = self._entity(opmode_entry={"command": "0A0001"}, device=device)
         entity.hass = MagicMock()
-        await entity.async_set_preset_mode(PRESET_COMFORT)  # Should not raise.
+        await entity.async_set_preset_mode("standby")  # Should not raise.
 
     @pytest.mark.asyncio
     async def test_set_fan_mode_no_entry_is_noop(self):
