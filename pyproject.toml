@@ -40,3 +40,10 @@ check_untyped_defs = true
 # integration targets. custom_components/thz/_typing_compat.py and scattered
 # `# type: ignore` comments document and confine the resulting gaps; see
 # that module's docstring for details.
+#
+# python_version here must stay >= whatever CPython version mypy itself is
+# invoked under (see .github/workflows/ci.yml's typecheck job) -- it's a
+# checking-semantics target, not a request to mypy's own parser, which can
+# only read syntax its host interpreter's grammar supports (e.g.
+# homeassistant-stubs' PEP 695/696 `type` statements need mypy running on
+# Python 3.12+ regardless of this setting).

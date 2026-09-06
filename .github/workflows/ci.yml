@@ -49,7 +49,13 @@ jobs:
       - name: Set up Python
         uses: "actions/setup-python@v5"
         with:
-          python-version: "3.11"
+          # mypy itself must run under an interpreter new enough to parse
+          # whatever syntax homeassistant-stubs' .pyi files use (e.g. PEP
+          # 695/696 type statements) -- this is independent of the
+          # [tool.mypy] python_version target in pyproject.toml, which only
+          # controls checking semantics, not what mypy's own parser can
+          # physically read. See pyproject.toml's comment on this setting.
+          python-version: "3.13"
       - name: Install type-check dependencies
         run: |
           pip install -r requirements_test.txt
