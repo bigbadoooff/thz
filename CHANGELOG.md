@@ -16,6 +16,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Wrong scaling for `p54MinPumpCycles`/`p55MaxPumpCycles`** (issue #155,
+  firmware 439/509/539): both had `step: 0.1` despite being whole-number
+  cycle counts, so a device value of 48 displayed as 4.8 and a value of 1
+  as 0.1. Fixed to `step: 1`.
+
 - **`enable_hc2` not applied on upgrade**: entries that predate the hc2/advanced
   category split (where HC2 was previously enabled under the "Extended"/"All" tiers)
   had no recorded HC2 reconciliation state, so the change-detection defaulted the
