@@ -1880,6 +1880,13 @@
           "sommerkassette": "Summer Cassette"
         }
       },
+      "cooling_hc1_distribution": {
+        "name": "Cooling HC1 Distribution",
+        "state": {
+          "area": "Area (floor)",
+          "air": "Air (fan coil)"
+        }
+      },
       "z_control_valve_dhw": {
         "name": "Control Valve DHW"
       },
@@ -1899,9 +1906,6 @@
     "switch": {
       "cooling_hc1_switch": {
         "name": "Cooling HC1 Switch"
-      },
-      "cooling_hc1_area_fan": {
-        "name": "Cooling HC1 Area Fan"
       },
       "cooling_hc2_switch": {
         "name": "Cooling HC2 Switch"

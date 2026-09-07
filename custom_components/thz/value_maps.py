@@ -85,4 +85,11 @@ SELECT_MAP = {
         "3": "bypass",
         "4": "sommerkassette",
     },
+    # Which distribution system HC1 cooling is delivered through: "area"
+    # (surface cooling, e.g. an underfloor-heating loop run in reverse) or
+    # "air" (a fan coil unit). Confirmed against real hardware.
+    "cooling_distribution_hc1": {
+        "0": "area",
+        "1": "air",
+    },
 }

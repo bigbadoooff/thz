@@ -1837,6 +1837,13 @@
           "sommerkassette": "Sommerkassette"
         }
       },
+      "cooling_hc1_distribution": {
+        "name": "Kühlung HK1 Verteilung",
+        "state": {
+          "area": "Fläche (Fußboden)",
+          "air": "Luft (Gebläsekonvektor)"
+        }
+      },
       "z_control_valve_dhw": {
         "name": "Steuerventil Warmwasser"
       },
@@ -1856,9 +1863,6 @@
     "switch": {
       "cooling_hc1_switch": {
         "name": "Kühlung HK1 Schalter"
-      },
-      "cooling_hc1_area_fan": {
-        "name": "Kühlung HK1 Flächenlüfter"
       },
       "cooling_hc2_switch": {
         "name": "Kühlung HK2 Schalter"

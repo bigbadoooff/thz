@@ -34,6 +34,15 @@ All notable changes to the THZ integration are documented here.
   HC2-related entity, program/schedule ones included, is gated purely by
   `enable_hc2`, independent of the tier.
 
+- **`p99CoolingHC1AreaFan` was a plain on/off switch showing "1"/"0"**:
+  this parameter actually selects which distribution system HC1 cooling is
+  delivered through -- "area" (a surface/underfloor loop run in reverse) or
+  "air" (a fan coil unit) -- not a literal fan. The name was also
+  misleading and the German translation ("Flächenlüfter", i.e. "area fan")
+  was simply wrong. Converted to a select entity (`Cooling HC1
+  Distribution`) showing "Area (floor)"/"Air (fan coil)" instead of raw
+  1/0, confirmed against real hardware: 0 = area, 1 = air.
+
 - **Time entities never actually wrote to the device**: `THZTime` and
   `THZScheduleTime` (schedule Start/End) defined `async_set_native_value`,
   which is the `NumberEntity`/`SelectEntity` override convention -- not

@@ -126,10 +126,10 @@ WRITE_MAP = {
         "min": "0",
         "max": "1",
         "unit": "",
-        "type": "switch",
+        "type": "select",
         "device_class": "",
-        "icon": "mdi:toggle-switch",
-        "decode_type": "1clean",
+        "icon": "mdi:hvac",
+        "decode_type": "cooling_distribution_hc1",
     },
     "p99CoolingHC1SetTemp": {
         "command": "0B0582",
