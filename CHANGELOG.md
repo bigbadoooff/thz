@@ -16,6 +16,12 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Firmware 709 used a separate, byte-for-byte duplicate readings map**:
+  `readings_map_709.py` excluded the exact same four compressor/power
+  blocks as `readings_map_509.py`, just under a different module name.
+  Consolidated firmware 709 onto `readings_map_509` and removed the
+  duplicate file.
+
 - **Wrong scaling for `p54MinPumpCycles`/`p55MaxPumpCycles`** (issue #155,
   firmware 439/509/539): both had `step: 0.1` despite being whole-number
   cycle counts, so a device value of 48 displayed as 4.8 and a value of 1
