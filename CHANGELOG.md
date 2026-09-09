@@ -6,6 +6,8 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] – 2026-09-10
+
 ### Added
 
 - **`enable_hc2` config option**: A separate checkbox for showing Heating Circuit 2
