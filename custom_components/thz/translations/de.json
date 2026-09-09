@@ -5,7 +5,11 @@
         "title": "Verbindungstyp wählen",
         "description": "Wählen Sie, wie Sie sich mit Ihrem THZ-Gerät verbinden möchten",
         "data": {
-          "connection_type": "Verbindungstyp"
+          "connection_type": "Verbindungstyp",
+          "alias": "Gerätename",
+          "entity_id_style": "Entity-ID-Stil",
+          "entity_visibility": "Sichtbarkeit der Entitäten",
+          "enable_hc2": "HK2-Entitäten aktivieren"
         }
       },
       "reconfigure": {
@@ -141,7 +145,12 @@
           "refresh_pxx0A0648": "Abfrageintervall: Kühlung Heizkreis gesamt (s)",
           "refresh_pxx0B0264": "Abfrageintervall: Taupunkt HK1 (s)",
           "refresh_pxx0C0264": "Abfrageintervall: Taupunkt HK2 (s)",
-          "refresh_pxx0C0011": "Abfrageintervall: Innentemperatur Kontrolleinheit HK2 (s)"
+          "refresh_pxx0C0011": "Abfrageintervall: Innentemperatur Kontrolleinheit HK2 (s)",
+          "entity_id_style": "Entity-ID-Stil",
+          "entity_visibility": "Sichtbarkeit der Entitäten",
+          "enable_hc2": "HK2-Entitäten aktivieren",
+          "firmware_override": "Firmware-Profil überschreiben",
+          "auto_sync_clock": "Uhrzeit automatisch synchronisieren"
         }
       },
       "setup_ip": {
@@ -222,7 +231,8 @@
           "refresh_pxx0A0648": "Abfrageintervall: Kühlung Heizkreis gesamt (s)",
           "refresh_pxx0B0264": "Abfrageintervall: Taupunkt HK1 (s)",
           "refresh_pxx0C0264": "Abfrageintervall: Taupunkt HK2 (s)",
-          "refresh_pxx0C0011": "Abfrageintervall: Innentemperatur Kontrolleinheit HK2 (s)"
+          "refresh_pxx0C0011": "Abfrageintervall: Innentemperatur Kontrolleinheit HK2 (s)",
+          "firmware_override": "Firmware-Profil überschreiben"
         },
         "data_description": {
           "write_interval": "Wie oft beschreibbare Entitäten ihren Status synchronisieren (5-86400 Sekunden)"
@@ -3171,6 +3181,33 @@
       },
       "window_open": {
         "name": "Fenster offen"
+      }
+    }
+  },
+  "selector": {
+    "entity_id_style": {
+      "options": {
+        "default": "Standard (beschreibend)",
+        "fhem": "FHEM/technisch (entspricht den Feldnamen aus 00_THZ.pm und den Stiebel-Parameternummern)"
+      }
+    },
+    "entity_visibility": {
+      "options": {
+        "default": "Standard (Zeitpläne und erweiterte Parameter ausblenden)",
+        "extended": "Erweitert (alles außer Zeitpläne aktivieren)",
+        "all": "Alle (alle Parameter aktivieren)"
+      }
+    },
+    "firmware_override": {
+      "options": {
+        "auto": "Automatische Erkennung",
+        "206": "2.06",
+        "214": "2.14",
+        "214j": "2.14j",
+        "439": "4.39",
+        "439technician": "4.39 Techniker",
+        "539": "5.39",
+        "539technician": "5.39 Techniker"
       }
     }
   }

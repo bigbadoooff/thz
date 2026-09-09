@@ -16,6 +16,18 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Config flow / Reconfigure dialog mixed German and English**: the
+  `entity_id_style`, `entity_visibility`, and `firmware_override` dropdowns
+  used a plain `vol.In(dict)` with hardcoded English option text, which
+  has no translation hook at all -- their option values (and, for
+  `entity_id_style`/`entity_visibility`/`firmware_override`/
+  `auto_sync_clock`, their field labels too) always showed in English
+  regardless of Home Assistant's language, mixed in with the correctly
+  German-translated fields around them. Converted those three fields to
+  `SelectSelector` with `translation_key`, and added the missing field
+  labels and option translations to `strings.json` and both
+  `translations/*.json` files.
+
 - **Firmware 709 used a separate, byte-for-byte duplicate readings map**:
   `readings_map_709.py` excluded the exact same four compressor/power
   blocks as `readings_map_509.py`, just under a different module name.

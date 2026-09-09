@@ -15,6 +15,11 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_DEVICE, CONF_HOST, CONF_PORT
 from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .const import (
     CONF_CONNECTION_TYPE,
@@ -51,6 +56,26 @@ LOG_LEVELS = {
 }
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _translated_select(labels: dict[str, str], translation_key: str) -> SelectSelector:
+    """Build a dropdown whose option labels are pulled from translations.
+
+    ``labels`` supplies the option values (its keys) only -- a plain
+    ``vol.In(labels)`` would instead show ``labels``' English values
+    verbatim regardless of the user's language, since a bare voluptuous
+    dict has no i18n hook. A ``SelectSelector`` with ``translation_key``
+    looks up each option's display text from ``selector.<translation_key>
+    .options.<value>`` in strings.json/translations/*.json instead, so it
+    renders in whatever language Home Assistant is running in.
+    """
+    return SelectSelector(
+        SelectSelectorConfig(
+            options=list(labels.keys()),
+            translation_key=translation_key,
+            mode=SelectSelectorMode.DROPDOWN,
+        )
+    )
 
 
 class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -103,7 +128,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # created entities -- it never touches the displayed name.
                 vol.Optional(
                     CONF_ENTITY_ID_STYLE, default=ENTITY_ID_STYLE_DEFAULT
-                ): vol.In(ENTITY_ID_STYLE_LABELS),
+                ): _translated_select(ENTITY_ID_STYLE_LABELS, CONF_ENTITY_ID_STYLE),
                 # Entity visibility tier: which less-common entities (HC2,
                 # schedules, advanced technical parameters) start enabled.
                 # "default" hides all of them (matching prior behavior),
@@ -112,7 +137,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # which retroactively bulk enables/disables existing entities.
                 vol.Optional(
                     CONF_ENTITY_VISIBILITY, default=ENTITY_VISIBILITY_DEFAULT
-                ): vol.In(ENTITY_VISIBILITY_LABELS),
+                ): _translated_select(ENTITY_VISIBILITY_LABELS, CONF_ENTITY_VISIBILITY),
                 # Heating Circuit 2 entities: independent of the tier above,
                 # since most installs only have one heating circuit. Off by
                 # default; can be changed later via Reconfigure, which
@@ -343,7 +368,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema_dict[vol.Optional(
             CONF_FIRMWARE_OVERRIDE,
             default=defaults.get(CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO),
-        )] = vol.In(FIRMWARE_PROFILE_LABELS)
+        )] = _translated_select(FIRMWARE_PROFILE_LABELS, CONF_FIRMWARE_OVERRIDE)
 
         # Entity ID naming style: purely cosmetic, does not affect device
         # communication. "fhem" only changes HA's suggested_object_id for a
@@ -354,7 +379,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema_dict[vol.Optional(
             CONF_ENTITY_ID_STYLE,
             default=defaults.get(CONF_ENTITY_ID_STYLE, ENTITY_ID_STYLE_DEFAULT),
-        )] = vol.In(ENTITY_ID_STYLE_LABELS)
+        )] = _translated_select(ENTITY_ID_STYLE_LABELS, CONF_ENTITY_ID_STYLE)
 
         # Entity visibility tier: unlike entity_id_style, changing this HERE
         # retroactively bulk enables/disables entities already in the
@@ -363,7 +388,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         schema_dict[vol.Optional(
             CONF_ENTITY_VISIBILITY,
             default=defaults.get(CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT),
-        )] = vol.In(ENTITY_VISIBILITY_LABELS)
+        )] = _translated_select(ENTITY_VISIBILITY_LABELS, CONF_ENTITY_VISIBILITY)
 
         # Heating Circuit 2 entities: independent of the tier above. Like
         # entity_visibility, changing this retroactively bulk enables/
@@ -752,7 +777,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # profile, use Reconfigure after initial setup instead.)
         schema_dict[vol.Optional(
             CONF_FIRMWARE_OVERRIDE, default=FIRMWARE_OVERRIDE_AUTO
-        )] = vol.In(FIRMWARE_PROFILE_LABELS)
+        )] = _translated_select(FIRMWARE_PROFILE_LABELS, CONF_FIRMWARE_OVERRIDE)
 
         schema = vol.Schema(schema_dict)
         return self.async_show_form(
