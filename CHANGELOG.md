@@ -6,6 +6,35 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+## [0.5.1] – 2026-09-14
+
+### Added
+
+- **Sensors for firmware 2.06/2.14/2.14j ported from the legacy FHEM
+  module**: `readings_map_2xx.py`, `readings_map_214.py`, and
+  `readings_map_214j.py` were empty stubs, so most sensors for the 200
+  firmware series were entirely missing. Added the sensor blocks common to
+  all three 2.xx variants (defrost/heating/DHW/solar parameters, operating
+  hours, schedules, fan calibration, solar circuit readings, system status,
+  time/date), the previously entirely-missing solar-circuit sensor block
+  (`sSol`, cmd `16`) for all 2xx firmware, and the firmware-specific `pFan`
+  (cmd `01`) block for 214/214j.
+
+### Bug Fixes
+
+- **Firmware 214j read the wrong `sGlobal` register layout**: without a
+  firmware-specific override, `pxxFB` (`sGlobal`, cmd `FB`) silently fell
+  back to `register_map_all.py`'s generic 4.39-style block, decoding the
+  wrong bit positions/offsets for mixer, pump, compressor, and ventilator
+  status on real 214j hardware. Added the correct `FBglob214` layout.
+
+### Documentation
+
+- **README**: added a "How Firmware Versions Are Loaded" section
+  documenting `RegisterMapManager`'s base/write/read map layering, the
+  firmware → module table, and the functional differences between the 2xx
+  and 4.39/5.39 firmware families.
+
 ## [0.5.0] – 2026-09-10
 
 ### Added
