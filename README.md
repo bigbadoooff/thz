@@ -1,6 +1,6 @@
 # Stiebel Eltron LWZ / Tecalor THZ Integration (unofficial)
 
-[![Validate](https://github.com/bigbadoooff/thz/actions/workflows/validate.yml/badge.svg)](https://github.com/bigbadoooff/thz/actions/workflows/validate.yml)
+[![Validate](https://github.com/bigbadoooff/thz/actions/workflows/ci.yml/badge.svg)](https://github.com/bigbadoooff/thz/actions/workflows/ci.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/bigbadoooff/thz)](https://github.com/bigbadoooff/thz/releases)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
