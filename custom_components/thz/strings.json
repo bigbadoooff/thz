@@ -1603,6 +1603,12 @@
       "enable_dhw_buffer": {
         "name": "Enable DHW Buffer"
       },
+      "solar_hysteresis": {
+        "name": "Solar Hysteresis"
+      },
+      "dhw_vaporization_delay": {
+        "name": "DHW Vaporization Delay"
+      },
       "room_temp_day_hc1_summer": {
         "name": "Room Temperature Day HC1 Summer"
       },

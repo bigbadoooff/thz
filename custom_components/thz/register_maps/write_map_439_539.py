@@ -162,6 +162,21 @@ WRITE_MAP = {
         "icon": "mdi:cog",
         "decode_type": "1clean",
     },
+    # p20FlowProportionHC2 mirrors p19FlowProportionHC1 one heating circuit
+    # down (0B059D -> 0C059D, like p14LowEndHC1 0B059E -> p17LowEndHC2 0C059E).
+    # Confirmed with read_raw_register on an LWZ 403 SOL (firmware 4.38): a
+    # clean in-range value (30, i.e. 30 %) with the same decode as p19.
+    "p20FlowProportionHC2": {
+        "command": "0C059D",
+        "min": "0",
+        "max": "100",
+        "unit": "%",
+        "step": 1,
+        "type": "number",
+        "device_class": "measurement",
+        "icon": "mdi:cog",
+        "decode_type": "1clean",
+    },
     "p01RoomTempDayHC2": {
         "command": "0C0005",
         "min": "12",
@@ -293,6 +308,35 @@ WRITE_MAP = {
         "device_class": "measurement",
         "icon": "mdi:thermometer",
         "decode_type": "5temp",
+    },
+    # pSolarHysteresis and pDHWVaporizationDelay were never individually
+    # addressable before; found by scanning the unmapped 0A05xx gap with
+    # read_raw_register on an LWZ 403 SOL (firmware 4.38). 0A058F returned 18
+    # (x0.1 = 1.8 K) and 0A058E returned 60 (minutes), both matching the
+    # control panel exactly.
+    "pSolarHysteresis": {
+        "command": "0A058F",
+        "min": "0",
+        "max": "10",
+        "unit": " K",
+        "step": 0.1,
+        "type": "number",
+        "device_class": "measurement",
+        "icon": "mdi:swap-horizontal",
+        "decode_type": "5temp",
+    },
+    # Delay before the DHW solar loop responds after a collector
+    # stagnation/vaporization event.
+    "pDHWVaporizationDelay": {
+        "command": "0A058E",
+        "min": "0",
+        "max": "120",
+        "unit": " min",
+        "step": 1,
+        "type": "number",
+        "device_class": "measurement",
+        "icon": "mdi:clock-outline",
+        "decode_type": "1clean",
     },
     "p06DHWsetStandbyTemp": {
         "command": "0A0581",

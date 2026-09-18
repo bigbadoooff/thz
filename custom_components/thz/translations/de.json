@@ -1562,6 +1562,12 @@
       "enable_dhw_buffer": {
         "name": "Warmwasserspeicher aktivieren"
       },
+      "solar_hysteresis": {
+        "name": "Solar-Hysterese"
+      },
+      "dhw_vaporization_delay": {
+        "name": "Warmwasser-Verdampfungsverzögerung"
+      },
       "room_temp_day_hc1_summer": {
         "name": "Raumtemperatur Tag HK1 Sommer"
       },

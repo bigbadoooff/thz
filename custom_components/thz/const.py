@@ -311,6 +311,7 @@ def _classify_hidden_category(entity_name: str) -> str | None:
         "booster",
         "pasteurisation",
         "asymmetry",
+        "vaporization",  # Solar collector stagnation delay
     ]
 
     for keyword in advanced_keywords:

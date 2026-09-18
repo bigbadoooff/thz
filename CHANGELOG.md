@@ -6,6 +6,15 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Write entities for firmware 4.39/5.39** (ported from the m-l fork, found
+  with `read_raw_register` on an LWZ 403 SOL): `p20FlowProportionHC2`
+  (`0C059D`, mirror of `p19` for heating circuit 2, hidden unless
+  `enable_hc2`), `pSolarHysteresis` (`0A058F`) and `pDHWVaporizationDelay`
+  (`0A058E`, solar loop delay after a collector stagnation event). The two
+  solar parameters count as advanced and are hidden by default.
+
 ### Bug Fixes
 
 - **Firmware 4.39: 45 `pxxFB` sensors lost unit, device class, state class,
