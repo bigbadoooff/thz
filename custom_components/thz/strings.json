@@ -2155,7 +2155,16 @@
     },
     "select": {
       "op_mode": {
-        "name": "Operating Mode"
+        "name": "Operating Mode",
+        "state": {
+          "standby": "Standby",
+          "automatic": "Automatic",
+          "daymode": "Day mode",
+          "setback": "Setback",
+          "dhwmode": "DHW mode",
+          "manual": "Manual",
+          "emergency": "Emergency operation"
+        }
       },
       "passive_cooling": {
         "name": "Passive Cooling",
@@ -2175,7 +2184,11 @@
         }
       },
       "z_control_valve_dhw": {
-        "name": "Control Valve DHW"
+        "name": "Control Valve DHW",
+        "state": {
+          "off": "Off",
+          "on": "On"
+        }
       },
       "z_pump_dhw": {
         "name": "Pump DHW"

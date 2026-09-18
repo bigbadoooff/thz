@@ -28,6 +28,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -44,7 +45,12 @@ from .fault_sensor import async_setup_fault_sensors
 from .register_maps.register_map_manager import RegisterMapManager
 from .runtime_data import THZConfigEntry
 from .value_codec import decode_raw_value
-from .value_maps import STATE_TRANSLATED_DECODE_TYPES, state_options, to_state
+from .value_maps import (
+    STATE_TRANSLATED_DECODE_TYPES,
+    state_options,
+    state_slug,
+    to_state,
+)
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
@@ -351,6 +357,9 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         self._device_id = device_id
         self._implausible_logged = False
         self._raw_hex: str | None = None
+        # hex2error is a list of fault names, which an enum state cannot be;
+        # the names are translated when the value is built instead.
+        self._fault_texts: dict[str, str] = {}
 
         # Table-backed text values (weekday, season/operating mode, fault
         # codes) are enum sensors so their states are translated.
@@ -437,12 +446,38 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             if self._translated_states:
                 self._raw_hex = raw_bytes.hex()
                 return to_state(self._decode_type, value)
+            if self._decode_type == "hex2error" and isinstance(value, str):
+                return self._translate_fault_list(value)
             return self._discard_implausible(value, raw_bytes)
         except (ValueError, IndexError, TypeError) as err:
             _LOGGER.error(
                 "Error decoding sensor %s: %s", self._entity_name, err, exc_info=True
             )
             return None
+
+    async def async_added_to_hass(self) -> None:
+        """Load the fault names in the configured language for list sensors."""
+        await super().async_added_to_hass()
+        if self._decode_type != "hex2error":
+            return
+        prefix = f"component.{DOMAIN}.entity.sensor.fault_latest.state."
+        translations = await async_get_translations(
+            self.hass, self.hass.config.language, "entity", [DOMAIN]
+        )
+        self._fault_texts = {
+            key[len(prefix):]: text
+            for key, text in translations.items()
+            if key.startswith(prefix)
+        }
+
+    def _translate_fault_list(self, value: str) -> str:
+        """Translate a ", "-joined list of fault names (unknown names stay)."""
+        if not self._fault_texts:
+            return value
+        return ", ".join(
+            self._fault_texts.get(state_slug(name), name)
+            for name in value.split(", ")
+        )
 
     def _discard_implausible(
         self, value: int | float | bool | str, raw_bytes: bytes

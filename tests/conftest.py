@@ -169,6 +169,7 @@ sys.modules["homeassistant.helpers.area_registry"] = MagicMock()
 sys.modules["homeassistant.helpers.entity_registry"] = MagicMock()
 sys.modules["homeassistant.helpers.selector"] = MagicMock()
 sys.modules["homeassistant.helpers.storage"] = MagicMock()
+sys.modules["homeassistant.helpers.translation"] = MagicMock()
 
 # Mock homeassistant.util (and its "dt" submodule, e.g. dt_util.now()/.utcnow()
 # used by __init__.py). Without an explicit sys.modules entry for the

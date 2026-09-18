@@ -136,3 +136,119 @@ class TestTranslationsCoverEveryState:
             states = sensors[key]["state"]
             assert set(states) == set(state_options(decode)), key
             assert all(text for text in states.values()), key
+
+
+class TestSelectOptionsAreTranslationKeys:
+    """Select options are slugs; the device still gets the table value."""
+
+    def _entity(self, decode_type="2opmode"):
+        from unittest.mock import AsyncMock
+
+        from custom_components.thz.select import THZSelect
+
+        device = MagicMock()
+        device.async_execute = AsyncMock()
+        entity = THZSelect(
+            name="pOpMode",
+            entry={"command": "0A0900", "type": "select", "decode_type": decode_type},
+            device=device,
+            device_id="dev1",
+        )
+        entity.name = "pOpMode"
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        return entity
+
+    def test_options_are_slugs(self):
+        options = self._entity()._attr_options
+        assert "daymode" in options and "DAYmode" not in options
+        assert all(SLUG.match(o) for o in options)
+
+    @pytest.mark.asyncio
+    async def test_selecting_writes_the_table_value(self):
+        entity = self._entity()
+        await entity.async_select_option("daymode")
+        # 2opmode: "DAYmode" is register value 3
+        written = entity._device.async_execute.call_args[0][-1]
+        assert written[0] == 3
+        assert entity.current_option == "daymode"
+
+    @pytest.mark.asyncio
+    async def test_reading_reports_the_slug(self):
+        from unittest.mock import AsyncMock
+
+        entity = self._entity()
+        entity._device.async_execute = AsyncMock(return_value=bytes([5, 0]))
+        await entity.async_update()
+        assert entity.current_option == "dhwmode"
+
+    def test_slug_tables_keep_existing_options(self):
+        # already-slug tables must not change their option names
+        assert self._entity("passive_cooling")._attr_options == [
+            "off", "exhaust_air", "supply_air", "bypass", "sommerkassette",
+        ]
+        assert self._entity("cooling_distribution_hc1")._attr_options == [
+            "area", "air",
+        ]
+
+    @pytest.mark.parametrize(
+        "path", ["strings.json", "translations/en.json", "translations/de.json"]
+    )
+    def test_select_states_are_translated(self, path):
+        from custom_components.thz.value_maps import select_slugs
+
+        selects = json.loads((COMPONENT / path).read_text(encoding="utf-8"))[
+            "entity"
+        ]["select"]
+        for key, table in (
+            ("op_mode", "2opmode"),
+            ("z_control_valve_dhw", "1clean"),
+            ("passive_cooling", "passive_cooling"),
+            ("cooling_hc1_distribution", "cooling_distribution_hc1"),
+        ):
+            assert set(selects[key]["state"]) == set(select_slugs(table)), key
+
+
+class TestFaultListTranslation:
+    """The 2.xx "last errors" list is translated when the value is built."""
+
+    def _sensor(self, payload):
+        sensor = _sensor("hex2error", payload, "last_errors")
+        sensor._fault_texts = {
+            "none": "Kein Fehler",
+            "f01_anodefault": "Anodenfehler",
+            "f03_highpreasureguardfault": "Störung Hochdruckwächter",
+        }
+        return sensor
+
+    def test_names_are_translated(self):
+        # bits 0 and 2 set -> faults 1 and 3
+        sensor = self._sensor(bytes([0b101, 0, 0, 0]))
+        assert sensor.native_value == "Anodenfehler, Störung Hochdruckwächter"
+
+    def test_no_faults(self):
+        assert self._sensor(bytes(4)).native_value == "Kein Fehler"
+
+    def test_without_translations_the_names_are_kept(self):
+        sensor = self._sensor(bytes([0b1, 0, 0, 0]))
+        sensor._fault_texts = {}
+        assert sensor.native_value == "F01_AnodeFault"
+
+    def test_unlisted_name_is_kept(self):
+        sensor = self._sensor(bytes([0b10, 0, 0, 0]))  # fault 2 not in texts
+        assert sensor.native_value == "F02_SafetyTempDelimiterEngaged"
+
+    @pytest.mark.asyncio
+    async def test_texts_are_loaded_from_the_translations(self):
+        from unittest.mock import AsyncMock, patch
+
+        sensor = _sensor("hex2error", bytes(4), "last_errors")
+        sensor.hass = MagicMock()
+        sensor.hass.config.language = "de"
+        prefix = "component.thz.entity.sensor.fault_latest.state."
+        with patch(
+            "custom_components.thz.sensor.async_get_translations",
+            AsyncMock(return_value={prefix + "none": "Kein Fehler", "other": "x"}),
+        ):
+            await sensor.async_added_to_hass()
+        assert sensor._fault_texts == {"none": "Kein Fehler"}

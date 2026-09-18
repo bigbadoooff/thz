@@ -138,3 +138,13 @@ def to_state(decode_type: str, value: object) -> str:
     """Map a decoded table value to its state key ("unknown" if not in the table)."""
     slug = state_slug(str(value))
     return slug if slug in state_options(decode_type) else STATE_UNKNOWN
+
+
+def select_slugs(decode_type: str) -> dict[str, str]:
+    """Return {state key: SELECT_MAP value} for a select entity's table.
+
+    Select options must be translation-safe keys too, so entities expose the
+    slug ("daymode") while the codec keeps working with the table value
+    ("DAYmode"). Tables whose values are already slugs map to themselves.
+    """
+    return {state_slug(value): value for value in SELECT_MAP[decode_type].values()}

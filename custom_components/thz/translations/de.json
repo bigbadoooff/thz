@@ -2114,7 +2114,16 @@
     },
     "select": {
       "op_mode": {
-        "name": "Betriebsart"
+        "name": "Betriebsart",
+        "state": {
+          "standby": "Bereitschaft",
+          "automatic": "Automatik",
+          "daymode": "Tagbetrieb",
+          "setback": "Absenkbetrieb",
+          "dhwmode": "Warmwasserbetrieb",
+          "manual": "Handbetrieb",
+          "emergency": "Notbetrieb"
+        }
       },
       "passive_cooling": {
         "name": "Passive Kühlung",
@@ -2134,7 +2143,11 @@
         }
       },
       "z_control_valve_dhw": {
-        "name": "Steuerventil Warmwasser"
+        "name": "Steuerventil Warmwasser",
+        "state": {
+          "off": "Aus",
+          "on": "Ein"
+        }
       },
       "z_pump_dhw": {
         "name": "Pumpe Warmwasser"
