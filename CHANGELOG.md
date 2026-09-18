@@ -30,6 +30,14 @@ All notable changes to the THZ integration are documented here.
   follows the `enable_hc2` option, including when that option is toggled
   later in Reconfigure.
 
+- **Firmware 4.19 profile (Tecalor THZ 303 SOL)** (ported from the
+  Darian6969 fork): `419` is now a known firmware and is selectable in the
+  `firmware_override` dropdown. It uses the 4.39 maps, but `pxxFB` is shorter
+  on 4.19, so `flowRate`, `p_HCw`, `humidityAirOut` and `insideTemp` are
+  disabled instead of logging "payload too short" on every poll. Not verified
+  on 4.19 hardware: whether `actualPower_Qc`/`actualPower_Pel` are in kW like
+  4.39 (left unscaled), and COP sensors are not offered below firmware 4.39.
+
 ### Bug Fixes
 
 - **Firmware 4.39: 45 `pxxFB` sensors lost unit, device class, state class,

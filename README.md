@@ -186,6 +186,7 @@ register block):
 | `206` | `write_map_206` | `readings_map_2xx`, `readings_map_206`, `register_map_206` |
 | `214` | `write_map_206`, `write_map_214` | `readings_map_2xx`, `readings_map_214`, `register_map_214` |
 | `214j` | `write_map_206`, `write_map_214` | `readings_map_2xx`, `readings_map_214j`, `register_map_214j` |
+| `419` | `write_map_439_539`, `write_map_439` | `readings_map_439`, `register_map_419` |
 | `439` | `write_map_439_539`, `write_map_439` | `readings_map_439`, `register_map_439` |
 | `439technician` | `write_map_439_539`, `write_map_439`, `write_map_X39tech` | `readings_map_439`, `register_map_439` |
 | `509` / `709` | `write_map_439_539`, `write_map_539` | `readings_map_439`, `readings_map_509` |

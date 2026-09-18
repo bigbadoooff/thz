@@ -47,6 +47,7 @@ FIRMWARE_PROFILE_LABELS: dict[str, str] = {
     "206": "2.06",
     "214": "2.14",
     "214j": "2.14j",
+    "419": "4.19",
     "439": "4.39",
     "439technician": "4.39 Technician",
     "539": "5.39",
