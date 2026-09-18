@@ -15,6 +15,13 @@ All notable changes to the THZ integration are documented here.
   (`0A058E`, solar loop delay after a collector stagnation event). The two
   solar parameters count as advanced and are hidden by default.
 
+- **Implausible temperature readings are discarded** (ported from the m-l
+  fork): the serial protocol has only a 1-byte checksum, so a corrupted
+  frame can decode to e.g. -3276.8 degC and end up in long-term statistics.
+  Temperature sensors now report unknown instead when the value is outside
+  -50..100 degC (solar collector -50..300, hot gas -50..200, both can
+  legitimately exceed 100). The warning is logged once per episode.
+
 ### Bug Fixes
 
 - **Firmware 4.39: 45 `pxxFB` sensors lost unit, device class, state class,

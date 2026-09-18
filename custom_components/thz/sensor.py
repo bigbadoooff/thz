@@ -49,6 +49,21 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# The serial protocol only has a 1-byte checksum, so an occasional corrupted
+# frame can slip through and decode to garbage (e.g. -3276.8 degC). Reporting
+# None ("unknown") for one poll is far cheaper than a corrupted long-term
+# statistics history; the next good poll reports the real value again.
+_TEMPERATURE_RANGE = (-50.0, 100.0)
+
+# Sensors that legitimately exceed the standard ceiling: a stagnating solar
+# collector (pump stopped in full sun) reaches 150-200 degC, and the
+# compressor hot gas line can run above 100 degC.
+_WIDE_TEMPERATURE_RANGES: dict[str, tuple[float, float]] = {
+    "collector_temp": (-50.0, 300.0),
+    "solar_collector_temp": (-50.0, 300.0),
+    "hotgas_temp": (-50.0, 200.0),
+}
+
 # Read-only sensors backed by a DataUpdateCoordinator: no per-entity polling
 # and no service actions, so updates are not limited.
 PARALLEL_UPDATES = 0
@@ -319,6 +334,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         self._device_class = e.get("device_class")
         self._state_class = e.get("state_class")
         self._device_id = device_id
+        self._implausible_logged = False
 
         # Store the name for later use in unique_id and visibility checks
         self._entity_name = e["name"]
@@ -388,12 +404,45 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
                 )
                 return None
             raw_bytes = payload[self._offset : self._offset + self._length]
-            return decode_value(raw_bytes, self._decode_type, self._factor)
+            value = decode_value(raw_bytes, self._decode_type, self._factor)
+            return self._discard_implausible(value, raw_bytes)
         except (ValueError, IndexError, TypeError) as err:
             _LOGGER.error(
                 "Error decoding sensor %s: %s", self._entity_name, err, exc_info=True
             )
             return None
+
+    def _discard_implausible(
+        self, value: int | float | bool | str, raw_bytes: bytes
+    ) -> int | float | bool | str | None:
+        """Return None instead of a temperature outside its plausible range.
+
+        Only numeric temperature sensors are checked. The warning is logged
+        once per episode (until a plausible value is read again) so a
+        permanently faulty sensor does not flood the log on every poll.
+        """
+        if (
+            self._device_class != "temperature"
+            or isinstance(value, (bool, str))
+        ):
+            return value
+        key = getattr(self, "_attr_translation_key", None)
+        low, high = (
+            _WIDE_TEMPERATURE_RANGES.get(key, _TEMPERATURE_RANGE)
+            if isinstance(key, str)
+            else _TEMPERATURE_RANGE
+        )
+        if low <= value <= high:
+            self._implausible_logged = False
+            return value
+        if not self._implausible_logged:
+            self._implausible_logged = True
+            _LOGGER.warning(
+                "Sensor %s read an implausible value %s (outside %s..%s) from "
+                "raw bytes %s; discarding it as a corrupted response",
+                self._entity_name, value, low, high, raw_bytes.hex(),
+            )
+        return None
 
     @property
     def native_unit_of_measurement(self) -> str | None:
