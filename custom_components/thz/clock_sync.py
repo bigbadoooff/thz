@@ -54,16 +54,18 @@ CLOCK_REGISTER_NAMES = (
 CLOCK_DRIFT_WARN_SECONDS = 60  # periodic check: log + optionally auto-correct
 CLOCK_DRIFT_BACKUP_SECONDS = 3600  # backup: always auto-correct past this
 CLOCK_CHECK_INTERVAL = timedelta(minutes=15)
+# Attempts per clock register read before the clock is treated as unreadable.
+CLOCK_READ_ATTEMPTS = 3
 
 
-async def async_read_device_clock(
+async def _read_clock_parts(
     hass: HomeAssistant, device: "THZDevice", write_manager
-) -> datetime | None:
-    """Read the device's current date/time from its 5 pClock* registers.
+) -> dict[str, int] | None:
+    """Read the five pClock* components, retrying each read a few times.
 
-    Returns a naive datetime representing the device's own wall-clock
-    reading (no timezone concept on the device side), or None if any of the
-    five registers is missing from the current register map or unreadable.
+    A single dropped frame on the serial line would otherwise make the whole
+    snapshot (and with it the drift check) fail. Returns None if a register is
+    missing from the current register map or stays unreadable.
     """
     write_registers = write_manager.get_all_registers()
     parts: dict[str, int] = {}
@@ -71,18 +73,25 @@ async def async_read_device_clock(
         entry = write_registers.get(name)
         if entry is None:
             return None
-        try:
-            value_bytes = await device.async_execute(
-                hass,
-                device.read_value,
-                bytes.fromhex(entry["command"]),
-                "get",
-                WRITE_REGISTER_OFFSET,
-                WRITE_REGISTER_LENGTH,
-            )
-        except Exception as err:  # noqa: BLE001
-            _LOGGER.debug("clock_sync: failed to read %s: %s", name, err)
-            return None
+        value_bytes = None
+        for attempt in range(1, CLOCK_READ_ATTEMPTS + 1):
+            try:
+                value_bytes = await device.async_execute(
+                    hass,
+                    device.read_value,
+                    bytes.fromhex(entry["command"]),
+                    "get",
+                    WRITE_REGISTER_OFFSET,
+                    WRITE_REGISTER_LENGTH,
+                )
+            except Exception as err:  # noqa: BLE001
+                _LOGGER.debug(
+                    "clock_sync: failed to read %s (attempt %d/%d): %s",
+                    name, attempt, CLOCK_READ_ATTEMPTS, err,
+                )
+                value_bytes = None
+            if value_bytes:
+                break
         if not value_bytes:
             return None
         try:
@@ -91,6 +100,11 @@ async def async_read_device_clock(
             )
         except (ValueError, IndexError):
             return None
+    return parts
+
+
+def _parts_to_datetime(parts: dict[str, int]) -> datetime | None:
+    """Combine the five components into a naive datetime, or None if invalid."""
     try:
         return datetime(
             2000 + parts["pClockYear"],
@@ -103,14 +117,33 @@ async def async_read_device_clock(
         return None
 
 
+async def async_read_device_clock(
+    hass: HomeAssistant, device: "THZDevice", write_manager
+) -> datetime | None:
+    """Read the device's current date/time from its 5 pClock* registers.
+
+    Returns a naive datetime representing the device's own wall-clock
+    reading (no timezone concept on the device side), or None if any of the
+    five registers is missing from the current register map or unreadable.
+    """
+    parts = await _read_clock_parts(hass, device, write_manager)
+    return None if parts is None else _parts_to_datetime(parts)
+
+
 async def async_write_device_clock(
     hass: HomeAssistant, device: "THZDevice", write_manager, when: datetime
-) -> None:
+) -> bool:
     """Write ``when`` (a local wall-clock time) onto the 5 pClock* registers.
 
     Bypasses each register's declared min/max (pClockYear's in particular is
     a stale "12".."20" bound) since the value being written is always a
     freshly computed, valid current date/time component, never user input.
+
+    Only the components that differ from the device's current reading are
+    written (all of them if the current clock cannot be read), and the result
+    is verified by reading the clock back. Returns True if the readback
+    matches ``when``; a mismatch is logged but not raised, since the write
+    itself was accepted by the device.
     """
     write_registers = write_manager.get_all_registers()
     values = {
@@ -120,14 +153,26 @@ async def async_write_device_clock(
         "pClockHour": when.hour,
         "pClockMinutes": when.minute,
     }
+    current = await _read_clock_parts(hass, device, write_manager) or {}
     for name, value in values.items():
         entry = write_registers.get(name)
-        if entry is None:
+        if entry is None or current.get(name) == value:
             continue
         value_bytes = THZValueCodec.encode_number(value, 1.0, entry["decode_type"])
         await device.async_execute(
             hass, device.write_value, bytes.fromhex(entry["command"]), value_bytes
         )
+    readback = await _read_clock_parts(hass, device, write_manager)
+    if readback is None:
+        _LOGGER.warning("clock_sync: could not read the clock back after writing")
+        return False
+    if any(readback.get(name) != value for name, value in values.items()):
+        _LOGGER.warning(
+            "clock_sync: clock readback %s does not match the written time %s",
+            _parts_to_datetime(readback), when,
+        )
+        return False
+    return True
 
 
 async def async_check_and_maybe_sync_clock(

@@ -49,6 +49,11 @@ All notable changes to the THZ integration are documented here.
   confirmation phrase, one non-retried write and verification by readback.
   The clear write is only validated on firmware 4.19 and refused elsewhere.
 
+- **More robust device clock sync** (ported from the Darian6969 fork): each
+  clock register read is retried up to three times, a correction only writes
+  the components that differ, and the result is verified by reading the clock
+  back (a mismatch is logged). `auto_sync_clock` stays opt-in.
+
 ### Bug Fixes
 
 - **Firmware 4.39: 45 `pxxFB` sensors lost unit, device class, state class,

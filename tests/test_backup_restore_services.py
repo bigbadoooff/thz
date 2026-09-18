@@ -402,11 +402,16 @@ class TestClockDriftCheck:
         write_manager = self._make_write_manager()
 
         local_now = datetime(2026, 8, 25, 10, 0)
-        # 5 reads for the check, then 5 writes for the correction
+        # 5 reads for the check, 5 reads before the write, then the readback
+        # after the correction (only the hour differs, so only it is written)
         device_time_parts = [26, 8, 25, 12, 0]
+        corrected_parts = [26, 8, 25, 10, 0]
         write_calls = []
         device = self._make_device(
-            read_values=iter(bytes([v]) for v in device_time_parts),
+            read_values=iter(
+                bytes([v])
+                for v in device_time_parts + device_time_parts + corrected_parts
+            ),
             write_values=write_calls,
         )
 
@@ -418,10 +423,10 @@ class TestClockDriftCheck:
                 hass, config_entry, device, write_manager
             )
 
-        # 5 reads + 5 writes = 10 executor calls; no notification since
+        # 15 reads + 1 write = 16 executor calls; no notification since
         # auto-correction handled it.
-        assert device.async_execute.await_count == 10
-        assert len(write_calls) == 5
+        assert device.async_execute.await_count == 16
+        assert len(write_calls) == 1
         hass.services.async_call.assert_not_called()
 
     @pytest.mark.asyncio
@@ -932,3 +937,125 @@ class TestRestoreParametersService:
         pclock_year_cmd = bytes.fromhex("0A0101")
         matching = [w for w in clock_writes if w[0] == pclock_year_cmd]
         assert matching, "expected a write to the pClockYear register"
+
+
+class _FakeClockDevice:
+    """Device whose five clock registers behave like real, stateful storage."""
+
+    COMMANDS = {
+        "0A0101": "pClockYear",
+        "0A0102": "pClockMonth",
+        "0A0103": "pClockDay",
+        "0A0104": "pClockHour",
+        "0A0105": "pClockMinutes",
+    }
+
+    def __init__(self, clock, fail_reads=0, ignore_writes=False):
+        self.clock = dict(clock)
+        self.fail_reads = fail_reads
+        self.ignore_writes = ignore_writes
+        self.writes = []
+        self.read_value = object()
+        self.write_value = object()
+
+    async def async_execute(self, hass, fn, *args):
+        name = self.COMMANDS[args[0].hex().upper()]
+        if fn is self.read_value:
+            if self.fail_reads:
+                self.fail_reads -= 1
+                raise OSError("no data")
+            return bytes([self.clock[name]])
+        self.writes.append(name)
+        if not self.ignore_writes:
+            self.clock[name] = args[1][0]
+        return None
+
+
+def _clock_write_manager():
+    write_manager = MagicMock()
+    write_manager.get_all_registers = MagicMock(
+        return_value={
+            name: {"command": cmd, "decode_type": "0clean"}
+            for cmd, name in _FakeClockDevice.COMMANDS.items()
+        }
+    )
+    return write_manager
+
+
+_CLOCK = {
+    "pClockYear": 26,
+    "pClockMonth": 8,
+    "pClockDay": 25,
+    "pClockHour": 12,
+    "pClockMinutes": 0,
+}
+
+
+class TestClockRobustness:
+    """Retries on read, minimal writes and readback verification."""
+
+    @pytest.mark.asyncio
+    async def test_read_retries_transient_failures(self):
+        from custom_components.thz.clock_sync import async_read_device_clock
+
+        device = _FakeClockDevice(_CLOCK, fail_reads=2)
+        result = await async_read_device_clock(
+            MagicMock(), device, _clock_write_manager()
+        )
+        assert result == datetime(2026, 8, 25, 12, 0)
+
+    @pytest.mark.asyncio
+    async def test_read_gives_up_after_three_attempts(self):
+        from custom_components.thz.clock_sync import async_read_device_clock
+
+        device = _FakeClockDevice(_CLOCK, fail_reads=3)
+        result = await async_read_device_clock(
+            MagicMock(), device, _clock_write_manager()
+        )
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_write_only_changes_differing_components(self):
+        from custom_components.thz.clock_sync import async_write_device_clock
+
+        device = _FakeClockDevice(_CLOCK)
+        ok = await async_write_device_clock(
+            MagicMock(), device, _clock_write_manager(), datetime(2026, 8, 25, 10, 0)
+        )
+        assert ok is True
+        assert device.writes == ["pClockHour"]
+        assert device.clock["pClockHour"] == 10
+
+    @pytest.mark.asyncio
+    async def test_write_nothing_when_clock_already_correct(self):
+        from custom_components.thz.clock_sync import async_write_device_clock
+
+        device = _FakeClockDevice(_CLOCK)
+        ok = await async_write_device_clock(
+            MagicMock(), device, _clock_write_manager(), datetime(2026, 8, 25, 12, 0)
+        )
+        assert ok is True
+        assert device.writes == []
+
+    @pytest.mark.asyncio
+    async def test_write_all_when_current_clock_unreadable(self):
+        from custom_components.thz.clock_sync import async_write_device_clock
+
+        # Three failed attempts exhaust the pre-write read of the first register.
+        device = _FakeClockDevice(_CLOCK, fail_reads=3)
+        ok = await async_write_device_clock(
+            MagicMock(), device, _clock_write_manager(), datetime(2026, 8, 25, 12, 0)
+        )
+        assert ok is True
+        assert len(device.writes) == 5
+
+    @pytest.mark.asyncio
+    async def test_write_reports_readback_mismatch(self):
+        from custom_components.thz.clock_sync import async_write_device_clock
+
+        device = _FakeClockDevice(_CLOCK, ignore_writes=True)
+        ok = await async_write_device_clock(
+            MagicMock(), device, _clock_write_manager(), datetime(2026, 8, 25, 10, 0)
+        )
+        assert ok is False
+        assert device.writes == ["pClockHour"]
