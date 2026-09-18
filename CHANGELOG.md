@@ -105,6 +105,16 @@ All notable changes to the THZ integration are documented here.
   history recorded before the fix keeps its old (kW-sized) values and will
   show a step to the correct values at the update.
 
+- **Text sensors showed English protocol names instead of translated
+  values** (e.g. *Wochentag* reading `Monday`): the weekday, season mode,
+  heating/DHW operating mode, program state and fault code sensors (plus the
+  new *Latest fault* sensor) are now enum sensors with translated states in
+  English and German. Their state values change to lowercase keys
+  (`monday`, `setback`, `f05_outletfanfault`, `none` for "no fault"); update
+  automations or templates that compared against the old text. A value that
+  is not in the table reads `unknown`, with the raw bytes in the
+  `register_raw` attribute. The 2.xx-only *Last errors* list is unchanged.
+
 ## [0.5.1] – 2026-09-14
 
 ### Added

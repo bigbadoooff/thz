@@ -44,6 +44,7 @@ from .fault_sensor import async_setup_fault_sensors
 from .register_maps.register_map_manager import RegisterMapManager
 from .runtime_data import THZConfigEntry
 from .value_codec import decode_raw_value
+from .value_maps import STATE_TRANSLATED_DECODE_TYPES, state_options, to_state
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
@@ -349,6 +350,16 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         self._nibble = e.get("nibble")
         self._device_id = device_id
         self._implausible_logged = False
+        self._raw_hex: str | None = None
+
+        # Table-backed text values (weekday, season/operating mode, fault
+        # codes) are enum sensors so their states are translated.
+        self._translated_states = self._decode_type in STATE_TRANSLATED_DECODE_TYPES
+        if self._translated_states:
+            self._device_class = SensorDeviceClass.ENUM
+            self._unit = None
+            self._state_class = None
+            self._attr_options = state_options(self._decode_type)
 
         # Store the name for later use in unique_id and visibility checks
         self._entity_name = e["name"]
@@ -423,6 +434,9 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             elif self._nibble == "low":
                 raw_bytes = bytes([raw_bytes[0] & 0x0F])
             value = decode_value(raw_bytes, self._decode_type, self._factor)
+            if self._translated_states:
+                self._raw_hex = raw_bytes.hex()
+                return to_state(self._decode_type, value)
             return self._discard_implausible(value, raw_bytes)
         except (ValueError, IndexError, TypeError) as err:
             _LOGGER.error(
@@ -520,13 +534,17 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             A dictionary containing register metadata for this sensor,
             visible as attributes in the Home Assistant UI.
         """
-        return {
+        attributes: dict[str, Any] = {
             "register_block": "pxx" + self._block.hex().upper(),
             "register_offset": self._offset,
             "register_length": self._length,
             "register_decode_type": self._decode_type,
             "register_factor": self._factor,
         }
+        if self._translated_states and self._raw_hex is not None:
+            # Lets a value missing from the table ("unknown") be identified.
+            attributes["register_raw"] = self._raw_hex
+        return attributes
 
     # Sub-device group, set by devices.assign_subdevices before the entity
     # is added; None links the entity to the heat pump itself.

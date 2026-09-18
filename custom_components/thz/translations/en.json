@@ -603,10 +603,22 @@
         "name": "Inside Temperature HC2 (Room Controller)"
       },
       "season_mode": {
-        "name": "Season Mode"
+        "name": "Season Mode",
+        "state": {
+          "winter": "Winter",
+          "summer": "Summer",
+          "unknown": "Unknown"
+        }
       },
       "hc_op_mode": {
-        "name": "Heating Circuit Operating Mode"
+        "name": "Heating Circuit Operating Mode",
+        "state": {
+          "normal": "Normal",
+          "setback": "Setback",
+          "standby": "Standby",
+          "restart": "Restart",
+          "unknown": "Unknown"
+        }
       },
       "integral_heat": {
         "name": "Integral Heat"
@@ -819,7 +831,14 @@
         "name": "DHW Hours"
       },
       "dhw_op_mode": {
-        "name": "DHW Operating Mode"
+        "name": "DHW Operating Mode",
+        "state": {
+          "normal": "Normal",
+          "setback": "Setback",
+          "standby": "Standby",
+          "restart": "Restart",
+          "unknown": "Unknown"
+        }
       },
       "dhw_out_mode": {
         "name": "DHW Output Mode"
@@ -918,7 +937,42 @@
         "name": "Fan Stage Standby"
       },
       "fault0_code": {
-        "name": "Fault 0 Code"
+        "name": "Fault 0 Code",
+        "state": {
+          "none": "No fault",
+          "f01_anodefault": "Anode fault",
+          "f02_safetytempdelimiterengaged": "Safety temperature limiter engaged",
+          "f03_highpreasureguardfault": "High-pressure switch fault",
+          "f04_lowpreasureguardfault": "Low-pressure switch fault",
+          "f05_outletfanfault": "Outlet fan fault",
+          "f06_inletfanfault": "Inlet fan fault",
+          "f07_mainoutputfanfault": "Main output fan fault",
+          "f11_lowpreasuresensorfault": "Low-pressure sensor fault",
+          "f12_highpreasuresensorfault": "High-pressure sensor fault",
+          "f15_dhw_temperaturefault": "DHW temperature fault",
+          "f17_defrostingdurationexceeded": "Defrost duration exceeded",
+          "f20_solarsensorfault": "Solar sensor fault",
+          "f21_outsidetemperaturesensorfault": "Outside temperature sensor fault",
+          "f22_hotgastemperaturefault": "Hot gas temperature fault",
+          "f23_condensertemperaturesensorfault": "Condenser temperature sensor fault",
+          "f24_evaporatortemperaturesensorfault": "Evaporator temperature sensor fault",
+          "f26_returntemperaturesensorfault": "Return temperature sensor fault",
+          "f28_flowtemperaturesensorfault": "Flow temperature sensor fault",
+          "f29_dhw_temperaturesensorfault": "DHW temperature sensor fault",
+          "f30_softwareversionfault": "Software version fault",
+          "f31_ramfault": "RAM fault",
+          "f32_eepromfault": "EEPROM fault",
+          "f33_extractairhumiditysensor": "Extract air humidity sensor fault",
+          "f34_flowsensor": "Flow sensor fault",
+          "f35_minflowcooling": "Minimum flow in cooling mode",
+          "f36_minflowrate": "Minimum flow rate",
+          "f37_minwaterpressure": "Minimum water pressure",
+          "f40_floatswitch": "Float switch",
+          "f50_sensorheatpumpreturn": "Heat pump return sensor",
+          "f51_sensorheatpumpflow": "Heat pump flow sensor",
+          "f52_sensorcondenseroutlet": "Condenser outlet sensor",
+          "unknown": "Unknown fault"
+        }
       },
       "fault0_date": {
         "name": "Fault 0 Date"
@@ -927,7 +981,42 @@
         "name": "Fault 0 Time"
       },
       "fault1_code": {
-        "name": "Fault 1 Code"
+        "name": "Fault 1 Code",
+        "state": {
+          "none": "No fault",
+          "f01_anodefault": "Anode fault",
+          "f02_safetytempdelimiterengaged": "Safety temperature limiter engaged",
+          "f03_highpreasureguardfault": "High-pressure switch fault",
+          "f04_lowpreasureguardfault": "Low-pressure switch fault",
+          "f05_outletfanfault": "Outlet fan fault",
+          "f06_inletfanfault": "Inlet fan fault",
+          "f07_mainoutputfanfault": "Main output fan fault",
+          "f11_lowpreasuresensorfault": "Low-pressure sensor fault",
+          "f12_highpreasuresensorfault": "High-pressure sensor fault",
+          "f15_dhw_temperaturefault": "DHW temperature fault",
+          "f17_defrostingdurationexceeded": "Defrost duration exceeded",
+          "f20_solarsensorfault": "Solar sensor fault",
+          "f21_outsidetemperaturesensorfault": "Outside temperature sensor fault",
+          "f22_hotgastemperaturefault": "Hot gas temperature fault",
+          "f23_condensertemperaturesensorfault": "Condenser temperature sensor fault",
+          "f24_evaporatortemperaturesensorfault": "Evaporator temperature sensor fault",
+          "f26_returntemperaturesensorfault": "Return temperature sensor fault",
+          "f28_flowtemperaturesensorfault": "Flow temperature sensor fault",
+          "f29_dhw_temperaturesensorfault": "DHW temperature sensor fault",
+          "f30_softwareversionfault": "Software version fault",
+          "f31_ramfault": "RAM fault",
+          "f32_eepromfault": "EEPROM fault",
+          "f33_extractairhumiditysensor": "Extract air humidity sensor fault",
+          "f34_flowsensor": "Flow sensor fault",
+          "f35_minflowcooling": "Minimum flow in cooling mode",
+          "f36_minflowrate": "Minimum flow rate",
+          "f37_minwaterpressure": "Minimum water pressure",
+          "f40_floatswitch": "Float switch",
+          "f50_sensorheatpumpreturn": "Heat pump return sensor",
+          "f51_sensorheatpumpflow": "Heat pump flow sensor",
+          "f52_sensorcondenseroutlet": "Condenser outlet sensor",
+          "unknown": "Unknown fault"
+        }
       },
       "fault1_date": {
         "name": "Fault 1 Date"
@@ -936,7 +1025,42 @@
         "name": "Fault 1 Time"
       },
       "fault2_code": {
-        "name": "Fault 2 Code"
+        "name": "Fault 2 Code",
+        "state": {
+          "none": "No fault",
+          "f01_anodefault": "Anode fault",
+          "f02_safetytempdelimiterengaged": "Safety temperature limiter engaged",
+          "f03_highpreasureguardfault": "High-pressure switch fault",
+          "f04_lowpreasureguardfault": "Low-pressure switch fault",
+          "f05_outletfanfault": "Outlet fan fault",
+          "f06_inletfanfault": "Inlet fan fault",
+          "f07_mainoutputfanfault": "Main output fan fault",
+          "f11_lowpreasuresensorfault": "Low-pressure sensor fault",
+          "f12_highpreasuresensorfault": "High-pressure sensor fault",
+          "f15_dhw_temperaturefault": "DHW temperature fault",
+          "f17_defrostingdurationexceeded": "Defrost duration exceeded",
+          "f20_solarsensorfault": "Solar sensor fault",
+          "f21_outsidetemperaturesensorfault": "Outside temperature sensor fault",
+          "f22_hotgastemperaturefault": "Hot gas temperature fault",
+          "f23_condensertemperaturesensorfault": "Condenser temperature sensor fault",
+          "f24_evaporatortemperaturesensorfault": "Evaporator temperature sensor fault",
+          "f26_returntemperaturesensorfault": "Return temperature sensor fault",
+          "f28_flowtemperaturesensorfault": "Flow temperature sensor fault",
+          "f29_dhw_temperaturesensorfault": "DHW temperature sensor fault",
+          "f30_softwareversionfault": "Software version fault",
+          "f31_ramfault": "RAM fault",
+          "f32_eepromfault": "EEPROM fault",
+          "f33_extractairhumiditysensor": "Extract air humidity sensor fault",
+          "f34_flowsensor": "Flow sensor fault",
+          "f35_minflowcooling": "Minimum flow in cooling mode",
+          "f36_minflowrate": "Minimum flow rate",
+          "f37_minwaterpressure": "Minimum water pressure",
+          "f40_floatswitch": "Float switch",
+          "f50_sensorheatpumpreturn": "Heat pump return sensor",
+          "f51_sensorheatpumpflow": "Heat pump flow sensor",
+          "f52_sensorcondenseroutlet": "Condenser outlet sensor",
+          "unknown": "Unknown fault"
+        }
       },
       "fault2_date": {
         "name": "Fault 2 Date"
@@ -945,7 +1069,42 @@
         "name": "Fault 2 Time"
       },
       "fault3_code": {
-        "name": "Fault 3 Code"
+        "name": "Fault 3 Code",
+        "state": {
+          "none": "No fault",
+          "f01_anodefault": "Anode fault",
+          "f02_safetytempdelimiterengaged": "Safety temperature limiter engaged",
+          "f03_highpreasureguardfault": "High-pressure switch fault",
+          "f04_lowpreasureguardfault": "Low-pressure switch fault",
+          "f05_outletfanfault": "Outlet fan fault",
+          "f06_inletfanfault": "Inlet fan fault",
+          "f07_mainoutputfanfault": "Main output fan fault",
+          "f11_lowpreasuresensorfault": "Low-pressure sensor fault",
+          "f12_highpreasuresensorfault": "High-pressure sensor fault",
+          "f15_dhw_temperaturefault": "DHW temperature fault",
+          "f17_defrostingdurationexceeded": "Defrost duration exceeded",
+          "f20_solarsensorfault": "Solar sensor fault",
+          "f21_outsidetemperaturesensorfault": "Outside temperature sensor fault",
+          "f22_hotgastemperaturefault": "Hot gas temperature fault",
+          "f23_condensertemperaturesensorfault": "Condenser temperature sensor fault",
+          "f24_evaporatortemperaturesensorfault": "Evaporator temperature sensor fault",
+          "f26_returntemperaturesensorfault": "Return temperature sensor fault",
+          "f28_flowtemperaturesensorfault": "Flow temperature sensor fault",
+          "f29_dhw_temperaturesensorfault": "DHW temperature sensor fault",
+          "f30_softwareversionfault": "Software version fault",
+          "f31_ramfault": "RAM fault",
+          "f32_eepromfault": "EEPROM fault",
+          "f33_extractairhumiditysensor": "Extract air humidity sensor fault",
+          "f34_flowsensor": "Flow sensor fault",
+          "f35_minflowcooling": "Minimum flow in cooling mode",
+          "f36_minflowrate": "Minimum flow rate",
+          "f37_minwaterpressure": "Minimum water pressure",
+          "f40_floatswitch": "Float switch",
+          "f50_sensorheatpumpreturn": "Heat pump return sensor",
+          "f51_sensorheatpumpflow": "Heat pump flow sensor",
+          "f52_sensorcondenseroutlet": "Condenser outlet sensor",
+          "unknown": "Unknown fault"
+        }
       },
       "fault3_date": {
         "name": "Fault 3 Date"
@@ -1275,13 +1434,34 @@
         "name": "Program HC2 Wednesday"
       },
       "prog_state_dhw": {
-        "name": "Program State DHW"
+        "name": "Program State DHW",
+        "state": {
+          "normal": "Normal",
+          "setback": "Setback",
+          "standby": "Standby",
+          "restart": "Restart",
+          "unknown": "Unknown"
+        }
       },
       "prog_state_fan": {
-        "name": "Program State Fan"
+        "name": "Program State Fan",
+        "state": {
+          "normal": "Normal",
+          "setback": "Setback",
+          "standby": "Standby",
+          "restart": "Restart",
+          "unknown": "Unknown"
+        }
       },
       "prog_state_hc": {
-        "name": "Program State HC"
+        "name": "Program State HC",
+        "state": {
+          "normal": "Normal",
+          "setback": "Setback",
+          "standby": "Standby",
+          "restart": "Restart",
+          "unknown": "Unknown"
+        }
       },
       "restart_before_setback_end": {
         "name": "Restart Before Setback End"
@@ -1383,7 +1563,17 @@
         "name": "Volume Flow Filter Replacement"
       },
       "weekday": {
-        "name": "Weekday"
+        "name": "Weekday",
+        "state": {
+          "monday": "Monday",
+          "tuesday": "Tuesday",
+          "wednesday": "Wednesday",
+          "thursday": "Thursday",
+          "friday": "Friday",
+          "saturday": "Saturday",
+          "sunday": "Sunday",
+          "unknown": "Unknown"
+        }
       },
       "x08": {
         "name": "Register X08"
@@ -1432,7 +1622,42 @@
         "name": "Fault memory"
       },
       "fault_latest": {
-        "name": "Latest fault"
+        "name": "Latest fault",
+        "state": {
+          "none": "No fault",
+          "f01_anodefault": "Anode fault",
+          "f02_safetytempdelimiterengaged": "Safety temperature limiter engaged",
+          "f03_highpreasureguardfault": "High-pressure switch fault",
+          "f04_lowpreasureguardfault": "Low-pressure switch fault",
+          "f05_outletfanfault": "Outlet fan fault",
+          "f06_inletfanfault": "Inlet fan fault",
+          "f07_mainoutputfanfault": "Main output fan fault",
+          "f11_lowpreasuresensorfault": "Low-pressure sensor fault",
+          "f12_highpreasuresensorfault": "High-pressure sensor fault",
+          "f15_dhw_temperaturefault": "DHW temperature fault",
+          "f17_defrostingdurationexceeded": "Defrost duration exceeded",
+          "f20_solarsensorfault": "Solar sensor fault",
+          "f21_outsidetemperaturesensorfault": "Outside temperature sensor fault",
+          "f22_hotgastemperaturefault": "Hot gas temperature fault",
+          "f23_condensertemperaturesensorfault": "Condenser temperature sensor fault",
+          "f24_evaporatortemperaturesensorfault": "Evaporator temperature sensor fault",
+          "f26_returntemperaturesensorfault": "Return temperature sensor fault",
+          "f28_flowtemperaturesensorfault": "Flow temperature sensor fault",
+          "f29_dhw_temperaturesensorfault": "DHW temperature sensor fault",
+          "f30_softwareversionfault": "Software version fault",
+          "f31_ramfault": "RAM fault",
+          "f32_eepromfault": "EEPROM fault",
+          "f33_extractairhumiditysensor": "Extract air humidity sensor fault",
+          "f34_flowsensor": "Flow sensor fault",
+          "f35_minflowcooling": "Minimum flow in cooling mode",
+          "f36_minflowrate": "Minimum flow rate",
+          "f37_minwaterpressure": "Minimum water pressure",
+          "f40_floatswitch": "Float switch",
+          "f50_sensorheatpumpreturn": "Heat pump return sensor",
+          "f51_sensorheatpumpflow": "Heat pump flow sensor",
+          "f52_sensorcondenseroutlet": "Condenser outlet sensor",
+          "unknown": "Unknown fault"
+        }
       },
       "fault_new": {
         "name": "New faults"
