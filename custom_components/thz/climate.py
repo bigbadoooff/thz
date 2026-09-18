@@ -26,7 +26,11 @@ entities are created when the required data blocks are available:
 
 - **Heating Circuit 2 (HC2)**: reads target temperature from the ``pxxF5``
   coordinator.  Created only when ``p01RoomTempDayHC2`` is present in the
-  write-register map.  No room-temperature sensor is available for HC2.
+  write-register map.  No room-temperature sensor is available for HC2, and
+  ``pxxF5`` has no per-circuit ``hcOpMode`` field on any firmware, so
+  ``hvac_mode`` is a fixed ``HEAT`` (``COOL`` when cooling is active).  Like
+  every other HC2 entity it is disabled by default and only enabled by the
+  ``enable_hc2`` option.
   Like HC1, HC2 has independently-scheduled day/night setpoints
   (``p01RoomTempDayHC2`` / ``p02RoomTempNightHC2``); setting a new
   temperature writes to whichever register is currently active, using the
@@ -84,6 +88,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from ._typing_compat import get_runtime_data
 from .const import (
+    CONF_ENABLE_HC2,
     DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
     WRITE_REGISTER_LENGTH,
@@ -253,6 +258,7 @@ async def async_setup_entry(
     register_manager = entry_data["register_manager"]
     entity_id_style = entry_data.get("entity_id_style", ENTITY_ID_STYLE_DEFAULT)
     entity_id_prefix = entry_data.get("entity_id_prefix")
+    enable_hc2 = bool(config_entry.data.get(CONF_ENABLE_HC2, False))
 
     # Derive field byte-offsets and lengths from the active firmware's register map.
     # Returns None when a field is absent; the entity is skipped in that case.
@@ -335,11 +341,16 @@ async def async_setup_entry(
     # ── Heating Circuit 2 ──────────────────────────────────────────────────
     hc2_coordinator = coordinators.get("pxxF5")
     if hc2_coordinator is not None:
-        if f5_target is None or f5_opmode is None:
+        if f5_target is None:
             _LOGGER.error(
                 "Required fields missing from pxxF5 map; skipping HC2 climate entity"
             )
         else:
+            if f5_opmode is None:
+                _LOGGER.debug(
+                    "pxxF5 has no hcOpMode field; HC2 climate reports a fixed "
+                    "HEAT mode instead of live per-circuit status"
+                )
             hc2_heat_entry = _find_entry(write_registers, _HC2_HEAT_SETPOINT_NAMES)
             hc2_night_entry = _find_entry(write_registers, _HC2_NIGHT_SETPOINT_NAMES)
             if hc2_heat_entry is not None:
@@ -365,8 +376,9 @@ async def async_setup_entry(
                         current_temp_length=None,
                         target_temp_offset=f5_target[0],
                         target_temp_length=f5_target[1],
-                        op_mode_offset=f5_opmode[0],
-                        op_mode_length=f5_opmode[1],
+                        op_mode_offset=f5_opmode[0] if f5_opmode else None,
+                        op_mode_length=f5_opmode[1] if f5_opmode else None,
+                        enabled_default=enable_hc2,
                         cooling_byte=a176_cooling[0] if a176_cooling else None,
                         cooling_bit=a176_cooling[1] if a176_cooling else None,
                         compressor_bit=a176_compressor[1] if a176_compressor else None,
@@ -538,8 +550,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         current_temp_length: int | None,
         target_temp_offset: int,
         target_temp_length: int,
-        op_mode_offset: int,
-        op_mode_length: int,
+        op_mode_offset: int | None,
+        op_mode_length: int | None,
         heat_setpoint_entry: dict | None,
         cool_switch_entry: dict | None,
         cool_setpoint_entry: dict | None,
@@ -552,6 +564,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         manual_setpoint_entry: dict | None = None,
         entity_id_style: str = ENTITY_ID_STYLE_DEFAULT,
         entity_id_prefix: str | None = None,
+        enabled_default: bool = True,
     ) -> None:
         """Initialise a THZ climate entity.
 
@@ -566,8 +579,11 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             current_temp_length: Byte length of current temperature field.
             target_temp_offset: Byte offset of target temperature in block.
             target_temp_length: Byte length of target temperature field.
-            op_mode_offset: Byte offset of operating-mode field in block.
-            op_mode_length: Byte length of operating-mode field.
+            op_mode_offset: Byte offset of operating-mode field in block, or
+                ``None`` when the block has none (HC2); ``hvac_mode`` is then
+                a fixed ``HEAT``.
+            op_mode_length: Byte length of operating-mode field. Ignored when
+                ``op_mode_offset`` is ``None``.
             heat_setpoint_entry: Write-register metadata for heat setpoint.
             cool_switch_entry: Write-register metadata for cooling switch.
             cool_setpoint_entry: Write-register metadata for cooling setpoint.
@@ -598,8 +614,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             entity_id_prefix: Optional device name/alias (e.g. "lwz") to
                 prepend to the FHEM-style entity_id. Only used when
                 entity_id_style is "fhem"; ignored otherwise.
+            enabled_default: Whether the entity is enabled when first added to
+                the entity registry (``False`` for HC2 unless ``enable_hc2``).
         """
         super().__init__(coordinator)
+        if not enabled_default:
+            self._attr_entity_registry_enabled_default = False
 
         self._cooling_coordinator = cooling_coordinator
         self._device = device
@@ -814,8 +834,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             ):
                 return HVACMode.COOL
 
-        # Fall back to hcOpMode / dhwOpMode
-        if self.coordinator.data is None:
+        # Fall back to hcOpMode / dhwOpMode (HC2 has no such field)
+        if (
+            self.coordinator.data is None
+            or self._op_mode_offset is None
+            or self._op_mode_length is None
+        ):
             return HVACMode.HEAT
         return _read_op_mode(
             self.coordinator.data,

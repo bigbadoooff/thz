@@ -341,6 +341,11 @@ def _entity_should_be_hidden(
         enable_hc2: Whether Heating Circuit 2 entities should be shown,
             independent of visibility.
     """
+    if uid.endswith("_climate_heating_circuit_2"):
+        # The HC2 climate entity carries no "hc2" keyword in its unique_id or
+        # name, so the classifier below would miss it; it is gated purely by
+        # enable_hc2 like every other HC2 entity.
+        return not enable_hc2
     if should_hide_entity(uid, visibility, enable_hc2) or should_hide_entity(
         name, visibility, enable_hc2
     ):

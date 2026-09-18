@@ -22,6 +22,14 @@ All notable changes to the THZ integration are documented here.
   -50..100 degC (solar collector -50..300, hot gas -50..200, both can
   legitimately exceed 100). The warning is logged once per episode.
 
+- **Heating Circuit 2 climate entity is now created** (ported from the m-l
+  fork): `pxxF5` has no `hcOpMode` field on any firmware, and the setup code
+  required one, so the HC2 climate entity was never created. It now only
+  needs the HC2 target temperature; `hvac_mode` is a fixed HEAT (COOL while
+  cooling). Like every other HC2 entity it is disabled by default and
+  follows the `enable_hc2` option, including when that option is toggled
+  later in Reconfigure.
+
 ### Bug Fixes
 
 - **Firmware 4.39: 45 `pxxFB` sensors lost unit, device class, state class,
