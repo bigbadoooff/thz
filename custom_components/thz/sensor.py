@@ -194,7 +194,7 @@ def decode_value(
             - "hex": Unsigned integer divided by factor.
             - "bitX": Extracts bit number X (e.g., "bit3").
             - "nbitX": Negation of bit X (e.g., "nbit2").
-            - "esp_mant": Mantissa and exponent representation.
+            - "esp_mant": Big-endian IEEE-754 float divided by factor.
             - "hexdate": 2-byte unsigned int formatted as "DD.MM".
             - "clockdate": 3-byte date → "YYYY-MM-DD".
             - "somwinmode": Map lookup for summer/winter mode.
@@ -205,7 +205,8 @@ def decode_value(
             - "turnhexdate"/"turnhex2time": Byte-swapped date/time, used for
               the firmware 4.39/5.39 fault log (see value_codec for details).
             - Any other: Returns hexadecimal representation.
-        factor: The divisor for "hex2int" and "hex" decoding. Defaults to 1.0.
+        factor: The divisor for "hex2int", "hex" and "esp_mant" decoding.
+            Defaults to 1.0.
 
     Returns:
         The decoded value (int, float, bool, or str).

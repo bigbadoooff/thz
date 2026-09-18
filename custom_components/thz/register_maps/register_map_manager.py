@@ -196,6 +196,16 @@ class BaseRegisterMapManager:
         """Normalize a sensor name for comparison by stripping whitespace."""
         return name.strip() if isinstance(name, str) else name
 
+    @staticmethod
+    def _inherit_meta(entry, base_entry):
+        """Return ``entry`` with ``base_entry``'s meta dict if it has none.
+
+        Read-map entries are ``(name, offset, length, decode, factor[, meta])``.
+        """
+        if base_entry is None or len(entry) > 5 or len(base_entry) <= 5:
+            return entry
+        return (*entry, base_entry[5])
+
     def _merge_maps(self, base: dict, override: dict) -> dict:
         """Merge base and override maps in a predictable way."""
         merged = deepcopy(base) if base else {}
@@ -209,6 +219,18 @@ class BaseRegisterMapManager:
                     try:
                         # Normalize names for comparison by stripping whitespace
                         override_names = {self._normalize_name(e[0]) for e in entries}
+                        base_by_name = {
+                            self._normalize_name(e[0]): e for e in merged[block]
+                        }
+                        # An override that omits an entry's meta dict (unit,
+                        # device_class, translation_key, ...) keeps the base
+                        # entry's, so overrides can be pure offset/decode tweaks.
+                        entries = [
+                            self._inherit_meta(
+                                e, base_by_name.get(self._normalize_name(e[0]))
+                            )
+                            for e in entries
+                        ]
                     except (AttributeError, TypeError):
                         override_names = set()
                     # Keep entries from base that are not in override, then add all override entries

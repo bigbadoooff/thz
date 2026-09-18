@@ -32,7 +32,9 @@ def _dec_esp_mant(raw: bytes, factor: float) -> float:
         mant: float = struct.unpack(">f", raw)[0]
     except struct.error as err:
         raise ValueError(f"Failed to decode esp_mant value: {err}") from err
-    return round(mant, 3)
+    # Like hex/hex2int, factor is a divisor: some firmwares report power in kW
+    # where the map declares W, so those entries use e.g. 0.001 (kW -> W).
+    return round(mant / factor if factor else mant, 3)
 
 
 def _dec_hexdate(raw: bytes, factor: float) -> str:
@@ -194,7 +196,7 @@ def decode_raw_value(
             - "hex": Unsigned integer divided by factor.
             - "bitX": Extracts bit number X (e.g., "bit3").
             - "nbitX": Negation of bit X (e.g., "nbit2").
-            - "esp_mant": Mantissa and exponent representation.
+            - "esp_mant": Big-endian IEEE-754 float divided by factor.
             - "hexdate": 2-byte unsigned int formatted as "DD.MM"
               (value/100 . value%100).
             - "clockdate": 3-byte date (year-offset, month, day) → "YYYY-MM-DD".

@@ -6,6 +6,27 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Bug Fixes
+
+- **Firmware 4.39: 45 `pxxFB` sensors lost unit, device class, state class,
+  icon and name** (issue #164, introduced in 0.5.0): `register_map_439.py`
+  re-declared the whole `pxxFB` block without meta dicts, and the merge in
+  `RegisterMapManager` replaces base entries by name, so every re-listed
+  entry silently lost its metadata (no more long-term statistics, no unit,
+  raw register name as friendly name). `_merge_maps` now carries the base
+  entry's meta dict over when an override omits it, and
+  `register_map_439.py` is reduced to what really differs on 4.39 (the
+  three disabled sensors, `dewPoint`, and the power scaling below). A
+  regression test asserts no firmware's merged map drops base metadata.
+
+- **Firmware 4.39: `actualPower_Qc` / `actualPower_Pel` off by a factor of
+  1000** (issue #165): 4.39 hardware reports these in kW while the map
+  declares W (5.39 reports W, so the base map is unchanged). The `esp_mant`
+  decoder ignored its `factor` argument; it now divides by it like the other
+  decoders, and the 4.39 map uses `0.001` (kW → W). The unit stays W, so
+  history recorded before the fix keeps its old (kW-sized) values and will
+  show a step to the correct values at the update.
+
 ## [0.5.1] – 2026-09-14
 
 ### Added
