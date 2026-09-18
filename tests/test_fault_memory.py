@@ -9,7 +9,6 @@ import pytest
 from custom_components.thz.fault_memory import (
     CLEAR_CONFIRMATION,
     FAULT_CLEAR_PAYLOAD,
-    FAULT_CLEAR_VALIDATED_FIRMWARE,
     FAULT_MEMORY_COMMAND,
     clear_fault_memory,
     decode_fault_date,
@@ -369,6 +368,3 @@ class TestClearFaultMemory:
 class TestConstants:
     def test_confirmation_phrase(self):
         assert CLEAR_CONFIRMATION == "CLEAR D1"
-
-    def test_clear_is_only_validated_on_419(self):
-        assert FAULT_CLEAR_VALIDATED_FIRMWARE == {"419"}

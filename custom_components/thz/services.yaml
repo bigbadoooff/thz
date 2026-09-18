@@ -347,8 +347,8 @@ clear_fault_memory:
     Physically clear the heat pump's fault memory (register D1). This writes
     to the device: it reads and validates D1 first, sends exactly one clear
     command (never retried) and confirms the result by reading D1 again. The
-    fault history on the heat pump is permanently lost. Only available on
-    firmware where this has been validated on real hardware (currently 4.19).
+    fault history on the heat pump is permanently lost. Works on every
+    firmware; success is decided by reading D1 back.
   fields:
     confirmation:
       name: Confirmation

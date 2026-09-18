@@ -47,7 +47,9 @@ All notable changes to the THZ integration are documented here.
   `thz.probe_fault_memory` (read-only), `thz.acknowledge_faults` (HA side only)
   and `thz.clear_fault_memory`, which clears the device's fault memory with a
   confirmation phrase, one non-retried write and verification by readback.
-  The clear write is only validated on firmware 4.19 and refused elsewhere.
+  The clear service is available on every firmware; the write was verified
+  on real hardware on firmware 4.19 only, elsewhere success is decided by the
+  readback.
 
 - **More robust device clock sync** (ported from the Darian6969 fork): each
   clock register read is retried up to three times, a correction only writes

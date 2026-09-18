@@ -10,8 +10,9 @@ ten six-byte records follow from byte 4, oldest first::
 Time and date are two-digit decimal pairs stored byte-swapped (see
 ``value_codec._dec_turnhex2time`` / ``_dec_turnhexdate``); no year is stored.
 
-Reading is always safe. Clearing writes ``0000`` to D1 exactly once and is only
-allowed on firmware where that write has been validated on real hardware.
+Reading is always safe. Clearing writes ``0000`` to D1 exactly once. That write
+was verified on firmware 4.19 only; on other firmware the pre-read still has to
+validate the D1 response and success is decided by reading D1 back.
 """
 
 from __future__ import annotations
@@ -37,9 +38,6 @@ FAULT_MAX_RECORDS = 10
 
 FAULT_CLEAR_PAYLOAD = bytes.fromhex("0000")
 CLEAR_CONFIRMATION = "CLEAR D1"
-# Firmware on which writing 0000 to D1 was verified against real hardware.
-# Other firmware is refused until a user confirms the same behaviour.
-FAULT_CLEAR_VALIDATED_FIRMWARE = frozenset({"419"})
 
 _READ_ERRORS = (RuntimeError, ConnectionError, OSError)
 

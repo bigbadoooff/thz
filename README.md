@@ -104,7 +104,7 @@ Read-only. Returns the raw D1 bytes and the decoded records.
 Marks all records currently stored as seen. Only affects Home Assistant (the *Fault status* and *New faults* sensors); nothing is written to the heat pump.
 
 #### `thz.clear_fault_memory`
-Physically clears the heat pump's fault memory. It reads and validates D1 first, sends **one** clear command (`0000` to D1, never retried) and verifies the result by reading D1 again. The history on the device is lost. You must pass `confirmation: "CLEAR D1"`. This has only been validated on firmware **4.19**; on other firmware the service refuses to run.
+Physically clears the heat pump's fault memory. It reads and validates D1 first, sends **one** clear command (`0000` to D1, never retried) and verifies the result by reading D1 again. The history on the device is lost. You must pass `confirmation: "CLEAR D1"`. It works on every firmware that provides D1, but the write has only been verified on real hardware on firmware **4.19**; if the readback still shows faults the service reports an error.
 
 ```yaml
 service: thz.clear_fault_memory
@@ -182,7 +182,7 @@ The report includes firmware version, connection status, coordinator last-update
 |----------|-------|
 | 2.06     | Sensor read support; write support via block read-modify-write |
 | 2.14 / 2.14j | Sensor read support; write support via block read-modify-write |
-| 4.19     | 4.39-like profile for the THZ 303 SOL; a few `pxxFB` sensors the shorter payload cannot supply are disabled. Fault memory can be cleared (validated on this firmware only) |
+| 4.19     | 4.39-like profile for the THZ 303 SOL; a few `pxxFB` sensors the shorter payload cannot supply are disabled. Fault memory clear verified on this firmware |
 | 4.39     | Full support including energy sensors, COP, runtime hours, and passive cooling |
 | 5.39     | Full support including passive cooling energy sensor (`sCoolHCTotal`) |
 | Other    | Falls back to a 4.39-like configuration (like the reference FHEM module) — may work partially |

@@ -214,7 +214,6 @@ def _call(**data):
 
 def _device(firmware="419"):
     device = MagicMock()
-    device.effective_firmware = firmware
     device.async_execute = AsyncMock(return_value=_payload(R3))
     return device
 
@@ -296,12 +295,19 @@ class TestClearService:
         device.async_execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_unvalidated_firmware_is_refused(self):
-        device = _device(firmware="539")
-        handler = await _handler(_hass_with({"device": device}), "clear_fault_memory")
-        with pytest.raises(ServiceValidationError, match="only been validated"):
-            await handler(_call(confirmation="CLEAR D1"))
-        device.async_execute.assert_not_called()
+    @pytest.mark.parametrize("firmware", ["419", "439", "539", "509"])
+    async def test_available_on_every_firmware(self, firmware):
+        hass = _hass_with({"device": _device(firmware=firmware)})
+        handler = await _handler(hass, "clear_fault_memory")
+        with patch(
+            "custom_components.thz.services.clear_fault_memory",
+            AsyncMock(
+                return_value={"cleared": True, "before_count": 1, "after_count": 0}
+            ),
+        ) as clear:
+            result = await handler(_call(confirmation="CLEAR D1"))
+        clear.assert_awaited_once()
+        assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_success_refreshes_the_source_coordinator(self):
@@ -332,21 +338,6 @@ class TestClearService:
         ):
             with pytest.raises(HomeAssistantError, match="still reports"):
                 await handler(_call(confirmation="CLEAR D1"))
-
-    @pytest.mark.asyncio
-    async def test_firmware_override_is_respected(self):
-        # effective_firmware already reflects firmware_override; a 4.19
-        # override on another detected firmware is allowed.
-        hass = _hass_with({"device": _device(firmware="419")})
-        handler = await _handler(hass, "clear_fault_memory")
-        with patch(
-            "custom_components.thz.services.clear_fault_memory",
-            AsyncMock(
-                return_value={"cleared": False, "before_count": 0, "after_count": 0}
-            ),
-        ):
-            result = await handler(_call(confirmation="CLEAR D1"))
-        assert result["success"] is True
 
 
 class TestTranslationsAndIcons:

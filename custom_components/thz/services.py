@@ -39,7 +39,6 @@ from .clock_sync import (
 from .const import DOMAIN, WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
 from .fault_memory import (
     CLEAR_CONFIRMATION,
-    FAULT_CLEAR_VALIDATED_FIRMWARE,
     clear_fault_memory,
     read_fault_memory,
 )
@@ -1277,13 +1276,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             )
         _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
         device = entry_data["device"]
-        firmware = device.effective_firmware
-        if firmware not in FAULT_CLEAR_VALIDATED_FIRMWARE:
-            raise ServiceValidationError(
-                "Clearing the fault memory has only been validated on firmware "
-                f"{', '.join(sorted(FAULT_CLEAR_VALIDATED_FIRMWARE))}; this device "
-                f"uses {firmware}. Use the heat pump's own menu instead."
-            )
         try:
             result = await clear_fault_memory(hass, device)
         except RuntimeError as err:
