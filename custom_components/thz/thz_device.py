@@ -979,6 +979,11 @@ class THZDevice:
         return self._firmware_version
 
     @property
+    def effective_firmware(self) -> str:
+        """Return the firmware profile in use (the override, if one is set)."""
+        return self._resolve_effective_firmware()
+
+    @property
     def available_reading_blocks(self) -> list[str]:
         """Return the available reading blocks of the device."""
         if self.register_map_manager:

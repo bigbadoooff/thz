@@ -40,6 +40,7 @@ from .const import (
     should_hide_entity_by_default,
 )
 from .cop_sensor import async_setup_cop_sensors
+from .fault_sensor import async_setup_fault_sensors
 from .entity_id_style import resolve_suggested_object_id
 from .register_maps.register_map_manager import RegisterMapManager
 from .value_codec import decode_raw_value
@@ -193,6 +194,7 @@ async def async_setup_entry(
 
     # Set up COP sensors separately
     await async_setup_cop_sensors(hass, config_entry, async_add_entities)
+    await async_setup_fault_sensors(hass, config_entry, async_add_entities)
 
 
 def decode_value(

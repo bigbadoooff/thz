@@ -598,6 +598,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             hass.services.async_remove(DOMAIN, "backup_parameters")
             hass.services.async_remove(DOMAIN, "restore_parameters")
             hass.services.async_remove(DOMAIN, "list_parameter_backups")
+            hass.services.async_remove(DOMAIN, "probe_fault_memory")
+            hass.services.async_remove(DOMAIN, "acknowledge_faults")
+            hass.services.async_remove(DOMAIN, "clear_fault_memory")
 
     return unload_ok
 

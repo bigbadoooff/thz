@@ -1388,6 +1388,22 @@
       },
       "power_hd": {
         "name": "Power Hd"
+      },
+      "fault_status": {
+        "name": "Fault status",
+        "state": {
+          "ok": "No fault",
+          "fault": "Fault"
+        }
+      },
+      "fault_memory": {
+        "name": "Fault memory"
+      },
+      "fault_latest": {
+        "name": "Latest fault"
+      },
+      "fault_new": {
+        "name": "New faults"
       }
     },
     "number": {

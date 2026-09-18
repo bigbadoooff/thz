@@ -79,6 +79,9 @@ class TestServiceRegistration:
             "backup_parameters",
             "restore_parameters",
             "list_parameter_backups",
+            "probe_fault_memory",
+            "acknowledge_faults",
+            "clear_fault_memory",
         }
 
     @pytest.mark.asyncio

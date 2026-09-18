@@ -692,6 +692,22 @@
       },
       "temp_limit_boost_dhw": {
         "default": "mdi:thermometer"
+      },
+      "fault_status": {
+        "default": "mdi:check-circle",
+        "state": {
+          "ok": "mdi:check-circle",
+          "fault": "mdi:alert-circle"
+        }
+      },
+      "fault_memory": {
+        "default": "mdi:history"
+      },
+      "fault_latest": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "fault_new": {
+        "default": "mdi:alert"
       }
     },
     "switch": {

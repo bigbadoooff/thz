@@ -311,3 +311,55 @@ list_parameter_backups:
     List the parameter backup files saved under config/thz_backups/, newest
     first, with each one's creation time and parameter count — use this to
     find the filename to pass to restore_parameters.
+
+probe_fault_memory:
+  name: Probe Fault Memory
+  description: >
+    Read and decode the heat pump's fault memory (register D1, up to the last
+    ten faults, newest last) and return the raw bytes plus the decoded
+    records. Strictly read-only.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID. Only required when multiple THZ devices are configured.
+      required: false
+      selector:
+        text:
+
+acknowledge_faults:
+  name: Acknowledge Faults
+  description: >
+    Mark all fault records currently stored in the heat pump as seen. This
+    only resets the "New faults" count and the fault status sensor in Home
+    Assistant; nothing is written to the heat pump and its fault memory stays
+    as it is.
+  fields:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID. Only required when multiple THZ devices are configured.
+      required: false
+      selector:
+        text:
+
+clear_fault_memory:
+  name: Clear Fault Memory
+  description: >
+    Physically clear the heat pump's fault memory (register D1). This writes
+    to the device: it reads and validates D1 first, sends exactly one clear
+    command (never retried) and confirms the result by reading D1 again. The
+    fault history on the heat pump is permanently lost. Only available on
+    firmware where this has been validated on real hardware (currently 4.19).
+  fields:
+    confirmation:
+      name: Confirmation
+      description: Type CLEAR D1 exactly to confirm.
+      required: true
+      example: "CLEAR D1"
+      selector:
+        text:
+    entry_id:
+      name: Entry ID
+      description: Config entry ID. Only required when multiple THZ devices are configured.
+      required: false
+      selector:
+        text:

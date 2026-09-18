@@ -37,6 +37,12 @@ from .clock_sync import (
     async_write_device_clock,
 )
 from .const import DOMAIN, WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
+from .fault_memory import (
+    CLEAR_CONFIRMATION,
+    FAULT_CLEAR_VALIDATED_FIRMWARE,
+    clear_fault_memory,
+    read_fault_memory,
+)
 from .thz_device import THZDevice, THZRegisterNotSupportedError
 from .time import quarters_to_time, time_to_quarters
 from .value_codec import THZValueCodec, decode_raw_value
@@ -1230,6 +1236,63 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             {"success": True, "count": len(backups), "backups": backups},
         )
 
+    async def _async_handle_probe_fault_memory(call: ServiceCall) -> ServiceResponse:
+        """Read and decode the D1 fault memory. Read-only."""
+        _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
+        try:
+            result = await read_fault_memory(hass, entry_data["device"])
+        except THZRegisterNotSupportedError as err:
+            raise HomeAssistantError(
+                f"D1 fault memory is not supported by this device: {err}"
+            ) from err
+        except (RuntimeError, ConnectionError, OSError) as err:
+            raise HomeAssistantError(f"Could not read D1 fault memory: {err}") from err
+        return cast("ServiceResponse", {"success": True, **result})
+
+    async def _async_handle_acknowledge_faults(call: ServiceCall) -> ServiceResponse:
+        """Mark all current D1 fault records as seen in Home Assistant only."""
+        _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
+        tracker = entry_data.get("fault_tracker")
+        source = entry_data.get("fault_source")
+        if tracker is None or source is None:
+            raise ServiceValidationError(
+                "Fault tracking is not available: it needs the Fault Log (pxxD1) "
+                "read block on firmware 4.x/5.x"
+            )
+        await source.async_request_refresh()
+        try:
+            pending = tracker.acknowledge()
+        except RuntimeError as err:
+            raise HomeAssistantError(str(err)) from err
+        await tracker.async_save()
+        source.async_update_listeners()
+        return cast("ServiceResponse", {"success": True, "acknowledged": pending})
+
+    async def _async_handle_clear_fault_memory(call: ServiceCall) -> ServiceResponse:
+        """Clear the heat pump's D1 fault memory (guarded, verified by readback)."""
+        if call.data["confirmation"] != CLEAR_CONFIRMATION:
+            raise ServiceValidationError(
+                "Confirmation phrase incorrect. "
+                f"Expected exactly: {CLEAR_CONFIRMATION}"
+            )
+        _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
+        device = entry_data["device"]
+        firmware = device.effective_firmware
+        if firmware not in FAULT_CLEAR_VALIDATED_FIRMWARE:
+            raise ServiceValidationError(
+                "Clearing the fault memory has only been validated on firmware "
+                f"{', '.join(sorted(FAULT_CLEAR_VALIDATED_FIRMWARE))}; this device "
+                f"uses {firmware}. Use the heat pump's own menu instead."
+            )
+        try:
+            result = await clear_fault_memory(hass, device)
+        except RuntimeError as err:
+            raise HomeAssistantError(str(err)) from err
+        source = entry_data.get("fault_source")
+        if source is not None:
+            await source.async_request_refresh()
+        return cast("ServiceResponse", {"success": True, **result})
+
     # Register services
     hass.services.async_register(
         DOMAIN,
@@ -1334,6 +1397,32 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         "list_parameter_backups",
         _async_handle_list_parameter_backups,
         schema=vol.Schema({}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "probe_fault_memory",
+        _async_handle_probe_fault_memory,
+        schema=vol.Schema({vol.Optional("entry_id"): cv.string}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "acknowledge_faults",
+        _async_handle_acknowledge_faults,
+        schema=vol.Schema({vol.Optional("entry_id"): cv.string}),
+        supports_response=SupportsResponse.OPTIONAL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        "clear_fault_memory",
+        _async_handle_clear_fault_memory,
+        schema=vol.Schema(
+            {
+                vol.Required("confirmation"): cv.string,
+                vol.Optional("entry_id"): cv.string,
+            }
+        ),
         supports_response=SupportsResponse.OPTIONAL,
     )
     _LOGGER.info("THZ services registered")

@@ -38,6 +38,17 @@ All notable changes to the THZ integration are documented here.
   on 4.19 hardware: whether `actualPower_Qc`/`actualPower_Pel` are in kW like
   4.39 (left unscaled), and COP sensors are not offered below firmware 4.39.
 
+- **Fault memory sensors and services for firmware 4.x/5.x** (ported from the
+  Darian6969 fork): four sensors (*Fault status*, *Fault memory*, *Latest
+  fault*, *New faults*) decode up to ten stored faults from the `pxxD1` block
+  and remember, in Home Assistant only, which records you have seen (existing
+  history is not an alarm on first run). Built on the existing `pxxD1`
+  coordinator, so there is no extra serial traffic. New services
+  `thz.probe_fault_memory` (read-only), `thz.acknowledge_faults` (HA side only)
+  and `thz.clear_fault_memory`, which clears the device's fault memory with a
+  confirmation phrase, one non-retried write and verification by readback.
+  The clear write is only validated on firmware 4.19 and refused elsewhere.
+
 ### Bug Fixes
 
 - **Firmware 4.39: 45 `pxxFB` sensors lost unit, device class, state class,

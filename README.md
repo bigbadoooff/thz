@@ -45,7 +45,7 @@ Parts of this software have been developed by the help of AI.
 - ✅ **Device Registry Integration**: Proper device identification in Home Assistant
 - ✅ **Per-Block Polling Intervals**: Each register block has its own configurable poll interval
 - ✅ **Smart Entity Management**: Non-essential entities are hidden by default to reduce clutter
-- ✅ **Services**: `thz.read_raw_register`, `thz.refresh_block`, and `thz.set_diverter_valve`
+- ✅ **Services**: `thz.read_raw_register`, `thz.refresh_block`, `thz.set_diverter_valve`, parameter backup/restore, and fault memory (`thz.probe_fault_memory`, `thz.acknowledge_faults`, `thz.clear_fault_memory`)
 
 ### Climate Entities
 
@@ -83,6 +83,34 @@ data:
 ```
 
 ⚠️ Only use this service if you have a manually-controlled 3-way valve and understand the risk of incorrect actuation.
+
+### Fault Memory (firmware 4.x / 5.x)
+
+The heat pump keeps its last ten faults but has no "acknowledged" concept. When the **Fault Log** (`pxxD1`) block is polled, four sensors are created from it (no extra serial traffic):
+
+| Sensor | Meaning |
+|--------|---------|
+| Fault status | `No fault` / `Fault` — `Fault` while there are records you have not acknowledged |
+| Fault memory | Number of stored records; all records (newest first) are in the `entries` attribute |
+| Latest fault | Name of the newest stored fault (`n.a.` if none) with code, date and time as attributes |
+| New faults | Number of records not yet acknowledged; the records are in the `entries` attribute |
+
+Faults already stored when the integration first sees the block are treated as acknowledged, so an existing history does not trigger an alarm. The heat pump stores day and month only, no year.
+
+#### `thz.probe_fault_memory`
+Read-only. Returns the raw D1 bytes and the decoded records.
+
+#### `thz.acknowledge_faults`
+Marks all records currently stored as seen. Only affects Home Assistant (the *Fault status* and *New faults* sensors); nothing is written to the heat pump.
+
+#### `thz.clear_fault_memory`
+Physically clears the heat pump's fault memory. It reads and validates D1 first, sends **one** clear command (`0000` to D1, never retried) and verifies the result by reading D1 again. The history on the device is lost. You must pass `confirmation: "CLEAR D1"`. This has only been validated on firmware **4.19**; on other firmware the service refuses to run.
+
+```yaml
+service: thz.clear_fault_memory
+data:
+  confirmation: "CLEAR D1"
+```
 
 ### Hidden Entities by Default
 
@@ -154,9 +182,10 @@ The report includes firmware version, connection status, coordinator last-update
 |----------|-------|
 | 2.06     | Sensor read support; write support via block read-modify-write |
 | 2.14 / 2.14j | Sensor read support; write support via block read-modify-write |
+| 4.19     | 4.39-like profile for the THZ 303 SOL; a few `pxxFB` sensors the shorter payload cannot supply are disabled. Fault memory can be cleared (validated on this firmware only) |
 | 4.39     | Full support including energy sensors, COP, runtime hours, and passive cooling |
 | 5.39     | Full support including passive cooling energy sensor (`sCoolHCTotal`) |
-| Other    | Falls back to 5.39-like configuration — may work partially |
+| Other    | Falls back to a 4.39-like configuration (like the reference FHEM module) — may work partially |
 
 ### How Firmware Versions Are Loaded
 

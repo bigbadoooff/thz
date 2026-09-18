@@ -1346,6 +1346,22 @@
       },
       "power_hd": {
         "name": "Leistung Hd"
+      },
+      "fault_status": {
+        "name": "Störungsstatus",
+        "state": {
+          "ok": "Störungsfrei",
+          "fault": "Störung"
+        }
+      },
+      "fault_memory": {
+        "name": "Fehlerspeicher"
+      },
+      "fault_latest": {
+        "name": "Letzter Fehler"
+      },
+      "fault_new": {
+        "name": "Neue Fehler"
       }
     },
     "number": {
