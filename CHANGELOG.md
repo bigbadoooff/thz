@@ -6,6 +6,8 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] – 2026-09-19
+
 ### Added
 
 - **Write entities for firmware 4.39/5.39** (ported from the m-l fork, found
