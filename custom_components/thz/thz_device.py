@@ -670,10 +670,9 @@ class THZDevice:
             deadline.cancel()
             self.lock.release()
 
-    def close(self):
-        """Close the connection."""
-        if self.ser is not None:
-            self.ser.close()
+    def close(self) -> None:
+        """Close the connection; safe to call repeatedly and never raises."""
+        self._force_close()
 
     def _force_close(self) -> None:
         """Close without raising; sets ser=None so the next call reconnects."""

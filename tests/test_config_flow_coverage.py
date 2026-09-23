@@ -339,6 +339,7 @@ class TestAsyncStepDetectBlocks:
         )
         assert result["step_id"] == "select_groups"
         assert flow.blocks == ["p01", "p02", "p03"]
+        mock_device.close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_ip_success(self, flow):
@@ -419,6 +420,7 @@ class TestAsyncStepDetectBlocks:
                 await flow.async_step_detect_blocks()
 
         assert exc_info.value.result["reason"] == "already_configured"
+        mock_device.close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_oserror_aborts(self, flow):
@@ -434,6 +436,7 @@ class TestAsyncStepDetectBlocks:
             result = await flow.async_step_detect_blocks()
 
         assert result == {"type": "abort", "reason": "cannot_detect_blocks"}
+        mock_device.close.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_runtimeerror_aborts(self, flow):
