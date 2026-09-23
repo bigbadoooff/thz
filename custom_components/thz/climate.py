@@ -171,34 +171,29 @@ _FAN_STAGE_TO_MODE: dict[int, str] = {i: m for i, m in enumerate(_FAN_MODES)}
 def _field_layout(
     register_manager, block: str, field_name: str
 ) -> tuple[int, int] | None:
-    """Return (byte_offset, byte_length) for a named field in a register block.
+    """Return (byte_offset, byte_length) of a named field in a register block.
 
-    Converts nibble-based positions from the map (nibble_offset // 2,
-    nibble_length // 2) to byte positions used at runtime.
     Returns None if the field is not present in the merged map for this firmware.
     """
-    normalized = field_name.strip().rstrip(":")
-    for entry in register_manager.get_registers_for_block(block):
-        if entry[0].strip().rstrip(":").strip() == normalized:
-            return entry[1] // 2, max(1, entry[2] // 2)
-    return None
+    read_field = register_manager.find_field(block, field_name)
+    if read_field is None:
+        return None
+    return read_field.byte_offset, read_field.byte_length
 
 
 def _bit_field_layout(
     register_manager, block: str, field_name: str
 ) -> tuple[int, int] | None:
-    """Return (byte_index, bit_index) for a named bit field in a register block.
+    """Return (byte_index, bit_index) of a named single-bit flag in a block.
 
-    The bit index is parsed from the decode_type string (e.g. ``"bit3"`` → 3).
-    Returns None if the field is not found or has no parseable bit index.
+    Returns None if the field is not found or is not a (non-negated) flag.
     """
-    normalized = field_name.strip().rstrip(":")
-    for entry in register_manager.get_registers_for_block(block):
-        if entry[0].strip().rstrip(":").strip() == normalized:
-            decode_type = entry[3]
-            if decode_type.startswith("bit") and decode_type[3:].isdigit():
-                return entry[1] // 2, int(decode_type[3:])
-    return None
+    read_field = register_manager.find_field(block, field_name)
+    if read_field is None or not read_field.decode_type.startswith("bit"):
+        return None
+    if read_field.bit is None:
+        return None
+    return read_field.byte_offset, read_field.bit
 
 
 def _get_step(entry: dict) -> float:

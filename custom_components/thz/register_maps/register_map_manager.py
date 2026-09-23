@@ -26,6 +26,7 @@ from . import (
     write_map_539,  # noqa: F401
     write_map_X39tech,  # noqa: F401
 )
+from .model import ReadField, normalize_field_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,45 +109,35 @@ FIRMWARE_MAPS = {
 }
 
 
-# (nibble offset, nibble length, factor, decode type) of a read-map field.
-_FieldLayout = tuple[int, int, float, str]
-
-
 def _is_read_field(field: Any) -> bool:
     """Return True for a read-map field tuple (name, offset, length, decode, factor)."""
     return isinstance(field, tuple) and len(field) >= 5
 
 
-def _field_name(field: tuple[Any, ...]) -> str:
-    return str(field[0]).strip().rstrip(":").strip()
+def _read_fields(block: str, entries: Any) -> list[ReadField]:
+    """Return the fields of a read-map block, skipping anything else."""
+    if not isinstance(entries, list):
+        return []
+    return [ReadField.from_tuple(block, e) for e in entries if _is_read_field(e)]
 
 
-def _field_layout(field: tuple[Any, ...]) -> _FieldLayout:
-    return (field[1], field[2], float(field[4]) if field[4] else 1.0, field[3])
+def _apply_block_layout(entry: dict[str, Any], field: ReadField) -> None:
+    """Store a read-map field's position on a 2xx write entry.
 
-
-def _apply_block_layout(entry: dict[str, Any], layout: _FieldLayout) -> None:
-    """Store a read-map layout on a 2xx write entry for block read-modify-write.
-
-    Register map offsets/lengths are in nibbles (FHEM convention); they are
-    converted to bytes so read_value and write_block_value can use them
-    directly (same conversion as sensor.py async_setup_entry).
+    The parameter is then written by block read-modify-write at the field's
+    byte offset, length and (for a flag sharing its byte) bit.
     """
-    nibble_offset, nibble_length, factor, decode_type = layout
-    entry["offset"] = nibble_offset // 2
-    entry["length"] = (nibble_length + 1) // 2
+    entry["offset"] = field.byte_offset
+    entry["length"] = field.byte_length
     entry["write_mode"] = "block"
     # FHEM reads 2xx parameters as "hex" (unsigned) unless the map says
     # "hex2int", e.g. 240 min in one byte is not -16.
-    entry["signed"] = decode_type == "hex2int"
-    if decode_type.startswith("bit") and decode_type[3:].isdigit():
-        # Single-bit flag (e.g. progHC1Monday) sharing its byte with other
-        # flags. Same nibble convention as sensor.py: an even nibble offset
-        # is the byte's high nibble.
-        bit = int(decode_type[3:])
-        entry["bit"] = bit + 4 if nibble_offset % 2 == 0 else bit
+    entry["signed"] = field.decode_type == "hex2int"
+    if field.bit is not None and not field.decode_type.startswith("nbit"):
+        # Single-bit flag (e.g. progHC1Monday) sharing its byte with others.
+        entry["bit"] = field.bit
     # step = 1/factor so encode/decode functions scale correctly.
-    entry["step"] = str((1.0 / factor) if factor else 1.0)
+    entry["step"] = str(1.0 / field.scale)
 
 
 class BaseRegisterMapManager:
@@ -355,6 +346,27 @@ class RegisterMapManager(BaseRegisterMapManager):
             entry_type=list,
             has_cooling=has_cooling,
         )
+        self._fields: dict[str, list[ReadField]] = {
+            block: _read_fields(block, entries)
+            for block, entries in self._merged_map.items()
+            if isinstance(entries, list)
+        }
+
+    def fields(self) -> dict[str, list[ReadField]]:
+        """Return the typed fields of every block, keyed by block ("pxxFB")."""
+        return self._fields
+
+    def block_fields(self, block: str) -> list[ReadField]:
+        """Return the typed fields of one block (empty if the block is unknown)."""
+        return self._fields.get(block, [])
+
+    def find_field(self, block: str, name: str) -> ReadField | None:
+        """Return the first field of ``block`` called ``name``, or None."""
+        wanted = normalize_field_name(name)
+        for read_field in self.block_fields(block):
+            if read_field.name == wanted:
+                return read_field
+        return None
 
 
 class RegisterMapManagerWrite(BaseRegisterMapManager):
@@ -436,7 +448,7 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
             if entry.get("type") == "pclean":
                 entry["type"] = "number"
 
-    def _fallback_2xx_layouts(self) -> dict[str, _FieldLayout]:
+    def _fallback_2xx_layouts(self) -> dict[str, ReadField]:
         """Return each parameter's layout from the 2xx read register maps.
 
         The first map that defines a parameter wins, so the running
@@ -449,23 +461,20 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
             map_order.remove(own_map)
             map_order.insert(0, own_map)
 
-        layouts: dict[str, _FieldLayout] = {}
+        layouts: dict[str, ReadField] = {}
         for mod_name in map_order:
             mod = sys.modules.get(f"{self._package}.{mod_name}")
             if mod is None:
                 continue
             for block_key, entries in getattr(mod, "REGISTER_MAP", {}).items():
-                if not isinstance(entries, list) or not block_key.startswith("pxx"):
+                if not block_key.startswith("pxx"):
                     continue
-                for field in entries:
-                    if not _is_read_field(field):
-                        continue
-                    name = _field_name(field)
-                    if name and name not in layouts:
-                        layouts[name] = _field_layout(field)
+                for read_field in _read_fields(block_key, entries):
+                    if read_field.name:
+                        layouts.setdefault(read_field.name, read_field)
         return layouts
 
-    def _own_block_layouts(self) -> dict[tuple[str, str], _FieldLayout]:
+    def _own_block_layouts(self) -> dict[tuple[str, str], ReadField]:
         """Return (name, block address) → layout from the firmware's read map.
 
         The running firmware's merged read map (what its sensors decode) is
@@ -473,17 +482,13 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
         out the pFan block (01) with 1-byte fields where 2.06 uses 2 bytes,
         and that layout lives in readings_map_214, not register_map_214.
         """
-        layouts: dict[tuple[str, str], _FieldLayout] = {}
-        own_maps = RegisterMapManager(
+        layouts: dict[tuple[str, str], ReadField] = {}
+        own_fields = RegisterMapManager(
             self.firmware_version, has_cooling=self._has_cooling
-        ).get_all_registers()
-        for block_key, entries in own_maps.items():
-            for field in entries:
-                if _is_read_field(field):
-                    layouts.setdefault(
-                        (_field_name(field), block_key[3:].upper()),
-                        _field_layout(field),
-                    )
+        ).fields()
+        for block_key, block_fields in own_fields.items():
+            for read_field in block_fields:
+                layouts.setdefault((read_field.name, block_key[3:].upper()), read_field)
         return layouts
 
     def _parent_block_map(self) -> dict[str, str]:

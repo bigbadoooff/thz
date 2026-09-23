@@ -45,11 +45,6 @@ _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
 
 
-def _is_bit_decode_type(decode_type: str) -> bool:
-    """Return True if the decode type extracts a single bit (boolean value)."""
-    return decode_type.startswith("bit") or decode_type.startswith("nbit")
-
-
 def _get_device_class(name: str) -> BinarySensorDeviceClass | None:
     """Return the appropriate BinarySensorDeviceClass for the given entity name.
 
@@ -109,9 +104,7 @@ async def async_setup_entry(
 
     entities: list[THZBinarySensor] = []
     seen_sensor_names: set[str] = set()
-    all_registers = register_manager.get_all_registers()
-
-    for block, entries in all_registers.items():
+    for block, fields in register_manager.fields().items():
         coordinator = coordinators.get(block)
         if coordinator is None:
             _LOGGER.warning(
@@ -122,15 +115,12 @@ async def async_setup_entry(
         block_hex = block.removeprefix("pxx")
         block_bytes = bytes.fromhex(block_hex)
 
-        for entry_tuple in entries:
-            name, offset, length, decode_type, _factor = entry_tuple[:5]
-            tuple_meta = entry_tuple[5] if len(entry_tuple) > 5 else {}
-
+        for read_field in fields:
             # Only handle bit-decoded entries
-            if not _is_bit_decode_type(decode_type):
+            if not read_field.is_bit:
                 continue
 
-            sensor_name = name.strip().rstrip(":")
+            sensor_name = read_field.name
 
             # Skip duplicate sensor names
             if sensor_name in seen_sensor_names:
@@ -142,26 +132,14 @@ async def async_setup_entry(
                 continue
             seen_sensor_names.add(sensor_name)
 
-            # Apply nibble-offset adjustment (same logic as sensor.py).
-            # Register offsets are nibble positions (4-bit units); two nibbles
-            # share one byte.  An even nibble offset means the value lives in
-            # the high nibble, so bit numbers must be shifted up by 4.
-            effective_decode = decode_type
-            if length == 1 and offset % 2 == 0:
-                if decode_type.startswith("bit") and not decode_type.startswith("nbit"):
-                    bitnum = int(decode_type[3:])
-                    effective_decode = f"bit{bitnum + 4}"
-                elif decode_type.startswith("nbit"):
-                    bitnum = int(decode_type[4:])
-                    effective_decode = f"nbit{bitnum + 4}"
-
             entry = {
                 "name": sensor_name,
-                "offset": offset // 2,
-                "length": (length + 1) // 2,
-                "decode": effective_decode,
-                "icon": tuple_meta.get("icon"),
-                "translation_key": tuple_meta.get("translation_key"),
+                "offset": read_field.byte_offset,
+                "length": read_field.byte_length,
+                # The flag's bit within the whole byte (high nibble: +4).
+                "decode": read_field.byte_decode_type,
+                "icon": read_field.meta.get("icon"),
+                "translation_key": read_field.translation_key,
             }
             entities.append(
                 THZBinarySensor(

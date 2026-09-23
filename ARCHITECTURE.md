@@ -43,9 +43,16 @@ module hard-codes register layouts.
 
 **Read map (blocks).** The device answers a block request (`pxxFB`, `pxxF4`,
 ...) with a fixed layout of many values. The read map lists them as
-`(name, offset, length, decode_type, factor[, meta])` per block. Sensors,
-binary sensors, COP sensors and the climate entities decode their values out
-of the block data.
+`(name, offset, length, decode_type, factor[, meta])` per block, with offset
+and length in nibbles as in FHEM. `RegisterMapManager` turns each entry into
+a `ReadField` (`register_maps/model.py`) once: byte offset and length, the
+nibble half of a one-nibble value, and a flag's bit within its byte (a flag
+in the high nibble is four bits up). Sensors, binary sensors, COP sensors,
+the climate entities and the 2.x write layouts all use these positions
+(`fields()`, `find_field()`); no other module converts nibbles.
+`tests/register_maps/test_map_schema.py` checks the maps of every firmware
+profile: known decode types, fields after the block header, one-nibble
+flags, unique names, existing translations and sane write bounds.
 
 **Write map (parameters).** Settings that can be changed: setpoints, modes,
 schedules, the clock. Each entry names a `command`, a `type` (number, select,

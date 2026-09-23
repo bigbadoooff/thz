@@ -48,15 +48,12 @@ def _diverter_bit_position(register_manager: Any) -> tuple[int, int] | None:
     """
     if register_manager is None:
         return _DIVERTER_DEFAULT_POSITION
-    for entry in register_manager.get_registers_for_block(_DIVERTER_BLOCK):
-        if entry[0].strip().rstrip(":").strip() != _DIVERTER_FIELD:
-            continue
-        decode = entry[3]
-        if not (decode.startswith("bit") and decode[3:].isdigit()):
-            return None
-        nibble, bit = entry[1], int(decode[3:])
-        return nibble // 2, bit + 4 if nibble % 2 == 0 else bit
-    return None
+    read_field = register_manager.find_field(_DIVERTER_BLOCK, _DIVERTER_FIELD)
+    if read_field is None or not read_field.decode_type.startswith("bit"):
+        return None
+    if read_field.bit is None:
+        return None
+    return read_field.byte_offset, read_field.bit
 
 
 def _diverter_points_to_dhw(entry_data: THZRuntimeData) -> bool:

@@ -84,6 +84,7 @@ module = [
     "thz.parameter_io",
     "thz.value_codec",
     "thz.register_maps.register_map_manager",
+    "thz.register_maps.model",
     "thz.protocol",
     "thz.transport",
     "thz.exceptions",

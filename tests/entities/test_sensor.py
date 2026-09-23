@@ -15,17 +15,7 @@ from custom_components.thz.sensor import (
     async_setup_entry,
     decode_value,
 )
-from tests.helpers import make_runtime_data
-
-
-class FakeRegisterManager:
-    """Minimal stand-in for RegisterMapManager exposing get_all_registers()."""
-
-    def __init__(self, registers: dict):
-        self._registers = registers
-
-    def get_all_registers(self) -> dict:
-        return self._registers
+from tests.helpers import FakeRegisterManager, make_runtime_data
 
 
 def _make_hass_and_entry(

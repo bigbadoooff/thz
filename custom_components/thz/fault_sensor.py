@@ -40,10 +40,11 @@ def supports_fault_memory(register_manager: Any) -> bool:
     Firmware 4.x/5.x store the fault number in one byte at byte offset 4
     (nibble 8); 2.xx firmware uses a different, two-byte layout.
     """
-    for entry in register_manager.get_registers_for_block(D1_BLOCK):
-        if entry[0].strip().rstrip(":").strip() == "fault0CODE":
-            return bool(entry[1] == 8 and entry[2] == 2)
-    return False
+    read_field = register_manager.find_field(D1_BLOCK, "fault0CODE")
+    return read_field is not None and (
+        read_field.nibble_offset,
+        read_field.nibble_length,
+    ) == (8, 2)
 
 
 async def async_setup_fault_sensors(
