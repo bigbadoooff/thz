@@ -225,9 +225,11 @@ class THZDevice:
                 # This is a best-effort check; MSG_PEEK may not work on all platforms
                 self.ser.setblocking(False)  # type: ignore[union-attr]
                 try:
-                    # recv with MSG_PEEK doesn't remove data from buffer
-                    # Empty return on non-blocking socket just means no data available
-                    self.ser.recv(1, socket.MSG_PEEK)  # type: ignore[union-attr]
+                    # recv with MSG_PEEK doesn't remove data from buffer. A
+                    # non-blocking socket without data raises BlockingIOError;
+                    # an empty result means the peer closed the connection.
+                    if self.ser.recv(1, socket.MSG_PEEK) == b"":  # type: ignore[union-attr]
+                        return False
                 except BlockingIOError:
                     # No data available but connection is alive
                     pass
@@ -373,19 +375,13 @@ class THZDevice:
             chunk = self._read_available()
             if chunk:
                 data.extend(chunk)
-                if (
-                    len(data) >= 8
-                    and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT
-                ):
+                if self._frame_complete(data):
                     break
             else:
                 # Avoid busy-waiting when no data is currently available
                 time.sleep(0.01)
 
-        if not (
-            len(data) >= 8
-            and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT
-        ):
+        if not self._frame_complete(data):
             error_msg = (
                 "No valid response received after data request - "
                 "timeout or incomplete data"
@@ -394,6 +390,24 @@ class THZDevice:
             raise RuntimeError(error_msg)
 
         return bytes(data)
+
+    @staticmethod
+    def _frame_complete(data: bytes | bytearray) -> bool:
+        """Return True if ``data`` ends with an unescaped 0x10 0x03 terminator.
+
+        A data byte 0x10 is sent escaped as 0x10 0x10, so ``... 10 10 03``
+        is an escaped 0x10 followed by a data byte 0x03, not the end of the
+        frame. The terminator's 0x10 is real only if the run of 0x10 bytes
+        before the final 0x03 has odd length.
+        """
+        if len(data) < 8 or data[-1] != const.ENDOFTEXT[0]:
+            return False
+        run = 0
+        for byte in reversed(data[:-1]):
+            if byte != const.DATALINKESCAPE[0]:
+                break
+            run += 1
+        return run % 2 == 1
 
     def _exchange_once(
         self, telegram: bytes, get_or_set: str, attempt: int, max_retries: int
@@ -514,7 +528,7 @@ class THZDevice:
             # self.ser turning None mid-call is a real, accepted race handled
             # by the AttributeError clause below.
             if self.connection == "ip":
-                self.ser.send(data)  # type: ignore[union-attr]
+                self.ser.sendall(data)  # type: ignore[union-attr]
             else:
                 self.ser.write(data)  # type: ignore[union-attr]
                 self.ser.flush()  # type: ignore[union-attr]
@@ -561,10 +575,6 @@ class THZDevice:
                 original_timeout = self.ser.gettimeout()  # type: ignore[union-attr]
                 self.ser.setblocking(False)  # type: ignore[union-attr]
                 data = self.ser.recv(1024)  # type: ignore[union-attr]
-                if not data and self.ser.fileno() == -1:
-                    # Socket is closed
-                    raise ConnectionError("TCP socket connection closed")
-                return data
             except BlockingIOError:
                 return b""
             except (OSError, socket.error) as e:
@@ -585,6 +595,11 @@ class THZDevice:
                 except (OSError, socket.error, AttributeError, UnboundLocalError):
                     # Socket may be in bad state or already None, ignore
                     pass
+            if not data:
+                # A non-blocking recv() only returns b"" at end of stream:
+                # the peer (e.g. a restarted ser2net) closed the connection.
+                raise ConnectionError("TCP socket connection closed by peer")
+            return bytes(data)
 
         # Serial connection
         try:

@@ -517,10 +517,11 @@ class TestSendRequest:
 class TestWriteBytes:
     def test_write_bytes_socket_path(self):
         device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock(spec=["send", "recv"])
+        mock_sock = Mock(spec=["sendall", "recv"])
         device.ser = mock_sock
         device._write_bytes(b"\x02")
-        mock_sock.send.assert_called_once_with(b"\x02")
+        # sendall, not send: send() may transmit only part of the telegram.
+        mock_sock.sendall.assert_called_once_with(b"\x02")
 
     def test_write_bytes_serial_path(self):
         device = _make_device()
@@ -631,6 +632,78 @@ class TestReadAvailableExtra:
         device.ser = mock_sock
         with pytest.raises(ConnectionError, match="TCP socket connection closed"):
             device._read_available()
+
+
+class TestTcpEndOfStream:
+    """A peer close (ser2net restart) must be reported, not read as "no data"."""
+
+    def test_read_available_eof_with_valid_fd_raises(self):
+        device = _make_device(connection="ip", host="h", tcp_port=1)
+        mock_sock = Mock()
+        mock_sock.gettimeout.return_value = 1.0
+        mock_sock.recv.return_value = b""
+        mock_sock.fileno.return_value = 5  # fd still valid after peer close
+        device.ser = mock_sock
+        with pytest.raises(ConnectionError, match="closed by peer"):
+            device._read_available()
+
+    def test_read_available_no_data_yet_returns_empty(self):
+        device = _make_device(connection="ip", host="h", tcp_port=1)
+        mock_sock = Mock()
+        mock_sock.gettimeout.return_value = 1.0
+        mock_sock.recv.side_effect = BlockingIOError
+        device.ser = mock_sock
+        assert device._read_available() == b""
+
+    def test_connection_not_alive_after_peer_close(self):
+        device = _make_device(connection="ip", host="h", tcp_port=1)
+        mock_sock = Mock()
+        mock_sock.fileno.return_value = 5
+        mock_sock.gettimeout.return_value = 1.0
+        mock_sock.recv.return_value = b""
+        device.ser = mock_sock
+        assert device._is_connection_alive() is False
+
+    def test_real_socketpair_peer_close(self):
+        left, right = socket_module.socketpair()
+        try:
+            device = _make_device(connection="ip", host="h", tcp_port=1)
+            device.ser = left
+            assert device._is_connection_alive() is True
+            right.close()
+            assert device._is_connection_alive() is False
+            with pytest.raises(ConnectionError, match="closed by peer"):
+                device._read_available()
+        finally:
+            left.close()
+
+
+class TestFrameComplete:
+    @pytest.mark.parametrize(
+        ("hex_data", "complete"),
+        [
+            ("0100aa1122334410" "03", True),
+            # escaped data byte 0x10 followed by data byte 0x03: not the end
+            ("0100aa1122331010" "03", False),
+            # escaped 0x10 as last data byte, then the real terminator
+            ("0100aa11223310101003", True),
+            ("0100aa1122334410", False),
+            ("1003", False),  # too short to be a frame
+        ],
+    )
+    def test_terminator_detection(self, hex_data, complete):
+        assert THZDevice._frame_complete(bytes.fromhex(hex_data)) is complete
+
+    def test_escaped_0x10_split_across_chunks_is_read_to_the_end(self):
+        device = _make_device()
+        frame = bytes.fromhex("0100aa1122331010031003")
+        # The first chunk ends right after "10 10 03", which used to be taken
+        # for the terminator and truncated the frame.
+        chunks = iter([frame[:9], frame[9:]])
+        with patch.object(device, "_write_bytes"), patch.object(
+            device, "_read_available", side_effect=lambda: next(chunks, b"")
+        ):
+            assert device._receive_data_telegram(1.0) == frame
 
 
 # ---------------------------------------------------------------------------
