@@ -112,10 +112,10 @@ _RULES: tuple[tuple[str | None, tuple[str, ...]], ...] = (
 def subdevice_for(unique_id: str, device_id: str) -> str | None:
     """Return the sub-device group of an entity, or None for the heat pump.
 
-    The device id prefix (host or serial path) and the command part of
-    register unique_ids are ignored so that they cannot match a rule.
+    The device id (host or serial path, wherever it appears) and the command
+    part of register unique_ids are ignored so that they cannot match a rule.
     """
-    name = unique_id.removeprefix(device_id).rsplit("'", 1)[-1].lower()
+    name = unique_id.replace(device_id, "").rsplit("'", 1)[-1].lower()
     for group, patterns in _RULES:
         if any(pattern in name for pattern in patterns):
             return group
@@ -128,18 +128,28 @@ def main_device_name(data: Mapping[str, Any]) -> str:
 
 
 def thz_device_info(
-    device_id: str, subdevice: str | None, device_name: str | None = None
+    device_id: str,
+    subdevice: str | None,
+    device_name: str | None = None,
+    area: str | None = None,
 ) -> DeviceInfo:
-    """Return the DeviceInfo linking an entity to the heat pump or a sub-device."""
+    """Return the DeviceInfo linking an entity to the heat pump or a sub-device.
+
+    ``area`` is the heat pump's configured area; Home Assistant applies it
+    only when it creates the sub-device, so a later change by the user stays.
+    """
     if subdevice is None:
         return DeviceInfo(identifiers={(DOMAIN, device_id)})
-    return DeviceInfo(
+    info = DeviceInfo(
         identifiers={(DOMAIN, subdevice_identifier(device_id, subdevice))},
         via_device=(DOMAIN, device_id),
         translation_key=subdevice,
         translation_placeholders={"device_name": device_name or device_id},
         manufacturer="Stiebel Eltron / Tecalor",
     )
+    if area:
+        info["suggested_area"] = area
+    return info
 
 
 def subdevice_identifier(device_id: str, subdevice: str) -> str:
@@ -156,10 +166,12 @@ def assign_subdevices(entities: Iterable[Any], data: Mapping[str, Any]) -> None:
     if not data.get(CONF_SPLIT_DEVICES, False):
         return
     name = main_device_name(data)
+    area = data.get("area") or None
     for entity in entities:
         unique_id = getattr(entity, "unique_id", None) or ""
         entity._subdevice = subdevice_for(unique_id, entity._device_id)
         entity._subdevice_device_name = name
+        entity._subdevice_area = area
 
 
 def _subdevice_entries(

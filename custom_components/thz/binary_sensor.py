@@ -325,10 +325,14 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
     # is added; None links the entity to the heat pump itself.
     _subdevice: str | None = None
     _subdevice_device_name: str | None = None
+    _subdevice_area: str | None = None
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information to link this entity to the device."""
         return thz_device_info(
-            self._device_id, self._subdevice, self._subdevice_device_name
+            self._device_id,
+            self._subdevice,
+            self._subdevice_device_name,
+            self._subdevice_area,
         )

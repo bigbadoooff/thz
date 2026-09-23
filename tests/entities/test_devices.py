@@ -50,8 +50,9 @@ def test_subdevice_for(unique_id, expected):
 
 
 def test_device_id_and_command_bytes_are_ignored():
-    # A host or serial path must not decide the group.
+    # A host or serial path must not decide the group, wherever it appears.
     assert subdevice_for("usb-fan-hc2_fault_status", "usb-fan-hc2") is None
+    assert subdevice_for("thz_usb-fan-hc2_fault_status", "usb-fan-hc2") is None
     # Nor may a printable byte in the command part of a register unique_id.
     assert subdevice_for("b'\\nhc'_4_status", DEVICE) is None
 
@@ -69,6 +70,10 @@ def test_device_info_for_heat_pump_and_subdevice():
     assert info["via_device"] == (DOMAIN, DEVICE)
     assert info["translation_key"] == "dhw"
     assert info["translation_placeholders"] == {"device_name": "lwz"}
+    assert "suggested_area" not in info
+    assert thz_device_info(DEVICE, "dhw", "lwz", "Basement")["suggested_area"] == (
+        "Basement"
+    )
 
 
 def _entity(unique_id):
@@ -80,9 +85,12 @@ def test_assign_subdevices_only_when_enabled():
     assign_subdevices([entity], {"alias": "lwz"})
     assert not hasattr(entity, "_subdevice")
 
-    assign_subdevices([entity], {"alias": "lwz", CONF_SPLIT_DEVICES: True})
+    assign_subdevices(
+        [entity], {"alias": "lwz", "area": "Basement", CONF_SPLIT_DEVICES: True}
+    )
     assert entity._subdevice == "dhw"
     assert entity._subdevice_device_name == "lwz"
+    assert entity._subdevice_area == "Basement"
 
 
 def _registries(devices_by_id, entities_by_device):

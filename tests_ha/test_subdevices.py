@@ -28,7 +28,9 @@ async def test_entries_without_the_option_keep_one_device(hass, fake_device):
 
 
 async def test_split_creates_linked_subdevices(hass, fake_device):
-    entry = await setup_entry(hass, alias="lwz", **{CONF_SPLIT_DEVICES: True})
+    entry = await setup_entry(
+        hass, alias="lwz", area="Basement", **{CONF_SPLIT_DEVICES: True}
+    )
     found = _devices(hass, entry)
     main = found[MAIN]
 
@@ -36,6 +38,8 @@ async def test_split_creates_linked_subdevices(hass, fake_device):
     dhw = found[f"{MAIN}_dhw"]
     assert dhw.via_device_id == main.id
     assert dhw.name == "lwz Hot water"
+    # Sub-devices start in the heat pump's area.
+    assert dhw.area_id == main.area_id is not None
 
     registry = er.async_get(hass)
     climate = registry.async_get(entity_id(hass, entry, "climate", "dhw_heating"))
