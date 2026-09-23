@@ -42,6 +42,11 @@ from .fault_memory import (
     clear_fault_memory,
     read_fault_memory,
 )
+from .parameter_io import (
+    async_read_parameter,
+    async_write_parameter,
+    parameter_length,
+)
 from .thz_device import THZDevice, THZRegisterNotSupportedError
 from .time import quarters_to_time, time_to_quarters
 from .value_codec import THZValueCodec, decode_raw_value
@@ -877,10 +882,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         "end": end.strftime("%H:%M") if end else None,
                     }
                 else:
-                    value_bytes = await device.async_execute(
-                        hass, device.read_value, bytes.fromhex(command), "get",
-                        WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH,
-                    )
+                    value_bytes = await async_read_parameter(hass, device, entry)
                     if not value_bytes:
                         raise ValueError("no data received")
 
@@ -1088,7 +1090,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         except (TypeError, ValueError):
                             pass
                     value_bytes = THZValueCodec.encode_number(
-                        num_value, step, entry["decode_type"]
+                        num_value, step, entry["decode_type"],
+                        parameter_length(entry),
                     )
                 elif reg_type == "switch":
                     value_bytes = THZValueCodec.encode_switch(bool(value))
@@ -1122,9 +1125,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 continue
 
             try:
-                await device.async_execute(
-                    hass, device.write_value, bytes.fromhex(command), value_bytes
-                )
+                await async_write_parameter(hass, device, entry, value_bytes)
                 restored += 1
             except (OSError, RuntimeError, ConnectionError) as err:
                 failed.append(f"{name}: {err}")

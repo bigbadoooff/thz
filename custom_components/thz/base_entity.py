@@ -7,7 +7,7 @@ across entity platforms (number, switch, select, time).
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -241,8 +241,8 @@ class THZBaseEntity(Entity):
         should treat None as "nothing to decode this cycle, keep the
         previous value" and return from their own async_update.
         """
-        try:
-            value_bytes: bytes = await self._device.async_execute(
+        return await self._async_guarded_read(
+            self._device.async_execute(
                 self.hass,
                 self._device.read_value,
                 bytes.fromhex(self._command),
@@ -250,6 +250,14 @@ class THZBaseEntity(Entity):
                 offset,
                 length,
             )
+        )
+
+    async def _async_guarded_read(
+        self, read: Coroutine[Any, Any, bytes]
+    ) -> bytes | None:
+        """Await a device read with the availability handling described above."""
+        try:
+            value_bytes = await read
         except (ConnectionError, RuntimeError, OSError) as err:
             if self._attr_available:
                 _LOGGER.warning("%s became unavailable: %s", self.name, err)

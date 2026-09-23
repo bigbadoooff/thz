@@ -30,7 +30,11 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from ._typing_compat import get_runtime_data
-from .const import WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
+from .parameter_io import (
+    async_read_parameter,
+    async_write_parameter,
+    parameter_length,
+)
 from .value_codec import THZValueCodec
 
 if TYPE_CHECKING:
@@ -76,14 +80,7 @@ async def _read_clock_parts(
         value_bytes = None
         for attempt in range(1, CLOCK_READ_ATTEMPTS + 1):
             try:
-                value_bytes = await device.async_execute(
-                    hass,
-                    device.read_value,
-                    bytes.fromhex(entry["command"]),
-                    "get",
-                    WRITE_REGISTER_OFFSET,
-                    WRITE_REGISTER_LENGTH,
-                )
+                value_bytes = await async_read_parameter(hass, device, entry)
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug(
                     "clock_sync: failed to read %s (attempt %d/%d): %s",
@@ -158,10 +155,10 @@ async def async_write_device_clock(
         entry = write_registers.get(name)
         if entry is None or current.get(name) == value:
             continue
-        value_bytes = THZValueCodec.encode_number(value, 1.0, entry["decode_type"])
-        await device.async_execute(
-            hass, device.write_value, bytes.fromhex(entry["command"]), value_bytes
+        value_bytes = THZValueCodec.encode_number(
+            value, 1.0, entry["decode_type"], parameter_length(entry)
         )
+        await async_write_parameter(hass, device, entry, value_bytes)
     readback = await _read_clock_parts(hass, device, write_manager)
     if readback is None:
         _LOGGER.warning("clock_sync: could not read the clock back after writing")

@@ -10,9 +10,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZBaseEntity
 from .entity_translations import get_translation_key
-from .const import (
-    WRITE_REGISTER_OFFSET,
-    WRITE_REGISTER_LENGTH,
+from .parameter_io import (
+    async_read_parameter,
+    async_write_parameter,
+    parameter_length,
 )
 from .platform_setup import async_setup_write_platform
 from .thz_device import THZDevice
@@ -92,12 +93,10 @@ class THZNumber(THZBaseEntity, NumberEntity):
         self._decode_type = entry["decode_type"]
         self._attr_native_value = None
 
-        # Support 2xx firmware block read-modify-write:
-        # "offset" and "length" override the default WRITE_REGISTER_OFFSET/LENGTH
-        # when the parameter lives inside a shared register block.
-        self._read_offset = entry.get("offset", WRITE_REGISTER_OFFSET)
-        self._read_length = entry.get("length", WRITE_REGISTER_LENGTH)
-        self._write_mode = entry.get("write_mode", "direct")
+        # Reads/writes go through parameter_io, which handles both direct
+        # registers and 2xx block parameters (see write_mode="block").
+        self._entry = entry
+        self._read_length = parameter_length(entry)
 
     @property
     def native_value(self) -> float | None:
@@ -106,8 +105,8 @@ class THZNumber(THZBaseEntity, NumberEntity):
 
     async def async_update(self) -> None:
         """Fetch new state data for the number."""
-        value_bytes = await self._async_read_register(
-            self._read_offset, self._read_length
+        value_bytes = await self._async_guarded_read(
+            async_read_parameter(self.hass, self._device, self._entry)
         )
         if value_bytes is None:
             return
@@ -143,22 +142,9 @@ class THZNumber(THZBaseEntity, NumberEntity):
                 self._read_length,
             )
 
-            if self._write_mode == "block":
-                await self._device.async_execute(
-                    self.hass,
-                    self._device.write_block_value,
-                    bytes.fromhex(self._command),
-                    self._read_offset,
-                    self._read_length,
-                    value_bytes,
-                )
-            else:
-                await self._device.async_execute(
-                    self.hass,
-                    self._device.write_value,
-                    bytes.fromhex(self._command),
-                    value_bytes,
-                )
+            await async_write_parameter(
+                self.hass, self._device, self._entry, value_bytes
+            )
 
             self._attr_native_value = value
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms

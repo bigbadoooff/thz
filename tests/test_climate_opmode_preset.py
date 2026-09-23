@@ -200,7 +200,8 @@ class TestAsyncAddedToHassReadsOpMode:
     @pytest.mark.asyncio
     async def test_reads_op_mode_on_startup_when_entry_present(self):
         entity = _make_entity(opmode_entry=_OPMODE_ENTRY)
-        entity.hass.async_add_executor_job = AsyncMock(
+        # Goes through async_execute (lock + timeout), not a bare executor job.
+        entity._device.async_execute = AsyncMock(
             return_value=bytes([1, 0])  # "1" -> "standby" per SELECT_MAP
         )
         entity.async_on_remove = MagicMock()
@@ -208,13 +209,14 @@ class TestAsyncAddedToHassReadsOpMode:
         await entity._async_read_op_mode()
 
         assert entity._op_mode_cache == "standby"
+        entity._device.async_execute.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_noop_without_opmode_entry(self):
         entity = _make_entity()
-        entity.hass.async_add_executor_job = AsyncMock()
+        entity._device.async_execute = AsyncMock()
 
         await entity._async_read_op_mode()
 
-        entity.hass.async_add_executor_job.assert_not_called()
+        entity._device.async_execute.assert_not_called()
         assert entity._op_mode_cache is None
