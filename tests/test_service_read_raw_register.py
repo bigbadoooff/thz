@@ -99,8 +99,11 @@ class TestReadRawRegisterService:
     @pytest.mark.asyncio
     async def test_read_raw_register_success(self, mock_hass, mock_device):
         """Test successful read of raw register."""
+        from custom_components.thz import notify
         from custom_components.thz.services import async_setup_services
 
+        create = notify.persistent_notification.async_create
+        create.reset_mock()
         # Setup device in hass.data (per-entry)
         mock_hass.data[DOMAIN]["test_entry"] = {"device": mock_device}
         test_data = bytes.fromhex("010a070503001234ff")
@@ -126,10 +129,8 @@ class TestReadRawRegisterService:
         assert "0000:" in result["formatted"]
 
         # Verify persistent notification was created
-        mock_hass.services.async_call.assert_called()
-        notification_call = mock_hass.services.async_call.call_args_list[-1]
-        assert notification_call[0][0] == "persistent_notification"
-        assert notification_call[0][1] == "create"
+        create.assert_called_once()
+        assert create.call_args.kwargs["notification_id"] == "thz_raw_FB"
 
     @pytest.mark.asyncio
     async def test_read_raw_register_invalid_hex(self, mock_hass, mock_device):

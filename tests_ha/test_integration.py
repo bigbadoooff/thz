@@ -6,7 +6,6 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
-from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
@@ -150,8 +149,8 @@ async def test_default_visibility_disables_schedules(hass, fake_device):
 
 
 async def test_services_follow_the_config_entry(hass, fake_device):
-    # Loaded at bootstrap in a real instance; the services report through it.
-    assert await async_setup_component(hass, "persistent_notification", {})
+    # Notifications use persistent_notification.async_create directly, so
+    # this works without the persistent_notification service being set up.
     entry = await _setup(hass)
     assert hass.services.has_service(DOMAIN, "read_raw_register")
     assert hass.services.has_service(DOMAIN, "backup_parameters")

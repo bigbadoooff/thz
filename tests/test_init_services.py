@@ -140,6 +140,10 @@ class TestScanRawRegisters:
 
     @pytest.mark.asyncio
     async def test_successful_scan_with_pattern(self):
+        from custom_components.thz import notify
+
+        create = notify.persistent_notification.async_create
+        create.reset_mock()
         hass = _mock_hass()
         device = _mock_device()
         device.async_execute = AsyncMock(return_value=bytes.fromhex("0100" + "1234"))
@@ -157,7 +161,7 @@ class TestScanRawRegisters:
         assert result["summary"]["success_count"] == 1
         assert result["results"][0]["success"] is True
         assert "decoded" in result["results"][0]
-        hass.services.async_call.assert_awaited()
+        create.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_scan_with_range_and_errors_included(self):

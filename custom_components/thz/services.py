@@ -42,6 +42,7 @@ from .fault_memory import (
     clear_fault_memory,
     read_fault_memory,
 )
+from .notify import async_notify
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
@@ -441,15 +442,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             error_msg = f"Invalid hex command: {command_str} - {err}"
             _LOGGER.exception(error_msg)
             # Create persistent notification for the error
-            await hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "title": "THZ Raw Register Read Error",
-                    "message": error_msg,
-                    "notification_id": f"thz_raw_{command_str}",
-                },
-                blocking=True,
+            async_notify(
+                hass,
+                title="THZ Raw Register Read Error",
+                message=error_msg,
+                notification_id=f"thz_raw_{command_str}",
             )
             raise ServiceValidationError(error_msg) from err
 
@@ -460,15 +457,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         except (ServiceValidationError, HomeAssistantError) as err:
             error_msg = str(err)
             _LOGGER.exception(error_msg)
-            await hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "title": "THZ Raw Register Read Error",
-                    "message": error_msg,
-                    "notification_id": f"thz_raw_{command_str}",
-                },
-                blocking=True,
+            async_notify(
+                hass,
+                title="THZ Raw Register Read Error",
+                message=error_msg,
+                notification_id=f"thz_raw_{command_str}",
             )
             raise
         device = entry_data["device"]
@@ -499,15 +492,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 f"Formatted:\n{formatted}"
             )
 
-            await hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "title": f"THZ Raw Register Read: {command_str}",
-                    "message": notification_message,
-                    "notification_id": f"thz_raw_{command_str}",
-                },
-                blocking=True,
+            async_notify(
+                hass,
+                title=f"THZ Raw Register Read: {command_str}",
+                message=notification_message,
+                notification_id=f"thz_raw_{command_str}",
             )
 
             # Return service response
@@ -522,15 +511,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         except Exception as err:  # noqa: BLE001
             error_msg = f"Error reading register {command_str}: {err}"
             _LOGGER.error(error_msg, exc_info=True)
-            await hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "title": "THZ Raw Register Read Error",
-                    "message": error_msg,
-                    "notification_id": f"thz_raw_{command_str}",
-                },
-                blocking=True,
+            async_notify(
+                hass,
+                title="THZ Raw Register Read Error",
+                message=error_msg,
+                notification_id=f"thz_raw_{command_str}",
             )
             raise HomeAssistantError(error_msg) from err
 
@@ -625,15 +610,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         if preview_limit != 0 and len(results) > preview_limit:
             preview_lines.append(f"... and {len(results) - preview_limit} more")
 
-        await hass.services.async_call(
-            "persistent_notification",
-            "create",
-            {
-                "title": f"THZ Raw Register Scan ({scan_mode})",
-                "message": "\n".join(preview_lines),
-                "notification_id": f"thz_scan_{scan_mode.replace(':', '_')}",
-            },
-            blocking=True,
+        async_notify(
+            hass,
+            title=f"THZ Raw Register Scan ({scan_mode})",
+            message="\n".join(preview_lines),
+            notification_id=f"thz_scan_{scan_mode.replace(':', '_')}",
         )
 
         return cast("ServiceResponse", response)
@@ -1223,18 +1204,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 else "Clock: not synced (write failed, see failed list)"
             )
         )
-        await hass.services.async_call(
-            "persistent_notification",
-            "create",
-            {
-                "title": (
-                    f"THZ Parameter Restore "
-                    f"{'(dry run) ' if dry_run else ''}Complete"
-                ),
-                "message": notification_message,
-                "notification_id": "thz_restore_parameters",
-            },
-            blocking=True,
+        async_notify(
+            hass,
+            title=(
+                f"THZ Parameter Restore "
+                f"{'(dry run) ' if dry_run else ''}Complete"
+            ),
+            message=notification_message,
+            notification_id="thz_restore_parameters",
         )
 
         return cast("ServiceResponse", {

@@ -103,7 +103,11 @@ sys.modules['homeassistant'] = MagicMock()
 sys.modules['homeassistant.util'] = MagicMock()
 sys.modules['homeassistant.util.dt'] = MagicMock()
 sys.modules['homeassistant.config_entries'] = MagicMock()
-sys.modules['homeassistant.core'] = MagicMock()
+core_mock = MagicMock()
+# Like Home Assistant's own decorator: marks the function, returns it as-is.
+# A MagicMock here would replace every @callback function with a mock.
+core_mock.callback = lambda func: func
+sys.modules['homeassistant.core'] = core_mock
 
 
 class HomeAssistantError(Exception):

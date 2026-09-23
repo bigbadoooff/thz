@@ -29,6 +29,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from ._typing_compat import get_runtime_data
+from .notify import async_notify
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
@@ -212,22 +213,18 @@ async def async_check_and_maybe_sync_clock(
         if entry_data.get("_clock_notify_date") == today:
             return
         entry_data["_clock_notify_date"] = today
-    await hass.services.async_call(
-        "persistent_notification",
-        "create",
-        {
-            "title": "THZ Device Clock Drifted",
-            "message": (
-                f"The heat pump's clock is off by about {abs(drift) / 60:.0f} "
-                f"minute(s) (device reads {device_dt.strftime('%Y-%m-%d %H:%M')}, "
-                f"local time is {local_now.strftime('%Y-%m-%d %H:%M')}).\n\n"
-                "Auto-sync clock is turned off, so this wasn't corrected "
-                "automatically. Enable it under the integration's "
-                "Reconfigure screen to fix this going forward."
-            ),
-            "notification_id": f"thz_clock_drift_{config_entry.entry_id}",
-        },
-        blocking=True,
+    async_notify(
+        hass,
+        title="THZ Device Clock Drifted",
+        message=(
+            f"The heat pump's clock is off by about {abs(drift) / 60:.0f} "
+            f"minute(s) (device reads {device_dt.strftime('%Y-%m-%d %H:%M')}, "
+            f"local time is {local_now.strftime('%Y-%m-%d %H:%M')}).\n\n"
+            "Auto-sync clock is turned off, so this wasn't corrected "
+            "automatically. Enable it under the integration's "
+            "Reconfigure screen to fix this going forward."
+        ),
+        notification_id=f"thz_clock_drift_{config_entry.entry_id}",
     )
 
 
