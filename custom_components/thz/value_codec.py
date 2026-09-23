@@ -259,10 +259,12 @@ class THZValueCodec:
         """
         if decode_type == "0clean":
             # Single byte encoding
-            return bytes([int(value)])
+            return bytes([round(value)])
         else:
-            # Standard signed integer encoding scaled by step.
-            value_int = int(value / step)
+            # Standard signed integer encoding scaled by step. Round rather
+            # than truncate: value / step is often just below the integer
+            # (0.3 / 0.1 == 2.9999999999999996).
+            value_int = round(value / step)
             return value_int.to_bytes(length, byteorder="big", signed=True)
 
     @staticmethod
