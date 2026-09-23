@@ -1,6 +1,9 @@
 """Test doubles shared by several test modules."""
 
+import asyncio
+
 from custom_components.thz.thz_device import THZDevice
+from custom_components.thz.transport import THZTransport
 
 
 class Simulated2xxDevice(THZDevice):
@@ -11,7 +14,7 @@ class Simulated2xxDevice(THZDevice):
         self.blocks = dict(blocks)
         self.sent: list[bytes] = []
 
-    def send_request(self, telegram: bytes, get_or_set: str) -> bytes:
+    async def send_request(self, telegram: bytes, get_or_set: str) -> bytes:
         self.sent.append(telegram)
         # header (2) + escaped(CRC + address + data) + footer (2)
         body = self.unescape(telegram[2:-2])[1:]
@@ -27,8 +30,78 @@ class Simulated2xxDevice(THZDevice):
         crc = self.thz_checksum(b"\x01\x00\x00" + data)
         return self.escape(b"\x01\x00" + crc + data) + b"\x10\x03"
 
-    async def async_execute(self, hass, fn, *args, timeout: float = 8.0):  # noqa: ASYNC109
-        return fn(*args)
+
+class ScriptedTransport(THZTransport):
+    """In-memory transport: hands out scripted chunks or a responder's answers.
+
+    ``chunks`` are returned by successive reads. ``responder`` is called with
+    every written byte string and returns the bytes the device sends back.
+    A read with nothing queued waits ``max_wait`` like the real transport.
+    """
+
+    def __init__(self, chunks=(), responder=None) -> None:
+        super().__init__()
+        self.incoming: list[bytes] = list(chunks)
+        self.responder = responder
+        self.written: list[bytes] = []
+        self.alive = True
+        self.connects = 0
+        self.closes = 0
+        self.resets = 0
+
+    async def connect(self) -> None:
+        self.connects += 1
+        self.alive = True
+
+    def is_alive(self) -> bool:
+        return self.alive
+
+    async def write(self, data: bytes) -> None:
+        self.written.append(data)
+        if self.responder is not None:
+            answer = self.responder(data)
+            if answer:
+                self.incoming.append(answer)
+
+    async def read(self, max_wait: float) -> bytes:
+        if self.incoming:
+            return self.incoming.pop(0)
+        await asyncio.sleep(max_wait)
+        return b""
+
+    async def reset_input_buffer(self) -> None:
+        self.resets += 1
+        if self.responder is not None:
+            # Scripted chunks are the test's input; a responder's leftovers
+            # (e.g. the answer to the closing 0x02) are stale input.
+            self.incoming.clear()
+
+    def close(self) -> None:
+        self.closes += 1
+        self.alive = False
+
+
+def heat_pump_responder(frame: bytes):
+    """Responder answering one exchange like the heat pump: 10, 10 02, frame."""
+
+    def respond(data: bytes) -> bytes:
+        if data == b"\x02":
+            return b"\x10"
+        if data == b"\x10":
+            return frame
+        return b"\x10\x02"
+
+    return respond
+
+
+def device_with_transport(transport, **kwargs) -> THZDevice:
+    """A THZDevice talking to ``transport``, with a short read timeout."""
+    kwargs.setdefault("connection", "usb")
+    kwargs.setdefault("port", "/dev/null")
+    kwargs.setdefault("read_timeout", 0.05)
+    device = THZDevice(**kwargs)
+    device._transport = transport
+    return device
 
 
 def make_runtime_data(**fields):

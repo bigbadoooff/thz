@@ -3,3 +3,4 @@
 # the test environment unnoticed; bump deliberately. Requires Python 3.13.
 pytest-homeassistant-custom-component==0.13.316
 pyserial>=3.5
+pyserial-asyncio-fast>=0.16

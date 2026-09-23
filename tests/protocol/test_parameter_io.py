@@ -5,7 +5,6 @@ its register blocks in memory and speaks the real telegram format, so the
 tests cover the whole path from write-map entry to bytes on the wire.
 """
 
-import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
@@ -226,7 +225,9 @@ class TestNumberReadsFromBlockCoordinator:
         self, write_map_206
     ):
         device = Simulated2xxDevice({b"\x17": _block_17()})
-        coordinator = self._coordinator(device.read_write_register(b"\x17", "get"))
+        coordinator = self._coordinator(
+            await device.read_write_register(b"\x17", "get")
+        )
         device.sent.clear()
         number = self._number(write_map_206["p02RoomTempNight"], device, coordinator)
 
@@ -249,7 +250,9 @@ class TestNumberReadsFromBlockCoordinator:
     @pytest.mark.asyncio
     async def test_write_refreshes_the_block_coordinator(self, write_map_206):
         device = Simulated2xxDevice({b"\x17": _block_17()})
-        coordinator = self._coordinator(device.read_write_register(b"\x17", "get"))
+        coordinator = self._coordinator(
+            await device.read_write_register(b"\x17", "get")
+        )
         number = self._number(write_map_206["p02RoomTempNight"], device, coordinator)
 
         await number.async_set_native_value(18.5)
@@ -257,15 +260,16 @@ class TestNumberReadsFromBlockCoordinator:
         coordinator.async_request_refresh.assert_awaited_once()
         assert device.blocks[b"\x17"][2:4] == bytes.fromhex("00B9")
 
+    @pytest.mark.asyncio
     @pytest.mark.parametrize("name", ["p02RoomTempNight", "progHC1Tuesday"])
-    def test_block_slice_equals_device_read(self, write_map_206, name):
+    async def test_block_slice_equals_device_read(self, write_map_206, name):
         from custom_components.thz.parameter_io import parameter_from_block
 
         entry = write_map_206[name]
         addr = bytes.fromhex(entry["command"])
         device = Simulated2xxDevice({addr: bytes(range(7, 55))})
-        response = device.read_write_register(addr, "get")
+        response = await device.read_write_register(addr, "get")
 
         from_block = parameter_from_block(entry, response)
-        from_device = asyncio.run(async_read_parameter(None, device, entry))
+        from_device = await async_read_parameter(None, device, entry)
         assert from_block == from_device

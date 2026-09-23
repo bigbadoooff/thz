@@ -602,10 +602,14 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
 
         # Read the current schedule data (4 bytes total) so only the
         # relevant byte (start or end) is touched, same as async_set_value.
-        async with self._device.lock:
-            current_bytes = await self.hass.async_add_executor_job(
-                self._device.read_value, bytes.fromhex(self._command), "get", 4, 4
-            )
+        current_bytes = await self._device.async_execute(
+            self.hass,
+            self._device.read_value,
+            bytes.fromhex(self._command),
+            "get",
+            4,
+            4,
+        )
 
         schedule_bytes = bytearray(current_bytes)
         if self._time_type == "start":
@@ -613,12 +617,12 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         else:  # "end"
             schedule_bytes[1] = TIME_VALUE_UNSET
 
-        async with self._device.lock:
-            await self.hass.async_add_executor_job(
-                self._device.write_value,
-                bytes.fromhex(self._command),
-                bytes(schedule_bytes),
-            )
+        await self._device.async_execute(
+            self.hass,
+            self._device.write_value,
+            bytes.fromhex(self._command),
+            bytes(schedule_bytes),
+        )
 
         self._attr_native_value = None
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms

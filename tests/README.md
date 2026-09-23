@@ -83,8 +83,8 @@ Shared test doubles live in `helpers.py`.
   - `protocol/test_parameter_io.py` uses `Simulated2xxDevice`, which keeps 2xx register
     blocks in memory and speaks the real telegram format, to cover the path
     from write-map entry to bytes on the wire.
-  - `protocol/test_transport.py::TestFrameComplete` covers frame termination
-    including escaped `0x10` bytes split across read chunks.
+  - `protocol/test_client.py::TestReceiveDataTelegram` covers frame
+    termination including escaped `0x10` bytes split across read chunks.
 - `protocol/test_fhem_reference.py` checks the protocol against FHEM's unmodified
   `docs/legacy/00_THZ.pm`, which is known to work on real devices. The Perl
   harness in `protocol/fhem_reference/` stubs only FHEM's runtime and the serial line,
@@ -97,7 +97,12 @@ Shared test doubles live in `helpers.py`.
   input: codec round-trips, escaping, frame reading across arbitrary chunk
   boundaries, time quantisation and 2.x block writes touching only their own
   bytes.
-- `protocol/test_async_execute.py` runs `THZDevice.async_execute` against a real thread
-  pool to cover timeouts, cancellation and lock hand-over.
+- `protocol/test_async_execute.py` covers the lock, timeouts and cancellation
+  of `THZDevice.async_execute`.
+- `protocol/test_client.py` drives the client (handshakes, telegrams, retry
+  rules, register access) against `ScriptedTransport` from `tests/helpers.py`.
+- `protocol/test_transport.py` runs the TCP transport against a local asyncio
+  server, including a GET and a SET through the whole client, and the serial
+  transport against a mocked `serial_asyncio_fast`.
 - Codec changes should keep the round-trip tests in
   `codec/test_value_codec.py` passing for every step value.

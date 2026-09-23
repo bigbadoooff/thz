@@ -6,7 +6,7 @@
   "documentation": "https://github.com/bigbadoooff/thz",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/bigbadoooff/thz/issues",
-  "loggers": ["serial"],
-  "requirements": ["pyserial"],
+  "loggers": ["serial", "serial_asyncio_fast"],
+  "requirements": ["pyserial", "pyserial-asyncio-fast>=0.16"],
   "version": "0.6.0"
 }

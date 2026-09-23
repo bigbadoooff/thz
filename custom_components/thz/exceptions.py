@@ -50,5 +50,5 @@ class THZNotInitializedError(THZError, RuntimeError):
 
 
 # What a device call can raise: the THZ errors above and OS-level I/O errors
-# that surface unwrapped (e.g. from the executor or a closed descriptor).
+# that surface unwrapped (e.g. from the serial port driver).
 DEVICE_ERRORS = (THZError, OSError)

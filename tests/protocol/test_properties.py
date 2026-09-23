@@ -8,7 +8,6 @@ block write only ever changes the bytes (or bits) of its own parameter.
 
 import asyncio
 from datetime import time as dt_time
-from unittest.mock import patch
 
 from hypothesis import given, settings, strategies as st
 import pytest
@@ -24,7 +23,11 @@ from custom_components.thz.register_maps.register_map_manager import (
 from custom_components.thz.thz_device import THZDevice
 from custom_components.thz.time import quarters_to_time, time_to_quarters
 from custom_components.thz.value_codec import THZValueCodec
-from tests.helpers import Simulated2xxDevice
+from tests.helpers import (
+    ScriptedTransport,
+    Simulated2xxDevice,
+    device_with_transport,
+)
 
 _DEVICE = THZDevice(connection="usb", port="/dev/null")
 
@@ -110,13 +113,8 @@ def test_frame_is_read_completely_across_any_chunking(payload, cuts):
         frame[start:end]
         for start, end in zip([0, *bounds], [*bounds, len(frame)], strict=True)
     ]
-    feed = iter(chunks)
-    device = THZDevice(connection="usb", port="/dev/null")
-    with (
-        patch.object(device, "_write_bytes"),
-        patch.object(device, "_read_available", side_effect=lambda: next(feed, b"")),
-    ):
-        received = device._receive_data_telegram(1.0)
+    device = device_with_transport(ScriptedTransport(chunks), read_timeout=1.0)
+    received = asyncio.run(device._receive_data_telegram())
 
     assert received == frame
     crc = _DEVICE.thz_checksum(b"\x01\x00\x00" + payload)
