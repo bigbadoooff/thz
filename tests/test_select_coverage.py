@@ -210,3 +210,29 @@ class TestTHZSelectSelectOption:
 
         entity._device.async_execute.assert_not_awaited()
         entity.async_write_ha_state.assert_not_called()
+
+
+class TestOptionsWithinMapBounds:
+    """Shared value tables are limited to the firmware's min/max."""
+
+    def test_439_passive_cooling_offers_only_0_to_2(self):
+        from unittest.mock import MagicMock
+
+        from custom_components.thz.select import THZSelect
+
+        entry = {
+            "command": "0A0575", "min": "0", "max": "2",
+            "type": "select", "decode_type": "passive_cooling",
+        }
+        select = THZSelect("p75passiveCooling", entry, MagicMock(), "dev")
+        assert select._attr_options == ["off", "exhaust_air", "supply_air"]
+
+    def test_no_bounds_keeps_every_option(self):
+        from unittest.mock import MagicMock
+
+        from custom_components.thz.select import THZSelect
+        from custom_components.thz.value_maps import SELECT_MAP
+
+        entry = {"command": "0A0112", "min": "", "max": "", "decode_type": "2opmode"}
+        select = THZSelect("pOpMode", entry, MagicMock(), "dev")
+        assert select._attr_options == list(SELECT_MAP["2opmode"].values())

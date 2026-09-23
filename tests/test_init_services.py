@@ -5,7 +5,8 @@ This file covers scan_raw_registers, watch_raw_registers_changes,
 refresh_block, and set_diverter_valve. backup_parameters, restore_parameters,
 and list_parameter_backups are covered by test_backup_restore_services.py.
 """
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -139,6 +140,10 @@ class TestScanRawRegisters:
 
     @pytest.mark.asyncio
     async def test_successful_scan_with_pattern(self):
+        from custom_components.thz import notify
+
+        create = notify.persistent_notification.async_create
+        create.reset_mock()
         hass = _mock_hass()
         device = _mock_device()
         device.async_execute = AsyncMock(return_value=bytes.fromhex("0100" + "1234"))
@@ -156,7 +161,7 @@ class TestScanRawRegisters:
         assert result["summary"]["success_count"] == 1
         assert result["results"][0]["success"] is True
         assert "decoded" in result["results"][0]
-        hass.services.async_call.assert_awaited()
+        create.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_scan_with_range_and_errors_included(self):
@@ -416,3 +421,86 @@ class TestSetDiverterValveService:
         ):
             await handler(call)
 
+
+    @pytest.mark.asyncio
+    async def test_cancel_while_motor_runs_still_stops_both_motors(self):
+        from custom_components.thz import services as services_module
+
+        hass = _mock_hass()
+        device = _mock_device()
+        device.async_execute = AsyncMock(return_value=None)
+        hass.data[DOMAIN]["entry1"] = {
+            "device": device,
+            # diverterValve bit clear -> heating active -> "heating" allowed
+            "coordinators": {"pxxF2": self._coordinator(bytes(12))},
+        }
+
+        await async_setup_services(hass)
+        handler = _handler_for(hass, "set_diverter_valve")
+
+        call = MagicMock()
+        call.data = {"position": "heating"}
+        with patch.object(
+            services_module.asyncio, "sleep",
+            AsyncMock(side_effect=asyncio.CancelledError),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await handler(call)
+
+        writes = [c.args[2:] for c in device.async_execute.await_args_list]
+        assert writes[0] == (bytes.fromhex("0A0653"), bytes.fromhex("0001"))
+        assert (bytes.fromhex("0A0653"), bytes.fromhex("0000")) in writes[1:]
+        assert (bytes.fromhex("0A0652"), bytes.fromhex("0000")) in writes[1:]
+
+    @pytest.mark.asyncio
+    async def test_failed_stop_write_still_stops_other_motor(self):
+        hass = _mock_hass()
+        device = _mock_device()
+        calls = []
+
+        async def _execute(_hass, _fn, command, value, *rest):
+            calls.append((command, value))
+            if (command, value) == (bytes.fromhex("0A0653"), bytes.fromhex("0000")):
+                raise ConnectionError("lost")
+
+        device.async_execute = AsyncMock(side_effect=_execute)
+        hass.data[DOMAIN]["entry1"] = {"device": device, "coordinators": {}}
+
+        await async_setup_services(hass)
+        handler = _handler_for(hass, "set_diverter_valve")
+
+        call = MagicMock()
+        call.data = {"position": "off"}
+        with pytest.raises(HomeAssistantError):
+            await handler(call)
+
+        assert (bytes.fromhex("0A0652"), bytes.fromhex("0000")) in calls
+
+
+class TestDiverterBitPosition:
+    """The diverterValve flag is located through the firmware's register map."""
+
+    def test_every_firmware_map_has_the_flag(self):
+        from custom_components.thz.register_maps.register_map_manager import (
+            RegisterMapManager,
+        )
+        from custom_components.thz.services import _diverter_bit_position
+
+        for firmware in ("206", "214", "419", "439", "509", "539", "709"):
+            assert _diverter_bit_position(RegisterMapManager(firmware)) == (11, 2)
+
+    def test_even_nibble_is_the_high_nibble(self):
+        from custom_components.thz.services import _diverter_bit_position
+
+        manager = MagicMock()
+        manager.get_registers_for_block.return_value = [
+            ("diverterValve:", 22, 1, "bit1", 1)
+        ]
+        assert _diverter_bit_position(manager) == (11, 5)
+
+    def test_missing_flag_is_reported(self):
+        from custom_components.thz.services import _diverter_bit_position
+
+        manager = MagicMock()
+        manager.get_registers_for_block.return_value = []
+        assert _diverter_bit_position(manager) is None

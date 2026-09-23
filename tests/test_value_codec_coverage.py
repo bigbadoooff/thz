@@ -14,8 +14,18 @@ class TestEncodeNumber:
     """Tests for THZValueCodec.encode_number."""
 
     def test_0clean_encoding(self):
+        # Padded to the register's two data bytes, as FHEM sends "XX00".
         result = THZValueCodec.encode_number(7.0, 1, "0clean")
-        assert result == bytes([7])
+        assert result == bytes([7, 0])
+
+    def test_0clean_negative_is_twos_complement_byte(self):
+        assert THZValueCodec.encode_number(-5.0, 1, "0clean") == bytes([0xFB, 0])
+
+    def test_4temp_puts_value_in_high_byte(self):
+        # FHEM "4temp" divides by 2560: -5.0 K is CE00.
+        encoded = THZValueCodec.encode_number(-5.0, 0.1, "4temp")
+        assert encoded == bytes.fromhex("CE00")
+        assert THZValueCodec.decode_number(encoded, 0.1, "4temp") == pytest.approx(-5.0)
 
     def test_standard_signed_int_encoding(self):
         # value 20.0 / step 0.5 = 40 -> 2-byte big-endian signed
@@ -29,6 +39,24 @@ class TestEncodeNumber:
     def test_standard_step_one(self):
         result = THZValueCodec.encode_number(15.0, 1, "hex")
         assert result == (15).to_bytes(2, byteorder="big", signed=True)
+
+    @pytest.mark.parametrize("value", [0.3, 1.2, 19.9, 20.2, -0.3])
+    def test_rounds_instead_of_truncating(self, value):
+        # value / 0.1 lands just below the integer for these (e.g.
+        # 0.3 / 0.1 == 2.9999999999999996); truncating wrote one step too low.
+        result = THZValueCodec.encode_number(value, 0.1, "hex2int")
+        assert int.from_bytes(result, byteorder="big", signed=True) == round(
+            value * 10
+        )
+
+    @pytest.mark.parametrize("step", [0.1, 0.5, 1.0])
+    def test_round_trips_every_step_value(self, step):
+        for i in range(-300, 1000):
+            value = round(i * step, 1)
+            encoded = THZValueCodec.encode_number(value, step, "hex2int")
+            assert THZValueCodec.decode_number(
+                encoded, step, "hex2int"
+            ) == pytest.approx(value)
 
 
 class TestDecodeNumber:

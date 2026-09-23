@@ -5,9 +5,12 @@ communication with Stiebel Eltron LWZ / Tecalor THZ heat pumps.
 """
 
 import asyncio
+from collections.abc import Callable
 import logging
 import socket
+import threading
 import time
+from typing import Any
 
 import serial
 
@@ -61,10 +64,12 @@ class THZDevice:
         self.register_map_manager: RegisterMapManager | None = None
         self.write_register_map_manager: RegisterMapManagerWrite | None = None
 
-        # Thread lock for parallel access
+        # Serialises device access across coroutines (see async_execute).
         self.lock = asyncio.Lock()
-        self._last_access = 0
-        self._min_interval = 0.1  # minimum time between reads in seconds
+        # Per-thread abandon signal of the async_execute call being served.
+        self._call_state = threading.local()
+        # Whether the current exchange already sent its telegram.
+        self._request_sent = False
 
         # ---------------------------------------------------------------------
 
@@ -72,23 +77,28 @@ class THZDevice:
         """Open connection and initialize firmware-dependent data structures."""
         _LOGGER.debug("Initializing THZ device (%s)", self.connection)
 
-        # Open connection
         if self.connection == "usb":
-            self._connect_serial()
+            connect = self._connect_serial
         elif self.connection == "ip":
-            self._connect_tcp()
+            connect = self._connect_tcp
         else:
             raise ValueError(f"Unknown connection type: {self.connection}")
 
-        # Read firmware (runs synchronously in executor)
-        self._firmware_version = await hass.async_add_executor_job(
-            self.read_firmware_version
-        )
+        try:
+            # Opening the port / TCP connect blocks, so keep it off the loop.
+            await hass.async_add_executor_job(connect)
+            self._firmware_version = await hass.async_add_executor_job(
+                self.read_firmware_version
+            )
+            if not self._firmware_version:
+                # Never guess a profile: an unanswered FD request would
+                # otherwise fall through to the 4.39 default maps, including
+                # their write commands.
+                raise ConnectionError("Firmware version could not be read")
+        except BaseException:
+            self._force_close()
+            raise
         _LOGGER.info("Firmware version detected: %s", self._firmware_version)
-
-        # Load firmware-specific register maps
-        if self._firmware_version is None:
-            raise RuntimeError("Firmware version could not be determined")
 
         effective_firmware = self._resolve_effective_firmware()
         if effective_firmware != self._firmware_version:
@@ -215,9 +225,11 @@ class THZDevice:
                 # This is a best-effort check; MSG_PEEK may not work on all platforms
                 self.ser.setblocking(False)  # type: ignore[union-attr]
                 try:
-                    # recv with MSG_PEEK doesn't remove data from buffer
-                    # Empty return on non-blocking socket just means no data available
-                    self.ser.recv(1, socket.MSG_PEEK)  # type: ignore[union-attr]
+                    # recv with MSG_PEEK doesn't remove data from buffer. A
+                    # non-blocking socket without data raises BlockingIOError;
+                    # an empty result means the peer closed the connection.
+                    if self.ser.recv(1, socket.MSG_PEEK) == b"":  # type: ignore[union-attr]
+                        return False
                 except BlockingIOError:
                     # No data available but connection is alive
                     pass
@@ -242,8 +254,31 @@ class THZDevice:
         except AttributeError:
             return False
 
+    def _raise_if_abandoned(self) -> None:
+        """Stop a worker thread whose async_execute call already gave up.
+
+        Once async_execute has timed out it may hand the device to the next
+        caller, so the old thread must neither reconnect nor send anything.
+        """
+        abandoned: threading.Event | None = getattr(
+            self._call_state, "abandoned", None
+        )
+        if abandoned is not None and abandoned.is_set():
+            raise ConnectionError("Device call abandoned after its timeout")
+
+    def _run_abandonable(
+        self, abandoned: threading.Event, fn: Callable[..., Any], *args: Any
+    ) -> Any:
+        """Run ``fn`` in this worker thread with its abandon signal attached."""
+        self._call_state.abandoned = abandoned
+        try:
+            return fn(*args)
+        finally:
+            self._call_state.abandoned = None
+
     def _reconnect(self):
         """Attempt to reconnect if connection was lost."""
+        self._raise_if_abandoned()
         _LOGGER.warning("Attempting to reconnect...")
         try:
             if self.ser is not None:
@@ -259,7 +294,7 @@ class THZDevice:
 
             _LOGGER.info("Reconnection successful")
         except OSError as e:
-            _LOGGER.exception("Reconnection failed: %s", e)
+            _LOGGER.debug("Reconnection failed: %s", e)
             raise
 
     def _do_handshake_1(self, timeout: float) -> None:
@@ -276,7 +311,7 @@ class THZDevice:
         if response != const.DATALINKESCAPE:
             resp_hex = response.hex() if response else "no data"
             error_msg = f"Handshake 1 failed, received: {resp_hex}"
-            _LOGGER.error(error_msg)
+            _LOGGER.debug(error_msg)
             raise RuntimeError(error_msg)
 
     def _do_handshake_2(self, timeout: float) -> None:
@@ -307,7 +342,7 @@ class THZDevice:
             else:
                 byte_hex = second_byte.hex() if second_byte else "no data"
                 error_msg = f"Handshake 2 failed: received 0x10 then {byte_hex}"
-                _LOGGER.error(error_msg)
+                _LOGGER.debug(error_msg)
                 raise RuntimeError(error_msg)
         elif response == const.STARTOFTEXT:
             # Sometimes device sends just 0x02 (as per Perl code line 1525)
@@ -317,7 +352,7 @@ class THZDevice:
         if response != const.DATALINKESCAPE + const.STARTOFTEXT:
             resp_hex = response.hex() if response else "no data"
             error_msg = f"Handshake 2 failed, received: {resp_hex}"
-            _LOGGER.error(error_msg)
+            _LOGGER.debug(error_msg)
             raise RuntimeError(error_msg)
 
     def _receive_data_telegram(self, timeout: float) -> bytes:
@@ -340,27 +375,39 @@ class THZDevice:
             chunk = self._read_available()
             if chunk:
                 data.extend(chunk)
-                if (
-                    len(data) >= 8
-                    and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT
-                ):
+                if self._frame_complete(data):
                     break
             else:
                 # Avoid busy-waiting when no data is currently available
                 time.sleep(0.01)
 
-        if not (
-            len(data) >= 8
-            and data[-2:] == const.DATALINKESCAPE + const.ENDOFTEXT
-        ):
+        if not self._frame_complete(data):
             error_msg = (
                 "No valid response received after data request - "
                 "timeout or incomplete data"
             )
-            _LOGGER.error(error_msg)
+            _LOGGER.debug(error_msg)
             raise RuntimeError(error_msg)
 
         return bytes(data)
+
+    @staticmethod
+    def _frame_complete(data: bytes | bytearray) -> bool:
+        """Return True if ``data`` ends with an unescaped 0x10 0x03 terminator.
+
+        A data byte 0x10 is sent escaped as 0x10 0x10, so ``... 10 10 03``
+        is an escaped 0x10 followed by a data byte 0x03, not the end of the
+        frame. The terminator's 0x10 is real only if the run of 0x10 bytes
+        before the final 0x03 has odd length.
+        """
+        if len(data) < 8 or data[-1] != const.ENDOFTEXT[0]:
+            return False
+        run = 0
+        for byte in reversed(data[:-1]):
+            if byte != const.DATALINKESCAPE[0]:
+                break
+            run += 1
+        return run % 2 == 1
 
     def _exchange_once(
         self, telegram: bytes, get_or_set: str, attempt: int, max_retries: int
@@ -384,6 +431,7 @@ class THZDevice:
             RuntimeError: If a protocol/handshake error occurs.
         """
         timeout = self.read_timeout
+        self._raise_if_abandoned()
 
         if self._initialized and not self._is_connection_alive():
             _LOGGER.warning(
@@ -401,6 +449,7 @@ class THZDevice:
 
         self._reset_input_buffer()
         self._write_bytes(telegram)
+        self._request_sent = True
 
         self._do_handshake_2(timeout)
 
@@ -420,24 +469,24 @@ class THZDevice:
                 invalid response).
         """
         max_retries = 1  # Allow one retry on connection error
-        last_error: Exception | None = None
 
         for attempt in range(max_retries + 1):
+            self._request_sent = False
             try:
                 return self._exchange_once(telegram, get_or_set, attempt, max_retries)
 
             except ConnectionError as e:
-                last_error = e
-                _LOGGER.exception(
+                # Final failures are raised and reported once by the caller.
+                _LOGGER.debug(
                     "Connection error in send_request (attempt %d/%d): %s",
                     attempt + 1, max_retries + 1, e,
                 )
-                if attempt < max_retries:
+                if attempt < max_retries and self._may_retry(get_or_set):
                     try:
                         self._reconnect()
                         continue
                     except OSError as reconnect_error:
-                        _LOGGER.exception("Reconnect failed: %s", reconnect_error)
+                        _LOGGER.warning("Reconnect failed: %s", reconnect_error)
                 raise ConnectionError(
                     f"Connection failed after {max_retries + 1} attempts: {e}"
                 ) from e
@@ -446,25 +495,40 @@ class THZDevice:
                 raise  # legitimate device response — no reconnect
 
             except RuntimeError as e:
-                last_error = e
-                _LOGGER.exception("Protocol error in send_request: %s", e)
-                if attempt < max_retries:
+                _LOGGER.debug(
+                    "Protocol error in send_request (attempt %d/%d): %s",
+                    attempt + 1, max_retries + 1, e,
+                )
+                if attempt < max_retries and self._may_retry(get_or_set):
                     try:
                         self._reconnect()
                         continue
                     except OSError as reconnect_error:
-                        _LOGGER.exception("Reconnect failed: %s", reconnect_error)
+                        _LOGGER.warning("Reconnect failed: %s", reconnect_error)
                 raise
 
             except Exception as e:  # noqa: BLE001
-                last_error = e
                 _LOGGER.exception("Unexpected error in send_request: %s", e)
                 raise RuntimeError(f"Device communication failed: {e}") from e
 
-        # Should not reach here, but just in case
-        if last_error:
-            raise last_error
+        # Every iteration returns, raises or retries; the last never retries.
         raise RuntimeError("send_request failed without specific error")
+
+    def _may_retry(self, get_or_set: str) -> bool:
+        """Return True if a failed exchange may be repeated.
+
+        A GET is always safe to repeat. A SET is only repeated if it failed
+        before the telegram went out; once sent, the device may already have
+        applied it, and callers such as the D1 fault-memory clear rely on a
+        write being sent at most once.
+        """
+        if get_or_set == "get" or not self._request_sent:
+            return True
+        _LOGGER.warning(
+            "Not repeating a SET that was already sent; the device may or "
+            "may not have applied it"
+        )
+        return False
 
     # Helper methods
     def _write_bytes(self, data: bytes):
@@ -480,13 +544,13 @@ class THZDevice:
             # self.ser turning None mid-call is a real, accepted race handled
             # by the AttributeError clause below.
             if self.connection == "ip":
-                self.ser.send(data)  # type: ignore[union-attr]
+                self.ser.sendall(data)  # type: ignore[union-attr]
             else:
                 self.ser.write(data)  # type: ignore[union-attr]
                 self.ser.flush()  # type: ignore[union-attr]
         except (OSError, socket.error, BrokenPipeError) as e:
             # Connection reset, broken pipe, or other socket/serial errors
-            _LOGGER.exception("Connection error during write: %s", e)
+            _LOGGER.debug("Connection error during write: %s", e)
             raise ConnectionError(f"Failed to write to connection: {e}") from e
         except (ValueError, AttributeError) as e:
             # Raised by select.select() when the fd is closed mid-write (pyserial sets
@@ -527,15 +591,11 @@ class THZDevice:
                 original_timeout = self.ser.gettimeout()  # type: ignore[union-attr]
                 self.ser.setblocking(False)  # type: ignore[union-attr]
                 data = self.ser.recv(1024)  # type: ignore[union-attr]
-                if not data and self.ser.fileno() == -1:
-                    # Socket is closed
-                    raise ConnectionError("TCP socket connection closed")
-                return data
             except BlockingIOError:
                 return b""
             except (OSError, socket.error) as e:
                 # Connection reset, broken pipe, or other socket errors
-                _LOGGER.exception("TCP socket error during read: %s", e)
+                _LOGGER.debug("TCP socket error during read: %s", e)
                 raise ConnectionError(f"TCP connection error: {e}") from e
             except (ValueError, AttributeError) as e:
                 # select.select() raises ValueError when the socket fd is closed
@@ -551,6 +611,11 @@ class THZDevice:
                 except (OSError, socket.error, AttributeError, UnboundLocalError):
                     # Socket may be in bad state or already None, ignore
                     pass
+            if not data:
+                # A non-blocking recv() only returns b"" at end of stream:
+                # the peer (e.g. a restarted ser2net) closed the connection.
+                raise ConnectionError("TCP socket connection closed by peer")
+            return bytes(data)
 
         # Serial connection
         try:
@@ -582,10 +647,10 @@ class THZDevice:
     async def async_execute(
         self,
         hass: HomeAssistant,
-        fn,
-        *args,
+        fn: Callable[..., Any],
+        *args: Any,
         timeout: float = 8.0,
-    ):
+    ) -> Any:
         """Execute a blocking device function with the lock held and a hard timeout.
 
         Acquires the device lock (with a 20-second cap so coordinators cannot
@@ -593,20 +658,15 @@ class THZDevice:
         ``fn(*args)`` in a thread-pool executor with a ``timeout``-second
         deadline.
 
-        Two complementary timeout mechanisms are used:
-
-        1. ``asyncio.wait_for`` — cancels a *pending* (not-yet-started) executor
-           future immediately, raising ``asyncio.TimeoutError``.
-        2. ``call_later`` deadline — closes the serial port from the event loop
-           at exactly ``timeout`` seconds.  This interrupts a *running* thread's
-           blocking I/O.  In Python ≥ 3.12 ``asyncio.wait_for`` does not raise
-           ``TimeoutError`` when the future is already running; without this
-           second mechanism the thread could reconnect and succeed silently past
-           the deadline.
+        A running thread cannot be cancelled, so on timeout the call is marked
+        abandoned (the thread then refuses to reconnect or send anything, see
+        _raise_if_abandoned) and the connection is closed to interrupt its
+        blocking I/O. The lock is only released once the thread has actually
+        finished (or after a short grace period), so it never talks to the
+        device concurrently with the next caller.
 
         On *any* failure ``_force_close`` is called so ``self.ser`` is
-        guaranteed to be ``None`` on exit, triggering a fresh ``_reconnect()``
-        on the next call.
+        ``None`` on exit, triggering a fresh ``_reconnect()`` on the next call.
         """
         # Prevent unbounded queuing: if the lock cannot be acquired within
         # 20 seconds the coordinator gives up and retries at its next interval.
@@ -618,57 +678,49 @@ class THZDevice:
                 f"Device busy: could not acquire lock within {_LOCK_WAIT_TIMEOUT:.0f}s"
             ) from None
 
-        # Hard deadline: close the connection at timeout seconds so a running
-        # thread cannot silently hold the port past the deadline.
-        loop = asyncio.get_running_loop()
-        _timed_out = False
-
-        def _deadline_close() -> None:
-            nonlocal _timed_out
-            _timed_out = True
-            self._force_close()
-
-        deadline = loop.call_later(timeout, _deadline_close)
+        abandoned = threading.Event()
+        future = hass.async_add_executor_job(
+            self._run_abandonable, abandoned, fn, *args
+        )
         try:
-            result = await asyncio.wait_for(
-                hass.async_add_executor_job(fn, *args),
-                timeout=timeout,
-            )
+            return await asyncio.wait_for(asyncio.shield(future), timeout=timeout)
         except asyncio.TimeoutError:
-            # Future was pending (never ran); our call_later may also have fired.
-            _LOGGER.exception(
+            _LOGGER.warning(
                 "Device call timed out after %.1fs; closing connection", timeout
             )
-            self._force_close()
             raise ConnectionError(
                 f"Device communication timed out after {timeout}s"
             ) from None
         except THZRegisterNotSupportedError:
-            raise  # device said "not supported" — connection is fine, don't close it
+            raise  # device said "not supported" — connection is fine, keep it
         except BaseException:
             self._force_close()
             raise
-        else:
-            if _timed_out:
-                # call_later fired and force-closed the connection, but the
-                # thread had already reconnected and succeeded.  The data is
-                # valid; close the now-stale reconnected connection so the next
-                # call starts fresh.
-                _LOGGER.warning(
-                    "Device call exceeded %.1fs deadline but thread reconnected "
-                    "and succeeded; connection reset for next call",
-                    timeout,
-                )
-                self._force_close()
-            return result
         finally:
-            deadline.cancel()
+            if not future.done():
+                # Timed out or cancelled while the thread still runs.
+                abandoned.set()
+                self._force_close()
+                await asyncio.wait({future}, timeout=self._abandon_grace)
+                if not future.done():
+                    _LOGGER.warning(
+                        "Device worker did not finish within %.1fs after "
+                        "being abandoned", self._abandon_grace,
+                    )
+                else:
+                    # Consume the thread's (expected) error so it is not
+                    # reported as "exception was never retrieved".
+                    future.exception()
             self.lock.release()
 
-    def close(self):
-        """Close the connection."""
-        if self.ser is not None:
-            self.ser.close()
+    @property
+    def _abandon_grace(self) -> float:
+        """Upper bound for an abandoned worker to notice the closed port."""
+        return 2 * self.read_timeout + 1.0
+
+    def close(self) -> None:
+        """Close the connection; safe to call repeatedly and never raises."""
+        self._force_close()
 
     def _force_close(self) -> None:
         """Close without raising; sets ser=None so the next call reconnects."""
@@ -788,11 +840,11 @@ class THZDevice:
                 not supported
         """
         header = b"\x01\x00" if get_or_set == "get" else b"\x01\x80"
-        # Standard Header für "get" und "set"
-        footer = const.DATALINKESCAPE + const.ENDOFTEXT  # Standard Footer
+        # Standard header for "get" and "set"
+        footer = const.DATALINKESCAPE + const.ENDOFTEXT  # Standard footer
 
         checksum = self.thz_checksum(header + b"\x00" + addr_bytes + payload_to_deliver)
-        # b'\x00' = Platzhalter für die Checksumme
+        # b'\x00' = placeholder for the checksum byte
         telegram = self.construct_telegram(
             addr_bytes + payload_to_deliver, header, footer, checksum
         )
@@ -838,14 +890,14 @@ class THZDevice:
             value_raw = self.read_value(b"\xfd", "get", 2, 2)
             if value_raw is None:
                 _LOGGER.error(
-                    "Firmware-Version konnte nicht gelesen werden: Keine Antwort"
+                    "Could not read firmware version: no response"
                 )
                 return ""
             firmware_version = int.from_bytes(value_raw, byteorder="big", signed=False)
-            _LOGGER.debug("Firmware-Version gelesen: %s", firmware_version)
+            _LOGGER.debug("Firmware version read: %s", firmware_version)
             return str(firmware_version)
         except (OSError, RuntimeError) as e:
-            _LOGGER.exception("Firmware-Version konnte nicht gelesen werden: %s", e)
+            _LOGGER.warning("Could not read firmware version: %s", e)
             return ""
 
     def _probe_cooling_support(self) -> bool:
@@ -903,7 +955,12 @@ class THZDevice:
         _LOGGER.debug("Value %s written to address %s", value, addr_bytes.hex())
 
     def write_block_value(
-        self, block_addr: bytes, offset: int, length: int, value: bytes
+        self,
+        block_addr: bytes,
+        offset: int,
+        length: int,
+        value: bytes,
+        mask: int | None = None,
     ) -> None:
         r"""Write a value inside a register block using read-modify-write (2xx).
 
@@ -917,40 +974,55 @@ class THZDevice:
 
         Args:
             block_addr: Single-byte block address (e.g. b'\x17' for block "pxx17").
-            offset: Byte offset of the parameter within the decoded block response.
-                    The decoded response starts with a CRC byte at index 0, so
-                    offset=4 corresponds to payload byte 3.
+            offset: Byte offset of the parameter within the decoded block response,
+                    which starts with the CRC byte at index 0 followed by the
+                    echoed block address.
             length: Number of bytes occupied by the parameter value.
             value: Encoded bytes to write (must be exactly ``length`` bytes).
+            mask: Optional bit mask applied to every target byte; only the
+                masked bits are taken from ``value``, the others are kept
+                (used for single-bit flags that share a byte).
 
         Raises:
             ValueError: If ``value`` is not ``length`` bytes, or if the offset/length
                         is out of range for the block.
-            RuntimeError: If the device read or write fails.
+            RuntimeError: If the device read or write fails, or the read-back
+                block does not echo ``block_addr``.
         """
         if len(value) != length:
             raise ValueError(
                 f"write_block_value: value length {len(value)} != expected {length}"
             )
 
-        # Read the current block.
-        # decode_response returns [CRC_byte] + PAYLOAD_BYTES, so response[1:] is the
-        # raw payload that must be sent back unchanged (except for the modified bytes).
+        # Read the current block. decode_response returns
+        # [CRC] + [address echo] + [data]; only the data is sent back, since
+        # read_write_register prepends block_addr itself (FHEM's THZ_Set
+        # likewise re-encodes the read-back message with the address once).
         response = self.read_write_register(block_addr, "get")
+        header_len = 1 + len(block_addr)
+        echo = response[1:header_len]
+        if echo != block_addr:
+            raise RuntimeError(
+                f"write_block_value: unexpected address echo {echo.hex()} "
+                f"for block {block_addr.hex()}"
+            )
+        payload = bytearray(response[header_len:])
 
-        # response[0] = calculated CRC; response[1:] = PAYLOAD_BYTES from device.
-        payload = bytearray(response[1:])
-
-        # Register map offsets are relative to the full decoded response (CRC at 0),
-        # so we subtract 1 to get the index into the payload slice.
-        payload_offset = offset - 1
+        # Register map offsets are relative to the full decoded response (CRC
+        # at 0, address echo after it), so shift them into the data slice.
+        payload_offset = offset - header_len
         if payload_offset < 0 or payload_offset + length > len(payload):
             raise ValueError(
                 f"write_block_value: offset={offset}/length={length} out of range "
                 f"for block {block_addr.hex()} (payload size {len(payload)})"
             )
 
-        payload[payload_offset : payload_offset + length] = value
+        if mask is None:
+            payload[payload_offset : payload_offset + length] = value
+        else:
+            for i, byte in enumerate(value):
+                old = payload[payload_offset + i]
+                payload[payload_offset + i] = (old & ~mask & 0xFF) | (byte & mask)
 
         # Write the modified payload back to the device.
         self.read_write_register(block_addr, "set", bytes(payload))

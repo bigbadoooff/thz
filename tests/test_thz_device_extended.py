@@ -188,16 +188,6 @@ class TestTHZDeviceConfiguration:
         )
         assert device.tcp_port == 5555
 
-    def test_device_min_interval(self):
-        """Test minimum interval between reads."""
-        device = THZDevice(connection="usb", port="/dev/null")
-        assert device._min_interval == 0.1
-
-    def test_device_last_access_initialized(self):
-        """Test that last access time is initialized."""
-        device = THZDevice(connection="usb", port="/dev/null")
-        assert device._last_access == 0
-
 
 class TestTHZDeviceProperties:
     """Test device properties and attributes."""

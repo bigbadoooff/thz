@@ -400,3 +400,42 @@ class TestTHZScheduleTime:
         assert entity.available is True
         assert entity.native_value == dtime(2, 0)
 
+
+
+class TestHolidayAndPartyTimeByte:
+    """FHEM keeps 9holy / 8party start times in the second data byte."""
+
+    @staticmethod
+    def _entity(decode_type, read_bytes):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from custom_components.thz.time import THZTime
+
+        device = MagicMock()
+        device.async_execute = AsyncMock(return_value=read_bytes)
+        entity = THZTime(
+            name="pHolidayBeginTime",
+            entry={"command": "0A05D3", "decode_type": decode_type},
+            device=device,
+            device_id="dev",
+        )
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        return entity, device
+
+    @pytest.mark.asyncio
+    async def test_holiday_time_read_from_second_byte(self):
+        from datetime import time
+
+        entity, _ = self._entity("9holy", bytes([0x00, 0x1E]))
+        await entity.async_update()
+        assert entity.native_value == time(7, 30)
+
+    @pytest.mark.asyncio
+    async def test_party_start_write_keeps_the_end_byte(self):
+        from datetime import time
+
+        entity, device = self._entity("8party", bytes([0x50, 0x10]))
+        await entity.async_set_value(time(7, 30))
+        written = device.async_execute.await_args_list[-1].args[3]
+        assert written == bytes([0x50, 0x1E])

@@ -39,6 +39,27 @@ async def async_setup_entry(
 
 
 
+def _options_within_bounds(
+    options: dict[str, str], low: str | None, high: str | None
+) -> list[str]:
+    """Return the option names whose raw value lies within the map's bounds.
+
+    The value tables are shared across firmwares, but a firmware may allow
+    fewer values (e.g. p75passiveCooling is 0..2 on 4.39 and 0..4 on 5.39).
+    """
+    try:
+        low_value = int(low) if low not in (None, "") else None
+        high_value = int(high) if high not in (None, "") else None
+    except ValueError:
+        return list(options.values())
+    return [
+        option
+        for key, option in options.items()
+        if (low_value is None or int(key) >= low_value)
+        and (high_value is None or int(key) <= high_value)
+    ]
+
+
 class THZSelect(THZBaseEntity, SelectEntity):
     """Representation of a THZ Select entity."""
 
@@ -86,7 +107,9 @@ class THZSelect(THZBaseEntity, SelectEntity):
 
         # Set available options based on decode_type
         if self._decode_type and self._decode_type in SELECT_MAP:
-            self._attr_options = list(SELECT_MAP[self._decode_type].values())
+            self._attr_options = _options_within_bounds(
+                SELECT_MAP[self._decode_type], entry.get("min"), entry.get("max")
+            )
             _LOGGER.debug(
                 "Options for %s (%s): %s", name, self._decode_type, self._attr_options
             )

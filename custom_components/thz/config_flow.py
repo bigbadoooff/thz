@@ -622,27 +622,21 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data = self.connection_data
         conn_type = data["connection_type"]
 
-        try:
-
-            def create_and_init_device():
-                if conn_type == "usb":
-                    return THZDevice(
-                        connection="usb",
-                        port=data.get(CONF_DEVICE),  # <-- HIER!
-                        baudrate=DEFAULT_BAUDRATE,
-                    )
-
-                return THZDevice(
-                    connection="ip",
-                    host=data.get(CONF_HOST),
-                    tcp_port=data.get(CONF_PORT, DEFAULT_PORT),
-                    baudrate=data.get("baudrate", DEFAULT_BAUDRATE),
-                )
-
-            device: THZDevice = await self.hass.async_add_executor_job(
-                create_and_init_device
+        if conn_type == "usb":
+            device = THZDevice(
+                connection="usb",
+                port=data.get(CONF_DEVICE),
+                baudrate=DEFAULT_BAUDRATE,
+            )
+        else:
+            device = THZDevice(
+                connection="ip",
+                host=data.get(CONF_HOST),
+                tcp_port=data.get(CONF_PORT, DEFAULT_PORT),
+                baudrate=data.get("baudrate", DEFAULT_BAUDRATE),
             )
 
+        try:
             await device.async_initialize(self.hass)
 
             unique_id = (
@@ -675,6 +669,10 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         except (OSError, RuntimeError):
             _LOGGER.exception("Error reading firmware/blocks")
             return self.async_abort(reason="cannot_detect_blocks")
+        finally:
+            # The probe connection must not outlive the flow: ser2net often
+            # allows a single client, and the entry opens its own connection.
+            await self.hass.async_add_executor_job(device.close)
 
         self.blocks = blocks
         self.connection_data["firmware"] = firmware

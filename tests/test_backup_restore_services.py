@@ -74,6 +74,15 @@ async def _get_handler(hass, name: str):
 # ---------------------------------------------------------------------------
 
 
+
+def _reset_notifications():
+    """Return the (stubbed) persistent_notification.async_create, reset."""
+    from custom_components.thz import notify
+
+    create = notify.persistent_notification.async_create
+    create.reset_mock()
+    return create
+
 class TestSanitizeLabel:
     """Tests for services._sanitize_label."""
 
@@ -315,7 +324,7 @@ class TestClockDriftCheck:
 
         hass = MagicMock()
         hass.services = MagicMock()
-        hass.services.async_call = AsyncMock()
+        notify = _reset_notifications()
 
         config_entry = MagicMock()
         config_entry.entry_id = "entry_1"
@@ -345,11 +354,8 @@ class TestClockDriftCheck:
         assert device.async_execute.await_count == 5
         # Proves the drift comparison actually ran and fired the
         # notification path.
-        hass.services.async_call.assert_called_once()
-        call_args = hass.services.async_call.call_args
-        assert call_args[0][0] == "persistent_notification"
-        assert call_args[0][1] == "create"
-        message = call_args[0][2]["message"].lower()
+        notify.assert_called_once()
+        message = notify.call_args.args[1].lower()
         assert "drift" in message or "off by" in message
 
     @pytest.mark.asyncio
@@ -359,7 +365,7 @@ class TestClockDriftCheck:
 
         hass = MagicMock()
         hass.services = MagicMock()
-        hass.services.async_call = AsyncMock()
+        notify = _reset_notifications()
 
         config_entry = MagicMock()
         config_entry.entry_id = "entry_1"
@@ -383,7 +389,7 @@ class TestClockDriftCheck:
             )
 
         assert device.async_execute.await_count == 5
-        hass.services.async_call.assert_not_called()
+        notify.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_drift_check_auto_corrects_when_opted_in(self):
@@ -392,7 +398,7 @@ class TestClockDriftCheck:
 
         hass = MagicMock()
         hass.services = MagicMock()
-        hass.services.async_call = AsyncMock()
+        notify = _reset_notifications()
 
         config_entry = MagicMock()
         config_entry.entry_id = "entry_1"
@@ -427,7 +433,7 @@ class TestClockDriftCheck:
         # auto-correction handled it.
         assert device.async_execute.await_count == 16
         assert len(write_calls) == 1
-        hass.services.async_call.assert_not_called()
+        notify.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_drift_check_returns_early_when_clock_unreadable(self):
@@ -436,7 +442,7 @@ class TestClockDriftCheck:
 
         hass = MagicMock()
         hass.services = MagicMock()
-        hass.services.async_call = AsyncMock()
+        notify = _reset_notifications()
 
         config_entry = MagicMock()
         config_entry.entry_id = "entry_1"
@@ -453,7 +459,7 @@ class TestClockDriftCheck:
             hass, config_entry, device, write_manager
         )
 
-        hass.services.async_call.assert_not_called()
+        notify.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

@@ -65,6 +65,11 @@ _WIDE_TEMPERATURE_RANGES: dict[str, tuple[float, float]] = {
     "hotgas_temp": (-50.0, 200.0),
 }
 
+# Decode types marking a field that does not exist on this firmware. FHEM's
+# own maps use "n.a." and (once, a typo kept for fidelity) "n.a" for fields
+# whose nibble was repurposed; creating sensors for them only shows raw hex.
+_SKIPPED_DECODE_TYPES = frozenset({"disabled", "n.a.", "n.a"})
+
 # Read-only sensors backed by a DataUpdateCoordinator: no per-entity polling
 # and no service actions, so updates are not limited.
 PARALLEL_UPDATES = 0
@@ -125,8 +130,8 @@ async def async_setup_entry(
             # 6th element (if present) is a metadata dict with HA entity attributes
             tuple_meta = entry_tuple[5] if len(entry_tuple) > 5 else {}
 
-            # Skip sensors explicitly disabled in firmware-specific register maps
-            if decode_type == "disabled":
+            # Skip fields that are disabled or absent on this firmware
+            if decode_type in _SKIPPED_DECODE_TYPES:
                 continue
 
             # Skip bit-decoded entries: they are handled by the binary_sensor platform
@@ -179,6 +184,11 @@ async def async_setup_entry(
                 "icon": meta.get("icon"),
                 "translation_key": meta.get("translation_key"),
             }
+            if length == 1:
+                # Single-nibble value (e.g. Weekday): the byte it lives in is
+                # shared with the neighbouring nibble. Even nibble offsets are
+                # the high nibble, odd ones the low nibble.
+                entry["nibble"] = "high" if offset % 2 == 0 else "low"
             sensors.append(
                 THZGenericSensor(
                     coordinator,
@@ -335,6 +345,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         self._unit = e.get("unit")
         self._device_class = e.get("device_class")
         self._state_class = e.get("state_class")
+        self._nibble = e.get("nibble")
         self._device_id = device_id
         self._implausible_logged = False
 
@@ -406,6 +417,10 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
                 )
                 return None
             raw_bytes = payload[self._offset : self._offset + self._length]
+            if self._nibble == "high":
+                raw_bytes = bytes([raw_bytes[0] >> 4])
+            elif self._nibble == "low":
+                raw_bytes = bytes([raw_bytes[0] & 0x0F])
             value = decode_value(raw_bytes, self._decode_type, self._factor)
             return self._discard_implausible(value, raw_bytes)
         except (ValueError, IndexError, TypeError) as err:

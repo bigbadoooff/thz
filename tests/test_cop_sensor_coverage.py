@@ -18,9 +18,16 @@ from custom_components.thz.cop_sensor import (
     _ENERGY_SENSOR_BLOCKS,
     _has_energy_sensors,
     _has_energy_values,
-    _has_power_sensors,
+    _power_field_layout,
     async_setup_cop_sensors,
 )
+from custom_components.thz.register_maps.register_map_manager import (
+    RegisterMapManager,
+)
+
+# (byte_offset, byte_length, factor) of actualPower_Qc / _Pel on 5.39.
+_QC = (47, 4, 1.0)
+_PEL = (51, 4, 1.0)
 
 
 def _encode_hex2int(value: int, length: int = 4) -> bytes:
@@ -82,35 +89,26 @@ class TestHasEnergyValues:
         assert _has_energy_values("not-a-version") is False
 
 
-class TestHasPowerSensors:
-    """Tests for _has_power_sensors heuristic."""
+class TestPowerFieldLayout:
+    """Power fields come from the active firmware's pxxFB register map."""
 
-    def test_no_coordinators(self):
-        assert _has_power_sensors({}) is False
+    def test_539_uses_map_offsets(self):
+        manager = RegisterMapManager("539")
+        assert _power_field_layout(manager, "actualPower_Qc") == _QC
+        assert _power_field_layout(manager, "actualPower_Pel") == _PEL
 
-    def test_coordinator_with_none_data(self):
-        coord = MagicMock()
-        coord.data = None
-        assert _has_power_sensors({"pxxFB": coord}) is False
+    def test_439_carries_kw_factor(self):
+        manager = RegisterMapManager("439")
+        assert _power_field_layout(manager, "actualPower_Qc") == (47, 4, 0.001)
 
-    def test_coordinator_with_short_data(self):
-        coord = MagicMock()
-        coord.data = bytes(50)
-        assert _has_power_sensors({"pxxFB": coord}) is False
+    def test_206_placeholder_is_not_a_power_field(self):
+        manager = RegisterMapManager("206")
+        assert _power_field_layout(manager, "actualPower_Qc") is None
 
-    def test_coordinator_with_long_data(self):
-        coord = MagicMock()
-        coord.data = bytes(150)
-        assert _has_power_sensors({"pxxFB": coord}) is True
-
-    def test_mixed_coordinators_one_qualifies(self):
-        short_coord = MagicMock()
-        short_coord.data = bytes(10)
-        long_coord = MagicMock()
-        long_coord.data = bytes(200)
-        assert (
-            _has_power_sensors({"pxxFB": short_coord, "pxx0B": long_coord}) is True
-        )
+    def test_missing_field(self):
+        manager = MagicMock()
+        manager.get_registers_for_block.return_value = []
+        assert _power_field_layout(manager, "actualPower_Qc") is None
 
 
 class TestHasEnergySensors:
@@ -140,6 +138,7 @@ class TestAsyncSetupCopSensors:
             "coordinators": coordinators,
             "device_id": device_id,
             "device": device,
+            "register_manager": RegisterMapManager("539"),
         }
         return hass, config_entry
 
@@ -154,10 +153,10 @@ class TestAsyncSetupCopSensors:
 
     @pytest.mark.asyncio
     async def test_no_qualifying_data_warns_and_skips(self):
-        # Firmware supports energy, but no power data and no energy blocks.
+        # Firmware supports energy, but no pxxFB block and no energy blocks.
         coord = MagicMock()
-        coord.data = bytes(10)
-        hass, config_entry = self._make_hass({"pxxFB": coord})
+        coord.data = bytes(150)
+        hass, config_entry = self._make_hass({"pxxF2": coord})
         async_add_entities = MagicMock()
 
         await async_setup_cop_sensors(hass, config_entry, async_add_entities)
@@ -168,7 +167,7 @@ class TestAsyncSetupCopSensors:
     async def test_power_sensors_create_current_cop_only(self):
         coord = MagicMock()
         coord.data = bytes(150)
-        hass, config_entry = self._make_hass({"pxx0B": coord})
+        hass, config_entry = self._make_hass({"pxxFB": coord})
         async_add_entities = MagicMock()
 
         await async_setup_cop_sensors(hass, config_entry, async_add_entities)
@@ -178,6 +177,19 @@ class TestAsyncSetupCopSensors:
         assert should_refresh is True
         assert len(entities) == 1
         assert isinstance(entities[0], THZCurrentCOPSensor)
+        assert entities[0].coordinator is coord
+
+    @pytest.mark.asyncio
+    async def test_other_long_block_is_never_used_for_power(self):
+        # A long non-FB block used to be picked by the "> 100 bytes" heuristic.
+        coord = MagicMock()
+        coord.data = bytes(150)
+        hass, config_entry = self._make_hass({"pxx0B": coord})
+        async_add_entities = MagicMock()
+
+        await async_setup_cop_sensors(hass, config_entry, async_add_entities)
+
+        async_add_entities.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_energy_sensors_create_six_cop_sensors(self):
@@ -203,7 +215,7 @@ class TestAsyncSetupCopSensors:
         energy_coord = MagicMock()
         energy_coord.data = bytes(10)
         hass, config_entry = self._make_hass(
-            {"pxx0B": power_coord, "pxx0A091A": energy_coord}
+            {"pxxFB": power_coord, "pxx0A091A": energy_coord}
         )
         async_add_entities = MagicMock()
 
@@ -216,74 +228,63 @@ class TestAsyncSetupCopSensors:
 class TestTHZCurrentCOPSensor:
     """Tests for the instantaneous power-ratio COP sensor."""
 
-    def test_init_picks_qualifying_coordinator(self):
-        short_coord = MagicMock()
-        short_coord.data = bytes(10)
-        long_coord = MagicMock()
-        long_coord.data = _make_power_payload(4.0, 1.0)
-        coordinators = {"short": short_coord, "long": long_coord}
-
-        sensor = THZCurrentCOPSensor(coordinators, "dev1", "current_cop_total")
-
-        assert sensor._power_coordinator is long_coord
-        assert sensor._attr_unique_id == "thz_dev1_current_cop"
-
-    def test_init_falls_back_to_first_coordinator(self):
-        short_coord = MagicMock()
-        short_coord.data = bytes(10)
-        coordinators = {"short": short_coord}
-
-        sensor = THZCurrentCOPSensor(coordinators, "dev1", "current_cop_total")
-
-        assert sensor._power_coordinator is short_coord
-
-    def test_handle_coordinator_update_callable(self):
+    def test_init_uses_given_coordinator(self):
         coord = MagicMock()
         coord.data = _make_power_payload(4.0, 1.0)
-        sensor = THZCurrentCOPSensor({"a": coord}, "dev1", "current_cop_total")
-        # Should not raise; delegates to CoordinatorEntity base implementation.
-        sensor._handle_coordinator_update()
+
+        sensor = THZCurrentCOPSensor(coord, "dev1", _QC, _PEL)
+
+        assert sensor.coordinator is coord
+        assert sensor._attr_unique_id == "thz_dev1_current_cop"
+
+    def test_factor_is_applied_to_both_values(self):
+        coord = MagicMock()
+        coord.data = _make_power_payload(qc=0.004, pel=0.001)
+        sensor = THZCurrentCOPSensor(
+            coord, "dev1", (47, 4, 0.001), (51, 4, 0.001)
+        )
+        assert sensor.native_value == 4.0
 
     def test_native_value_none_when_no_data(self):
         coord = MagicMock()
         coord.data = None
-        sensor = THZCurrentCOPSensor({"a": coord}, "dev1", "current_cop_total")
+        sensor = THZCurrentCOPSensor(coord, "dev1", _QC, _PEL)
         assert sensor.native_value is None
 
     def test_native_value_none_when_payload_too_short(self):
         coord = MagicMock()
         coord.data = bytes(10)
-        sensor = THZCurrentCOPSensor({"a": coord}, "dev1", "current_cop_total")
+        sensor = THZCurrentCOPSensor(coord, "dev1", _QC, _PEL)
         assert sensor.native_value is None
 
     def test_native_value_computes_cop(self):
         coord = MagicMock()
         coord.data = _make_power_payload(qc=4.0, pel=2.0)
-        sensor = THZCurrentCOPSensor({"a": coord}, "dev1", "current_cop_total")
+        sensor = THZCurrentCOPSensor(coord, "dev1", _QC, _PEL)
         assert sensor.native_value == 2.0
 
     def test_native_value_zero_pel_returns_none(self):
         coord = MagicMock()
         coord.data = _make_power_payload(qc=4.0, pel=0.0)
-        sensor = THZCurrentCOPSensor({"a": coord}, "dev1", "current_cop_total")
+        sensor = THZCurrentCOPSensor(coord, "dev1", _QC, _PEL)
         assert sensor.native_value is None
 
     def test_native_value_negative_qc_returns_none(self):
         coord = MagicMock()
         coord.data = _make_power_payload(qc=-1.0, pel=2.0)
-        sensor = THZCurrentCOPSensor({"a": coord}, "dev1", "current_cop_total")
+        sensor = THZCurrentCOPSensor(coord, "dev1", _QC, _PEL)
         assert sensor.native_value is None
 
     def test_native_value_out_of_range_returns_none(self):
         coord = MagicMock()
         coord.data = _make_power_payload(qc=100.0, pel=1.0)
-        sensor = THZCurrentCOPSensor({"a": coord}, "dev1", "current_cop_total")
+        sensor = THZCurrentCOPSensor(coord, "dev1", _QC, _PEL)
         assert sensor.native_value is None
 
     def test_native_value_zero_qc_is_valid(self):
         coord = MagicMock()
         coord.data = _make_power_payload(qc=0.0, pel=2.0)
-        sensor = THZCurrentCOPSensor({"a": coord}, "dev1", "current_cop_total")
+        sensor = THZCurrentCOPSensor(coord, "dev1", _QC, _PEL)
         assert sensor.native_value == 0.0
 
     def test_native_value_handles_decode_exception(self, monkeypatch):
@@ -291,7 +292,7 @@ class TestTHZCurrentCOPSensor:
 
         coord = MagicMock()
         coord.data = _make_power_payload(qc=4.0, pel=2.0)
-        sensor = THZCurrentCOPSensor({"a": coord}, "dev1", "current_cop_total")
+        sensor = THZCurrentCOPSensor(coord, "dev1", _QC, _PEL)
 
         def _raise(*args, **kwargs):
             raise ValueError("boom")
@@ -302,7 +303,7 @@ class TestTHZCurrentCOPSensor:
     def test_device_info(self):
         coord = MagicMock()
         coord.data = None
-        sensor = THZCurrentCOPSensor({"a": coord}, "my_device", "current_cop_total")
+        sensor = THZCurrentCOPSensor(coord, "my_device", _QC, _PEL)
         info = sensor.device_info
         assert (DOMAIN, "my_device") in info["identifiers"]
 

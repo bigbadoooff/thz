@@ -134,6 +134,16 @@ def quarters_to_time(num: int) -> time | None:
 
 
 
+def time_byte_index(decode_type: str | None) -> int:
+    """Return which of a time register's two data bytes holds the time.
+
+    FHEM's parsing rules put the holiday times ("9holy") and the party start
+    ("8party") in the second data byte (nibble offset 10); every other
+    single time register uses the first one.
+    """
+    return 1 if decode_type in ("9holy", "8party") else 0
+
+
 def _create_time_entities(
     name,
     entry,
@@ -203,8 +213,8 @@ async def async_setup_entry(
     entity_visibility = entry_data.get("entity_visibility", "default")
     entity_id_prefix = entry_data.get("entity_id_prefix")
 
-    from .const import DEFAULT_UPDATE_INTERVAL
-    write_interval = config_entry.data.get("write_interval", DEFAULT_UPDATE_INTERVAL)
+    from .const import DEFAULT_WRITE_INTERVAL
+    write_interval = config_entry.data.get("write_interval", DEFAULT_WRITE_INTERVAL)
 
     write_registers = write_manager.get_all_registers()
     _LOGGER.debug("Loading time platform with %d registers", len(write_registers))
@@ -294,6 +304,7 @@ class THZTime(THZBaseEntity, TimeEntity):
         self._attr_has_entity_name = True
 
         self._attr_native_value = None
+        self._byte_index = time_byte_index(entry.get("decode_type"))
 
     @property
     def native_value(self):
@@ -309,7 +320,7 @@ class THZTime(THZBaseEntity, TimeEntity):
         if value_bytes is None:
             return
 
-        num = value_bytes[0]
+        num = value_bytes[self._byte_index]
         self._attr_native_value = quarters_to_time(num)
         _LOGGER.debug(
             "Updated time %s: %s quarters -> %s",
@@ -339,19 +350,8 @@ class THZTime(THZBaseEntity, TimeEntity):
         num = time_to_quarters(t_value)
         _LOGGER.debug("Setting time %s to %s (%s quarters)", self.name, t_value, num)
 
-        # Write as 2 bytes to match the protocol's read format (offset=4, length=2)
-        # even though only the first byte contains the meaningful time value
-        # (0-95 quarters).
-        # Second byte is set to 0 as it appears to be unused by the device.
-        num_bytes = bytes([num, 0])
-
         try:
-            await self._device.async_execute(
-                self.hass,
-                self._device.write_value,
-                bytes.fromhex(self._command),
-                num_bytes,
-            )
+            await self._async_write_quarters(num)
         except (ConnectionError, RuntimeError, OSError) as err:
             _LOGGER.error("Error writing time %s: %s", self.name, err, exc_info=True)
             return
@@ -364,6 +364,33 @@ class THZTime(THZBaseEntity, TimeEntity):
         self._attr_native_value = quarters_to_time(num)
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
 
+    async def _async_write_quarters(self, num: int) -> None:
+        """Write ``num`` into this entity's byte of the 2-byte register.
+
+        Registers whose time lives in the second byte (see time_byte_index)
+        keep the other byte as read from the device, e.g. the party end
+        time next to the party start; the others are written as
+        ``[num, 0]`` as before.
+        """
+        command = bytes.fromhex(self._command)
+        if self._byte_index == 0:
+            payload = bytearray([num, 0])
+        else:
+            current = await self._device.async_execute(
+                self.hass,
+                self._device.read_value,
+                command,
+                "get",
+                WRITE_REGISTER_OFFSET,
+                WRITE_REGISTER_LENGTH,
+            )
+            payload = bytearray(current or b"") + bytearray(2)
+            payload = payload[:2]
+            payload[self._byte_index] = num
+        await self._device.async_execute(
+            self.hass, self._device.write_value, command, bytes(payload)
+        )
+
     async def async_clear_value(self) -> None:
         """Clear this time back to the device's own "unset" state.
 
@@ -374,14 +401,9 @@ class THZTime(THZBaseEntity, TimeEntity):
         """
         _LOGGER.debug("Clearing time %s to unset", self.name)
 
-        # Same 2-byte payload shape as async_set_value, with the sentinel
-        # value in place of a real quarters count.
-        num_bytes = bytes([TIME_VALUE_UNSET, 0])
-
-        async with self._device.lock:
-            await self.hass.async_add_executor_job(
-                self._device.write_value, bytes.fromhex(self._command), num_bytes
-            )
+        # Same payload shape as async_set_value, with the sentinel value in
+        # place of a real quarters count.
+        await self._async_write_quarters(TIME_VALUE_UNSET)
 
         self._attr_native_value = None
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms

@@ -258,21 +258,37 @@ class THZValueCodec:
             Encoded bytes ready to send to device.
         """
         if decode_type == "0clean":
-            # Single byte encoding
-            return bytes([int(value)])
-        else:
-            # Standard signed integer encoding scaled by step.
-            value_int = int(value / step)
+            # One-byte value in the first data byte, padded like FHEM does
+            # ("0clean" = [8, 2] in a "<cmd>0000" message: "XX00").
+            return bytes([round(value) & 0xFF]) + bytes(max(length - 1, 0))
+        if decode_type == "4temp":
+            # FHEM "4temp" (divisor 2560): the signed value in steps sits in
+            # the high byte, e.g. -5.0 K with step 0.1 -> CE00.
+            value_int = round(value / step) * 256
             return value_int.to_bytes(length, byteorder="big", signed=True)
+        else:
+            # Standard signed integer encoding scaled by step. Round rather
+            # than truncate: value / step is often just below the integer
+            # (0.3 / 0.1 == 2.9999999999999996).
+            value_int = round(value / step)
+            # Negative values are two's complement; positive ones may use the
+            # full unsigned range (e.g. 240 min in a single byte), as in FHEM.
+            return value_int.to_bytes(
+                length, byteorder="big", signed=value_int < 0
+            )
 
     @staticmethod
-    def decode_number(value_bytes: bytes, step: float, decode_type: str) -> float:
+    def decode_number(
+        value_bytes: bytes, step: float, decode_type: str, signed: bool = True
+    ) -> float:
         """Decode a numeric value from device response.
 
         Args:
             value_bytes: The raw bytes from device.
             step: The step size (for scaling).
             decode_type: The decoding type.
+            signed: Whether the value is two's complement (2xx block
+                parameters carry this as ``entry["signed"]``).
 
         Returns:
             The decoded numeric value.
@@ -286,9 +302,12 @@ class THZValueCodec:
         if decode_type == "0clean":
             # Single byte decoding
             return float(value_bytes[0])
+        if decode_type == "4temp":
+            value = int.from_bytes(value_bytes, byteorder="big", signed=True)
+            return value / 256 * step
         else:
             # Standard 2-byte signed integer decoding with scaling
-            value = int.from_bytes(value_bytes, byteorder="big", signed=True)
+            value = int.from_bytes(value_bytes, byteorder="big", signed=signed)
             return value * step
 
     @staticmethod

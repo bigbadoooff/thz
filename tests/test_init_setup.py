@@ -185,6 +185,21 @@ class TestAsyncSetupEntry:
         assert set(stored["coordinators"]) == {"pxxFB", "pxxF2"}
 
     @pytest.mark.asyncio
+    async def test_all_blocks_deselected_polls_nothing(self):
+        # Reconfigure with every read block deselected stores {}; that must
+        # not fall back to polling every available block.
+        hass = _mock_hass()
+        entry = _mock_config_entry(refresh_intervals={})
+        device = _fake_device(blocks=["pxxFB", "pxxF2"])
+        factory = MagicMock(side_effect=lambda *a, **kw: _fake_coordinator())
+
+        with _patched_setup(device=device, coordinator_factory=factory):
+            await thz_module.async_setup_entry(hass, entry)
+
+        assert entry.runtime_data["coordinators"] == {}
+        factory.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_no_refresh_intervals_and_no_available_blocks_creates_none(self):
         hass = _mock_hass()
         entry = _mock_config_entry()
@@ -197,24 +212,47 @@ class TestAsyncSetupEntry:
         assert stored["coordinators"] == {}
 
     @pytest.mark.asyncio
-    async def test_block_config_entry_not_ready_marks_unsupported(self):
+    async def test_transient_block_failure_keeps_coordinator(self):
+        # A read error at startup is not "unsupported": the block keeps its
+        # coordinator (and entities) and recovers on the next poll.
         hass = _mock_hass()
-        entry = _mock_config_entry(refresh_intervals={"pxxFB": 300})
+        entry = _mock_config_entry(refresh_intervals={"pxxFB": 300, "pxxF2": 300})
         device = _fake_device()
 
-        failing_coordinator = _fake_coordinator()
+        failing_coordinator = _fake_coordinator(data=None)
         failing_coordinator.async_config_entry_first_refresh = AsyncMock(
             side_effect=thz_module.ConfigEntryNotReady("block failed")
         )
+        coordinators = iter([failing_coordinator, _fake_coordinator()])
 
         with _patched_setup(
-            device=device, coordinator_factory=lambda *a, **kw: failing_coordinator
+            device=device, coordinator_factory=lambda *a, **kw: next(coordinators)
         ):
             await thz_module.async_setup_entry(hass, entry)
 
         stored = entry.runtime_data
-        assert "pxxFB" in stored["unsupported_blocks"]
-        assert "pxxFB" not in stored["coordinators"]
+        assert stored["coordinators"]["pxxFB"] is failing_coordinator
+        assert "pxxFB" not in stored["unsupported_blocks"]
+
+    @pytest.mark.asyncio
+    async def test_all_blocks_failing_retries_whole_entry(self):
+        hass = _mock_hass()
+        entry = _mock_config_entry(refresh_intervals={"pxxFB": 300, "pxxF2": 300})
+        device = _fake_device()
+
+        def _failing(*a, **kw):
+            coordinator = _fake_coordinator(data=None)
+            coordinator.async_config_entry_first_refresh = AsyncMock(
+                side_effect=thz_module.ConfigEntryNotReady("timeout")
+            )
+            return coordinator
+
+        with _patched_setup(device=device, coordinator_factory=_failing):
+            with pytest.raises(thz_module.ConfigEntryNotReady):
+                await thz_module.async_setup_entry(hass, entry)
+
+        hass.async_add_executor_job.assert_any_await(device.close)
+        hass.config_entries.async_forward_entry_setups.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_block_with_none_data_marked_unsupported(self):
@@ -263,6 +301,22 @@ class TestAsyncSetupEntry:
 
         assert thz_module._LOGGER.level == logging.DEBUG
         thz_module._LOGGER.setLevel(logging.NOTSET)  # reset for other tests
+
+    @pytest.mark.asyncio
+    async def test_log_level_left_to_home_assistant_without_option(self):
+        import logging
+
+        hass = _mock_hass()
+        entry = _mock_config_entry()  # no "log_level" (current config flow)
+        device = _fake_device(blocks=[])
+        thz_module._LOGGER.setLevel(logging.DEBUG)  # e.g. from `logger:` config
+        try:
+            with _patched_setup(device=device):
+                await thz_module.async_setup_entry(hass, entry)
+
+            assert thz_module._LOGGER.level == logging.DEBUG
+        finally:
+            thz_module._LOGGER.setLevel(logging.NOTSET)
 
 
 class TestAsyncUnloadEntry:
@@ -349,52 +403,6 @@ class TestAsyncRemoveEntry:
 
         mock_get.return_value.async_remove.assert_any_call("sensor.thz_a")
         mock_get.return_value.async_remove.assert_any_call("sensor.thz_b")
-
-
-class TestMigrateDisableHiddenEntities:
-    @pytest.mark.asyncio
-    async def test_skips_when_already_migrated(self):
-        hass = _mock_hass()
-        entry = _mock_config_entry(_hidden_entities_migrated=True)
-
-        with patch.object(thz_module.er, "async_get") as mock_get:
-            await thz_module._async_migrate_disable_hidden_entities(hass, entry)
-            mock_get.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_disables_hidden_entities_and_sets_flag(self):
-        hass = _mock_hass()
-        entry = _mock_config_entry()
-
-        hidden_entity = MagicMock(
-            unique_id="programHC1_Mo_0", original_name=None, name=None,
-            entity_id="time.thz_program", disabled_by=None,
-        )
-        visible_entity = MagicMock(
-            unique_id="insideTempRC", original_name="Inside Temperature",
-            name=None, entity_id="sensor.thz_inside_temp", disabled_by=None,
-        )
-        already_disabled = MagicMock(
-            unique_id="programHC2_Mo_0", original_name=None, name=None,
-            entity_id="time.thz_program2", disabled_by="user",
-        )
-
-        ent_reg = MagicMock()
-        ent_reg.async_update_entity = MagicMock()
-
-        with patch.object(thz_module.er, "async_get", return_value=ent_reg), \
-             patch.object(
-                 thz_module.er, "async_entries_for_config_entry",
-                 return_value=[hidden_entity, visible_entity, already_disabled],
-             ):
-            await thz_module._async_migrate_disable_hidden_entities(hass, entry)
-
-        ent_reg.async_update_entity.assert_called_once()
-        call_args = ent_reg.async_update_entity.call_args
-        assert call_args[0][0] == "time.thz_program"
-        hass.config_entries.async_update_entry.assert_called_once()
-        _, kwargs = hass.config_entries.async_update_entry.call_args
-        assert kwargs["data"]["_hidden_entities_migrated"] is True
 
 
 class TestCleanupOrphanedEntities:

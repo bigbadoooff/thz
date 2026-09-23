@@ -1,10 +1,9 @@
 """Real-time clock drift detection and correction for THZ devices.
 
-The device's real-time clock is exposed as five plain "pclean" registers
-(day/month/year/hour/minute) that no platform claims as an entity, NOT as a
-"time"-typed register. They are read/written here as one consistent
-snapshot rather than through the per-entity polling used for ordinary
-parameters.
+The device's real-time clock is exposed as five separate number registers
+(day/month/year/hour/minute), not as a "time"-typed register. They are
+read/written here as one consistent snapshot rather than through the
+per-entity polling of the individual pClock* number entities.
 
 Two independent callers rely on this module:
 
@@ -30,7 +29,12 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from ._typing_compat import get_runtime_data
-from .const import WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
+from .notify import async_notify
+from .parameter_io import (
+    async_read_parameter,
+    async_write_parameter,
+    parameter_length,
+)
 from .value_codec import THZValueCodec
 
 if TYPE_CHECKING:
@@ -41,8 +45,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 # The five pClock* registers that together make up the device's real-time
-# clock. "pclean" typed, so they are deliberately excluded from the
-# "restorable parameters" set in services.py — restoring an old backed-up
+# clock. restore_parameters skips them by name: restoring an old backed-up
 # clock value would set the heat pump's clock back to whenever the backup
 # was taken, and pClockYear's declared min/max ("12".."20") is a stale
 # bound that would otherwise get a real year like 26 clamped down to 20.
@@ -76,14 +79,7 @@ async def _read_clock_parts(
         value_bytes = None
         for attempt in range(1, CLOCK_READ_ATTEMPTS + 1):
             try:
-                value_bytes = await device.async_execute(
-                    hass,
-                    device.read_value,
-                    bytes.fromhex(entry["command"]),
-                    "get",
-                    WRITE_REGISTER_OFFSET,
-                    WRITE_REGISTER_LENGTH,
-                )
+                value_bytes = await async_read_parameter(hass, device, entry)
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug(
                     "clock_sync: failed to read %s (attempt %d/%d): %s",
@@ -96,7 +92,9 @@ async def _read_clock_parts(
             return None
         try:
             parts[name] = int(
-                THZValueCodec.decode_number(value_bytes, 1.0, entry["decode_type"])
+                THZValueCodec.decode_number(
+                    value_bytes, 1.0, entry["decode_type"], entry.get("signed", True)
+                )
             )
         except (ValueError, IndexError):
             return None
@@ -158,10 +156,10 @@ async def async_write_device_clock(
         entry = write_registers.get(name)
         if entry is None or current.get(name) == value:
             continue
-        value_bytes = THZValueCodec.encode_number(value, 1.0, entry["decode_type"])
-        await device.async_execute(
-            hass, device.write_value, bytes.fromhex(entry["command"]), value_bytes
+        value_bytes = THZValueCodec.encode_number(
+            value, 1.0, entry["decode_type"], parameter_length(entry)
         )
+        await async_write_parameter(hass, device, entry, value_bytes)
     readback = await _read_clock_parts(hass, device, write_manager)
     if readback is None:
         _LOGGER.warning("clock_sync: could not read the clock back after writing")
@@ -215,22 +213,18 @@ async def async_check_and_maybe_sync_clock(
         if entry_data.get("_clock_notify_date") == today:
             return
         entry_data["_clock_notify_date"] = today
-    await hass.services.async_call(
-        "persistent_notification",
-        "create",
-        {
-            "title": "THZ Device Clock Drifted",
-            "message": (
-                f"The heat pump's clock is off by about {abs(drift) / 60:.0f} "
-                f"minute(s) (device reads {device_dt.strftime('%Y-%m-%d %H:%M')}, "
-                f"local time is {local_now.strftime('%Y-%m-%d %H:%M')}).\n\n"
-                "Auto-sync clock is turned off, so this wasn't corrected "
-                "automatically. Enable it under the integration's "
-                "Reconfigure screen to fix this going forward."
-            ),
-            "notification_id": f"thz_clock_drift_{config_entry.entry_id}",
-        },
-        blocking=True,
+    async_notify(
+        hass,
+        title="THZ Device Clock Drifted",
+        message=(
+            f"The heat pump's clock is off by about {abs(drift) / 60:.0f} "
+            f"minute(s) (device reads {device_dt.strftime('%Y-%m-%d %H:%M')}, "
+            f"local time is {local_now.strftime('%Y-%m-%d %H:%M')}).\n\n"
+            "Auto-sync clock is turned off, so this wasn't corrected "
+            "automatically. Enable it under the integration's "
+            "Reconfigure screen to fix this going forward."
+        ),
+        notification_id=f"thz_clock_drift_{config_entry.entry_id}",
     )
 
 

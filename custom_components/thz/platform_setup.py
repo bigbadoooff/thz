@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from ._typing_compat import get_runtime_data
 from .const import (
-    DEFAULT_UPDATE_INTERVAL,
+    DEFAULT_WRITE_INTERVAL,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
     get_write_group_for_key,
@@ -56,8 +56,8 @@ async def async_setup_write_platform(
     entity_visibility = entry_data.get("entity_visibility", ENTITY_VISIBILITY_DEFAULT)
     entity_id_prefix = entry_data.get("entity_id_prefix")
 
-    # Get write interval from config, default to DEFAULT_UPDATE_INTERVAL
-    write_interval = config_entry.data.get("write_interval", DEFAULT_UPDATE_INTERVAL)
+    # Same default the config flow stores for new entries.
+    write_interval = config_entry.data.get("write_interval", DEFAULT_WRITE_INTERVAL)
 
     # Get selected write groups (if not set, all groups are enabled)
     selected_write_groups = config_entry.data.get("selected_write_groups")
@@ -92,6 +92,7 @@ async def async_setup_write_platform(
                 entity_visibility=entity_visibility,
                 entity_id_prefix=entity_id_prefix,
             )
+            entity._coordinators = entry_data.get("coordinators", {})
             entities.append(entity)
 
     _LOGGER.info("Created %d %s entities", len(entities), platform_type)

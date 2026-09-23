@@ -10,9 +10,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZBaseEntity
 from .entity_translations import get_translation_key
-from .const import (
-    WRITE_REGISTER_OFFSET,
-    WRITE_REGISTER_LENGTH,
+from .parameter_io import (
+    async_read_parameter,
+    async_write_parameter,
+    block_coordinator_key,
+    parameter_from_block,
+    parameter_length,
 )
 from .platform_setup import async_setup_write_platform
 from .thz_device import THZDevice
@@ -92,23 +95,37 @@ class THZNumber(THZBaseEntity, NumberEntity):
         self._decode_type = entry["decode_type"]
         self._attr_native_value = None
 
-        # Support 2xx firmware block read-modify-write:
-        # "offset" and "length" override the default WRITE_REGISTER_OFFSET/LENGTH
-        # when the parameter lives inside a shared register block.
-        self._read_offset = entry.get("offset", WRITE_REGISTER_OFFSET)
-        self._read_length = entry.get("length", WRITE_REGISTER_LENGTH)
-        self._write_mode = entry.get("write_mode", "direct")
+        # Reads/writes go through parameter_io, which handles both direct
+        # registers and 2xx block parameters (see write_mode="block").
+        self._entry = entry
+        self._read_length = parameter_length(entry)
 
     @property
     def native_value(self) -> float | None:
         """Return the native value of the number."""
         return self._attr_native_value
 
+    def _block_coordinator(self):
+        """Return the coordinator polling this 2xx parameter's block, if any."""
+        key = block_coordinator_key(self._entry)
+        return self._coordinators.get(key) if key else None
+
     async def async_update(self) -> None:
-        """Fetch new state data for the number."""
-        value_bytes = await self._async_read_register(
-            self._read_offset, self._read_length
-        )
+        """Fetch new state data for the number.
+
+        2xx block parameters are taken from the block's coordinator when it
+        has fresh data, instead of reading the whole block from the device
+        once per parameter; otherwise the device is read directly.
+        """
+        value_bytes = None
+        coordinator = self._block_coordinator()
+        if coordinator is not None and coordinator.last_update_success:
+            if coordinator.data:
+                value_bytes = parameter_from_block(self._entry, coordinator.data)
+        if value_bytes is None:
+            value_bytes = await self._async_guarded_read(
+                async_read_parameter(self.hass, self._device, self._entry)
+            )
         if value_bytes is None:
             return
 
@@ -119,7 +136,8 @@ class THZNumber(THZBaseEntity, NumberEntity):
             value = THZValueCodec.decode_number(
                 value_bytes,
                 self._attr_native_step,
-                self._decode_type
+                self._decode_type,
+                self._entry.get("signed", True),
             )
             _LOGGER.debug("Decoded value for %s: %s", self.name, value)
             self._attr_native_value = value
@@ -143,25 +161,17 @@ class THZNumber(THZBaseEntity, NumberEntity):
                 self._read_length,
             )
 
-            if self._write_mode == "block":
-                await self._device.async_execute(
-                    self.hass,
-                    self._device.write_block_value,
-                    bytes.fromhex(self._command),
-                    self._read_offset,
-                    self._read_length,
-                    value_bytes,
-                )
-            else:
-                await self._device.async_execute(
-                    self.hass,
-                    self._device.write_value,
-                    bytes.fromhex(self._command),
-                    value_bytes,
-                )
+            await async_write_parameter(
+                self.hass, self._device, self._entry, value_bytes
+            )
 
             self._attr_native_value = value
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+            coordinator = self._block_coordinator()
+            if coordinator is not None:
+                # Keep the block data this entity reads from in step with
+                # the write, so the next update does not show the old value.
+                await coordinator.async_request_refresh()
         except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
             _LOGGER.error(
                 "Error encoding number %s value %s: %s",

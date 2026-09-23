@@ -42,8 +42,14 @@ from .fault_memory import (
     clear_fault_memory,
     read_fault_memory,
 )
+from .notify import async_notify
+from .parameter_io import (
+    async_read_parameter,
+    async_write_parameter,
+    parameter_length,
+)
 from .thz_device import THZDevice, THZRegisterNotSupportedError
-from .time import quarters_to_time, time_to_quarters
+from .time import quarters_to_time, time_byte_index, time_to_quarters
 from .value_codec import THZValueCodec, decode_raw_value
 from .value_maps import SELECT_MAP
 
@@ -298,19 +304,42 @@ def _guess_decode_candidates(data: bytes) -> dict[str, int | float | bool | str]
 # ---------------------------------------------------------------------------
 # 3-way diverter valve motor control
 # Commands address the motor controller directly; the heat pump firmware does
-# NOT auto-stop — the caller must send "off" once the valve has moved.
+# NOT auto-stop the motor, so the service always stops it again after 3 s,
+# including when the call fails or is cancelled.
 # ---------------------------------------------------------------------------
 _VALVE_MOTOR_HEATING  = bytes.fromhex("0A0653")  # motor direction: heating circuit
 _VALVE_MOTOR_DHW      = bytes.fromhex("0A0652")  # motor direction: DHW (warm water)
 _VALVE_MOTOR_ON       = bytes.fromhex("0001")     # engage motor
 _VALVE_MOTOR_OFF      = bytes.fromhex("0000")     # stop motor
 
-# Safety source: diverterValve bit in pxxF2 block (nibble 23 → byte 11, bit 2).
-# Bit = 1 means the heat pump has switched flow to DHW → physically safe to move
-# the valve toward DHW.  Bit = 0 means heating circuit is active → refuse.
+# Safety source: diverterValve bit in the pxxF2 block, located through the
+# register map (see _diverter_bit_position). Bit = 1 means the heat pump has
+# switched flow to DHW → physically safe to move the valve toward DHW.
+# Bit = 0 means heating circuit is active → refuse.
 _DIVERTER_BLOCK = "pxxF2"
-_DIVERTER_BYTE  = 11   # nibble 23 // 2
-_DIVERTER_BIT   = 2    # from decode_type "bit2"
+_DIVERTER_FIELD = "diverterValve"
+# Position used when no register map is available (nibble 23, "bit2").
+_DIVERTER_DEFAULT_POSITION = (11, 2)
+
+
+def _diverter_bit_position(register_manager) -> tuple[int, int] | None:
+    """Return (byte, bit) of the diverterValve flag in the pxxF2 block.
+
+    Taken from the running firmware's register map, with the same nibble
+    convention as the binary sensors: an even nibble offset is the byte's
+    high nibble, so its bit numbers are shifted up by four.
+    """
+    if register_manager is None:
+        return _DIVERTER_DEFAULT_POSITION
+    for entry in register_manager.get_registers_for_block(_DIVERTER_BLOCK):
+        if entry[0].strip().rstrip(":").strip() != _DIVERTER_FIELD:
+            continue
+        decode = entry[3]
+        if not (decode.startswith("bit") and decode[3:].isdigit()):
+            return None
+        nibble, bit = entry[1], int(decode[3:])
+        return nibble // 2, bit + 4 if nibble % 2 == 0 else bit
+    return None
 
 
 def _normalize_block_name(block: str) -> str:
@@ -413,15 +442,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             error_msg = f"Invalid hex command: {command_str} - {err}"
             _LOGGER.exception(error_msg)
             # Create persistent notification for the error
-            await hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "title": "THZ Raw Register Read Error",
-                    "message": error_msg,
-                    "notification_id": f"thz_raw_{command_str}",
-                },
-                blocking=True,
+            async_notify(
+                hass,
+                title="THZ Raw Register Read Error",
+                message=error_msg,
+                notification_id=f"thz_raw_{command_str}",
             )
             raise ServiceValidationError(error_msg) from err
 
@@ -432,15 +457,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         except (ServiceValidationError, HomeAssistantError) as err:
             error_msg = str(err)
             _LOGGER.exception(error_msg)
-            await hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "title": "THZ Raw Register Read Error",
-                    "message": error_msg,
-                    "notification_id": f"thz_raw_{command_str}",
-                },
-                blocking=True,
+            async_notify(
+                hass,
+                title="THZ Raw Register Read Error",
+                message=error_msg,
+                notification_id=f"thz_raw_{command_str}",
             )
             raise
         device = entry_data["device"]
@@ -471,15 +492,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 f"Formatted:\n{formatted}"
             )
 
-            await hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "title": f"THZ Raw Register Read: {command_str}",
-                    "message": notification_message,
-                    "notification_id": f"thz_raw_{command_str}",
-                },
-                blocking=True,
+            async_notify(
+                hass,
+                title=f"THZ Raw Register Read: {command_str}",
+                message=notification_message,
+                notification_id=f"thz_raw_{command_str}",
             )
 
             # Return service response
@@ -494,15 +511,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         except Exception as err:  # noqa: BLE001
             error_msg = f"Error reading register {command_str}: {err}"
             _LOGGER.error(error_msg, exc_info=True)
-            await hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "title": "THZ Raw Register Read Error",
-                    "message": error_msg,
-                    "notification_id": f"thz_raw_{command_str}",
-                },
-                blocking=True,
+            async_notify(
+                hass,
+                title="THZ Raw Register Read Error",
+                message=error_msg,
+                notification_id=f"thz_raw_{command_str}",
             )
             raise HomeAssistantError(error_msg) from err
 
@@ -597,15 +610,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         if preview_limit != 0 and len(results) > preview_limit:
             preview_lines.append(f"... and {len(results) - preview_limit} more")
 
-        await hass.services.async_call(
-            "persistent_notification",
-            "create",
-            {
-                "title": f"THZ Raw Register Scan ({scan_mode})",
-                "message": "\n".join(preview_lines),
-                "notification_id": f"thz_scan_{scan_mode.replace(':', '_')}",
-            },
-            blocking=True,
+        async_notify(
+            hass,
+            title=f"THZ Raw Register Scan ({scan_mode})",
+            message="\n".join(preview_lines),
+            notification_id=f"thz_scan_{scan_mode.replace(':', '_')}",
         )
 
         return cast("ServiceResponse", response)
@@ -751,12 +760,19 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     f"Cannot verify valve state: {_DIVERTER_BLOCK} coordinator "
                     "data not available"
                 )
+            flag = _diverter_bit_position(entry_data.get("register_manager"))
+            if flag is None:
+                raise HomeAssistantError(
+                    f"Cannot verify valve state: no {_DIVERTER_FIELD} flag in "
+                    f"the {_DIVERTER_BLOCK} register map of this firmware"
+                )
+            diverter_byte, diverter_bit = flag
             data: bytes = coordinator.data
-            if len(data) <= _DIVERTER_BYTE:
+            if len(data) <= diverter_byte:
                 raise HomeAssistantError(
                     f"Insufficient data from {_DIVERTER_BLOCK} block"
                 )
-            diverter_active = bool((data[_DIVERTER_BYTE] >> _DIVERTER_BIT) & 0x01)
+            diverter_active = bool((data[diverter_byte] >> diverter_bit) & 0x01)
             if position == "dhw" and not diverter_active:
                 raise HomeAssistantError(
                     "Heat pump is not in DHW mode (diverterValve bit = 0 in "
@@ -805,6 +821,22 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
             return True
 
+        async def _emergency_stop() -> None:
+            """Best-effort stop of both motors; one failing never skips the other."""
+            for motor in (_VALVE_MOTOR_HEATING, _VALVE_MOTOR_DHW):
+                try:
+                    await device.async_execute(
+                        hass, device.write_value, motor, _VALVE_MOTOR_OFF
+                    )
+                except (RuntimeError, ConnectionError, OSError) as err:
+                    _LOGGER.error(
+                        "Could not stop diverter valve motor %s: %s",
+                        motor.hex(), err,
+                    )
+
+        # Set before the ON write: a write whose acknowledgement failed may
+        # still have started the motor.
+        motor_may_run = position in ("heating", "dhw")
         try:
             # Send the motor ON command
             if position == "heating":
@@ -817,13 +849,20 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 )
 
             # Auto-stop after 3s (lock released during wait so coordinators can poll)
-            if position in ("heating", "dhw"):
+            if motor_may_run:
                 await asyncio.sleep(3)
 
             # Stop and verify — runs for explicit "off" too
             confirmed = await _stop_and_verify()
 
+        except asyncio.CancelledError:
+            # The motor does not stop by itself: finish stopping it even if
+            # this service call is cancelled (HA shutdown, script stopped).
+            if motor_may_run:
+                await asyncio.shield(_emergency_stop())
+            raise
         except (RuntimeError, ConnectionError, OSError) as err:
+            await _emergency_stop()
             error_msg = f"Error sending diverter valve command: {err}"
             _LOGGER.exception(error_msg)
             raise HomeAssistantError(error_msg) from err
@@ -877,10 +916,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         "end": end.strftime("%H:%M") if end else None,
                     }
                 else:
-                    value_bytes = await device.async_execute(
-                        hass, device.read_value, bytes.fromhex(command), "get",
-                        WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH,
-                    )
+                    value_bytes = await async_read_parameter(hass, device, entry)
                     if not value_bytes:
                         raise ValueError("no data received")
 
@@ -888,7 +924,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         step_raw = entry.get("step", 1)
                         step = float(step_raw) if step_raw != "" else 1.0
                         value = THZValueCodec.decode_number(
-                            value_bytes, step, entry["decode_type"]
+                            value_bytes, step, entry["decode_type"],
+                            entry.get("signed", True),
                         )
                     elif reg_type == "switch":
                         value = THZValueCodec.decode_switch(value_bytes)
@@ -897,7 +934,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                             value_bytes, entry.get("decode_type")
                         )
                     else:  # "time"
-                        t = quarters_to_time(value_bytes[0])
+                        t = quarters_to_time(
+                            value_bytes[time_byte_index(entry.get("decode_type"))]
+                        )
                         value = t.strftime("%H:%M") if t else None
 
                 parameters[name] = {
@@ -921,10 +960,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         # clock_sync.py) is for.
         #
         # Read via async_read_device_clock rather than pulling from
-        # `parameters` above: the five pClock* registers are type "pclean"
-        # (no platform claims that type as an entity), so they're never
-        # added to `parameters` by the loop's _RESTORABLE_REGISTER_TYPES
-        # filter — reading them back out of it here would always miss.
+        # `parameters` above, so the five pClock* components are read as
+        # one consistent snapshot instead of minutes apart.
         clock_drift_seconds: float | None = None
         clock_corrected = False
         device_dt = await async_read_device_clock(hass, device, write_manager)
@@ -1088,7 +1125,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         except (TypeError, ValueError):
                             pass
                     value_bytes = THZValueCodec.encode_number(
-                        num_value, step, entry["decode_type"]
+                        num_value, step, entry["decode_type"],
+                        parameter_length(entry),
                     )
                 elif reg_type == "switch":
                     value_bytes = THZValueCodec.encode_switch(bool(value))
@@ -1099,7 +1137,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 elif reg_type == "time":
                     t_value = _parse_hhmm(value)
                     num = time_to_quarters(t_value)
-                    value_bytes = bytes([num, 0])
+                    payload = bytearray(2)
+                    payload[time_byte_index(entry.get("decode_type"))] = num
+                    value_bytes = bytes(payload)
                 elif reg_type == "schedule":
                     start_value = _parse_hhmm(value.get("start")) if value else None
                     end_value = _parse_hhmm(value.get("end")) if value else None
@@ -1122,9 +1162,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 continue
 
             try:
-                await device.async_execute(
-                    hass, device.write_value, bytes.fromhex(command), value_bytes
-                )
+                await async_write_parameter(hass, device, entry, value_bytes)
                 restored += 1
             except (OSError, RuntimeError, ConnectionError) as err:
                 failed.append(f"{name}: {err}")
@@ -1166,18 +1204,14 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 else "Clock: not synced (write failed, see failed list)"
             )
         )
-        await hass.services.async_call(
-            "persistent_notification",
-            "create",
-            {
-                "title": (
-                    f"THZ Parameter Restore "
-                    f"{'(dry run) ' if dry_run else ''}Complete"
-                ),
-                "message": notification_message,
-                "notification_id": "thz_restore_parameters",
-            },
-            blocking=True,
+        async_notify(
+            hass,
+            title=(
+                f"THZ Parameter Restore "
+                f"{'(dry run) ' if dry_run else ''}Complete"
+            ),
+            message=notification_message,
+            notification_id="thz_restore_parameters",
         )
 
         return cast("ServiceResponse", {

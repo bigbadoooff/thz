@@ -1,91 +1,74 @@
 # Tests for THZ Integration
 
-This directory contains unit tests for the THZ Home Assistant custom integration.
+Unit tests for the THZ Home Assistant custom integration. CI runs them (plus
+ruff, mypy, hassfest and HACS validation) on every push and pull request, see
+`.github/workflows/ci.yml`.
 
-## Running Tests
-
-### Prerequisites
+## Running
 
 ```bash
 pip install -r requirements_test.txt
+
+python3 -m pytest tests/                       # all tests
+python3 -m pytest tests/test_parameter_io.py   # one file
+python3 -m pytest tests/ --cov=custom_components/thz --cov-report=term-missing
+
+ruff check custom_components/thz tests
 ```
 
-### Run All Tests
+### Type check
+
+`homeassistant-stubs` uses syntax only Python 3.12+ can parse, so mypy must
+run under Python 3.13 (as in CI). Under an older interpreter it only reports
+`import-not-found` errors.
 
 ```bash
-python3 -m pytest tests/ -v
+pip install --no-deps homeassistant-stubs
+mypy
 ```
 
-### Run Specific Test File
+### Tests against a real Home Assistant
+
+`tests_ha/` sets the integration up inside a real Home Assistant instance
+(config entries, entity registry, translations, services, diagnostics) with
+only the serial/TCP line simulated. It needs Python 3.13 and its own
+dependencies, and must be run separately from `tests/`, whose `conftest.py`
+replaces Home Assistant with stubs:
 
 ```bash
-python3 -m pytest tests/test_time_conversion.py -v
+python3.13 -m venv .venv-ha && . .venv-ha/bin/activate
+pip install -r requirements_test_ha.txt
+python -m pytest tests_ha -o asyncio_mode=auto
 ```
 
-### Run with Coverage
+## How the tests are built
 
-```bash
-python3 -m pytest tests/ --cov=custom_components/thz --cov-report=html
-```
-
-## Test Structure
-
-- `conftest.py` - Test configuration and Home Assistant module mocking
-- `test_helpers.py` - Helper functions used by tests
-- `test_time_conversion.py` - Tests for time conversion functions (20 tests)
-- `test_decode_value.py` - Tests for sensor value decoding (27 tests)
-- `test_protocol.py` - Tests for THZ protocol functions (18 tests)
-
-## Test Coverage
-
-### Time Conversion (20 tests)
-- `time_to_quarters()` - Convert time to 15-minute quarter values
-- `quarters_to_time()` - Convert quarter values back to time
-- Round-trip conversions
-- Edge cases (midnight, end of day, None values)
-- Invalid value handling
-
-### Sensor Decoding (27 tests)
-- `hex2int` - Signed integer decoding with factors
-- `hex` - Unsigned integer decoding
-- `bitX` - Bit extraction
-- `nbitX` - Negated bit extraction
-- `esp_mant` - Float decoding with mantissa/exponent
-- Edge cases and multi-byte handling
-
-### Protocol Functions (18 tests)
-- Checksum calculation (`thz_checksum`)
-- Data escaping (`escape`/`unescape`)
-- Telegram construction
-- Cache functionality
-- Round-trip encode/decode
-
-## Test Results
-
-All 65 tests pass ✅
-
-```
-============================= 65 passed in 1.08s ==============================
-```
-
-## Adding New Tests
-
-1. Create a new test file in `tests/` directory
-2. Import necessary functions and fixtures
-3. Use pytest class-based structure for organization
-4. Run tests to verify
-
-Example:
-```python
-class TestNewFeature:
-    """Tests for new feature."""
-    
-    def test_basic_functionality(self):
-        """Test basic functionality."""
-        result = my_function(input)
-        assert result == expected
-```
-
-## Continuous Integration
-
-Tests are automatically run on pull requests via GitHub Actions (when configured).
+- `conftest.py` replaces the Home Assistant modules with lightweight stubs, so
+  the suite runs without a Home Assistant installation. Keep stubs faithful
+  to the real API (e.g. `async_redact_data` really redacts), otherwise tests
+  pass against behaviour Home Assistant does not have.
+- Protocol changes need a test against the real telegram format, not only
+  against mocked helpers:
+  - `test_thz_device.py::TestWriteBlockValue` compares a sent SET telegram
+    byte for byte with the FHEM format.
+  - `test_parameter_io.py` uses `Simulated2xxDevice`, which keeps 2xx register
+    blocks in memory and speaks the real telegram format, to cover the path
+    from write-map entry to bytes on the wire.
+  - `test_thz_device_coverage.py::TestFrameComplete` covers frame termination
+    including escaped `0x10` bytes split across read chunks.
+- `test_fhem_reference.py` checks the protocol against FHEM's unmodified
+  `docs/legacy/00_THZ.pm`, which is known to work on real devices. The Perl
+  harness in `fhem_reference/` stubs only FHEM's runtime and the serial line,
+  and hands FHEM *our* parameter definitions (the register maps here are more
+  current than FHEM's tables), so only the protocol is compared: telegram
+  framing, checksum, escaping, 2.x read-modify-write and the encoding of each
+  value type. Our code and FHEM must produce identical SET telegrams (and, for
+  2.x blocks, identical decoded values). Skipped when `perl` is not installed.
+- `test_properties.py` uses hypothesis for invariants that must hold for every
+  input: codec round-trips, escaping, frame reading across arbitrary chunk
+  boundaries, time quantisation and 2.x block writes touching only their own
+  bytes.
+- `test_async_execute.py` runs `THZDevice.async_execute` against a real thread
+  pool to cover timeouts, cancellation and lock hand-over.
+- Codec changes should keep the round-trip tests in
+  `test_value_codec_coverage.py` passing for every step value.

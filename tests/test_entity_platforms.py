@@ -127,9 +127,9 @@ class TestInitModule:
 class TestModuleConstants:
     """Test module-level constants and configurations."""
 
-    def test_number_uses_write_register_constants(self):
-        """Test that number module uses write register constants."""
-        from custom_components.thz.number import (
+    def test_parameter_io_uses_write_register_constants(self):
+        """Direct parameters are read at the shared write-register position."""
+        from custom_components.thz.parameter_io import (
             WRITE_REGISTER_LENGTH,
             WRITE_REGISTER_OFFSET,
         )

@@ -215,7 +215,8 @@ class TestTHZNumberSetNativeValue:
         await entity.async_set_native_value(3.0)
 
         write_call = device.async_execute.call_args[0]
-        assert write_call[3] == bytes([3])
+        # One byte padded to the register's two data bytes, as FHEM sends it.
+        assert write_call[3] == bytes([3, 0])
 
     @pytest.mark.asyncio
     async def test_async_set_native_value_encode_error_logged_not_raised(

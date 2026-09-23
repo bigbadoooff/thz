@@ -517,10 +517,11 @@ class TestSendRequest:
 class TestWriteBytes:
     def test_write_bytes_socket_path(self):
         device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock(spec=["send", "recv"])
+        mock_sock = Mock(spec=["sendall", "recv"])
         device.ser = mock_sock
         device._write_bytes(b"\x02")
-        mock_sock.send.assert_called_once_with(b"\x02")
+        # sendall, not send: send() may transmit only part of the telegram.
+        mock_sock.sendall.assert_called_once_with(b"\x02")
 
     def test_write_bytes_serial_path(self):
         device = _make_device()
@@ -631,6 +632,78 @@ class TestReadAvailableExtra:
         device.ser = mock_sock
         with pytest.raises(ConnectionError, match="TCP socket connection closed"):
             device._read_available()
+
+
+class TestTcpEndOfStream:
+    """A peer close (ser2net restart) must be reported, not read as "no data"."""
+
+    def test_read_available_eof_with_valid_fd_raises(self):
+        device = _make_device(connection="ip", host="h", tcp_port=1)
+        mock_sock = Mock()
+        mock_sock.gettimeout.return_value = 1.0
+        mock_sock.recv.return_value = b""
+        mock_sock.fileno.return_value = 5  # fd still valid after peer close
+        device.ser = mock_sock
+        with pytest.raises(ConnectionError, match="closed by peer"):
+            device._read_available()
+
+    def test_read_available_no_data_yet_returns_empty(self):
+        device = _make_device(connection="ip", host="h", tcp_port=1)
+        mock_sock = Mock()
+        mock_sock.gettimeout.return_value = 1.0
+        mock_sock.recv.side_effect = BlockingIOError
+        device.ser = mock_sock
+        assert device._read_available() == b""
+
+    def test_connection_not_alive_after_peer_close(self):
+        device = _make_device(connection="ip", host="h", tcp_port=1)
+        mock_sock = Mock()
+        mock_sock.fileno.return_value = 5
+        mock_sock.gettimeout.return_value = 1.0
+        mock_sock.recv.return_value = b""
+        device.ser = mock_sock
+        assert device._is_connection_alive() is False
+
+    def test_real_socketpair_peer_close(self):
+        left, right = socket_module.socketpair()
+        try:
+            device = _make_device(connection="ip", host="h", tcp_port=1)
+            device.ser = left
+            assert device._is_connection_alive() is True
+            right.close()
+            assert device._is_connection_alive() is False
+            with pytest.raises(ConnectionError, match="closed by peer"):
+                device._read_available()
+        finally:
+            left.close()
+
+
+class TestFrameComplete:
+    @pytest.mark.parametrize(
+        ("hex_data", "complete"),
+        [
+            ("0100aa1122334410" "03", True),
+            # escaped data byte 0x10 followed by data byte 0x03: not the end
+            ("0100aa1122331010" "03", False),
+            # escaped 0x10 as last data byte, then the real terminator
+            ("0100aa11223310101003", True),
+            ("0100aa1122334410", False),
+            ("1003", False),  # too short to be a frame
+        ],
+    )
+    def test_terminator_detection(self, hex_data, complete):
+        assert THZDevice._frame_complete(bytes.fromhex(hex_data)) is complete
+
+    def test_escaped_0x10_split_across_chunks_is_read_to_the_end(self):
+        device = _make_device()
+        frame = bytes.fromhex("0100aa1122331010031003")
+        # The first chunk ends right after "10 10 03", which used to be taken
+        # for the terminator and truncated the frame.
+        chunks = iter([frame[:9], frame[9:]])
+        with patch.object(device, "_write_bytes"), patch.object(
+            device, "_read_available", side_effect=lambda: next(chunks, b"")
+        ):
+            assert device._receive_data_telegram(1.0) == frame
 
 
 # ---------------------------------------------------------------------------
@@ -909,13 +982,45 @@ class TestAsyncInitialize:
         assert device.has_cooling is True
 
     @pytest.mark.asyncio
-    async def test_async_initialize_none_firmware_raises(self):
+    @pytest.mark.parametrize("firmware", [None, ""])
+    async def test_async_initialize_unread_firmware_raises_and_closes(
+        self, firmware
+    ):
+        # read_firmware_version() returns "" on failure; that must not fall
+        # through to the 4.39 default profile.
         device = _make_device(connection="usb")
-        with patch.object(device, "_connect_serial"), patch.object(
-            device, "read_firmware_version", return_value=None
-        ):
-            with pytest.raises(RuntimeError, match="could not be determined"):
+        port = MagicMock()
+
+        def _connect():
+            device.ser = port
+
+        with patch.object(device, "_connect_serial", side_effect=_connect), \
+                patch.object(device, "read_firmware_version", return_value=firmware):
+            with pytest.raises(ConnectionError, match="could not be read"):
                 await device.async_initialize(FakeHass())
+
+        port.close.assert_called_once()
+        assert device.ser is None
+        assert device.register_map_manager is None
+
+    @pytest.mark.asyncio
+    async def test_async_initialize_connects_in_executor(self):
+        device = _make_device(connection="ip", host="h", tcp_port=1)
+        hass = FakeHass()
+        calls = []
+        original = hass.async_add_executor_job
+
+        async def _record(func, *args):
+            calls.append(func)
+            return await original(func, *args)
+
+        hass.async_add_executor_job = _record
+        with patch.object(device, "_connect_tcp") as mock_connect, patch.object(
+            device, "read_firmware_version", return_value="439"
+        ):
+            await device.async_initialize(hass)
+
+        assert calls[0] is mock_connect
 
 
 # ---------------------------------------------------------------------------
@@ -970,3 +1075,52 @@ class TestFullRoundtripIntegration:
         with patch.object(device, "_reconnect"):
             with pytest.raises(RuntimeError, match="Handshake 1 failed"):
                 device.send_request(b"telegram", "get")
+
+
+class TestSetIsNotRepeatedOnceSent:
+    """A SET that already went out is never sent a second time (#180)."""
+
+    def _device(self):
+        device = _make_device()
+        device.ser = MagicMock()
+        device._initialized = False  # skip liveness check
+        return device
+
+    def test_set_failing_after_telegram_is_not_repeated(self):
+        device = self._device()
+        with patch.object(device, "_do_handshake_1"), patch.object(
+            device, "_do_handshake_2", side_effect=RuntimeError("no ack")
+        ), patch.object(device, "_write_bytes") as write, patch.object(
+            device, "_reconnect"
+        ) as reconnect:
+            with pytest.raises(RuntimeError, match="no ack"):
+                device.send_request(b"TELEGRAM", "set")
+
+        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
+        assert len(telegram_writes) == 1
+        reconnect.assert_not_called()
+
+    def test_set_failing_before_telegram_is_retried(self):
+        device = self._device()
+        handshake = MagicMock(side_effect=[ConnectionError("down"), None])
+        with patch.object(device, "_do_handshake_1", handshake), patch.object(
+            device, "_do_handshake_2"
+        ), patch.object(device, "_write_bytes") as write, patch.object(
+            device, "_reconnect"
+        ):
+            assert device.send_request(b"TELEGRAM", "set") == b""
+
+        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
+        assert len(telegram_writes) == 1
+
+    def test_get_is_still_retried_after_telegram(self):
+        device = self._device()
+        with patch.object(device, "_do_handshake_1"), patch.object(
+            device, "_do_handshake_2", side_effect=[RuntimeError("no ack"), None]
+        ), patch.object(device, "_write_bytes") as write, patch.object(
+            device, "_reconnect"
+        ), patch.object(device, "_receive_data_telegram", return_value=b"data"):
+            assert device.send_request(b"TELEGRAM", "get") == b"data"
+
+        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
+        assert len(telegram_writes) == 2

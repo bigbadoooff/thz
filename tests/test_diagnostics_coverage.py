@@ -158,7 +158,6 @@ class TestDiagnosticsMissingEntryData:
         assert result["device"]["firmware_version"] == "unknown"
         assert result["device"]["connection_type"] == "unknown"
         assert result["device"]["initialized"] is False
-        assert result["device"]["last_access"] == "never"
         assert result["coordinators"] == {}
         assert result["registers"] == {}
         assert result["raw_blocks"] == {}
@@ -177,12 +176,37 @@ class TestDiagnosticsMissingEntryData:
     async def test_redact_keys_used_for_config_data(self):
         hass = MagicMock()
         config_entry = _make_config_entry(
-            data={"host": "10.0.0.5", "device": "/dev/ttyUSB0", "other": "value"}
+            data={
+                "host": "10.0.0.5", "device": "/dev/ttyUSB0",
+                "alias": "Keller", "area": "Basement", "other": "value",
+            }
         )
+        config_entry.title = "THZ (ip: 10.0.0.5)"
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 
-        # conftest's async_redact_data mock is a passthrough, but verify
-        # TO_REDACT contains the expected sensitive keys.
-        assert TO_REDACT == {"host", "device", "unique_id", "serial"}
-        assert result["config_entry"]["data"]["other"] == "value"
+        assert {"host", "device", "unique_id", "serial"} <= TO_REDACT
+        data = result["config_entry"]["data"]
+        for key in ("host", "device", "alias", "area"):
+            assert data[key] == "**REDACTED**"
+        assert data["other"] == "value"
+        # The title embeds the host as well.
+        assert "10.0.0.5" not in str(result)
+
+    @pytest.mark.asyncio
+    async def test_reports_real_device_attributes(self):
+        from custom_components.thz.thz_device import THZDevice
+
+        device = THZDevice(connection="ip", host="h", tcp_port=1)
+        hass = MagicMock()
+        config_entry = _make_config_entry(runtime_data={"device": device})
+
+        # Firmware still unknown: must not raise from the firmware_version
+        # property.
+        result = await async_get_config_entry_diagnostics(hass, config_entry)
+        assert result["device"]["firmware_version"] == "unknown"
+        assert result["device"]["connection_type"] == "ip"
+
+        device._firmware_version = "439"
+        result = await async_get_config_entry_diagnostics(hass, config_entry)
+        assert result["device"]["firmware_version"] == "439"

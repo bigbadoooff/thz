@@ -27,9 +27,6 @@ from . import (
     write_map_X39tech,  # noqa: F401
 )
 
-supported_firmwares = [
-    "206, 214, 419, 439, 509, 539, 709"
-]  # Add other supported firmware versions here
 _LOGGER = logging.getLogger(__name__)
 
 # Cooling-only entries within the 5.39 maps.
@@ -349,10 +346,19 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
         Entries with ``type="ptime"`` (schedule start/end times) require a different
         time-encoding and are left unchanged for now.
         """
-        # Build lookup: stripped_param_name → (hex_block_addr, offset, length, factor)
+        # Build lookup: stripped_param_name →
+        # (hex_block_addr, offset, length, factor, decode_type)
         # from all 2xx-series read register maps.
-        param_lookup: dict[str, tuple[str, int, int, float]] = {}
-        for mod_name in ("register_map_206", "register_map_214", "register_map_214j"):
+        param_lookup: dict[str, tuple[str, int, int, float, str]] = {}
+        # The first map that defines a parameter wins, so the running
+        # firmware's own map must come first: 2.14 lays out e.g. the pFan
+        # block (01) differently from 2.06.
+        map_order = ["register_map_206", "register_map_214", "register_map_214j"]
+        own_map = f"register_map_{self.firmware_version}"
+        if own_map in map_order:
+            map_order.remove(own_map)
+            map_order.insert(0, own_map)
+        for mod_name in map_order:
             full_name = f"{self._package}.{mod_name}"
             mod = sys.modules.get(full_name)
             if mod is None:
@@ -369,9 +375,30 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
                     raw_name: str = entry[0].strip().rstrip(":").strip()
                     offset: int = entry[1]
                     length: int = entry[2]
+                    decode_type: str = entry[3]
                     factor: float = float(entry[4]) if entry[4] else 1.0
                     if raw_name and raw_name not in param_lookup:
-                        param_lookup[raw_name] = (hex_addr, offset, length, factor)
+                        param_lookup[raw_name] = (
+                            hex_addr, offset, length, factor, decode_type
+                        )
+
+        # The running firmware's merged read map (what its sensors decode) is
+        # authoritative for the block a parameter lives in: e.g. 2.14 lays
+        # out the pFan block (01) with 1-byte fields where 2.06 uses 2 bytes,
+        # and that layout lives in readings_map_214, not register_map_214.
+        own_layout: dict[tuple[str, str], tuple[int, int, float, str]] = {}
+        own_maps = RegisterMapManager(
+            self.firmware_version, has_cooling=self._has_cooling
+        ).get_all_registers()
+        for block_key, entries in own_maps.items():
+            for entry in entries:
+                if not isinstance(entry, tuple) or len(entry) < 5:
+                    continue
+                raw_name = entry[0].strip().rstrip(":").strip()
+                own_layout.setdefault(
+                    (raw_name, block_key[3:].upper()),
+                    (entry[1], entry[2], float(entry[4]) if entry[4] else 1.0, entry[3]),
+                )
 
         # Load the parent→block-address mapping from write_map_206.
         full_wm = f"{self._package}.write_map_206"
@@ -402,14 +429,26 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
             entry["command"] = block_addr
 
             # Look up offset / length / factor from the read register maps.
-            if name in param_lookup:
-                _, nibble_offset, nibble_length, factor = param_lookup[name]
+            layout = own_layout.get((name, block_addr.upper()))
+            if layout is None and name in param_lookup:
+                layout = param_lookup[name][1:]
+            if layout is not None:
+                nibble_offset, nibble_length, factor, decode_type = layout
                 # Register map offsets/lengths are in nibbles (FHEM convention).
                 # Convert to bytes so read_value and write_block_value can use them
                 # directly (same conversion as sensor.py async_setup_entry).
                 entry["offset"] = nibble_offset // 2
                 entry["length"] = (nibble_length + 1) // 2
                 entry["write_mode"] = "block"
+                # FHEM reads 2xx parameters as "hex" (unsigned) unless the map
+                # says "hex2int", e.g. 240 min in one byte is not -16.
+                entry["signed"] = decode_type == "hex2int"
+                if decode_type.startswith("bit") and decode_type[3:].isdigit():
+                    # Single-bit flag (e.g. progHC1Monday) sharing its byte
+                    # with other flags. Same nibble convention as sensor.py:
+                    # an even nibble offset is the byte's high nibble.
+                    bit = int(decode_type[3:])
+                    entry["bit"] = bit + 4 if nibble_offset % 2 == 0 else bit
                 # step = 1/factor so encode/decode functions scale correctly.
                 step_val = (1.0 / factor) if factor else 1.0
                 entry["step"] = str(step_val)
