@@ -436,8 +436,8 @@ class THZDevice:
                     f"Connection failed after {max_retries + 1} attempts: {e}"
                 ) from e
 
-            except THZNotSupportedError:
-                raise  # legitimate device response — no reconnect
+            except (THZNotSupportedError, THZWriteRejectedError):
+                raise  # legitimate device response — no reconnect, no retry
 
             except THZProtocolError as e:
                 _LOGGER.debug(

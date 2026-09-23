@@ -1197,7 +1197,7 @@ class TestSetIsNotRepeatedOnceSent:
         assert len(telegram_writes) == 1
         reconnect.assert_not_called()
 
-    def test_rejected_set_is_not_repeated(self):
+    def test_rejected_set_is_not_repeated(self, caplog):
         device = self._device()
         with (
             patch.object(device, "_do_handshake_1"),
@@ -1212,6 +1212,8 @@ class TestSetIsNotRepeatedOnceSent:
         telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
         assert len(telegram_writes) == 1
         reconnect.assert_not_called()
+        # A rejection is a clear answer, not a SET of unknown outcome.
+        assert "may or may not have applied" not in caplog.text
 
     def test_set_failing_before_telegram_is_retried(self):
         device = self._device()
