@@ -33,6 +33,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
     should_hide_entity,
@@ -465,7 +466,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             self.hass, self.hass.config.language, "entity", [DOMAIN]
         )
         self._fault_texts = {
-            key[len(prefix):]: text
+            key[len(prefix) :]: text
             for key, text in translations.items()
             if key.startswith(prefix)
         }
@@ -475,8 +476,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         if not self._fault_texts:
             return value
         return ", ".join(
-            self._fault_texts.get(state_slug(name), name)
-            for name in value.split(", ")
+            self._fault_texts.get(state_slug(name), name) for name in value.split(", ")
         )
 
     def _discard_implausible(

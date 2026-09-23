@@ -95,7 +95,11 @@ class TestSensorBehaviour:
         coordinator = MagicMock()
         coordinator.data = bytes([1, 2])
         entry = {
-            "name": "x", "offset": 0, "length": 2, "decode": "hex2int", "factor": 1,
+            "name": "x",
+            "offset": 0,
+            "length": 2,
+            "decode": "hex2int",
+            "factor": 1,
         }
         sensor = THZGenericSensor(
             coordinator, entry=entry, block=bytes.fromhex("FB"), device_id="dev1"
@@ -128,9 +132,9 @@ class TestTranslationsCoverEveryState:
         "path", ["strings.json", "translations/en.json", "translations/de.json"]
     )
     def test_all_states_are_translated(self, path):
-        sensors = json.loads((COMPONENT / path).read_text(encoding="utf-8"))[
-            "entity"
-        ]["sensor"]
+        sensors = json.loads((COMPONENT / path).read_text(encoding="utf-8"))["entity"][
+            "sensor"
+        ]
         pairs = _text_sensor_keys() | {("fault_latest", "faultmap")}
         for key, decode in pairs:
             states = sensors[key]["state"]
@@ -185,10 +189,15 @@ class TestSelectOptionsAreTranslationKeys:
     def test_slug_tables_keep_existing_options(self):
         # already-slug tables must not change their option names
         assert self._entity("passive_cooling")._attr_options == [
-            "off", "exhaust_air", "supply_air", "bypass", "sommerkassette",
+            "off",
+            "exhaust_air",
+            "supply_air",
+            "bypass",
+            "sommerkassette",
         ]
         assert self._entity("cooling_distribution_hc1")._attr_options == [
-            "area", "air",
+            "area",
+            "air",
         ]
 
     @pytest.mark.parametrize(
@@ -197,9 +206,9 @@ class TestSelectOptionsAreTranslationKeys:
     def test_select_states_are_translated(self, path):
         from custom_components.thz.value_maps import select_slugs
 
-        selects = json.loads((COMPONENT / path).read_text(encoding="utf-8"))[
-            "entity"
-        ]["select"]
+        selects = json.loads((COMPONENT / path).read_text(encoding="utf-8"))["entity"][
+            "select"
+        ]
         for key, table in (
             ("op_mode", "2opmode"),
             ("z_control_valve_dhw", "1clean"),

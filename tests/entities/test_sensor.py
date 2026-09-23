@@ -424,14 +424,14 @@ class TestAbsentAndNibbleFields:
     @pytest.mark.parametrize(
         ("nibble_offset", "byte_value", "expected"),
         [
-            (7, 0x93, "Thursday"),  # low nibble 3, high nibble set
-            (6, 0x35, "Thursday"),  # high nibble 3
+            (7, 0x93, "thursday"),  # low nibble 3, high nibble set
+            (6, 0x35, "thursday"),  # high nibble 3
         ],
     )
     async def test_single_nibble_value_ignores_the_other_nibble(
         self, nibble_offset, byte_value, expected
     ):
-        from custom_components.thz.value_maps import SELECT_MAP
+        from custom_components.thz.value_maps import SELECT_MAP, state_slug
 
         coord = MagicMock()
         payload = bytearray(8)
@@ -444,4 +444,4 @@ class TestAbsentAndNibbleFields:
         await async_setup_entry(hass, config_entry, async_add_entities)
 
         sensor = async_add_entities.call_args_list[0][0][0][0]
-        assert sensor.native_value == SELECT_MAP["weekday"]["3"] == expected
+        assert sensor.native_value == state_slug(SELECT_MAP["weekday"]["3"]) == expected
