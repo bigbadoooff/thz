@@ -42,8 +42,9 @@ These keep the protocol code safe to change. Reviews check them.
    FHEM is the reference for the protocol only. The register maps here are
    more current than FHEM's tables and are not changed to match them.
 3. **No new `except Exception`.** Catch the exceptions that can actually
-   occur (`OSError`, `ConnectionError`, `ValueError`, ...). ruff's `BLE`
-   rules enforce this. The few existing `# noqa: BLE001` sites are
+   occur. For device calls that is `DEVICE_ERRORS` from `exceptions.py`
+   (every `THZError` plus unwrapped `OSError`); the device layer raises only
+   `THZError` subclasses. ruff's `BLE` rules enforce this. The few existing `# noqa: BLE001` sites are
    deliberate last-resort guards, not a pattern to copy.
 4. **No history in comments.** Comments explain why the code is the way it
    is now. How it used to be, which bug led to it, and who changed what

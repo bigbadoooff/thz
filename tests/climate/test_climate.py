@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 from homeassistant.components.climate import HVACAction, HVACMode
 import pytest
 
+from custom_components.thz.exceptions import THZProtocolError
 from tests.helpers import as_runtime_data
 
 # Real register-map byte offsets (derived the same way _field_layout does:
@@ -889,7 +890,7 @@ class TestTHZClimateServiceCalls:
     @pytest.mark.asyncio
     async def test_set_preset_mode_handles_device_error(self):
         device = MagicMock()
-        device.async_execute = AsyncMock(side_effect=RuntimeError("boom"))
+        device.async_execute = AsyncMock(side_effect=THZProtocolError("boom"))
         entity = self._entity(opmode_entry={"command": "0A0001"}, device=device)
         entity.hass = MagicMock()
         await entity.async_set_preset_mode("standby")  # Should not raise.

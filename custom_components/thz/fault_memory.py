@@ -21,7 +21,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
-from .thz_device import THZRegisterNotSupportedError
+from .exceptions import DEVICE_ERRORS, THZNotSupportedError, THZProtocolError
 from .value_maps import SELECT_MAP
 
 if TYPE_CHECKING:
@@ -38,8 +38,6 @@ FAULT_MAX_RECORDS = 10
 
 FAULT_CLEAR_PAYLOAD = bytes.fromhex("0000")
 CLEAR_CONFIRMATION = "CLEAR D1"
-
-_READ_ERRORS = (RuntimeError, ConnectionError, OSError)
 
 
 def _swapped_pair(raw: bytes) -> int | None:
@@ -165,18 +163,18 @@ def new_record_start(acknowledged: list[str], current: list[str]) -> int:
 async def read_fault_memory(hass: HomeAssistant, device: THZDevice) -> dict[str, Any]:
     """Read and decode D1. Read-only.
 
-    Raises communication errors (and ``RuntimeError`` for an invalid payload)
+    Raises communication errors (and ``THZProtocolError`` for an invalid payload)
     so callers decide how to report them.
     """
     data = await device.async_execute(
         hass, device.read_block, FAULT_MEMORY_COMMAND, "get"
     )
     if data is None:
-        raise RuntimeError("D1 fault-memory read returned no data")
+        raise THZProtocolError("D1 fault-memory read returned no data")
     raw = bytes(data)
     decoded = decode_fault_memory(raw)
     if not decoded["valid"]:
-        raise RuntimeError(decoded["error"])
+        raise THZProtocolError(decoded["error"])
     return {"length": len(raw), "raw": raw.hex().upper(), "decoded": decoded}
 
 
@@ -194,7 +192,7 @@ async def _read_back(
             await asyncio.sleep(1.0)
         try:
             return await read_fault_memory(hass, device), errors
-        except (THZRegisterNotSupportedError, *_READ_ERRORS) as err:
+        except (THZNotSupportedError, *DEVICE_ERRORS) as err:
             errors.append(f"readback {attempt}/{attempts}: {type(err).__name__}: {err}")
     return None, errors
 
@@ -207,16 +205,16 @@ async def clear_fault_memory(hass: HomeAssistant, device: THZDevice) -> dict[str
     retried by this function; success is decided only by a later D1 read.
 
     Raises:
-        RuntimeError: D1 could not be read beforehand, the write failed, or the
+        THZProtocolError: D1 could not be read beforehand, the write failed, or the
             readback could not confirm the memory is empty (in that case the
             write may still have taken effect).
     """
     try:
         before = await read_fault_memory(hass, device)
-    except THZRegisterNotSupportedError as err:
-        raise RuntimeError(f"D1 fault memory is not supported: {err}") from err
-    except _READ_ERRORS as err:
-        raise RuntimeError(f"Could not read D1 before clearing: {err}") from err
+    except THZNotSupportedError as err:
+        raise THZProtocolError(f"D1 fault memory is not supported: {err}") from err
+    except DEVICE_ERRORS as err:
+        raise THZProtocolError(f"Could not read D1 before clearing: {err}") from err
 
     before_count = _fault_count(before)
     if before_count == 0:
@@ -227,21 +225,21 @@ async def clear_fault_memory(hass: HomeAssistant, device: THZDevice) -> dict[str
         await device.async_execute(
             hass, device.write_value, FAULT_MEMORY_COMMAND, FAULT_CLEAR_PAYLOAD
         )
-    except _READ_ERRORS as err:
-        raise RuntimeError(
+    except DEVICE_ERRORS as err:
+        raise THZProtocolError(
             f"Writing D1 failed ({type(err).__name__}: {err}); the fault memory "
             "may or may not have been cleared - check the D1 state"
         ) from err
 
     after, errors = await _read_back(hass, device)
     if after is None:
-        raise RuntimeError(
+        raise THZProtocolError(
             "D1 was written but the readback failed, so the result is unknown: "
             + "; ".join(errors)
         )
     after_count = _fault_count(after)
     if after_count != 0:
-        raise RuntimeError(
+        raise THZProtocolError(
             f"D1 still reports {after_count} fault(s) after the clear command"
         )
     return {"cleared": True, "before_count": before_count, "after_count": 0}

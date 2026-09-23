@@ -27,13 +27,14 @@ from ..clock_sync import (
     async_read_device_clock,
     async_write_device_clock,
 )
+from ..exceptions import DEVICE_ERRORS, THZNotSupportedError
 from ..notify import async_notify
 from ..parameter_io import (
     async_read_parameter,
     async_write_parameter,
     parameter_length,
 )
-from ..thz_device import THZDevice, THZRegisterNotSupportedError
+from ..thz_device import THZDevice
 from ..time import quarters_to_time, time_byte_index, time_to_quarters
 from ..value_codec import THZValueCodec
 from .common import _require_target_entry_data
@@ -151,7 +152,7 @@ async def _read_all_parameters(
             continue
         try:
             value = await _read_backup_value(hass, device, entry)
-        except THZRegisterNotSupportedError as err:
+        except THZNotSupportedError as err:
             read_errors.append(f"{name}: {err}")
             _LOGGER.debug(
                 "backup_parameters: skipping unsupported register %s: %s", name, err
@@ -442,7 +443,7 @@ async def async_handle_restore_parameters(
         if not dry_run:
             try:
                 await async_write_parameter(hass, device, entry, value_bytes)
-            except (OSError, RuntimeError, ConnectionError) as err:
+            except DEVICE_ERRORS as err:
                 failed.append(f"{name}: {err}")
                 continue
         restored += 1
@@ -455,7 +456,7 @@ async def async_handle_restore_parameters(
         try:
             await async_write_device_clock(hass, device, write_manager, local_now)
             clock_synced = True
-        except (OSError, RuntimeError, ConnectionError) as err:
+        except DEVICE_ERRORS as err:
             failed.append(f"<device clock>: {err}")
 
     _LOGGER.info(

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from custom_components.thz.exceptions import THZProtocolError
 from custom_components.thz.select import THZSelect, async_setup_entry
 from tests.helpers import make_runtime_data
 
@@ -154,7 +155,9 @@ class TestTHZSelectAvailability:
         entity = _make_entity(entry=_select_entry(decode_type="2opmode"))
         entity.hass = MagicMock()
         assert entity.available is True
-        entity._device.async_execute = AsyncMock(side_effect=RuntimeError("comm error"))
+        entity._device.async_execute = AsyncMock(
+            side_effect=THZProtocolError("comm error")
+        )
 
         await entity.async_update()
 

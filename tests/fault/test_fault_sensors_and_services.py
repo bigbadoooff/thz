@@ -7,6 +7,7 @@ import pytest
 
 from custom_components.thz import fault_sensor
 from custom_components.thz.const import DOMAIN
+from custom_components.thz.exceptions import THZProtocolError
 from custom_components.thz.fault_sensor import (
     NO_FAULT,
     THZFaultMemorySensor,
@@ -246,10 +247,10 @@ class TestProbeService:
 
     @pytest.mark.asyncio
     async def test_unsupported_register_is_reported(self):
-        from custom_components.thz.thz_device import THZRegisterNotSupportedError
+        from custom_components.thz.exceptions import THZNotSupportedError
 
         device = _device()
-        device.async_execute = AsyncMock(side_effect=THZRegisterNotSupportedError("x"))
+        device.async_execute = AsyncMock(side_effect=THZNotSupportedError("x"))
         handler = await _handler(_hass_with({"device": device}), "probe_fault_memory")
         with pytest.raises(HomeAssistantError, match="not supported"):
             await handler(_call())
@@ -347,7 +348,7 @@ class TestClearService:
         with (
             patch(
                 "custom_components.thz.services.faults.clear_fault_memory",
-                AsyncMock(side_effect=RuntimeError("D1 still reports 1 fault(s)")),
+                AsyncMock(side_effect=THZProtocolError("D1 still reports 1 fault(s)")),
             ),
             pytest.raises(HomeAssistantError, match="still reports"),
         ):

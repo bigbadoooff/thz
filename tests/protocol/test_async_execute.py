@@ -12,7 +12,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from custom_components.thz.thz_device import THZDevice, THZRegisterNotSupportedError
+from custom_components.thz.exceptions import THZNotSupportedError
+from custom_components.thz.thz_device import THZDevice
 
 
 class ExecutorHass:
@@ -88,9 +89,9 @@ async def test_register_not_supported_keeps_connection():
     port = device.ser
 
     def fn():
-        raise THZRegisterNotSupportedError("nope")
+        raise THZNotSupportedError("nope")
 
-    with pytest.raises(THZRegisterNotSupportedError):
+    with pytest.raises(THZNotSupportedError):
         await device.async_execute(ExecutorHass(), fn)
 
     assert device.ser is port

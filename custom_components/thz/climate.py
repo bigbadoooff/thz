@@ -93,6 +93,7 @@ from .const import (
 )
 from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
+from .exceptions import DEVICE_ERRORS
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
@@ -1021,7 +1022,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             self._op_mode_cache = preset_mode
             self.async_write_ha_state()
             await self.coordinator.async_request_refresh()
-        except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error setting preset mode for %s: %s", self.name, err, exc_info=True
             )
@@ -1056,7 +1057,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             await async_write_parameter(self.hass, self._device, entry, value_bytes)
             await self._async_read_fan_stage()
             self.async_write_ha_state()
-        except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error setting fan mode for %s: %s", self.name, err, exc_info=True
             )
@@ -1073,7 +1074,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 return THZValueCodec.decode_number(
                     value_bytes, step, decode_type, entry.get("signed", True)
                 )
-        except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.warning(
                 "Could not read setpoint register for %s: %s", self.name, err
             )
@@ -1151,7 +1152,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 self.hass, self._device, target_entry, value_bytes
             )
             await self.coordinator.async_request_refresh()
-        except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error writing heat setpoint for %s: %s", self.name, err, exc_info=True
             )
@@ -1186,7 +1187,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             )
             await async_write_parameter(self.hass, self._device, entry, value_bytes)
             await self._async_read_cooling_setpoint()
-        except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error writing cool setpoint for %s: %s", self.name, err, exc_info=True
             )
@@ -1213,7 +1214,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 self._cool_switch_entry,
                 THZValueCodec.encode_switch(enabled),
             )
-        except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error setting cooling switch for %s: %s", self.name, err, exc_info=True
             )
@@ -1238,7 +1239,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                     self.name,
                     self._cooling_target_temp,
                 )
-        except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.warning(
                 "Could not read cooling setpoint for %s: %s", self.name, err
             )
@@ -1260,7 +1261,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 _LOGGER.debug(
                     "Cached fan stage for %s: %d", self.name, self._fan_stage_cache
                 )
-        except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.warning("Could not read fan stage for %s: %s", self.name, err)
 
     async def _async_read_op_mode(self) -> None:
@@ -1277,7 +1278,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 _LOGGER.debug(
                     "Cached operating mode for %s: %s", self.name, self._op_mode_cache
                 )
-        except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.warning("Could not read operating mode for %s: %s", self.name, err)
 
     # ── Device registry ─────────────────────────────────────────────────────

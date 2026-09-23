@@ -8,6 +8,12 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **A write the heat pump rejects is reported as an error.** The answer to a
+  SET is now read and checked like FHEM does: only an acknowledgement
+  (`01 80`) counts as success; NAK and the device's error answers (timing,
+  CRC error, unknown command, unknown register) fail the write with a
+  message instead of passing silently.
+
 - **Services are registered when Home Assistant starts** instead of with
   the first config entry, and they stay registered after the last entry is
   removed. A call without a loaded THZ entry now fails with a validation

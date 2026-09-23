@@ -46,6 +46,7 @@ from .const import (
     WRITE_GROUP_LABELS,
     get_write_group_for_key,
 )
+from .exceptions import DEVICE_ERRORS
 from .thz_device import THZDevice
 
 if TYPE_CHECKING:
@@ -701,7 +702,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 groups_found.add(get_write_group_for_key(key))
             self.write_groups_available = sorted(groups_found)
 
-        except (OSError, RuntimeError):
+        except DEVICE_ERRORS:
             _LOGGER.exception("Error reading firmware/blocks")
             return self.async_abort(reason="cannot_detect_blocks")
         finally:

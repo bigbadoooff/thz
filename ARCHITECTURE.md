@@ -99,6 +99,15 @@ command and data, then `10 03`.
 - The checksum is the sum of all bytes except the checksum position, mod 256.
 - `0x10` is escaped as `10 10` and `0x2B` as `2B 18`.
 - A frame ends at a `03` preceded by an odd number of `10` bytes.
+- The device answers a SET too: `01 80` acknowledges it; NAK (`15`) and the
+  error headers `01 01`..`01 04` reject it (`THZWriteRejectedError`), as in
+  FHEM's `THZ_decode`. A SET is never repeated once it was sent.
+
+Errors of the device layer are `THZError` subclasses (`exceptions.py`):
+`THZConnectionError`, `THZProtocolError` (with `THZNotSupportedError` and
+`THZWriteRejectedError`) and `THZNotInitializedError`. Callers catch
+`DEVICE_ERRORS` and translate once: into `UpdateFailed` in the block
+coordinators, into `HomeAssistantError` in services and entity actions.
 
 The format is the one used by FHEM's `00_THZ.pm`, which is known to work on
 real devices. `tests/protocol/test_fhem_reference.py` runs that module

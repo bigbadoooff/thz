@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+from custom_components.thz.exceptions import THZProtocolError
 from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManager,
     RegisterMapManagerWrite,
@@ -42,7 +43,9 @@ class TestProbeCoolingSupport:
         """Probe failure defaults to cooling supported (safe fallback)."""
         device = THZDevice(connection="usb", port="/dev/null")
 
-        with patch.object(device, "read_block", side_effect=RuntimeError("timeout")):
+        with patch.object(
+            device, "read_block", side_effect=THZProtocolError("timeout")
+        ):
             assert device._probe_cooling_support() is True
 
     def test_probe_returns_true_on_connection_error(self):
