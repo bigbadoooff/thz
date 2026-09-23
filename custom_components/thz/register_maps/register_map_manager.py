@@ -195,12 +195,14 @@ class BaseRegisterMapManager:
             return {k: v for k, v in register_map.items() if k not in _COOLING_WRITE_KEYS}
         return register_map
 
-    def _normalize_name(self, name) -> str:
+    def _normalize_name(self, name: Any) -> Any:
         """Normalize a sensor name for comparison by stripping whitespace."""
         return name.strip() if isinstance(name, str) else name
 
     @staticmethod
-    def _inherit_meta(entry, base_entry):
+    def _inherit_meta(
+        entry: tuple[Any, ...], base_entry: tuple[Any, ...] | None
+    ) -> tuple[Any, ...]:
         """Return ``entry`` with ``base_entry``'s meta dict if it has none.
 
         Read-map entries are ``(name, offset, length, decode, factor[, meta])``.
@@ -209,7 +211,9 @@ class BaseRegisterMapManager:
             return entry
         return (*entry, base_entry[5])
 
-    def _merge_maps(self, base: dict, override: dict) -> dict:
+    def _merge_maps(
+        self, base: dict[str, Any], override: dict[str, Any]
+    ) -> dict[str, Any]:
         """Merge base and override maps in a predictable way."""
         merged = deepcopy(base) if base else {}
         if not override:
@@ -248,7 +252,7 @@ class BaseRegisterMapManager:
                 merged[block] = deepcopy(entries)
         return merged
 
-    def get_all_registers(self) -> dict:
+    def get_all_registers(self) -> dict[str, Any]:
         """Get the merged register map."""
         return self._merged_map
 
@@ -325,7 +329,9 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
         if firmware_version and firmware_version.startswith("2"):
             self._enrich_2xx_write_entries()
 
-    def _merge_maps(self, base: dict, override: dict) -> dict:
+    def _merge_maps(
+        self, base: dict[str, Any], override: dict[str, Any]
+    ) -> dict[str, Any]:
         """For write maps prefer a simple dict update behaviour."""
         merged = deepcopy(base) if base else {}
         merged.update(deepcopy(override) or {})
