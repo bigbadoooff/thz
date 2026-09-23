@@ -1059,7 +1059,9 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 self.hass, self._device, entry
             )
             if value_bytes:
-                return THZValueCodec.decode_number(value_bytes, step, decode_type)
+                return THZValueCodec.decode_number(
+                    value_bytes, step, decode_type, entry.get("signed", True)
+                )
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
             _LOGGER.warning(
                 "Could not read setpoint register for %s: %s", self.name, err
@@ -1234,7 +1236,9 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 self.hass, self._device, entry
             )
             if value_bytes:
-                raw = THZValueCodec.decode_number(value_bytes, step, decode_type)
+                raw = THZValueCodec.decode_number(
+                    value_bytes, step, decode_type, entry.get("signed", True)
+                )
                 self._fan_stage_cache = int(raw)
                 _LOGGER.debug(
                     "Cached fan stage for %s: %d", self.name, self._fan_stage_cache

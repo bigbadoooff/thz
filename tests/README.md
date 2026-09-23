@@ -42,6 +42,12 @@ mypy
     from write-map entry to bytes on the wire.
   - `test_thz_device_coverage.py::TestFrameComplete` covers frame termination
     including escaped `0x10` bytes split across read chunks.
+- `test_fhem_reference.py` runs FHEM's unmodified `docs/legacy/00_THZ.pm`
+  (through the Perl harness in `fhem_reference/`, which only stubs FHEM's
+  runtime and the serial line) against the same simulated 2xx blocks as our
+  code and requires identical SET telegrams and decoded values for every 2xx
+  parameter. FHEM is the reference known to work on real 2.06/2.14 devices;
+  the test is skipped when `perl` is not installed.
 - `test_async_execute.py` runs `THZDevice.async_execute` against a real thread
   pool to cover timeouts, cancellation and lock hand-over.
 - Codec changes should keep the round-trip tests in

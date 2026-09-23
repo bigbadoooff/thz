@@ -914,7 +914,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         step_raw = entry.get("step", 1)
                         step = float(step_raw) if step_raw != "" else 1.0
                         value = THZValueCodec.decode_number(
-                            value_bytes, step, entry["decode_type"]
+                            value_bytes, step, entry["decode_type"],
+                            entry.get("signed", True),
                         )
                     elif reg_type == "switch":
                         value = THZValueCodec.decode_switch(value_bytes)

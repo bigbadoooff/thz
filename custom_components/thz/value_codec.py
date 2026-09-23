@@ -265,16 +265,24 @@ class THZValueCodec:
             # than truncate: value / step is often just below the integer
             # (0.3 / 0.1 == 2.9999999999999996).
             value_int = round(value / step)
-            return value_int.to_bytes(length, byteorder="big", signed=True)
+            # Negative values are two's complement; positive ones may use the
+            # full unsigned range (e.g. 240 min in a single byte), as in FHEM.
+            return value_int.to_bytes(
+                length, byteorder="big", signed=value_int < 0
+            )
 
     @staticmethod
-    def decode_number(value_bytes: bytes, step: float, decode_type: str) -> float:
+    def decode_number(
+        value_bytes: bytes, step: float, decode_type: str, signed: bool = True
+    ) -> float:
         """Decode a numeric value from device response.
 
         Args:
             value_bytes: The raw bytes from device.
             step: The step size (for scaling).
             decode_type: The decoding type.
+            signed: Whether the value is two's complement (2xx block
+                parameters carry this as ``entry["signed"]``).
 
         Returns:
             The decoded numeric value.
@@ -290,7 +298,7 @@ class THZValueCodec:
             return float(value_bytes[0])
         else:
             # Standard 2-byte signed integer decoding with scaling
-            value = int.from_bytes(value_bytes, byteorder="big", signed=True)
+            value = int.from_bytes(value_bytes, byteorder="big", signed=signed)
             return value * step
 
     @staticmethod

@@ -91,7 +91,9 @@ async def _read_clock_parts(
             return None
         try:
             parts[name] = int(
-                THZValueCodec.decode_number(value_bytes, 1.0, entry["decode_type"])
+                THZValueCodec.decode_number(
+                    value_bytes, 1.0, entry["decode_type"], entry.get("signed", True)
+                )
             )
         except (ValueError, IndexError):
             return None

@@ -118,7 +118,8 @@ class THZNumber(THZBaseEntity, NumberEntity):
             value = THZValueCodec.decode_number(
                 value_bytes,
                 self._attr_native_step,
-                self._decode_type
+                self._decode_type,
+                self._entry.get("signed", True),
             )
             _LOGGER.debug("Decoded value for %s: %s", self.name, value)
             self._attr_native_value = value
