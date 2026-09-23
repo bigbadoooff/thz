@@ -6,6 +6,7 @@ connections via USB serial or network (ser2net).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
@@ -78,6 +79,53 @@ def _translated_select(labels: dict[str, str], translation_key: str) -> SelectSe
             mode=SelectSelectorMode.DROPDOWN,
         )
     )
+
+
+def entry_unique_id(data: Mapping[str, Any]) -> str:
+    """Return the unique id of the entry for a connection (``ip-<host>``...)."""
+    return f"{data['connection_type']}-{data.get(CONF_HOST) or data.get(CONF_DEVICE)}"
+
+
+def merge_reconfigure_input(
+    data: Mapping[str, Any], user_input: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Merge the reconfigure form into the entry data.
+
+    The form carries one ``read_<block>`` checkbox and ``refresh_<block>``
+    interval per block and one ``write_<group>`` checkbox per write group;
+    they become ``selected_read_blocks``, ``refresh_intervals`` (only for
+    selected blocks) and ``selected_write_groups``. Every other field
+    replaces the entry value of the same name.
+    """
+    updated = dict(data)
+    fields: dict[str, Any] = {}
+    refresh_intervals: dict[str, Any] = {}
+    read_blocks: list[str] = []
+    write_groups: list[str] = []
+    for key, value in user_input.items():
+        if key.startswith("refresh_"):
+            refresh_intervals[key.removeprefix("refresh_")] = value
+        elif key.startswith("read_"):
+            if value:
+                read_blocks.append(key.removeprefix("read_"))
+        elif key.startswith("write_"):
+            if value:
+                write_groups.append(key.removeprefix("write_"))
+        else:
+            fields[key] = value
+
+    if refresh_intervals:
+        updated["refresh_intervals"] = refresh_intervals
+    if "refresh_intervals" in updated:
+        updated["refresh_intervals"] = {
+            block: interval
+            for block, interval in updated["refresh_intervals"].items()
+            if block in read_blocks
+        }
+    updated["selected_read_blocks"] = read_blocks
+    updated["selected_write_groups"] = write_groups
+    updated.update(fields)
+    return updated
 
 
 class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -238,7 +286,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="setup_usb", data_schema=schema)
 
-    async def async_step_reconfigure(  # noqa: C901
+    async def async_step_reconfigure(
         self, user_input: dict | None = None
     ) -> ConfigFlowResult:
         """Handle reconfiguration initiated from the device UI."""
@@ -250,57 +298,17 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="invalid_entry_id")
 
         if user_input is not None:
-            # Merge user input with existing data to preserve required fields
-            updated_data = dict(entry.data)
-
-            # Extract and rebuild refresh_intervals from form inputs
-            refresh_intervals = {}
-            selected_read_blocks = []
-            selected_write_groups = []
-            keys_to_remove = []
-            for key, value in user_input.items():
-                if key.startswith("refresh_"):
-                    block = key.replace("refresh_", "")
-                    refresh_intervals[block] = value
-                    keys_to_remove.append(key)
-                elif key.startswith("read_"):
-                    if value:
-                        selected_read_blocks.append(key.replace("read_", ""))
-                    keys_to_remove.append(key)
-                elif key.startswith("write_"):
-                    if value:
-                        selected_write_groups.append(key.replace("write_", ""))
-                    keys_to_remove.append(key)
-
-            # Remove processed keys from user_input
-            for key in keys_to_remove:
-                user_input.pop(key)
-
-            # Update refresh_intervals if any were modified
-            if refresh_intervals:
-                updated_data["refresh_intervals"] = refresh_intervals
-
-            # Update entity group selections (allow empty selections)
-
-            updated_data["selected_read_blocks"] = selected_read_blocks
-
-            if "refresh_intervals" in updated_data:
-                updated_data["refresh_intervals"] = {
-                    k: v
-                    for k, v in updated_data["refresh_intervals"].items()
-                    if k in selected_read_blocks
-                }
-
-            updated_data["selected_write_groups"] = selected_write_groups
-
-            # Update other fields
-            updated_data.update(user_input)
-
-            # Update config entry with merged values
-            self.hass.config_entries.async_update_entry(entry, data=updated_data)
-            # Reload integration to apply changes
-            await self.hass.config_entries.async_reload(entry.entry_id)
-            return self.async_abort(reason="reconfigured")
+            updated_data = merge_reconfigure_input(entry.data, user_input)
+            unique_id = entry_unique_id(updated_data)
+            if unique_id != entry.unique_id and any(
+                other.unique_id == unique_id
+                for other in self.hass.config_entries.async_entries(DOMAIN)
+                if other.entry_id != entry.entry_id
+            ):
+                return self.async_abort(reason="already_configured")
+            return self.async_update_reload_and_abort(
+                entry, unique_id=unique_id, data=updated_data, reason="reconfigured"
+            )
 
         # Prefill current values
         data = dict(entry.data)

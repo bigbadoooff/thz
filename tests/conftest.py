@@ -316,6 +316,11 @@ button_mock.ButtonEntity = MockButtonEntity
 sys.modules["homeassistant.components.button"] = button_mock
 
 sys.modules["homeassistant.const"] = MagicMock()
+# The CONF_* keys are plain strings in Home Assistant; string operations on
+# them (startswith, formatting) must behave the same here.
+sys.modules["homeassistant.const"].CONF_HOST = "host"
+sys.modules["homeassistant.const"].CONF_PORT = "port"
+sys.modules["homeassistant.const"].CONF_DEVICE = "device"
 sys.modules["serial"] = MagicMock()
 sys.modules["serial.tools"] = MagicMock()
 sys.modules["serial.tools.list_ports"] = MagicMock()

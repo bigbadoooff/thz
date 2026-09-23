@@ -84,6 +84,13 @@ class _FakeConfigFlow(metaclass=_FakeConfigFlowMeta):
         self.unique_id = unique_id
         return None
 
+    def async_update_reload_and_abort(self, entry, *, unique_id, data, reason):
+        self.hass.config_entries.async_update_entry(
+            entry, unique_id=unique_id, data=data
+        )
+        self.hass.config_entries.async_schedule_reload(entry.entry_id)
+        return self.async_abort(reason=reason)
+
     def _abort_if_unique_id_configured(self):
         entries = self.hass.config_entries.async_entries(DOMAIN)
         for entry in entries:
@@ -603,7 +610,36 @@ class TestAsyncStepReconfigure:
         assert kwargs["data"]["alias"] == "Basement THZ"
         # refresh_p01 key itself must not leak into the merged data.
         assert "refresh_p01" not in kwargs["data"]
-        flow.hass.config_entries.async_reload.assert_awaited_once_with("abc123")
+        flow.hass.config_entries.async_schedule_reload.assert_called_once_with("abc123")
+        assert kwargs["unique_id"] == "ip-10.0.0.5"
+
+    @pytest.mark.asyncio
+    async def test_changed_host_updates_the_unique_id(self, flow):
+        flow.context = {"entry_id": "abc123"}
+        entry = MagicMock(entry_id="abc123", unique_id="ip-10.0.0.5")
+        entry.data = {"connection_type": CONNECTION_IP, CONF_HOST: "10.0.0.5"}
+        flow.hass.config_entries.async_get_entry.return_value = entry
+        flow.hass.config_entries.async_entries.return_value = [entry]
+
+        result = await flow.async_step_reconfigure({CONF_HOST: "10.0.0.9"})
+
+        assert result == {"type": "abort", "reason": "reconfigured"}
+        _, kwargs = flow.hass.config_entries.async_update_entry.call_args
+        assert kwargs["unique_id"] == "ip-10.0.0.9"
+
+    @pytest.mark.asyncio
+    async def test_host_of_another_entry_is_refused(self, flow):
+        flow.context = {"entry_id": "abc123"}
+        entry = MagicMock(entry_id="abc123", unique_id="ip-10.0.0.5")
+        entry.data = {"connection_type": CONNECTION_IP, CONF_HOST: "10.0.0.5"}
+        other = MagicMock(entry_id="other", unique_id="ip-10.0.0.9")
+        flow.hass.config_entries.async_get_entry.return_value = entry
+        flow.hass.config_entries.async_entries.return_value = [entry, other]
+
+        result = await flow.async_step_reconfigure({CONF_HOST: "10.0.0.9"})
+
+        assert result == {"type": "abort", "reason": "already_configured"}
+        flow.hass.config_entries.async_update_entry.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_process_user_input_without_refresh_keys(self, flow):
