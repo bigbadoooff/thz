@@ -41,8 +41,6 @@ set_diverter_valve:
   name: Set Diverter Valve
   description: >
     Move the 3-way diverter valve motor toward a position.
-    The motor does NOT auto-stop — you must send position "off" once the valve
-    has reached the target position.
     Both "heating" and "dhw" are guarded by the diverterValve bit in pxxF2:
     movement is only allowed in the direction the heat pump is already pressurising.
     After 3 seconds the motor is automatically stopped on both directions.

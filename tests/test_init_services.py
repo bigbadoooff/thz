@@ -5,7 +5,8 @@ This file covers scan_raw_registers, watch_raw_registers_changes,
 refresh_block, and set_diverter_valve. backup_parameters, restore_parameters,
 and list_parameter_backups are covered by test_backup_restore_services.py.
 """
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -416,3 +417,57 @@ class TestSetDiverterValveService:
         ):
             await handler(call)
 
+
+    @pytest.mark.asyncio
+    async def test_cancel_while_motor_runs_still_stops_both_motors(self):
+        from custom_components.thz import services as services_module
+
+        hass = _mock_hass()
+        device = _mock_device()
+        device.async_execute = AsyncMock(return_value=None)
+        hass.data[DOMAIN]["entry1"] = {
+            "device": device,
+            # diverterValve bit clear -> heating active -> "heating" allowed
+            "coordinators": {"pxxF2": self._coordinator(bytes(12))},
+        }
+
+        await async_setup_services(hass)
+        handler = _handler_for(hass, "set_diverter_valve")
+
+        call = MagicMock()
+        call.data = {"position": "heating"}
+        with patch.object(
+            services_module.asyncio, "sleep",
+            AsyncMock(side_effect=asyncio.CancelledError),
+        ):
+            with pytest.raises(asyncio.CancelledError):
+                await handler(call)
+
+        writes = [c.args[2:] for c in device.async_execute.await_args_list]
+        assert writes[0] == (bytes.fromhex("0A0653"), bytes.fromhex("0001"))
+        assert (bytes.fromhex("0A0653"), bytes.fromhex("0000")) in writes[1:]
+        assert (bytes.fromhex("0A0652"), bytes.fromhex("0000")) in writes[1:]
+
+    @pytest.mark.asyncio
+    async def test_failed_stop_write_still_stops_other_motor(self):
+        hass = _mock_hass()
+        device = _mock_device()
+        calls = []
+
+        async def _execute(_hass, _fn, command, value, *rest):
+            calls.append((command, value))
+            if (command, value) == (bytes.fromhex("0A0653"), bytes.fromhex("0000")):
+                raise ConnectionError("lost")
+
+        device.async_execute = AsyncMock(side_effect=_execute)
+        hass.data[DOMAIN]["entry1"] = {"device": device, "coordinators": {}}
+
+        await async_setup_services(hass)
+        handler = _handler_for(hass, "set_diverter_valve")
+
+        call = MagicMock()
+        call.data = {"position": "off"}
+        with pytest.raises(HomeAssistantError):
+            await handler(call)
+
+        assert (bytes.fromhex("0A0652"), bytes.fromhex("0000")) in calls

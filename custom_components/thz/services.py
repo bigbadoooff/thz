@@ -303,7 +303,8 @@ def _guess_decode_candidates(data: bytes) -> dict[str, int | float | bool | str]
 # ---------------------------------------------------------------------------
 # 3-way diverter valve motor control
 # Commands address the motor controller directly; the heat pump firmware does
-# NOT auto-stop — the caller must send "off" once the valve has moved.
+# NOT auto-stop the motor, so the service always stops it again after 3 s,
+# including when the call fails or is cancelled.
 # ---------------------------------------------------------------------------
 _VALVE_MOTOR_HEATING  = bytes.fromhex("0A0653")  # motor direction: heating circuit
 _VALVE_MOTOR_DHW      = bytes.fromhex("0A0652")  # motor direction: DHW (warm water)
@@ -810,6 +811,22 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
             return True
 
+        async def _emergency_stop() -> None:
+            """Best-effort stop of both motors; one failing never skips the other."""
+            for motor in (_VALVE_MOTOR_HEATING, _VALVE_MOTOR_DHW):
+                try:
+                    await device.async_execute(
+                        hass, device.write_value, motor, _VALVE_MOTOR_OFF
+                    )
+                except (RuntimeError, ConnectionError, OSError) as err:
+                    _LOGGER.error(
+                        "Could not stop diverter valve motor %s: %s",
+                        motor.hex(), err,
+                    )
+
+        # Set before the ON write: a write whose acknowledgement failed may
+        # still have started the motor.
+        motor_may_run = position in ("heating", "dhw")
         try:
             # Send the motor ON command
             if position == "heating":
@@ -822,13 +839,20 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 )
 
             # Auto-stop after 3s (lock released during wait so coordinators can poll)
-            if position in ("heating", "dhw"):
+            if motor_may_run:
                 await asyncio.sleep(3)
 
             # Stop and verify — runs for explicit "off" too
             confirmed = await _stop_and_verify()
 
+        except asyncio.CancelledError:
+            # The motor does not stop by itself: finish stopping it even if
+            # this service call is cancelled (HA shutdown, script stopped).
+            if motor_may_run:
+                await asyncio.shield(_emergency_stop())
+            raise
         except (RuntimeError, ConnectionError, OSError) as err:
+            await _emergency_stop()
             error_msg = f"Error sending diverter valve command: {err}"
             _LOGGER.exception(error_msg)
             raise HomeAssistantError(error_msg) from err
