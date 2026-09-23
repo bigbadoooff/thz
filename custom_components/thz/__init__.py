@@ -172,6 +172,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     # Create a coordinator for each block with its own interval
     unsupported_blocks: set[str] = set()
+    failed_blocks: list[str] = []
     for block, interval in refresh_intervals.items():
         _LOGGER.debug(
             "Creating coordinator for block %s with interval %s seconds",
@@ -188,18 +189,18 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             update_interval=timedelta(seconds=int(interval) + jitter),
             update_method=_make_update_method(block),
         )
+        coordinators[block] = coordinator
         try:
             await coordinator.async_config_entry_first_refresh()
         except ConfigEntryNotReady as exc:
-            # A block-level failure (unsupported register, transient decode error,
-            # etc.) should not abort the entire config entry setup — the device
-            # connection was already verified above.  Mark the block as unsupported
-            # so no entities are created for it; do not add it to coordinators so
-            # it is not polled again.
-            unsupported_blocks.add(block)
+            # A communication error (timeout, busy, CRC, ...) is transient:
+            # keep the coordinator so its entities are created and recover
+            # on the next successful poll. Registers the firmware genuinely
+            # lacks are reported as data=None below instead.
+            failed_blocks.append(block)
             _LOGGER.warning(
-                "Block %s could not be read at startup (%s); "
-                "no entities will be created for it.",
+                "Block %s could not be read at startup (%s); its entities "
+                "stay unavailable until the next successful poll.",
                 block, exc,
             )
             continue
@@ -214,7 +215,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             _LOGGER.info(
                 "Initial data fetch completed for block %s", block
             )
-        coordinators[block] = coordinator
+
+    if coordinators and len(failed_blocks) == len(coordinators):
+        # Not a single block answered: the device is not really reachable,
+        # so let Home Assistant retry the whole entry instead of setting up
+        # an integration without any data.
+        await hass.async_add_executor_job(device.close)
+        raise ConfigEntryNotReady(
+            "No register block could be read from the THZ device; will retry"
+        )
 
     # Store per-entry runtime state on the config entry itself (not hass.data),
     # per HA's recommended runtime-data pattern.

@@ -197,24 +197,47 @@ class TestAsyncSetupEntry:
         assert stored["coordinators"] == {}
 
     @pytest.mark.asyncio
-    async def test_block_config_entry_not_ready_marks_unsupported(self):
+    async def test_transient_block_failure_keeps_coordinator(self):
+        # A read error at startup is not "unsupported": the block keeps its
+        # coordinator (and entities) and recovers on the next poll.
         hass = _mock_hass()
-        entry = _mock_config_entry(refresh_intervals={"pxxFB": 300})
+        entry = _mock_config_entry(refresh_intervals={"pxxFB": 300, "pxxF2": 300})
         device = _fake_device()
 
-        failing_coordinator = _fake_coordinator()
+        failing_coordinator = _fake_coordinator(data=None)
         failing_coordinator.async_config_entry_first_refresh = AsyncMock(
             side_effect=thz_module.ConfigEntryNotReady("block failed")
         )
+        coordinators = iter([failing_coordinator, _fake_coordinator()])
 
         with _patched_setup(
-            device=device, coordinator_factory=lambda *a, **kw: failing_coordinator
+            device=device, coordinator_factory=lambda *a, **kw: next(coordinators)
         ):
             await thz_module.async_setup_entry(hass, entry)
 
         stored = entry.runtime_data
-        assert "pxxFB" in stored["unsupported_blocks"]
-        assert "pxxFB" not in stored["coordinators"]
+        assert stored["coordinators"]["pxxFB"] is failing_coordinator
+        assert "pxxFB" not in stored["unsupported_blocks"]
+
+    @pytest.mark.asyncio
+    async def test_all_blocks_failing_retries_whole_entry(self):
+        hass = _mock_hass()
+        entry = _mock_config_entry(refresh_intervals={"pxxFB": 300, "pxxF2": 300})
+        device = _fake_device()
+
+        def _failing(*a, **kw):
+            coordinator = _fake_coordinator(data=None)
+            coordinator.async_config_entry_first_refresh = AsyncMock(
+                side_effect=thz_module.ConfigEntryNotReady("timeout")
+            )
+            return coordinator
+
+        with _patched_setup(device=device, coordinator_factory=_failing):
+            with pytest.raises(thz_module.ConfigEntryNotReady):
+                await thz_module.async_setup_entry(hass, entry)
+
+        hass.async_add_executor_job.assert_any_await(device.close)
+        hass.config_entries.async_forward_entry_setups.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_block_with_none_data_marked_unsupported(self):
