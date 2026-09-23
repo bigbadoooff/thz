@@ -41,9 +41,7 @@ rules:
   reauthentication-flow:
     status: exempt
     comment: The device has no authentication.
-  test-coverage:
-    status: todo
-    comment: CI enforces 85 %; silver asks for 95 %.
+  test-coverage: done
 
   # Gold
   devices: done

@@ -39,8 +39,8 @@ ignore = [
 # Test method/class names are self-documenting; docstrings add no value there.
 # Mutable class attributes on test doubles and nested patch() blocks are fine
 # in tests.
-"tests/*.py" = ["D100", "D101", "D102", "D103", "D104", "D107", "RUF012", "SIM117"]
-"tests_ha/*.py" = ["D100", "D101", "D102", "D103", "D104", "D107"]
+"tests/**/*.py" = ["D100", "D101", "D102", "D103", "D104", "D107", "RUF012", "SIM117"]
+"tests_ha/**/*.py" = ["D100", "D101", "D102", "D103", "D104", "D107"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 12
