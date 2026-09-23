@@ -1,26 +1,34 @@
 #!/usr/bin/perl
-# Reference harness: runs FHEM's own THZ_Set from docs/legacy/00_THZ.pm
-# against a simulated heat pump and prints the SET telegrams it sends, plus
-# FHEM's THZ_Parse1 decoding of the initial blocks.
+# Protocol reference harness: runs FHEM's own THZ_Set / THZ_Parse1 from
+# docs/legacy/00_THZ.pm against a simulated heat pump.
 #
-# Only FHEM's runtime (logging, readings, serial I/O) is stubbed; the
-# telegram encoding, parsing tables and read-modify-write logic are the
-# unmodified module code. Delays (select(undef, undef, undef, x)) are
-# removed so the run is fast.
+# Only the *protocol* is taken from FHEM: telegram framing, checksum,
+# escaping, the read-modify-write of 2.x blocks, and how each value type is
+# encoded and decoded. The parameter definitions (block, position, length,
+# type, factor, limits) are passed in from the integration's own register
+# maps, which are more current than the tables in the FHEM module; FHEM's
+# built-in tables are only used for the value types themselves.
+#
+# FHEM's runtime (logging, readings, serial I/O) is stubbed and delays
+# (select(undef, undef, undef, x)) are removed so the run is fast.
 #
 # Input (JSON on stdin):
 #   {"module": path, "firmware": "2.06",
+#    "sets": {name: {parent|cmd2, argMin, argMax, type}},   added to %sets
+#    "gets": {name: {cmd2, type}},                          added to %gets
+#    "parsing": {type: [[title, pos, len, type, factor], ...]},
 #    "blocks": {"17": "<hex data after the address byte>", ...},
-#    "cases": [["p01RoomTempDay", "21"], ...]}
+#    "cases": [["p01RoomTempDay", "21"], ...],
+#    "parse": {"17": "<parsing type to decode block 17 with>", ...}}
 # Output (JSON on stdout):
 #   {"sets": {"<param> <value>": {"telegrams": [hex, ...]} | {"error": msg}},
-#    "parsed": {"<block>": "<THZ_Parse1 output for the initial block>"}}
+#    "parsed": {"<block>": "<THZ_Parse1 output>"}}
 use strict;
 use warnings;
 use JSON::PP;
 
 BEGIN {
-    # FHEM helper modules the THZ module "use"s; not needed for THZ_Set.
+    # FHEM helper modules the THZ module "use"s; not needed here.
     $INC{"$_.pm"} = 1 for qw(SetExtensions Blocking DevIo);
 }
 
@@ -44,13 +52,35 @@ my $src = do {
     local $/; <$fh>;
 };
 $src =~ s/select\(undef,\s*undef,\s*undef,\s*[^)]*\)/1/g;
+# Appended to the module source so they can reach its file-scoped (my)
+# %sets / %gets / %parsinghash tables.
+$src .= <<'OVERRIDES';
+
+sub THZ_TestOverride {
+    my ($sets, $gets, $parsing) = @_;
+    %parsinghash = (%parsinghash, %$parsing);
+    %sets = (%sets, %$sets);
+    %gets = (%gets, %$gets, %$sets);
+}
+
+sub THZ_TestParse {
+    my ($hash, $message, $type) = @_;
+    my %saved = %gets;
+    %gets = (test_block => { cmd2 => substr($message, 2, 2), type => $type });
+    my $parsed = THZ_Parse1($hash, $message);
+    %gets = %saved;
+    return $parsed;
+}
+1;
+OVERRIDES
 {
     local $SIG{__WARN__} = sub { };
     eval $src;
     die "loading THZ module failed: $@" if $@;
 }
 
-my %blocks = map { uc($_) => uc($input->{blocks}{$_}) } keys %{ $input->{blocks} };
+my %blocks = map { uc($_) => uc($input->{blocks}{$_}) }
+    keys %{ $input->{blocks} || {} };
 my @sent;
 
 sub unescape_hex {
@@ -84,9 +114,12 @@ my $hash = { NAME => $name, STATE => "opened", DeviceName => "none" };
 $defs{$name} = $hash;
 $attr{$name}{firmware} = $input->{firmware};
 THZ_Attr("set", $name, "firmware", $input->{firmware});
+THZ_TestOverride(
+    $input->{sets} || {}, $input->{gets} || {}, $input->{parsing} || {}
+);
 
 my %result;
-for my $case (@{ $input->{cases} }) {
+for my $case (@{ $input->{cases} || [] }) {
     my ($param, $value) = @$case;
     @sent = ();
     my $ret = eval { THZ_Set($hash, $name, $param, $value) };
@@ -99,10 +132,11 @@ for my $case (@{ $input->{cases} }) {
         $result{$key} = { telegrams => [@sent] };
     }
 }
+
 my %parsed;
-for my $addr (keys %blocks) {
-    my $data = $addr . $blocks{$addr};
+for my $addr (keys %{ $input->{parse} || {} }) {
+    my $data = uc($addr) . $blocks{uc($addr)};
     my $crc = THZ_checksum("0100XX" . $data . "1003");
-    $parsed{$addr} = THZ_Parse1($hash, $crc . $data);
+    $parsed{$addr} = THZ_TestParse($hash, $crc . $data, $input->{parse}{$addr});
 }
 print encode_json({ sets => \%result, parsed => \%parsed });

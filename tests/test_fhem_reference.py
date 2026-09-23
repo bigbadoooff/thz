@@ -1,27 +1,30 @@
-"""Differential test against FHEM's own 00_THZ.pm for 2xx parameter writes.
+"""Protocol test against FHEM's own 00_THZ.pm.
 
-FHEM's THZ module is known to work on real 2.06/2.14 heat pumps. This test
-runs its unmodified THZ_Set (via tests/fhem_reference/thz_set.pl, which only
-stubs FHEM's runtime and the serial line) and our write path against the same
-simulated register blocks, and requires byte-identical SET telegrams for every
-2xx block parameter at its minimum, maximum and a middle value.
+FHEM's THZ module is known to work on real heat pumps, so its telegram
+handling is the protocol reference: framing, checksum, escaping, the
+read-modify-write of 2.x blocks, and how each value type (hex/hex2int,
+bit, 0clean, 4temp, 5temp, 9holy, 7prog, ...) is encoded and decoded.
 
-That covers the telegram framing, checksum and escaping as well as our
-register offsets, lengths, scaling and bit positions, which are checked
-against FHEM's parsing tables rather than against our own assumptions. The
-read direction is checked the same way: every parameter value we decode from
-the blocks must equal FHEM's THZ_Parse1 reading.
+The register maps, however, are this integration's own and more current than
+the tables in the FHEM module. The Perl harness (tests/fhem_reference/
+thz_set.pl) therefore hands FHEM *our* parameter definitions -- block,
+position, length, type, factor and limits -- and only FHEM's protocol code
+turns them into telegrams. Our code and FHEM then write the same values into
+the same simulated registers and must produce byte-identical SET telegrams;
+for 2.x blocks the values we decode must also equal FHEM's decoding.
 """
+from datetime import time as dt_time
 import json
 from pathlib import Path
 import random
 import re
 import shutil
 import subprocess
-
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
+
+from custom_components.thz.number import THZNumber
 from custom_components.thz.parameter_io import (
     async_read_parameter,
     async_write_parameter,
@@ -31,7 +34,11 @@ from custom_components.thz.parameter_io import (
 from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManagerWrite,
 )
+from custom_components.thz.select import THZSelect
+from custom_components.thz.switch import THZSwitch
+from custom_components.thz.time import _create_time_entities
 from custom_components.thz.value_codec import THZValueCodec
+from custom_components.thz.value_maps import SELECT_MAP
 from tests.test_parameter_io import Simulated2xxDevice
 
 _REPO = Path(__file__).resolve().parent.parent
@@ -42,16 +49,34 @@ pytestmark = pytest.mark.skipif(
     shutil.which("perl") is None, reason="perl is required for the FHEM reference"
 )
 
-# Our firmware profile -> FHEM "firmware" attribute
-_FIRMWARES = {"206": "2.06", "214": "2.14", "214j": "2.14j"}
+
+def _fhem(firmware: str, **request) -> dict:
+    request.update(module=str(_MODULE), firmware=firmware)
+    result = subprocess.run(
+        ["perl", str(_HARNESS)],
+        input=json.dumps(request),
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=60,
+    )
+    return json.loads(result.stdout)
 
 
-def _block_data(addr: str) -> str:
-    """Deterministic block contents that include bytes needing escaping."""
-    rng = random.Random(addr)
-    data = bytearray(rng.randrange(256) for _ in range(48))
-    data[5], data[11], data[20] = 0x10, 0x2B, 0x10
-    return data.hex().upper()
+def _number_arg(value: float) -> str:
+    return f"{value:g}"
+
+
+def _number_values(entry: dict) -> list[float]:
+    low, high = float(entry["min"]), float(entry["max"])
+    return sorted({low, float(round((low + high) / 2)), high})
+
+
+# ---------------------------------------------------------------------------
+# 2.x: parameters live inside register blocks (read-modify-write).
+# ---------------------------------------------------------------------------
+
+_BLOCK_FIRMWARES = {"206": "2.06", "214": "2.14", "214j": "2.14j"}
 
 
 def _block_entries(firmware: str) -> dict:
@@ -64,41 +89,62 @@ def _block_entries(firmware: str) -> dict:
     }
 
 
-def _initial_blocks(entries: dict) -> dict:
-    return {e["command"]: _block_data(e["command"]) for e in entries.values()}
+def _block_data(addr: str) -> str:
+    """Deterministic block contents that include bytes needing escaping."""
+    rng = random.Random(addr)
+    data = bytearray(rng.randrange(256) for _ in range(48))
+    data[5], data[11], data[20] = 0x10, 0x2B, 0x10
+    return data.hex().upper()
 
 
-def _cases(entries: dict) -> list[tuple[str, str]]:
+def _fhem_rule(name: str, entry: dict) -> list:
+    """Our register-map entry as an FHEM parsing rule (nibble positions)."""
+    offset = int(entry["offset"])
+    if "bit" in entry:
+        bit = int(entry["bit"])
+        nibble = offset * 2 + (0 if bit >= 4 else 1)
+        return [f" {name}: ", nibble, 1, f"bit{bit % 4}", 1]
+    factor = round(1 / float(entry["step"]), 9)
+    decode = "hex2int" if entry.get("signed", True) else "hex"
+    return [f" {name}: ", offset * 2, int(entry["length"]) * 2, decode, factor]
+
+
+def _block_definitions(entries: dict) -> dict:
+    """FHEM sets/gets/parsing tables built from our register maps.
+
+    Every parameter gets its own one-rule parsing type, because FHEM picks
+    the rule by a regex match on the name; each block also gets a type with
+    all its parameters for decoding.
+    """
+    sets, gets, parsing, per_block = {}, {}, {}, {}
+    for name, entry in entries.items():
+        rule = _fhem_rule(name, entry)
+        parsing[f"test_{name}"] = [rule]
+        gets[f"test_parent_{name}"] = {
+            "cmd2": entry["command"].upper(),
+            "type": f"test_{name}",
+        }
+        sets[name] = {
+            "parent": f"test_parent_{name}",
+            "argMin": entry["min"],
+            "argMax": entry["max"],
+            "type": "pclean",
+        }
+        per_block.setdefault(entry["command"].upper(), []).append(rule)
+    for addr, rules in per_block.items():
+        parsing[f"test_block_{addr}"] = rules
+    return {"sets": sets, "gets": gets, "parsing": parsing}
+
+
+def _block_cases(entries: dict) -> list[tuple[str, str]]:
     cases = []
     for name, entry in entries.items():
-        if "bit" in entry:
-            values = [0, 1]
-        else:
-            low, high = int(float(entry["min"])), int(float(entry["max"]))
-            values = sorted({low, (low + high) // 2, high})
-        cases.extend((name, str(value)) for value in values)
+        values = [0.0, 1.0] if "bit" in entry else _number_values(entry)
+        cases.extend((name, _number_arg(value)) for value in values)
     return cases
 
 
-def _fhem_reference(firmware: str, blocks: dict, cases: list) -> dict:
-    request = {
-        "module": str(_MODULE),
-        "firmware": firmware,
-        "blocks": blocks,
-        "cases": cases,
-    }
-    result = subprocess.run(
-        ["perl", str(_HARNESS)],
-        input=json.dumps(request),
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=60,
-    )
-    return json.loads(result.stdout)
-
-
-async def _our_telegram(entry: dict, value: str, blocks: dict) -> str:
+async def _our_block_telegram(entry: dict, value: str, blocks: dict) -> str:
     device = Simulated2xxDevice(
         {bytes.fromhex(addr): bytes.fromhex(data) for addr, data in blocks.items()}
     )
@@ -115,30 +161,40 @@ async def _our_telegram(entry: dict, value: str, blocks: dict) -> str:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("firmware", sorted(_FIRMWARES))
+@pytest.mark.parametrize("firmware", sorted(_BLOCK_FIRMWARES))
 async def test_block_writes_match_fhem(firmware):
     entries = _block_entries(firmware)
     assert entries, f"no 2xx block parameters for {firmware}"
-    blocks = _initial_blocks(entries)
-    cases = _cases(entries)
+    blocks = {e["command"]: _block_data(e["command"]) for e in entries.values()}
+    cases = _block_cases(entries)
 
-    reference = _fhem_reference(_FIRMWARES[firmware], blocks, cases)["sets"]
+    reference = _fhem(
+        _BLOCK_FIRMWARES[firmware],
+        blocks=blocks,
+        cases=cases,
+        **_block_definitions(entries),
+    )["sets"]
 
     mismatches = []
     for name, value in cases:
         fhem = reference[f"{name} {value}"]
-        ours = await _our_telegram(entries[name], value, blocks)
+        ours = await _our_block_telegram(entries[name], value, blocks)
         if fhem.get("telegrams") != [ours]:
             mismatches.append(f"{name}={value}: fhem={fhem} ours={ours}")
     assert not mismatches, "\n".join(mismatches)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("firmware", sorted(_FIRMWARES))
+@pytest.mark.parametrize("firmware", sorted(_BLOCK_FIRMWARES))
 async def test_block_reads_match_fhem(firmware):
     entries = _block_entries(firmware)
-    blocks = _initial_blocks(entries)
-    parsed = _fhem_reference(_FIRMWARES[firmware], blocks, [])["parsed"]
+    blocks = {e["command"]: _block_data(e["command"]) for e in entries.values()}
+    parsed = _fhem(
+        _BLOCK_FIRMWARES[firmware],
+        blocks=blocks,
+        parse={addr.upper(): f"test_block_{addr.upper()}" for addr in blocks},
+        **_block_definitions(entries),
+    )["parsed"]
     fhem_values = {
         (addr, name): value
         for addr, text in parsed.items()
@@ -150,10 +206,7 @@ async def test_block_reads_match_fhem(firmware):
     )
     mismatches = []
     for name, entry in entries.items():
-        fhem = fhem_values.get((entry["command"].upper(), name))
-        if fhem is None:
-            mismatches.append(f"{name}: not in FHEM's {entry['command']} reading")
-            continue
+        fhem = fhem_values[(entry["command"].upper(), name)]
         raw = await async_read_parameter(None, device, entry)
         ours = THZValueCodec.decode_number(
             raw, float(entry["step"]), entry["decode_type"], entry.get("signed", True)
@@ -169,20 +222,12 @@ async def test_block_reads_match_fhem(firmware):
 
 _DIRECT_FIRMWARES = {"439": "4.39", "539": "5.39"}
 
-# Deliberate differences from FHEM, each needing a decision rather than a
-# silent fix. Anything not listed here must match FHEM exactly.
-_KNOWN_DIFFERENCES = {
-    # Not defined in FHEM at all (added from other sources).
-    "p20FlowProportionHC2": "not in FHEM",
-    "pSolarHysteresis": "not in FHEM",
-    "pDHWVaporizationDelay": "not in FHEM",
-    "p99CoolingHC1AreaFan": "not in FHEM",
-    # FHEM caps the DHW day/night setpoints at 55 degC; the map allows 65.
-    "p04DHWsetDayTemp=65": "FHEM max 55",
-    "p05DHWsetNightTemp=65": "FHEM max 55",
-    # FHEM allows 0..2 on 4.39 (0..4 only on 5.39); the select offers 0..4.
-    "439:p75passiveCooling=3": "FHEM 4.39 max 2",
-    "439:p75passiveCooling=4": "FHEM 4.39 max 2",
+# Value types FHEM's protocol code knows how to encode (%parsinghash).
+# Selects and switches without one of these types are plain 2-byte
+# integers, i.e. FHEM's "1clean".
+_FHEM_VALUE_TYPES = {
+    "0clean", "1clean", "2opmode", "4temp", "5temp", "6gradient",
+    "7prog", "8party", "9holy",
 }
 
 
@@ -205,29 +250,59 @@ class SimulatedDirectDevice(Simulated2xxDevice):
         return self.escape(b"\x01\x00" + crc + data) + b"\x10\x03"
 
 
+def _direct_entries(firmware: str) -> dict:
+    """Writable 4.x/5.x entries whose value FHEM can encode on its own.
+
+    "8party" is left out: FHEM writes party start and end in one call,
+    while the integration exposes only the start as a time entity.
+    """
+    registers = RegisterMapManagerWrite(firmware).get_all_registers()
+    entries = {}
+    for name, entry in registers.items():
+        kind, decode = entry.get("type"), entry.get("decode_type")
+        if kind in ("number", "switch", "select", "schedule") or (
+            kind == "time" and decode == "9holy"
+        ):
+            entries[name] = entry
+    return entries
+
+
+def _direct_definitions(entries: dict) -> dict:
+    sets = {}
+    for name, entry in entries.items():
+        decode = entry.get("decode_type")
+        if decode not in _FHEM_VALUE_TYPES:
+            assert entry["type"] in ("select", "switch"), (name, decode)
+            decode = "1clean"
+        sets[name] = {
+            "cmd2": entry["command"].upper(),
+            "argMin": entry.get("min") or "-32768",
+            "argMax": entry.get("max") or "32767",
+            "type": decode,
+        }
+    return {"sets": sets}
+
+
 def _direct_cases(entries: dict) -> list[tuple[str, str, object]]:
     """(name, FHEM argument, our value) triples for every writable entry."""
-    from datetime import time as dt_time
-
-    from custom_components.thz.value_maps import SELECT_MAP
-
     cases: list[tuple[str, str, object]] = []
     for name, entry in entries.items():
         kind, decode = entry["type"], entry.get("decode_type")
         if kind == "number":
-            low, high = float(entry["min"]), float(entry["max"])
-            for value in sorted({low, float(round((low + high) / 2)), high}):
-                arg = f"{value:g}"
-                cases.append((name, arg, value))
+            for value in _number_values(entry):
+                cases.append((name, _number_arg(value), value))
         elif kind == "switch":
             cases += [(name, "0", False), (name, "1", True)]
         elif kind == "select":
+            offered = THZSelect(name, entry, MagicMock(), "dev")._attr_options
             for key, option in SELECT_MAP[decode].items():
+                if option not in offered:
+                    continue
                 fhem_arg = option if decode == "2opmode" else str(int(key))
                 cases.append((name, fhem_arg, option))
-        elif kind == "time" and decode == "9holy":
+        elif kind == "time":
             cases.append((name, "07:30", dt_time(7, 30)))
-        elif kind == "schedule":
+        else:  # schedule
             cases.append(
                 (name, "06:15--22:00", (dt_time(6, 15), dt_time(22, 0)))
             )
@@ -235,11 +310,6 @@ def _direct_cases(entries: dict) -> list[tuple[str, str, object]]:
 
 
 async def _our_direct_telegram(name: str, entry: dict, value) -> str:
-    from custom_components.thz.number import THZNumber
-    from custom_components.thz.select import THZSelect
-    from custom_components.thz.switch import THZSwitch
-    from custom_components.thz.time import _create_time_entities
-
     device = SimulatedDirectDevice()
 
     def _prepare(entity):
@@ -273,21 +343,16 @@ async def _our_direct_telegram(name: str, entry: dict, value) -> str:
 @pytest.mark.asyncio
 @pytest.mark.parametrize("firmware", sorted(_DIRECT_FIRMWARES))
 async def test_direct_writes_match_fhem(firmware):
-    entries = {
-        name: entry
-        for name, entry in RegisterMapManagerWrite(firmware).get_all_registers().items()
-        if entry.get("type") in ("number", "switch", "select", "time", "schedule")
-    }
+    entries = _direct_entries(firmware)
     cases = _direct_cases(entries)
-    reference = _fhem_reference(
-        _DIRECT_FIRMWARES[firmware], {}, [(n, arg) for n, arg, _ in cases]
+    reference = _fhem(
+        _DIRECT_FIRMWARES[firmware],
+        cases=[(name, arg) for name, arg, _ in cases],
+        **_direct_definitions(entries),
     )["sets"]
 
     mismatches = []
     for name, fhem_arg, value in cases:
-        keys = (name, f"{name}={fhem_arg}", f"{firmware}:{name}={fhem_arg}")
-        if any(key in _KNOWN_DIFFERENCES for key in keys):
-            continue
         fhem = reference[f"{name} {fhem_arg}"]
         ours = await _our_direct_telegram(name, entries[name], value)
         # Mo-So / Mo-Fr programs make FHEM fan out to the single days too;

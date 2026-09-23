@@ -42,14 +42,14 @@ mypy
     from write-map entry to bytes on the wire.
   - `test_thz_device_coverage.py::TestFrameComplete` covers frame termination
     including escaped `0x10` bytes split across read chunks.
-- `test_fhem_reference.py` runs FHEM's unmodified `docs/legacy/00_THZ.pm`
-  (through the Perl harness in `fhem_reference/`, which only stubs FHEM's
-  runtime and the serial line) against the same simulated 2xx blocks as our
-  code and requires identical SET telegrams and decoded values for every 2xx
-  parameter, and identical SET telegrams for the 4.39/5.39 number, switch,
-  select, holiday-time and schedule entities. FHEM is the reference known to
-  work on real devices; deliberate differences are listed in
-  `_KNOWN_DIFFERENCES`. The test is skipped when `perl` is not installed.
+- `test_fhem_reference.py` checks the protocol against FHEM's unmodified
+  `docs/legacy/00_THZ.pm`, which is known to work on real devices. The Perl
+  harness in `fhem_reference/` stubs only FHEM's runtime and the serial line,
+  and hands FHEM *our* parameter definitions (the register maps here are more
+  current than FHEM's tables), so only the protocol is compared: telegram
+  framing, checksum, escaping, 2.x read-modify-write and the encoding of each
+  value type. Our code and FHEM must produce identical SET telegrams (and, for
+  2.x blocks, identical decoded values). Skipped when `perl` is not installed.
 - `test_async_execute.py` runs `THZDevice.async_execute` against a real thread
   pool to cover timeouts, cancellation and lock hand-over.
 - Codec changes should keep the round-trip tests in
