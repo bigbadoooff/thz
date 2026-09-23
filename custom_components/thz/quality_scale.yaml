@@ -1,0 +1,94 @@
+rules:
+  # Bronze
+  action-setup:
+    status: todo
+    comment: Services are registered in async_setup_entry, not async_setup.
+  appropriate-polling: done
+  brands: done
+  common-modules: done
+  config-flow-test-coverage:
+    status: todo
+    comment: >
+      Covered with stubbed Home Assistant in tests/; tests_ha/ covers only the
+      IP flow so far.
+  config-flow: done
+  dependency-transparency: done
+  docs-actions: done
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions: done
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable:
+    status: todo
+    comment: >
+      Coordinator entities are covered by the coordinator; directly polled
+      entities log going unavailable but not coming back.
+  parallel-updates: done
+  reauthentication-flow:
+    status: exempt
+    comment: The device has no authentication.
+  test-coverage:
+    status: todo
+    comment: CI enforces 85 %; silver asks for 95 %.
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery-update-info:
+    status: exempt
+    comment: Serial and ser2net connections cannot be discovered.
+  discovery:
+    status: exempt
+    comment: Serial and ser2net connections cannot be discovered.
+  docs-data-update: todo
+  docs-examples: todo
+  docs-known-limitations: todo
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: todo
+  dynamic-devices:
+    status: exempt
+    comment: A config entry is exactly one heat pump.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default: done
+  entity-translations: done
+  exception-translations:
+    status: todo
+    comment: Service errors are raised with English messages.
+  icon-translations: done
+  reconfiguration-flow: done
+  repair-issues:
+    status: todo
+    comment: Persistent notifications are used where a repair issue would fit.
+  stale-devices:
+    status: exempt
+    comment: A config entry is exactly one heat pump.
+
+  # Platinum
+  async-dependency:
+    status: todo
+    comment: pyserial is blocking and runs in the executor.
+  inject-websession:
+    status: exempt
+    comment: No HTTP communication.
+  strict-typing:
+    status: todo
+    comment: >
+      Strict only for parameter_io, value_codec and register_map_manager (see
+      pyproject.toml).
