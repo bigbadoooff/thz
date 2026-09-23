@@ -311,12 +311,34 @@ _VALVE_MOTOR_DHW      = bytes.fromhex("0A0652")  # motor direction: DHW (warm wa
 _VALVE_MOTOR_ON       = bytes.fromhex("0001")     # engage motor
 _VALVE_MOTOR_OFF      = bytes.fromhex("0000")     # stop motor
 
-# Safety source: diverterValve bit in pxxF2 block (nibble 23 → byte 11, bit 2).
-# Bit = 1 means the heat pump has switched flow to DHW → physically safe to move
-# the valve toward DHW.  Bit = 0 means heating circuit is active → refuse.
+# Safety source: diverterValve bit in the pxxF2 block, located through the
+# register map (see _diverter_bit_position). Bit = 1 means the heat pump has
+# switched flow to DHW → physically safe to move the valve toward DHW.
+# Bit = 0 means heating circuit is active → refuse.
 _DIVERTER_BLOCK = "pxxF2"
-_DIVERTER_BYTE  = 11   # nibble 23 // 2
-_DIVERTER_BIT   = 2    # from decode_type "bit2"
+_DIVERTER_FIELD = "diverterValve"
+# Position used when no register map is available (nibble 23, "bit2").
+_DIVERTER_DEFAULT_POSITION = (11, 2)
+
+
+def _diverter_bit_position(register_manager) -> tuple[int, int] | None:
+    """Return (byte, bit) of the diverterValve flag in the pxxF2 block.
+
+    Taken from the running firmware's register map, with the same nibble
+    convention as the binary sensors: an even nibble offset is the byte's
+    high nibble, so its bit numbers are shifted up by four.
+    """
+    if register_manager is None:
+        return _DIVERTER_DEFAULT_POSITION
+    for entry in register_manager.get_registers_for_block(_DIVERTER_BLOCK):
+        if entry[0].strip().rstrip(":").strip() != _DIVERTER_FIELD:
+            continue
+        decode = entry[3]
+        if not (decode.startswith("bit") and decode[3:].isdigit()):
+            return None
+        nibble, bit = entry[1], int(decode[3:])
+        return nibble // 2, bit + 4 if nibble % 2 == 0 else bit
+    return None
 
 
 def _normalize_block_name(block: str) -> str:
@@ -757,12 +779,19 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     f"Cannot verify valve state: {_DIVERTER_BLOCK} coordinator "
                     "data not available"
                 )
+            flag = _diverter_bit_position(entry_data.get("register_manager"))
+            if flag is None:
+                raise HomeAssistantError(
+                    f"Cannot verify valve state: no {_DIVERTER_FIELD} flag in "
+                    f"the {_DIVERTER_BLOCK} register map of this firmware"
+                )
+            diverter_byte, diverter_bit = flag
             data: bytes = coordinator.data
-            if len(data) <= _DIVERTER_BYTE:
+            if len(data) <= diverter_byte:
                 raise HomeAssistantError(
                     f"Insufficient data from {_DIVERTER_BLOCK} block"
                 )
-            diverter_active = bool((data[_DIVERTER_BYTE] >> _DIVERTER_BIT) & 0x01)
+            diverter_active = bool((data[diverter_byte] >> diverter_bit) & 0x01)
             if position == "dhw" and not diverter_active:
                 raise HomeAssistantError(
                     "Heat pump is not in DHW mode (diverterValve bit = 0 in "

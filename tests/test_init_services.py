@@ -471,3 +471,32 @@ class TestSetDiverterValveService:
             await handler(call)
 
         assert (bytes.fromhex("0A0652"), bytes.fromhex("0000")) in calls
+
+
+class TestDiverterBitPosition:
+    """The diverterValve flag is located through the firmware's register map."""
+
+    def test_every_firmware_map_has_the_flag(self):
+        from custom_components.thz.register_maps.register_map_manager import (
+            RegisterMapManager,
+        )
+        from custom_components.thz.services import _diverter_bit_position
+
+        for firmware in ("206", "214", "419", "439", "509", "539", "709"):
+            assert _diverter_bit_position(RegisterMapManager(firmware)) == (11, 2)
+
+    def test_even_nibble_is_the_high_nibble(self):
+        from custom_components.thz.services import _diverter_bit_position
+
+        manager = MagicMock()
+        manager.get_registers_for_block.return_value = [
+            ("diverterValve:", 22, 1, "bit1", 1)
+        ]
+        assert _diverter_bit_position(manager) == (11, 5)
+
+    def test_missing_flag_is_reported(self):
+        from custom_components.thz.services import _diverter_bit_position
+
+        manager = MagicMock()
+        manager.get_registers_for_block.return_value = []
+        assert _diverter_bit_position(manager) is None
