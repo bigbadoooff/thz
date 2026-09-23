@@ -172,6 +172,20 @@ class TestAsyncSetupEntry:
                 await thz_module.async_setup_entry(hass, entry)
 
     @pytest.mark.asyncio
+    async def test_missing_register_maps_close_device_and_retry(self):
+        hass = _mock_hass()
+        entry = _mock_config_entry()
+        device = _fake_device()
+        device.write_register_map_manager = None
+
+        with _patched_setup(device=device):
+            with pytest.raises(thz_module.ConfigEntryNotReady):
+                await thz_module.async_setup_entry(hass, entry)
+
+        hass.async_add_executor_job.assert_awaited_once_with(device.close)
+        assert entry.runtime_data is None
+
+    @pytest.mark.asyncio
     async def test_no_refresh_intervals_uses_defaults_from_available_blocks(self):
         hass = _mock_hass()
         entry = _mock_config_entry()
