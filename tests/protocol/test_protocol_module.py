@@ -55,3 +55,56 @@ def test_check_set_answer():
     protocol.check_set_answer(b"\x01\x80\x10\x03")
     with pytest.raises(THZWriteRejectedError, match="NAK"):
         protocol.check_set_answer(b"\x15")
+
+
+@pytest.mark.parametrize(
+    ("hex_data", "complete"),
+    [
+        ("0100aa112233441003", True),
+        # escaped data byte 0x10 followed by data byte 0x03: not the end
+        ("0100aa112233101003", False),
+        # escaped 0x10 as last data byte, then the real terminator
+        ("0100aa11223310101003", True),
+        ("0100aa1122334410", False),
+        ("1003", False),  # too short to be a frame
+    ],
+)
+def test_terminator_detection(hex_data, complete):
+    assert protocol.frame_complete(bytes.fromhex(hex_data)) is complete
+
+
+def _answer(header: bytes, payload: bytes) -> bytes:
+    crc = protocol.checksum(header + b"\x00" + payload)
+    return header + crc + payload + b"\x10\x03"
+
+
+def test_decode_response_get_and_set_answers():
+    assert protocol.decode_response(_answer(b"\x01\x00", b"\x00\xc8\x05")) == (
+        b"\xce\x00\xc8\x05"
+    )
+    assert protocol.decode_response(_answer(b"\x01\x80", b"\xab"))[1:] == b"\xab"
+
+
+def test_decode_response_crc_mismatch_returns_none():
+    corrupted = bytearray(_answer(b"\x01\x00", b"\x00\xc8\x05"))
+    corrupted[2] ^= 0xFF
+    assert protocol.decode_response(bytes(corrupted)) is None
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        b"\x01\x00\x00",  # too short
+        b"\x01\x01\x00\x00\x00\x00",  # timing issue
+        b"\x01\x02\x00\x00\x00\x00",  # CRC error in request
+        b"\x01\x03\x00\x00\x00\x00",  # unknown command
+        b"\x09\x09\x00\x00\x00\x00",  # unknown header
+    ],
+)
+def test_decode_response_errors_return_none(data):
+    assert protocol.decode_response(data) is None
+
+
+def test_decode_response_register_not_supported_raises():
+    with pytest.raises(THZNotSupportedError):
+        protocol.decode_response(b"\x01\x04\x00\x00\x00\x00")

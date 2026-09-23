@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.thz.const import CONF_ENTITY_VISIBILITY, DOMAIN
+from custom_components.thz.exceptions import THZConnectionError
 
 from .common import HOST, setup_entry
 
@@ -59,7 +60,9 @@ async def test_usb_flow_creates_entry(hass, fake_device):
 
 async def test_unreachable_device_aborts(hass, fake_device):
     result = await _start(hass, "ip")
-    with patch.object(fake_device, "_connect_tcp", side_effect=OSError("refused")):
+    with patch.object(
+        fake_device, "_connect", side_effect=THZConnectionError("refused")
+    ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"host": HOST, "port": 2323, "connection_type": "ip"}
         )

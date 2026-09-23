@@ -22,12 +22,13 @@ parameter_io.py             the single read/write path for write-map parameters
   ▼
 value_codec.py              bytes <-> values (numbers, temperatures, selects, times)
   ▼
-thz_device.py               client: lock, timeouts, abandon, retry policy,
-  │                         handshakes, register access (runs in the executor)
+thz_device.py               client: lock, timeouts, retry policy,
+  │                         handshakes, register access (asyncio)
   ├─ protocol.py            pure: telegrams, checksum, escaping, framing,
   │                         judging the device's answers (FHEM THZ_decode)
   ▼
 transport.py                SerialTransport / TcpTransport: move bytes only
+  │                         (asyncio; pyserial-asyncio-fast for the port)
   ▼
 Serial port or ser2net TCP socket
 ```
@@ -89,11 +90,11 @@ includes entities, climate, clock sync and backup/restore.
 5. After a write, an entity requests a refresh of the coordinator that shows
    the value.
 
-All device I/O goes through `THZDevice.async_execute`. It serialises access
-with the device lock, runs the blocking call in the executor with a hard
-timeout, and abandons (and disconnects) a call that overruns. That way a hung
-line cannot block the lock forever. A SET is never retried once its telegram
-has been sent.
+All device I/O runs on the event loop and goes through
+`THZDevice.async_execute`. It serialises access with the device lock and
+bounds each call with a hard timeout. A call that overruns is cancelled and
+the connection closed, so a hung line cannot block the lock forever. A SET is
+never retried once its telegram has been sent.
 
 ## The protocol
 

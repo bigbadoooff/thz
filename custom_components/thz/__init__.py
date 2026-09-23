@@ -108,7 +108,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     write_manager = device.write_register_map_manager
     register_manager = device.register_map_manager
     if write_manager is None or register_manager is None:
-        await hass.async_add_executor_job(device.close)
+        device.close()
         raise ConfigEntryNotReady("THZ register maps could not be loaded")
     # Paired register blocks for energy sensors (cmd2 + cmd3)
     paired_blocks = register_manager.get_paired_blocks()
@@ -122,7 +122,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         # Not a single block answered: the device is not really reachable,
         # so let Home Assistant retry the whole entry instead of setting up
         # an integration without any data.
-        await hass.async_add_executor_job(device.close)
+        device.close()
         raise ConfigEntryNotReady(
             "No register block could be read from the THZ device; will retry"
         )
@@ -576,7 +576,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if entry_data is not None:
             if entry_data.unsub_clock_check:
                 entry_data.unsub_clock_check()
-            await hass.async_add_executor_job(entry_data.device.close)
+            entry_data.device.close()
 
     return unload_ok
 

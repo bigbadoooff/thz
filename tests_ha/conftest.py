@@ -43,17 +43,13 @@ class FakeTHZDevice(THZDevice):
         self.closed = False
         FakeTHZDevice.instances.append(self)
 
-    def _connect_tcp(self) -> None:
-        self.ser = object()
-
-    def _connect_serial(self) -> None:
-        self.ser = object()
+    async def _connect(self) -> None:
+        self.closed = False
 
     def close(self) -> None:
         self.closed = True
-        self.ser = None
 
-    def send_request(self, telegram: bytes, get_or_set: str) -> bytes:
+    async def send_request(self, telegram: bytes, get_or_set: str) -> bytes:
         self.sent.append(telegram)
         body = self.unescape(telegram[2:-2])[1:]  # drop header, footer, CRC
         # 4.x parameters use 3-byte commands (0A/0B/0C...), blocks 1 byte.

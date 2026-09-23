@@ -76,9 +76,7 @@ rules:
   stale-devices: done
 
   # Platinum
-  async-dependency:
-    status: todo
-    comment: pyserial is blocking and runs in the executor.
+  async-dependency: done
   inject-websession:
     status: exempt
     comment: No HTTP communication.

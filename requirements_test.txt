@@ -5,6 +5,7 @@ hypothesis>=6.100
 ruff==0.15.8  # keep in sync with .pre-commit-config.yaml
 mypy>=1.8.0
 pyserial>=3.5
+pyserial-asyncio-fast>=0.16
 types-pyserial>=3.5
 voluptuous>=0.13.1
 tzlocal>=5.0

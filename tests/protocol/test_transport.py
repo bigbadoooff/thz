@@ -1,1249 +1,349 @@
-"""Tests for THZDevice connection, protocol and I/O paths.
+"""Tests for transport.py: the asyncio serial and TCP transports.
 
-These tests complement protocol/test_device.py / protocol/test_device_config.py /
-protocol/test_telegram.py / protocol/test_timeout_restoration.py by exercising the
-connection setup, handshake, telegram exchange, low-level read/write helpers
-and higher-level register access methods of THZDevice -- including both
-success and failure paths.
+TCP runs against a real local asyncio server; the serial port is replaced at
+serial_asyncio_fast.create_serial_connection.
 """
 
-import itertools
-import socket as socket_module
-import time
-from unittest.mock import MagicMock, Mock, patch
+import asyncio
+import contextlib
+import socket
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from custom_components.thz.exceptions import (
-    THZNotSupportedError,
-    THZProtocolError,
-    THZWriteRejectedError,
-)
+from custom_components.thz import transport as transport_module
+from custom_components.thz.exceptions import THZConnectionError
 from custom_components.thz.thz_device import THZDevice
+from custom_components.thz.transport import SerialTransport, TcpTransport
 
-# Answer of the device to an accepted SET (header 01 80, see FHEM THZ_decode).
-SET_ACK = b"\x01\x80\x81\x10\x03"
+
+@contextlib.asynccontextmanager
+async def _server(handler):
+    """Run a local TCP server; yields its port."""
+    server = await asyncio.start_server(handler, "127.0.0.1", 0)
+    try:
+        yield server.sockets[0].getsockname()[1]
+    finally:
+        server.close()
+        await server.wait_closed()
+
+
+async def _read_until(transport, size, max_wait=1.0):
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max_wait
+    data = b""
+    while len(data) < size and loop.time() < deadline:
+        data += await transport.read(deadline - loop.time())
+    return data
+
 
 # ---------------------------------------------------------------------------
-# Helpers
+# TCP
 # ---------------------------------------------------------------------------
 
 
-class FakeHass:
-    """Minimal fake HomeAssistant object.
+class TestTcpTransport:
+    @pytest.mark.asyncio
+    async def test_bytes_go_both_ways(self):
+        async def echo(reader, writer):
+            writer.write(await reader.read(10))
+            await writer.drain()
 
-    async_add_executor_job simply invokes the callable synchronously and
-    returns its result, mirroring what the real implementation does from the
-    caller's perspective for these tests.
-    """
+        async with _server(echo) as port:
+            tcp = TcpTransport("127.0.0.1", port, connect_timeout=1.0)
+            await tcp.connect()
+            assert tcp.is_alive()
+            await tcp.write(b"\x02\x10")
+            assert await _read_until(tcp, 2) == b"\x02\x10"
+            tcp.close()
+        assert not tcp.is_alive()
 
-    async def async_add_executor_job(self, func, *args):
-        return func(*args)
+    @pytest.mark.asyncio
+    async def test_keepalive_is_enabled(self):
+        async def idle(reader, writer):
+            await reader.read()
+
+        async with _server(idle) as port:
+            tcp = TcpTransport("127.0.0.1", port, connect_timeout=1.0)
+            await tcp.connect()
+            sock = tcp._transport.get_extra_info("socket")
+            assert sock.getsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE)
+            if hasattr(socket, "TCP_KEEPIDLE"):
+                assert sock.getsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE) == 60
+            tcp.close()
+
+    def test_keepalive_failure_is_tolerated(self):
+        sock = MagicMock()
+        sock.setsockopt.side_effect = OSError("not supported")
+        transport_module._enable_keepalive(sock)
+        transport_module._enable_keepalive(None)
+
+    @pytest.mark.asyncio
+    async def test_read_returns_nothing_when_no_data_arrives(self):
+        async def idle(reader, writer):
+            await reader.read()
+
+        async with _server(idle) as port:
+            tcp = TcpTransport("127.0.0.1", port, connect_timeout=1.0)
+            await tcp.connect()
+            assert await tcp.read(0.02) == b""
+            assert tcp.is_alive()
+            tcp.close()
+
+    @pytest.mark.asyncio
+    async def test_peer_close_is_detected(self):
+        async def hang_up(reader, writer):
+            writer.close()
+
+        async with _server(hang_up) as port:
+            tcp = TcpTransport("127.0.0.1", port, connect_timeout=1.0)
+            await tcp.connect()
+            with pytest.raises(THZConnectionError, match="closed by peer"):
+                await tcp.read(1.0)
+            assert not tcp.is_alive()
+            with pytest.raises(THZConnectionError, match="closed"):
+                await tcp.write(b"\x02")
+            tcp.close()
+
+    @pytest.mark.asyncio
+    async def test_data_before_the_peer_close_is_still_read(self):
+        async def answer_and_hang_up(reader, writer):
+            writer.write(b"\x10")
+            await writer.drain()
+            writer.close()
+
+        async with _server(answer_and_hang_up) as port:
+            tcp = TcpTransport("127.0.0.1", port, connect_timeout=1.0)
+            await tcp.connect()
+            await asyncio.sleep(0.05)
+            assert await tcp.read(1.0) == b"\x10"
+            with pytest.raises(THZConnectionError):
+                await tcp.read(1.0)
+            tcp.close()
+
+    @pytest.mark.asyncio
+    async def test_reset_input_buffer_drops_unread_bytes(self):
+        async def chatter(reader, writer):
+            writer.write(b"stale")
+            await writer.drain()
+            await reader.read()
+
+        async with _server(chatter) as port:
+            tcp = TcpTransport("127.0.0.1", port, connect_timeout=1.0)
+            await tcp.connect()
+            await asyncio.sleep(0.05)
+            await tcp.reset_input_buffer()
+            assert await tcp.read(0.02) == b""
+            tcp.close()
+
+    @pytest.mark.asyncio
+    async def test_refused_connection_raises(self):
+        async with _server(lambda r, w: None) as port:
+            pass  # closed again: nothing listens on the port any more
+        tcp = TcpTransport("127.0.0.1", port, connect_timeout=1.0)
+        with pytest.raises(THZConnectionError, match="Could not connect"):
+            await tcp.connect()
+        assert not tcp.is_alive()
+
+    @pytest.mark.asyncio
+    async def test_connect_timeout_raises(self):
+        async def never(*args, **kwargs):
+            await asyncio.sleep(10)
+
+        tcp = TcpTransport("192.0.2.1", 2323, connect_timeout=0.01)
+        loop = asyncio.get_running_loop()
+        with (
+            patch.object(loop, "create_connection", never),
+            pytest.raises(THZConnectionError, match="Could not connect"),
+        ):
+            await tcp.connect()
+
+    @pytest.mark.asyncio
+    async def test_missing_address_raises(self):
+        with pytest.raises(THZConnectionError, match="No host"):
+            await TcpTransport(None, None, connect_timeout=1.0).connect()
+
+    @pytest.mark.asyncio
+    async def test_use_before_connect_raises(self):
+        tcp = TcpTransport("127.0.0.1", 1, connect_timeout=1.0)
+        assert not tcp.is_alive()
+        with pytest.raises(THZConnectionError):
+            await tcp.write(b"\x02")
+        with pytest.raises(THZConnectionError):
+            await tcp.read(0.01)
+        await tcp.reset_input_buffer()
+        tcp.close()
 
 
-class ScriptedSerial:
-    """Fake serial object that trickles pre-scripted response bytes.
+# ---------------------------------------------------------------------------
+# Serial
+# ---------------------------------------------------------------------------
 
-    Mimics real hardware behaviour where only a small number of bytes are
-    available per read() call, so the protocol's byte-by-byte / N-byte reads
-    line up correctly against the scripted response stream.
-    """
 
-    def __init__(self, response_bytes: bytes):
-        self._buf = bytearray(response_bytes)
-        self.written = bytearray()
-        self.reset_calls = 0
-        self.closed = False
+class FakeSerialTransport(asyncio.Transport):
+    """What serial_asyncio_fast returns: an asyncio transport with .serial."""
+
+    def __init__(self):
+        super().__init__()
+        self.serial = MagicMock()
+        self.written = []
+        self.closing = False
 
     def write(self, data):
-        self.written.extend(data)
+        self.written.append(bytes(data))
 
-    def flush(self):
-        pass
-
-    @property
-    def in_waiting(self):
-        return 1 if self._buf else 0
-
-    def read(self, n):
-        take = min(n, 1, len(self._buf))
-        data = bytes(self._buf[:take])
-        del self._buf[:take]
-        return data
-
-    def reset_input_buffer(self):
-        self.reset_calls += 1
+    def is_closing(self):
+        return self.closing
 
     def close(self):
-        self.closed = True
+        self.closing = True
 
 
-def _make_device(**kwargs):
-    defaults = {"connection": "usb", "port": "/dev/null"}
-    defaults.update(kwargs)
-    return THZDevice(**defaults)
+class TestSerialTransport:
+    @staticmethod
+    def _open(fake):
+        async def create(loop, protocol_factory, url, **kwargs):
+            protocol = protocol_factory()
+            protocol.connection_made(fake)
+            create.protocol = protocol
+            create.url = url
+            create.kwargs = kwargs
+            return fake, protocol
+
+        return create
+
+    @pytest.mark.asyncio
+    async def test_opens_the_port_and_moves_bytes(self):
+        fake = FakeSerialTransport()
+        create = self._open(fake)
+        with patch.object(
+            transport_module.serial_asyncio_fast, "create_serial_connection", create
+        ):
+            port = SerialTransport("/dev/ttyUSB0", 115200)
+            await port.connect()
+
+        assert create.url == "/dev/ttyUSB0"
+        assert create.kwargs == {"baudrate": 115200}
+        await port.write(b"\x02")
+        assert fake.written == [b"\x02"]
+        create.protocol.data_received(b"\x10")
+        assert await port.read(0.01) == b"\x10"
+
+    @pytest.mark.asyncio
+    async def test_reset_input_buffer_also_flushes_the_port(self):
+        fake = FakeSerialTransport()
+        create = self._open(fake)
+        with patch.object(
+            transport_module.serial_asyncio_fast, "create_serial_connection", create
+        ):
+            port = SerialTransport("/dev/ttyUSB0", 115200)
+            await port.connect()
+        create.protocol.data_received(b"stale")
+        await port.reset_input_buffer()
+        fake.serial.reset_input_buffer.assert_called_once()
+        assert await port.read(0.01) == b""
+
+    @pytest.mark.asyncio
+    async def test_lost_port_is_detected(self):
+        fake = FakeSerialTransport()
+        create = self._open(fake)
+        with patch.object(
+            transport_module.serial_asyncio_fast, "create_serial_connection", create
+        ):
+            port = SerialTransport("/dev/ttyUSB0", 115200)
+            await port.connect()
+        create.protocol.connection_lost(OSError("unplugged"))
+        assert not port.is_alive()
+        with pytest.raises(THZConnectionError):
+            await port.read(1.0)
+
+    @pytest.mark.asyncio
+    async def test_open_failure_raises(self):
+        async def fail(*args, **kwargs):
+            raise OSError("no such port")
+
+        with patch.object(
+            transport_module.serial_asyncio_fast, "create_serial_connection", fail
+        ):
+            with pytest.raises(THZConnectionError, match="no such port"):
+                await SerialTransport("/dev/ttyUSB9", 115200).connect()
+
+    @pytest.mark.asyncio
+    async def test_missing_port_raises(self):
+        with pytest.raises(THZConnectionError, match="No serial port"):
+            await SerialTransport(None, 115200).connect()
+
+    @pytest.mark.asyncio
+    async def test_write_errors_become_connection_errors(self):
+        fake = FakeSerialTransport()
+        fake.write = MagicMock(side_effect=OSError("I/O error"))
+        with patch.object(
+            transport_module.serial_asyncio_fast,
+            "create_serial_connection",
+            self._open(fake),
+        ):
+            port = SerialTransport("/dev/ttyUSB0", 115200)
+            await port.connect()
+        with pytest.raises(THZConnectionError, match="Failed to write"):
+            await port.write(b"\x02")
+
+    @pytest.mark.asyncio
+    async def test_close_tolerates_errors_and_repeats(self):
+        fake = FakeSerialTransport()
+        fake.close = MagicMock(side_effect=OSError("already gone"))
+        with patch.object(
+            transport_module.serial_asyncio_fast,
+            "create_serial_connection",
+            self._open(fake),
+        ):
+            port = SerialTransport("/dev/ttyUSB0", 115200)
+            await port.connect()
+        port.close()
+        port.close()
+        assert not port.is_alive()
 
 
 # ---------------------------------------------------------------------------
-# _connect_serial / _connect_tcp
+# The client over a real TCP connection
 # ---------------------------------------------------------------------------
 
 
-class TestConnectSerial:
-    def test_connect_serial_success(self):
-        device = _make_device(port="/dev/ttyUSB0", baudrate=9600, read_timeout=2.0)
-        with patch("custom_components.thz.transport.serial.Serial") as mock_serial:
-            mock_instance = MagicMock()
-            mock_serial.return_value = mock_instance
-            device._connect_serial()
-            mock_serial.assert_called_once_with(
-                "/dev/ttyUSB0", baudrate=9600, timeout=2.0
+class TestClientOverTcp:
+    @pytest.mark.asyncio
+    async def test_register_read_and_write_over_a_socket(self):
+        """A fake heat pump behind a socket answers a GET and a SET."""
+        payload = b"\xfb\x00\xc8\x05"
+        crc = THZDevice.thz_checksum(b"\x01\x00\x00" + payload)
+        get_answer = b"\x01\x00" + crc + payload + b"\x10\x03"
+        requests = []
+
+        async def heat_pump(reader, writer):
+            while True:
+                data = await reader.read(1)
+                if not data:
+                    return
+                if data == b"\x02" and (not requests or requests[-1] == "done"):
+                    requests.append("start")
+                    writer.write(b"\x10")
+                elif data == b"\x01":
+                    rest = await reader.readuntil(b"\x10\x03")
+                    requests.append(data + rest)
+                    writer.write(b"\x10\x02")
+                elif data == b"\x10":
+                    set_request = requests[-1][:2] == b"\x01\x80"
+                    writer.write(b"\x01\x80\x81\x10\x03" if set_request else get_answer)
+                elif data == b"\x02":
+                    requests.append("done")
+                await writer.drain()
+
+        async with _server(heat_pump) as port:
+            device = THZDevice(
+                connection="ip", host="127.0.0.1", tcp_port=port, read_timeout=1.0
             )
-            assert device.ser is mock_instance
-
-    def test_connect_serial_propagates_error(self):
-        device = _make_device(port="/dev/ttyUSB0")
-        with (
-            patch(
-                "custom_components.thz.transport.serial.Serial",
-                side_effect=OSError("no such device"),
-            ),
-            pytest.raises(OSError),
-        ):
-            device._connect_serial()
-
-
-class TestConnectTcp:
-    def test_connect_tcp_success(self):
-        device = _make_device(
-            connection="ip", host="192.168.1.50", tcp_port=2000, read_timeout=1.5
-        )
-        mock_sock = MagicMock()
-        with patch(
-            "custom_components.thz.transport.socket.socket", return_value=mock_sock
-        ):
-            device._connect_tcp()
-
-        assert device.ser is mock_sock
-        mock_sock.settimeout.assert_called_with(1.5)
-        mock_sock.setsockopt.assert_any_call(
-            socket_module.SOL_SOCKET, socket_module.SO_KEEPALIVE, 1
-        )
-        mock_sock.connect.assert_called_once_with(("192.168.1.50", 2000))
-
-    def test_connect_tcp_keepalive_setsockopt_failure_is_tolerated(self):
-        """A platform without keepalive tuning support should not raise."""
-        device = _make_device(connection="ip", host="10.0.0.1", tcp_port=2323)
-        mock_sock = MagicMock()
-
-        def setsockopt_side_effect(level, optname, value):
-            if level == socket_module.IPPROTO_TCP:
-                raise OSError("not supported")
-            return None
-
-        mock_sock.setsockopt.side_effect = setsockopt_side_effect
-
-        with patch(
-            "custom_components.thz.transport.socket.socket", return_value=mock_sock
-        ):
-            device._connect_tcp()
-
-        assert device.ser is mock_sock
-        mock_sock.connect.assert_called_once_with(("10.0.0.1", 2323))
-
-
-# ---------------------------------------------------------------------------
-# _is_connection_alive
-# ---------------------------------------------------------------------------
-
-
-class TestIsConnectionAliveExtra:
-    def test_none_connection_is_not_alive(self):
-        device = _make_device()
-        assert device.ser is None
-        assert device._is_connection_alive() is False
-
-    def test_invalid_socket_fileno_is_dead(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock()
-        mock_sock.fileno.return_value = -1
-        device.ser = mock_sock
-        assert device._is_connection_alive() is False
-
-    def test_socket_fileno_raises_is_dead(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock()
-        mock_sock.fileno.side_effect = OSError("bad fd")
-        device.ser = mock_sock
-        assert device._is_connection_alive() is False
-
-    def test_serial_is_open_true(self):
-        device = _make_device()
-        mock_serial = Mock(spec=["is_open"])
-        mock_serial.is_open = True
-        device.ser = mock_serial
-        assert device._is_connection_alive() is True
-
-    def test_serial_is_open_false(self):
-        device = _make_device()
-        mock_serial = Mock(spec=["is_open"])
-        mock_serial.is_open = False
-        device.ser = mock_serial
-        assert device._is_connection_alive() is False
-
-    def test_serial_is_open_attribute_error(self):
-        device = _make_device()
-
-        class Weird:
-            @property
-            def is_open(self):
-                raise AttributeError("boom")
-
-        device.ser = Weird()
-        assert device._is_connection_alive() is False
-
-    def test_unknown_connection_object_is_not_alive(self):
-        device = _make_device()
-        device.ser = Mock(spec=[])
-        assert device._is_connection_alive() is False
-
-
-# ---------------------------------------------------------------------------
-# _reconnect
-# ---------------------------------------------------------------------------
-
-
-class TestReconnect:
-    def test_reconnect_usb_calls_connect_serial(self):
-        device = _make_device(connection="usb")
-        old_ser = MagicMock()
-        device.ser = old_ser
-        with patch.object(device, "_connect_serial") as mock_connect:
-            device._reconnect()
-        old_ser.close.assert_called_once()
-        mock_connect.assert_called_once()
-
-    def test_reconnect_ip_calls_connect_tcp(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        device.ser = MagicMock()
-        with patch.object(device, "_connect_tcp") as mock_connect:
-            device._reconnect()
-        mock_connect.assert_called_once()
-
-    def test_reconnect_when_ser_is_none_skips_close(self):
-        device = _make_device(connection="usb")
-        assert device.ser is None
-        with patch.object(device, "_connect_serial") as mock_connect:
-            device._reconnect()
-        mock_connect.assert_called_once()
-
-    def test_reconnect_ignores_close_error(self):
-        device = _make_device(connection="usb")
-        old_ser = MagicMock()
-        old_ser.close.side_effect = OSError("already closed")
-        device.ser = old_ser
-        with patch.object(device, "_connect_serial") as mock_connect:
-            device._reconnect()
-        mock_connect.assert_called_once()
-
-    def test_reconnect_propagates_connect_error(self):
-        device = _make_device(connection="usb")
-        with (
-            patch.object(device, "_connect_serial", side_effect=OSError("no device")),
-            pytest.raises(OSError),
-        ):
-            device._reconnect()
-
-
-# ---------------------------------------------------------------------------
-# _do_handshake_1
-# ---------------------------------------------------------------------------
-
-
-class TestHandshake1:
-    def test_handshake1_success(self):
-        device = _make_device()
-        with (
-            patch.object(device, "_write_bytes") as mock_write,
-            patch.object(device, "_read_exact", return_value=b"\x10") as mock_read,
-        ):
-            device._do_handshake_1(1.0)
-        mock_write.assert_called_once_with(b"\x02")
-        mock_read.assert_called_once_with(1, 1.0)
-
-    def test_handshake1_wrong_byte_raises(self):
-        device = _make_device()
-        with (
-            patch.object(device, "_write_bytes"),
-            patch.object(device, "_read_exact", return_value=b"\x05"),
-            pytest.raises(RuntimeError, match="Handshake 1 failed"),
-        ):
-            device._do_handshake_1(1.0)
-
-    def test_handshake1_no_data_raises(self):
-        device = _make_device()
-        with (
-            patch.object(device, "_write_bytes"),
-            patch.object(device, "_read_exact", return_value=b""),
-            pytest.raises(RuntimeError, match="no data"),
-        ):
-            device._do_handshake_1(1.0)
-
-
-# ---------------------------------------------------------------------------
-# _do_handshake_2
-# ---------------------------------------------------------------------------
-
-
-class TestHandshake2:
-    def test_handshake2_combined_success(self):
-        device = _make_device()
-        with patch.object(device, "_read_exact", return_value=b"\x10\x02") as m:
-            device._do_handshake_2(1.0)
-        m.assert_called_once_with(2, 1.0)
-
-    def test_handshake2_split_dle_then_stx(self):
-        device = _make_device()
-        with patch.object(device, "_read_exact", side_effect=[b"\x10", b"\x02"]):
-            device._do_handshake_2(1.0)
-
-    def test_handshake2_split_dle_then_stx_with_fw2_delay(self):
-        device = _make_device()
-        device._firmware_version = "206"
-        with (
-            patch.object(device, "_read_exact", side_effect=[b"\x10", b"\x02"]),
-            patch("custom_components.thz.thz_device.time.sleep") as mock_sleep,
-        ):
-            device._do_handshake_2(1.0)
-        mock_sleep.assert_called_once_with(0.005)
-
-    def test_handshake2_split_dle_then_wrong_byte_raises(self):
-        device = _make_device()
-        with (
-            patch.object(device, "_read_exact", side_effect=[b"\x10", b"\x99"]),
-            pytest.raises(RuntimeError, match="Handshake 2 failed"),
-        ):
-            device._do_handshake_2(1.0)
-
-    def test_handshake2_split_dle_then_no_data_raises(self):
-        device = _make_device()
-        with patch.object(device, "_read_exact", side_effect=[b"\x10", b""]):
-            with pytest.raises(RuntimeError, match="no data"):
-                device._do_handshake_2(1.0)
-
-    def test_handshake2_only_stx_treated_as_success(self):
-        device = _make_device()
-        with patch.object(device, "_read_exact", return_value=b"\x02"):
-            device._do_handshake_2(1.0)
-
-    def test_handshake2_unrelated_bytes_raises(self):
-        device = _make_device()
-        with patch.object(device, "_read_exact", return_value=b"\xaa\xbb"):
-            with pytest.raises(RuntimeError, match="Handshake 2 failed"):
-                device._do_handshake_2(1.0)
-
-
-# ---------------------------------------------------------------------------
-# _receive_data_telegram
-# ---------------------------------------------------------------------------
-
-
-class TestReceiveDataTelegram:
-    def test_receive_data_telegram_success(self):
-        device = _make_device()
-        telegram = b"\x01\x00\xce\x00\xc8\x05\x10\x03"
-        with (
-            patch.object(device, "_write_bytes") as mock_write,
-            patch.object(device, "_read_available", side_effect=[telegram]),
-        ):
-            result = device._receive_data_telegram(1.0)
-        mock_write.assert_called_once_with(b"\x10")
-        assert result == telegram
-
-    def test_receive_data_telegram_accumulates_chunks(self):
-        device = _make_device()
-        chunks = [b"\x01\x00\xce", b"\x00\xc8\x05", b"\x10\x03"]
-        with (
-            patch.object(device, "_write_bytes"),
-            patch.object(device, "_read_available", side_effect=chunks),
-        ):
-            result = device._receive_data_telegram(1.0)
-        assert result == b"\x01\x00\xce\x00\xc8\x05\x10\x03"
-
-    def test_receive_data_telegram_timeout_raises(self):
-        device = _make_device()
-        with (
-            patch.object(device, "_write_bytes"),
-            patch.object(device, "_read_available", return_value=b""),
-            pytest.raises(RuntimeError, match="No valid response"),
-        ):
-            device._receive_data_telegram(0.03)
-
-    def test_receive_data_telegram_incomplete_data_raises(self):
-        device = _make_device()
-        # Never reaches the 8-byte + DLE/ETX terminator condition.
-        chunks = itertools.chain([b"\x01\x02"], itertools.repeat(b""))
-        with (
-            patch.object(device, "_write_bytes"),
-            patch.object(device, "_read_available", side_effect=chunks),
-            pytest.raises(RuntimeError, match="No valid response"),
-        ):
-            device._receive_data_telegram(0.03)
-
-
-# ---------------------------------------------------------------------------
-# _exchange_once
-# ---------------------------------------------------------------------------
-
-
-class TestExchangeOnce:
-    def _make_mocks(self, alive=True):
-        return {
-            "_is_connection_alive": MagicMock(return_value=alive),
-            "_reconnect": MagicMock(),
-            "_do_handshake_1": MagicMock(),
-            "_reset_input_buffer": MagicMock(),
-            "_write_bytes": MagicMock(),
-            "_do_handshake_2": MagicMock(),
-            "_receive_data_telegram": MagicMock(return_value=b"DATA"),
-        }
-
-    def test_exchange_once_reconnects_when_not_initialized_alive_skipped(self):
-        device = _make_device()
-        device._initialized = False
-        mocks = self._make_mocks(alive=False)
-        with patch.multiple(device, **mocks):
-            device._exchange_once(b"telegram", "get", 0, 1)
-        mocks["_reconnect"].assert_not_called()
-
-    def test_exchange_once_reconnects_when_initialized_and_dead(self):
-        device = _make_device()
-        device._initialized = True
-        mocks = self._make_mocks(alive=False)
-        with patch.multiple(device, **mocks):
-            device._exchange_once(b"telegram", "get", 0, 1)
-        mocks["_reconnect"].assert_called_once()
-
-    def test_exchange_once_get_reads_data(self):
-        device = _make_device()
-        device._initialized = True
-        mocks = self._make_mocks(alive=True)
-        with patch.multiple(device, **mocks):
-            result = device._exchange_once(b"telegram", "get", 0, 1)
-        mocks["_receive_data_telegram"].assert_called_once()
-        assert result == b"DATA"
-
-    def test_exchange_once_set_requires_the_acknowledgement(self):
-        device = _make_device()
-        device._initialized = True
-        mocks = self._make_mocks(alive=True)
-        mocks["_receive_data_telegram"].return_value = SET_ACK
-        with patch.multiple(device, **mocks):
-            result = device._exchange_once(b"telegram", "set", 0, 1)
-        mocks["_receive_data_telegram"].assert_called_once()
-        assert result == b""
-
-    @pytest.mark.parametrize(
-        ("answer", "reason"),
-        [
-            (b"\x15", "NAK"),
-            (b"\x01\x01\x02\x10\x03", "timing issue"),
-            (b"\x01\x02\x03\x10\x03", "CRC error in request"),
-            (b"\x01\x03\x04\x10\x03", "command not known"),
-            (b"\x01\x04\x05\x10\x03", "unknown register"),
-            (b"\x01\x99\x01\x10\x03", "unknown answer"),
-            (b"\x01\x00\x00\x0a\x10\x03", "CRC error in answer"),
-        ],
-    )
-    def test_exchange_once_set_rejected(self, answer, reason):
-        """Only the 01 80 header acknowledges a SET, as in FHEM's THZ_decode."""
-        device = _make_device()
-        device._initialized = True
-        mocks = self._make_mocks(alive=True)
-        mocks["_receive_data_telegram"].return_value = answer
-        with (
-            patch.multiple(device, **mocks),
-            pytest.raises(THZWriteRejectedError, match=reason),
-        ):
-            device._exchange_once(b"telegram", "set", 0, 1)
-
-    def test_exchange_once_get_nak_is_a_protocol_error(self):
-        device = _make_device()
-        device._initialized = True
-        mocks = self._make_mocks(alive=True)
-        mocks["_receive_data_telegram"].return_value = b"\x15"
-        with (
-            patch.multiple(device, **mocks),
-            pytest.raises(THZProtocolError, match="NAK"),
-        ):
-            device._exchange_once(b"telegram", "get", 0, 1)
-
-
-# ---------------------------------------------------------------------------
-# send_request
-# ---------------------------------------------------------------------------
-
-
-class TestSendRequest:
-    def test_send_request_success_first_try(self):
-        device = _make_device()
-        with patch.object(
-            device, "_exchange_once", return_value=b"ok"
-        ) as mock_exchange:
-            result = device.send_request(b"telegram", "get")
-        assert result == b"ok"
-        assert mock_exchange.call_count == 1
-
-    def test_send_request_connection_error_then_success(self):
-        device = _make_device()
-        with (
-            patch.object(
-                device,
-                "_exchange_once",
-                side_effect=[ConnectionError("dropped"), b"ok"],
-            ),
-            patch.object(device, "_reconnect") as mock_reconnect,
-        ):
-            result = device.send_request(b"telegram", "get")
-        assert result == b"ok"
-        mock_reconnect.assert_called_once()
-
-    def test_send_request_connection_error_exhausts_retries(self):
-        device = _make_device()
-        with (
-            patch.object(
-                device,
-                "_exchange_once",
-                side_effect=[ConnectionError("a"), ConnectionError("b")],
-            ),
-            patch.object(device, "_reconnect"),
-        ):
-            with pytest.raises(ConnectionError, match="Connection failed after 2"):
-                device.send_request(b"telegram", "get")
-
-    def test_send_request_connection_error_reconnect_fails(self):
-        device = _make_device()
-        with (
-            patch.object(device, "_exchange_once", side_effect=[ConnectionError("a")]),
-            patch.object(device, "_reconnect", side_effect=OSError("no port")),
-        ):
-            with pytest.raises(ConnectionError, match="Connection failed after 2"):
-                device.send_request(b"telegram", "get")
-
-    def test_send_request_runtime_error_then_success(self):
-        device = _make_device()
-        with (
-            patch.object(
-                device,
-                "_exchange_once",
-                side_effect=[THZProtocolError("proto"), b"ok2"],
-            ),
-            patch.object(device, "_reconnect") as mock_reconnect,
-        ):
-            result = device.send_request(b"telegram", "get")
-        assert result == b"ok2"
-        mock_reconnect.assert_called_once()
-
-    def test_send_request_runtime_error_exhausts_retries(self):
-        device = _make_device()
-        with (
-            patch.object(
-                device,
-                "_exchange_once",
-                side_effect=[THZProtocolError("first"), THZProtocolError("second")],
-            ),
-            patch.object(device, "_reconnect"),
-        ):
-            with pytest.raises(RuntimeError, match="second"):
-                device.send_request(b"telegram", "get")
-
-    def test_send_request_runtime_error_reconnect_also_fails(self):
-        device = _make_device()
-        with (
-            patch.object(
-                device, "_exchange_once", side_effect=[THZProtocolError("proto")]
-            ),
-            patch.object(device, "_reconnect", side_effect=OSError("no port")),
-        ):
-            with pytest.raises(RuntimeError, match="proto"):
-                device.send_request(b"telegram", "get")
-
-    def test_send_request_unexpected_exception_wrapped(self):
-        device = _make_device()
-        with (
-            patch.object(device, "_exchange_once", side_effect=[ValueError("oops")]),
-            pytest.raises(RuntimeError, match="Device communication failed"),
-        ):
-            device.send_request(b"telegram", "get")
-
-
-# ---------------------------------------------------------------------------
-# _write_bytes
-# ---------------------------------------------------------------------------
-
-
-class TestWriteBytes:
-    def test_write_bytes_socket_path(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock(spec=["sendall", "recv"])
-        device.ser = mock_sock
-        device._write_bytes(b"\x02")
-        # sendall, not send: send() may transmit only part of the telegram.
-        mock_sock.sendall.assert_called_once_with(b"\x02")
-
-    def test_write_bytes_serial_path(self):
-        device = _make_device()
-        mock_serial = Mock(spec=["write", "flush"])
-        device.ser = mock_serial
-        device._write_bytes(b"\x02")
-        mock_serial.write.assert_called_once_with(b"\x02")
-        mock_serial.flush.assert_called_once()
-
-    def test_write_bytes_mismatched_ser_raises_connection_error(self):
-        """Dispatch trusts self.connection; a ser lacking the expected
-
-        interface (e.g. a bad mock) surfaces as a wrapped ConnectionError
-        via the AttributeError clause rather than a distinct "unknown type"
-        path.
-        """
-        device = _make_device()
-        device.ser = Mock(spec=[])
-        with pytest.raises(ConnectionError, match="Connection closed during write"):
-            device._write_bytes(b"\x02")
-
-    def test_write_bytes_oserror_raises_connection_error(self):
-        device = _make_device()
-        mock_serial = Mock(spec=["write", "flush"])
-        mock_serial.write.side_effect = OSError("broken")
-        device.ser = mock_serial
-        with pytest.raises(ConnectionError, match="Failed to write"):
-            device._write_bytes(b"\x02")
-
-    def test_write_bytes_broken_pipe_raises_connection_error(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock(spec=["send", "recv"])
-        mock_sock.send.side_effect = BrokenPipeError("pipe gone")
-        device.ser = mock_sock
-        with pytest.raises(ConnectionError):
-            device._write_bytes(b"\x02")
-
-
-# ---------------------------------------------------------------------------
-# _read_exact
-# ---------------------------------------------------------------------------
-
-
-class TestReadExact:
-    def test_read_exact_accumulates_until_size(self):
-        device = _make_device()
-        with patch.object(
-            device, "_read_available", side_effect=[b"\x01", b"\x02", b"\x03"]
-        ):
-            result = device._read_exact(3, 1.0)
-        assert result == b"\x01\x02\x03"
-
-    def test_read_exact_returns_partial_on_timeout(self):
-        device = _make_device()
-        chunks = itertools.chain([b"\x01"], itertools.repeat(b""))
-        with patch.object(device, "_read_available", side_effect=chunks):
-            result = device._read_exact(3, 0.03)
-        assert result == b"\x01"
-
-
-# ---------------------------------------------------------------------------
-# _read_available (branches not covered by protocol/test_timeout_restoration.py)
-# ---------------------------------------------------------------------------
-
-
-class TestReadAvailableExtra:
-    def test_read_available_serial_with_data(self):
-        device = _make_device()
-        mock_serial = Mock(spec=["in_waiting", "read"])
-        mock_serial.in_waiting = 3
-        mock_serial.read.return_value = b"\xaa\xbb\xcc"
-        device.ser = mock_serial
-        result = device._read_available()
-        assert result == b"\xaa\xbb\xcc"
-        mock_serial.read.assert_called_once_with(3)
-
-    def test_read_available_serial_no_data(self):
-        device = _make_device()
-        mock_serial = Mock(spec=["in_waiting", "read"])
-        mock_serial.in_waiting = 0
-        device.ser = mock_serial
-        result = device._read_available()
-        assert result == b""
-
-    def test_read_available_unknown_type_returns_empty(self):
-        device = _make_device()
-        device.ser = Mock(spec=[])
-        assert device._read_available() == b""
-
-    def test_read_available_settimeout_restore_failure_is_ignored(self):
-        """settimeout() failing in the finally block should not raise."""
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock()
-        mock_sock.gettimeout.return_value = 1.0
-        mock_sock.recv.return_value = b"\x01\x02"
-        mock_sock.fileno.return_value = 5
-        mock_sock.settimeout.side_effect = OSError("bad socket state")
-        device.ser = mock_sock
-        result = device._read_available()
-        assert result == b"\x01\x02"
-
-    def test_read_available_socket_closed_raises(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock()
-        mock_sock.gettimeout.return_value = 1.0
-        mock_sock.recv.return_value = b""
-        mock_sock.fileno.return_value = -1
-        device.ser = mock_sock
-        with pytest.raises(ConnectionError, match="TCP socket connection closed"):
-            device._read_available()
-
-
-class TestTcpEndOfStream:
-    """A peer close (ser2net restart) must be reported, not read as "no data"."""
-
-    def test_read_available_eof_with_valid_fd_raises(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock()
-        mock_sock.gettimeout.return_value = 1.0
-        mock_sock.recv.return_value = b""
-        mock_sock.fileno.return_value = 5  # fd still valid after peer close
-        device.ser = mock_sock
-        with pytest.raises(ConnectionError, match="closed by peer"):
-            device._read_available()
-
-    def test_read_available_no_data_yet_returns_empty(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock()
-        mock_sock.gettimeout.return_value = 1.0
-        mock_sock.recv.side_effect = BlockingIOError
-        device.ser = mock_sock
-        assert device._read_available() == b""
-
-    def test_connection_not_alive_after_peer_close(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        mock_sock = Mock()
-        mock_sock.fileno.return_value = 5
-        mock_sock.gettimeout.return_value = 1.0
-        mock_sock.recv.return_value = b""
-        device.ser = mock_sock
-        assert device._is_connection_alive() is False
-
-    def test_real_socketpair_peer_close(self):
-        left, right = socket_module.socketpair()
-        try:
-            device = _make_device(connection="ip", host="h", tcp_port=1)
-            device.ser = left
-            assert device._is_connection_alive() is True
-            right.close()
-            assert device._is_connection_alive() is False
-            with pytest.raises(ConnectionError, match="closed by peer"):
-                device._read_available()
-        finally:
-            left.close()
-
-
-class TestFrameComplete:
-    @pytest.mark.parametrize(
-        ("hex_data", "complete"),
-        [
-            ("0100aa112233441003", True),
-            # escaped data byte 0x10 followed by data byte 0x03: not the end
-            ("0100aa112233101003", False),
-            # escaped 0x10 as last data byte, then the real terminator
-            ("0100aa11223310101003", True),
-            ("0100aa1122334410", False),
-            ("1003", False),  # too short to be a frame
-        ],
-    )
-    def test_terminator_detection(self, hex_data, complete):
-        assert THZDevice._frame_complete(bytes.fromhex(hex_data)) is complete
-
-    def test_escaped_0x10_split_across_chunks_is_read_to_the_end(self):
-        device = _make_device()
-        frame = bytes.fromhex("0100aa1122331010031003")
-        # The first chunk ends right after "10 10 03", which used to be taken
-        # for the terminator and truncated the frame.
-        chunks = iter([frame[:9], frame[9:]])
-        with (
-            patch.object(device, "_write_bytes"),
-            patch.object(
-                device, "_read_available", side_effect=lambda: next(chunks, b"")
-            ),
-        ):
-            assert device._receive_data_telegram(1.0) == frame
-
-
-# ---------------------------------------------------------------------------
-# _reset_input_buffer
-# ---------------------------------------------------------------------------
-
-
-class TestResetInputBuffer:
-    def test_reset_input_buffer_none_ser_noop(self):
-        device = _make_device()
-        device._reset_input_buffer()  # should not raise
-
-    def test_reset_input_buffer_calls_underlying(self):
-        device = _make_device()
-        mock_serial = Mock(spec=["reset_input_buffer"])
-        device.ser = mock_serial
-        device._reset_input_buffer()
-        mock_serial.reset_input_buffer.assert_called_once()
-
-    def test_reset_input_buffer_swallows_attribute_error(self):
-        device = _make_device()
-        mock_serial = Mock(spec=["reset_input_buffer"])
-        mock_serial.reset_input_buffer.side_effect = AttributeError("nope")
-        device.ser = mock_serial
-        device._reset_input_buffer()  # should not raise
-
-    def test_reset_input_buffer_no_attribute_noop(self):
-        device = _make_device()
-        device.ser = Mock(spec=[])
-        device._reset_input_buffer()  # should not raise / not call anything
-
-
-# ---------------------------------------------------------------------------
-# close
-# ---------------------------------------------------------------------------
-
-
-class TestClose:
-    def test_close_calls_underlying_close(self):
-        device = _make_device()
-        mock_ser = MagicMock()
-        device.ser = mock_ser
-        device.close()
-        mock_ser.close.assert_called_once()
-
-    def test_close_with_no_connection_is_noop(self):
-        device = _make_device()
-        device.close()  # should not raise
-
-
-# ---------------------------------------------------------------------------
-# decode_response
-# ---------------------------------------------------------------------------
-
-
-class TestDecodeResponse:
-    def _build_response(self, header: bytes, payload: bytes) -> bytes:
-        device = _make_device()
-        check_data = header + b"\x00" + payload
-        crc = device.thz_checksum(check_data)
-        return header + crc + payload + b"\x10\x03"
-
-    def test_decode_response_get_success(self):
-        device = _make_device()
-        data = self._build_response(b"\x01\x00", b"\x00\xc8\x05")
-        result = device.decode_response(data)
-        assert result == b"\xce\x00\xc8\x05"
-
-    def test_decode_response_set_success(self):
-        device = _make_device()
-        data = self._build_response(b"\x01\x80", b"\xab")
-        result = device.decode_response(data)
-        assert result is not None
-        assert result[1:] == b"\xab"
-
-    def test_decode_response_crc_mismatch_returns_none(self):
-        device = _make_device()
-        data = self._build_response(b"\x01\x00", b"\x00\xc8\x05")
-        corrupted = bytearray(data)
-        corrupted[2] ^= 0xFF  # flip the CRC byte
-        assert device.decode_response(bytes(corrupted)) is None
-
-    def test_decode_response_too_short_returns_none(self):
-        device = _make_device()
-        assert device.decode_response(b"\x01\x00\x00") is None
-
-    def test_decode_response_timing_issue(self):
-        device = _make_device()
-        assert device.decode_response(b"\x01\x01\x00\x00\x00\x00") is None
-
-    def test_decode_response_crc_error_in_request(self):
-        device = _make_device()
-        assert device.decode_response(b"\x01\x02\x00\x00\x00\x00") is None
-
-    def test_decode_response_unknown_command(self):
-        device = _make_device()
-        assert device.decode_response(b"\x01\x03\x00\x00\x00\x00") is None
-
-    def test_decode_response_register_not_supported_raises(self):
-        device = _make_device()
-        with pytest.raises(THZNotSupportedError):
-            device.decode_response(b"\x01\x04\x00\x00\x00\x00")
-
-    def test_decode_response_unknown_header_returns_none(self):
-        device = _make_device()
-        assert device.decode_response(b"\x09\x09\x00\x00\x00\x00") is None
-
-
-# ---------------------------------------------------------------------------
-# read_write_register (unit-level, isolating send_request/decode_response)
-# ---------------------------------------------------------------------------
-
-
-class TestReadWriteRegisterUnit:
-    def test_read_write_register_get_returns_decoded(self):
-        device = _make_device()
-        with (
-            patch.object(device, "send_request", return_value=b"raw") as mock_send,
-            patch.object(
-                device, "decode_response", return_value=b"decoded"
-            ) as mock_decode,
-        ):
-            result = device.read_write_register(b"\xfb", "get")
-        assert result == b"decoded"
-        mock_send.assert_called_once()
-        mock_decode.assert_called_once_with(b"raw")
-        # get_or_set == "get" should use header 0x01 0x00
-        telegram_sent = mock_send.call_args[0][0]
-        assert telegram_sent.startswith(b"\x01\x00")
-
-    def test_read_write_register_get_decode_failure_raises(self):
-        device = _make_device()
-        with (
-            patch.object(device, "send_request", return_value=b"raw"),
-            patch.object(device, "decode_response", return_value=None),
-        ):
-            with pytest.raises(RuntimeError, match="Failed to decode"):
-                device.read_write_register(b"\xfb", "get")
-
-    def test_read_write_register_set_returns_empty(self):
-        device = _make_device()
-        with patch.object(device, "send_request", return_value=b"ignored") as mock_send:
-            result = device.read_write_register(b"\xfb", "set", b"\x01")
-        assert result == b""
-        telegram_sent = mock_send.call_args[0][0]
-        assert telegram_sent.startswith(b"\x01\x80")
-
-
-# ---------------------------------------------------------------------------
-# read_firmware_version
-# ---------------------------------------------------------------------------
-
-
-class TestReadFirmwareVersion:
-    def test_read_firmware_version_success(self):
-        device = _make_device()
-        with patch.object(device, "read_value", return_value=b"\x00\xce"):
-            assert device.read_firmware_version() == "206"
-
-    def test_read_firmware_version_none_response(self):
-        device = _make_device()
-        with patch.object(device, "read_value", return_value=None):
-            assert device.read_firmware_version() == ""
-
-    def test_read_firmware_version_oserror_returns_empty(self):
-        device = _make_device()
-        with patch.object(device, "read_value", side_effect=OSError("io")):
-            assert device.read_firmware_version() == ""
-
-    def test_read_firmware_version_runtimeerror_returns_empty(self):
-        device = _make_device()
-        with patch.object(device, "read_value", side_effect=THZProtocolError("proto")):
-            assert device.read_firmware_version() == ""
-
-
-# ---------------------------------------------------------------------------
-# read_value / write_value / read_block
-# ---------------------------------------------------------------------------
-
-
-class TestReadValueWriteValueReadBlock:
-    def test_read_value_slices_response(self):
-        device = _make_device()
-        with patch.object(
-            device, "read_write_register", return_value=b"\x00\x01\x02\x03\x04"
-        ) as mock_rw:
-            result = device.read_value(b"\xfb", "get", 2, 2)
-        assert result == b"\x02\x03"
-        mock_rw.assert_called_once_with(b"\xfb", "get")
-
-    def test_write_value_calls_read_write_register(self):
-        device = _make_device()
-        with patch.object(device, "read_write_register") as mock_rw:
-            device.write_value(b"\xfb", b"\x01\x02")
-        mock_rw.assert_called_once_with(b"\xfb", "set", b"\x01\x02")
-
-    def test_read_block_delegates(self):
-        device = _make_device()
-        with patch.object(
-            device, "read_write_register", return_value=b"blockdata"
-        ) as mock_rw:
-            result = device.read_block(b"\x0a\x06\x48", "get")
-        assert result == b"blockdata"
-        mock_rw.assert_called_once_with(b"\x0a\x06\x48", "get")
-
-
-# ---------------------------------------------------------------------------
-# available_reading_blocks
-# ---------------------------------------------------------------------------
-
-
-class TestAvailableReadingBlocks:
-    def test_available_reading_blocks_empty_when_no_manager(self):
-        device = _make_device()
-        assert device.available_reading_blocks == []
-
-    def test_available_reading_blocks_lists_manager_keys(self):
-        device = _make_device()
-        mock_manager = MagicMock()
-        mock_manager.get_all_registers.return_value = {"a": 1, "b": 2}
-        device.register_map_manager = mock_manager
-        assert sorted(device.available_reading_blocks) == ["a", "b"]
-
-
-# ---------------------------------------------------------------------------
-# async_initialize
-# ---------------------------------------------------------------------------
-
-
-class TestAsyncInitialize:
-    @pytest.mark.asyncio
-    async def test_async_initialize_unknown_connection_raises(self):
-        device = _make_device(connection="bogus")
-        with pytest.raises(ValueError, match="Unknown connection type"):
-            await device.async_initialize(FakeHass())
-
-    @pytest.mark.asyncio
-    async def test_async_initialize_usb_low_firmware_no_cooling_probe(self):
-        device = _make_device(connection="usb")
-        with (
-            patch.object(device, "_connect_serial") as mock_connect,
-            patch.object(device, "read_firmware_version", return_value="206"),
-            patch.object(device, "_probe_cooling_support") as mock_probe,
-        ):
-            await device.async_initialize(FakeHass())
-
-        mock_connect.assert_called_once()
-        mock_probe.assert_not_called()
-        assert device._initialized is True
-        assert device.firmware_version == "206"
-        assert device.register_map_manager is not None
-        assert device.write_register_map_manager is not None
-
-    @pytest.mark.asyncio
-    async def test_async_initialize_ip_high_firmware_runs_cooling_probe(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        with (
-            patch.object(device, "_connect_tcp") as mock_connect,
-            patch.object(device, "read_firmware_version", return_value="539"),
-            patch.object(
-                device, "_probe_cooling_support", return_value=False
-            ) as mock_probe,
-        ):
-            await device.async_initialize(FakeHass())
-
-        mock_connect.assert_called_once()
-        mock_probe.assert_called_once()
-        assert device.has_cooling is False
-        assert device._initialized is True
-
-    @pytest.mark.asyncio
-    async def test_async_initialize_high_firmware_with_cooling(self):
-        device = _make_device(connection="usb")
-        with (
-            patch.object(device, "_connect_serial"),
-            patch.object(device, "read_firmware_version", return_value="539"),
-            patch.object(device, "_probe_cooling_support", return_value=True),
-        ):
-            await device.async_initialize(FakeHass())
-        assert device.has_cooling is True
-
-    @pytest.mark.asyncio
-    @pytest.mark.parametrize("firmware", [None, ""])
-    async def test_async_initialize_unread_firmware_raises_and_closes(self, firmware):
-        # read_firmware_version() returns "" on failure; that must not fall
-        # through to the 4.39 default profile.
-        device = _make_device(connection="usb")
-        port = MagicMock()
-
-        def _connect():
-            device.ser = port
-
-        with (
-            patch.object(device, "_connect_serial", side_effect=_connect),
-            patch.object(device, "read_firmware_version", return_value=firmware),
-        ):
-            with pytest.raises(ConnectionError, match="could not be read"):
-                await device.async_initialize(FakeHass())
-
-        port.close.assert_called_once()
-        assert device.ser is None
-        assert device.register_map_manager is None
-
-    @pytest.mark.asyncio
-    async def test_async_initialize_connects_in_executor(self):
-        device = _make_device(connection="ip", host="h", tcp_port=1)
-        hass = FakeHass()
-        calls = []
-        original = hass.async_add_executor_job
-
-        async def _record(func, *args):
-            calls.append(func)
-            return await original(func, *args)
-
-        hass.async_add_executor_job = _record
-        with (
-            patch.object(device, "_connect_tcp") as mock_connect,
-            patch.object(device, "read_firmware_version", return_value="439"),
-        ):
-            await device.async_initialize(hass)
-
-        assert calls[0] is mock_connect
-
-
-# ---------------------------------------------------------------------------
-# Full protocol round-trip integration tests (exercise the real stack
-# end-to-end through a scripted fake serial device).
-# ---------------------------------------------------------------------------
-
-
-class TestFullRoundtripIntegration:
-    def test_get_register_full_roundtrip(self):
-        device = _make_device(read_timeout=1.0)
-        # handshake1 response (0x10) + handshake2 response (0x10 0x02)
-        # + data telegram (header 01 00, crc, payload, DLE ETX terminator)
-        header = b"\x01\x00"
-        payload = b"\x00\xc8\x05"
-        crc = device.thz_checksum(header + b"\x00" + payload)
-        telegram_response = header + crc + payload + b"\x10\x03"
-        response_stream = b"\x10" + b"\x10\x02" + telegram_response
-
-        fake_serial = ScriptedSerial(response_stream)
-        device.ser = fake_serial
-
-        decoded = device.read_write_register(b"\xfb", "get")
-
-        assert decoded == crc + payload
-        # Verify the full write sequence happened: STX (handshake1),
-        # telegram, DLE (request data), STX (close).
-        assert fake_serial.written.startswith(b"\x02")
-        # One reset to flush stale bytes before handshake, one after handshake1.
-        assert fake_serial.reset_calls == 2
-
-    def test_set_register_full_roundtrip(self):
-        device = _make_device(read_timeout=1.0)
-        # Handshake 1 and 2, then the device's acknowledgement of the SET.
-        response_stream = b"\x10" + b"\x10\x02" + SET_ACK
-        fake_serial = ScriptedSerial(response_stream)
-        device.ser = fake_serial
-
-        result = device.write_value(b"\xfb", b"\x01\x02")
-
-        assert result is None
-        assert fake_serial.written.startswith(b"\x02")
-
-    def test_set_accepts_the_shortest_acknowledgement(self):
-        """FHEM reads a SET answer until it ends in 10 03, whatever its length."""
-        device = _make_device(read_timeout=1.0)
-        fake_serial = ScriptedSerial(b"\x10" + b"\x10\x02" + b"\x01\x80\x10\x03")
-        device.ser = fake_serial
-
-        device.write_value(b"\xfb", b"\x01\x02")
-
-    def test_set_nak_is_reported_without_waiting_for_the_timeout(self):
-        device = _make_device(read_timeout=5.0)
-        fake_serial = ScriptedSerial(b"\x10" + b"\x10\x02" + b"\x15")
-        device.ser = fake_serial
-
-        start = time.monotonic()
-        with pytest.raises(THZWriteRejectedError, match="NAK"):
-            device.write_value(b"\xfb", b"\x01\x02")
-        assert time.monotonic() - start < 1.0
-
-    def test_get_register_handshake_failure_raises_after_retries(self):
-        device = _make_device(read_timeout=0.05)
-        # Handshake1 gets a wrong byte both times; reconnect uses the
-        # (mocked) serial module, so _connect_serial succeeds but the new
-        # connection also never produces a valid handshake byte.
-        fake_serial = ScriptedSerial(b"\x99")
-        device.ser = fake_serial
-
-        with patch.object(device, "_reconnect"):
-            with pytest.raises(RuntimeError, match="Handshake 1 failed"):
-                device.send_request(b"telegram", "get")
-
-
-class TestSetIsNotRepeatedOnceSent:
-    """A SET that already went out is never sent a second time (#180)."""
-
-    def _device(self):
-        device = _make_device()
-        device.ser = MagicMock()
-        device._initialized = False  # skip liveness check
-        return device
-
-    def test_set_failing_after_telegram_is_not_repeated(self):
-        device = self._device()
-        with (
-            patch.object(device, "_do_handshake_1"),
-            patch.object(
-                device, "_do_handshake_2", side_effect=THZProtocolError("no ack")
-            ),
-            patch.object(device, "_write_bytes") as write,
-            patch.object(device, "_reconnect") as reconnect,
-            pytest.raises(RuntimeError, match="no ack"),
-        ):
-            device.send_request(b"TELEGRAM", "set")
-
-        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
-        assert len(telegram_writes) == 1
-        reconnect.assert_not_called()
-
-    def test_rejected_set_is_not_repeated(self, caplog):
-        device = self._device()
-        with (
-            patch.object(device, "_do_handshake_1"),
-            patch.object(device, "_do_handshake_2"),
-            patch.object(device, "_write_bytes") as write,
-            patch.object(device, "_reconnect") as reconnect,
-            patch.object(device, "_receive_data_telegram", return_value=b"\x15"),
-            pytest.raises(THZWriteRejectedError),
-        ):
-            device.send_request(b"TELEGRAM", "set")
-
-        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
-        assert len(telegram_writes) == 1
-        reconnect.assert_not_called()
-        # A rejection is a clear answer, not a SET of unknown outcome.
-        assert "may or may not have applied" not in caplog.text
-
-    def test_set_failing_before_telegram_is_retried(self):
-        device = self._device()
-        handshake = MagicMock(side_effect=[ConnectionError("down"), None])
-        with (
-            patch.object(device, "_do_handshake_1", handshake),
-            patch.object(device, "_do_handshake_2"),
-            patch.object(device, "_write_bytes") as write,
-            patch.object(device, "_reconnect"),
-            patch.object(device, "_receive_data_telegram", return_value=SET_ACK),
-        ):
-            assert device.send_request(b"TELEGRAM", "set") == b""
-
-        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
-        assert len(telegram_writes) == 1
-
-    def test_get_is_still_retried_after_telegram(self):
-        device = self._device()
-        with (
-            patch.object(device, "_do_handshake_1"),
-            patch.object(
-                device,
-                "_do_handshake_2",
-                side_effect=[THZProtocolError("no ack"), None],
-            ),
-            patch.object(device, "_write_bytes") as write,
-            patch.object(device, "_reconnect"),
-            patch.object(device, "_receive_data_telegram", return_value=b"data"),
-        ):
-            assert device.send_request(b"TELEGRAM", "get") == b"data"
-
-        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
-        assert len(telegram_writes) == 2
+            await device._connect()
+            assert await device.read_block(b"\xfb", "get") == crc + payload
+            await device.write_value(b"\x0a\x01\x12", b"\x00\x01")
+            device.close()
+
+        telegrams = [r for r in requests if isinstance(r, bytes)]
+        assert [t[:2] for t in telegrams] == [b"\x01\x00", b"\x01\x80"]

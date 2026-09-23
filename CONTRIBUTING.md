@@ -54,9 +54,9 @@ These keep the protocol code safe to change. Reviews check them.
    drops or reclassifies entities, `tests_ha/test_firmware_matrix.py`
    fails. Review the diff and accept it with `--snapshot-update` in the same
    change.
-6. **Blocking I/O stays in the executor.** Device access goes through
-   `THZDevice.async_execute`. Nothing on the event loop touches the serial
-   port or socket.
+6. **Device access goes through `THZDevice.async_execute`.** It holds the
+   device lock and the timeout. The transports are asyncio; nothing may
+   block the event loop, and nothing else touches the port or socket.
 
 ## Style
 

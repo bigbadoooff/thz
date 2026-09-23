@@ -708,7 +708,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         finally:
             # The probe connection must not outlive the flow: ser2net often
             # allows a single client, and the entry opens its own connection.
-            await self.hass.async_add_executor_job(device.close)
+            device.close()
 
         self.blocks = blocks
         self.connection_data["firmware"] = firmware

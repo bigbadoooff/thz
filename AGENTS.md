@@ -15,7 +15,8 @@ follow [CONTRIBUTING.md](CONTRIBUTING.md). The rules that matter most:
   FHEM's tables. The maps here are newer and were confirmed on devices.
 - **No new `except Exception`.** Catch specific exceptions.
 - **No history in comments.** History belongs in commit messages and issues.
-- **Blocking I/O only via `THZDevice.async_execute`.**
+- **Device I/O only via `THZDevice.async_execute`.** The transport is
+  asyncio; never block the event loop.
 - **User-facing strings go in `strings.json` and `translations/`.**
 
 ## Checks to run before committing

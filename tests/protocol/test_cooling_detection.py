@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from custom_components.thz.exceptions import THZProtocolError
 from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManager,
@@ -13,67 +15,75 @@ from custom_components.thz.thz_device import THZDevice
 class TestProbeCoolingSupport:
     """Tests for THZDevice._probe_cooling_support()."""
 
-    def test_no_cooling_all_zero_payload(self):
+    @pytest.mark.asyncio
+    async def test_no_cooling_all_zero_payload(self):
         """Device without cooling returns zero payload for 0A0648."""
         device = THZDevice(connection="usb", port="/dev/null")
         # Simulate decode_response output: checksum + addr + 0x00 0x00
         mock_response = bytes.fromhex("590a06480000")
 
         with patch.object(device, "read_block", return_value=mock_response):
-            assert device._probe_cooling_support() is False
+            assert await device._probe_cooling_support() is False
 
-    def test_cooling_present_nonzero_payload(self):
+    @pytest.mark.asyncio
+    async def test_cooling_present_nonzero_payload(self):
         """Device with cooling returns non-zero payload for 0A0648."""
         device = THZDevice(connection="usb", port="/dev/null")
         # Simulate a non-zero energy value at bytes 4-5
         mock_response = bytes.fromhex("590a064801f4")  # value 0x01f4 = 500
 
         with patch.object(device, "read_block", return_value=mock_response):
-            assert device._probe_cooling_support() is True
+            assert await device._probe_cooling_support() is True
 
-    def test_second_byte_nonzero_is_cooling(self):
+    @pytest.mark.asyncio
+    async def test_second_byte_nonzero_is_cooling(self):
         """Non-zero in byte 5 alone also signals cooling present."""
         device = THZDevice(connection="usb", port="/dev/null")
         mock_response = bytes.fromhex("590a06480001")  # only byte 5 non-zero
 
         with patch.object(device, "read_block", return_value=mock_response):
-            assert device._probe_cooling_support() is True
+            assert await device._probe_cooling_support() is True
 
-    def test_probe_returns_true_on_runtime_error(self):
+    @pytest.mark.asyncio
+    async def test_probe_returns_true_on_runtime_error(self):
         """Probe failure defaults to cooling supported (safe fallback)."""
         device = THZDevice(connection="usb", port="/dev/null")
 
         with patch.object(
             device, "read_block", side_effect=THZProtocolError("timeout")
         ):
-            assert device._probe_cooling_support() is True
+            assert await device._probe_cooling_support() is True
 
-    def test_probe_returns_true_on_connection_error(self):
+    @pytest.mark.asyncio
+    async def test_probe_returns_true_on_connection_error(self):
         """ConnectionError during probe defaults to cooling supported."""
         device = THZDevice(connection="usb", port="/dev/null")
 
         with patch.object(
             device, "read_block", side_effect=ConnectionError("disconnected")
         ):
-            assert device._probe_cooling_support() is True
+            assert await device._probe_cooling_support() is True
 
-    def test_probe_returns_true_on_os_error(self):
+    @pytest.mark.asyncio
+    async def test_probe_returns_true_on_os_error(self):
         """OSError during probe defaults to cooling supported."""
         device = THZDevice(connection="usb", port="/dev/null")
 
         with patch.object(device, "read_block", side_effect=OSError("io error")):
-            assert device._probe_cooling_support() is True
+            assert await device._probe_cooling_support() is True
 
-    def test_short_response_treated_as_cooling(self):
+    @pytest.mark.asyncio
+    async def test_short_response_treated_as_cooling(self):
         """Response shorter than 6 bytes is treated as cooling present (safe)."""
         device = THZDevice(connection="usb", port="/dev/null")
         # Only 4 bytes — can't check bytes 4-5
         mock_response = bytes.fromhex("590a0648")
 
         with patch.object(device, "read_block", return_value=mock_response):
-            assert device._probe_cooling_support() is True
+            assert await device._probe_cooling_support() is True
 
-    def test_has_cooling_default_is_true(self):
+    @pytest.mark.asyncio
+    async def test_has_cooling_default_is_true(self):
         """has_cooling is True before async_initialize is called."""
         device = THZDevice(connection="usb", port="/dev/null")
         assert device.has_cooling is True

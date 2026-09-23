@@ -8,6 +8,12 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **The connection runs on asyncio** (#185): serial port and ser2net TCP
+  no longer use a worker thread per request. The serial port is opened with
+  `pyserial-asyncio-fast`, a new requirement that Home Assistant installs
+  automatically. A request that exceeds its timeout is cancelled cleanly
+  instead of being left running in the background.
+
 - **A write the heat pump rejects is reported as an error.** The answer to a
   SET is now read and checked like FHEM does: only an acknowledgement
   (`01 80`) counts as success; NAK and the device's error answers (timing,

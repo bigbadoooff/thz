@@ -182,7 +182,7 @@ class TestAsyncSetupEntry:
             with pytest.raises(thz_module.ConfigEntryNotReady):
                 await thz_module.async_setup_entry(hass, entry)
 
-        hass.async_add_executor_job.assert_awaited_once_with(device.close)
+        device.close.assert_called_once_with()
         assert entry.runtime_data is None
 
     @pytest.mark.asyncio
@@ -266,7 +266,7 @@ class TestAsyncSetupEntry:
             with pytest.raises(thz_module.ConfigEntryNotReady):
                 await thz_module.async_setup_entry(hass, entry)
 
-        hass.async_add_executor_job.assert_any_await(device.close)
+        device.close.assert_called_with()
         hass.config_entries.async_forward_entry_setups.assert_not_awaited()
 
     @pytest.mark.asyncio
@@ -346,7 +346,7 @@ class TestAsyncUnloadEntry:
         result = await thz_module.async_unload_entry(hass, entry)
 
         assert result is True
-        hass.async_add_executor_job.assert_awaited_once_with(device.close)
+        device.close.assert_called_once_with()
         # Services are registered in async_setup and outlive every entry.
         hass.services.async_remove.assert_not_called()
 
@@ -377,7 +377,7 @@ class TestAsyncUnloadEntry:
         assert result is False
         assert entry.runtime_data.device is device
         assert entry.runtime_data.unsub_clock_check is None
-        hass.async_add_executor_job.assert_not_awaited()
+        device.close.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_unload_missing_entry_data_is_safe(self):

@@ -20,7 +20,7 @@ class TestTHZDeviceInitialization:
         assert device.port == "/dev/ttyUSB0"
         assert device.baudrate == 115200
         assert not device._initialized
-        assert device.ser is None
+        assert not device._transport.is_alive()
 
     def test_ip_initialization(self):
         """Test IP/network device initialization without connection."""
@@ -34,7 +34,7 @@ class TestTHZDeviceInitialization:
         assert device.host == "192.168.1.100"
         assert device.tcp_port == 2000
         assert not device._initialized
-        assert device.ser is None
+        assert not device._transport.is_alive()
 
     def test_default_baudrate(self):
         """Test default baudrate is applied."""
@@ -222,7 +222,7 @@ class TestWriteBlockValue:
 
         call_log = []
 
-        def fake_read_write_register(addr, mode, payload=b""):
+        async def fake_read_write_register(addr, mode, payload=b""):
             call_log.append((addr, mode, payload))
             if mode == "get":
                 return simulated_response
@@ -231,7 +231,8 @@ class TestWriteBlockValue:
         device.read_write_register = fake_read_write_register
         return device, call_log
 
-    def test_write_block_value_modifies_correct_bytes(self):
+    @pytest.mark.asyncio
+    async def test_write_block_value_modifies_correct_bytes(self):
         """Only the target bytes change, and the address is not sent twice.
 
         p01RoomTempDay: nibble offset=4 in FHEM/register_map -> byte offset=2 in
@@ -240,7 +241,7 @@ class TestWriteBlockValue:
         block_data = bytes(range(20))
         device, call_log = self._make_device_with_block(b"\x17", block_data)
 
-        device.write_block_value(b"\x17", offset=2, length=2, value=b"\xaa\xbb")
+        await device.write_block_value(b"\x17", offset=2, length=2, value=b"\xaa\xbb")
 
         assert len(call_log) == 2
         assert call_log[0] == (b"\x17", "get", b"")
@@ -251,55 +252,65 @@ class TestWriteBlockValue:
         expected[0:2] = b"\xaa\xbb"
         assert written_payload == bytes(expected)
 
-    def test_write_block_value_preserves_other_bytes(self):
+    @pytest.mark.asyncio
+    async def test_write_block_value_preserves_other_bytes(self):
         """Test that write_block_value does not disturb other bytes in the block."""
         block_data = b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a"
         device, call_log = self._make_device_with_block(b"\x06", block_data)
 
         # offset 6 in the decoded response -> data index 4
-        device.write_block_value(b"\x06", offset=6, length=2, value=b"\xff\xfe")
+        await device.write_block_value(b"\x06", offset=6, length=2, value=b"\xff\xfe")
 
         _, _, written = call_log[1]
         assert written[0:4] == block_data[0:4]
         assert written[4:6] == b"\xff\xfe"
         assert written[6:] == block_data[6:]
 
-    def test_write_block_value_wrong_length_raises(self):
+    @pytest.mark.asyncio
+    async def test_write_block_value_wrong_length_raises(self):
         """Test that passing a value of wrong length raises ValueError."""
         device, _ = self._make_device_with_block(b"\x17", bytes(10))
 
         with pytest.raises(ValueError, match="value length"):
-            device.write_block_value(
+            await device.write_block_value(
                 b"\x17",
                 offset=2,
                 length=2,
                 value=b"\xaa",  # 1 byte, expected 2
             )
 
-    def test_write_block_value_out_of_range_raises(self):
+    @pytest.mark.asyncio
+    async def test_write_block_value_out_of_range_raises(self):
         """Test that an out-of-range offset raises ValueError."""
         device, _ = self._make_device_with_block(b"\x17", bytes(5))
 
         with pytest.raises(ValueError, match="out of range"):
             # offset=6 -> data index 4; length=2 needs data[4:6] but len is 5.
-            device.write_block_value(b"\x17", offset=6, length=2, value=b"\xaa\xbb")
+            await device.write_block_value(
+                b"\x17", offset=6, length=2, value=b"\xaa\xbb"
+            )
 
-    def test_write_block_value_offset_inside_header_raises(self):
+    @pytest.mark.asyncio
+    async def test_write_block_value_offset_inside_header_raises(self):
         """Offsets pointing at the CRC or address echo are rejected."""
         device, _ = self._make_device_with_block(b"\x17", bytes(10))
 
         with pytest.raises(ValueError, match="out of range"):
-            device.write_block_value(b"\x17", offset=1, length=1, value=b"\x00")
+            await device.write_block_value(b"\x17", offset=1, length=1, value=b"\x00")
 
-    def test_write_block_value_wrong_echo_raises(self):
+    @pytest.mark.asyncio
+    async def test_write_block_value_wrong_echo_raises(self):
         """A read-back that echoes a different block is never written back."""
         device, call_log = self._make_device_with_block(b"\x05", bytes(10))
 
         with pytest.raises(RuntimeError, match="address echo"):
-            device.write_block_value(b"\x17", offset=2, length=2, value=b"\x00\x01")
+            await device.write_block_value(
+                b"\x17", offset=2, length=2, value=b"\x00\x01"
+            )
         assert all(mode == "get" for _, mode, _ in call_log)
 
-    def test_write_block_value_sends_fhem_compatible_telegram(self):
+    @pytest.mark.asyncio
+    async def test_write_block_value_sends_fhem_compatible_telegram(self):
         """Golden test on the wire: the SET telegram carries the address once."""
         device = THZDevice(connection="usb", port="/dev/null")
         data = bytes.fromhex("1700C800AA0064")
@@ -307,12 +318,12 @@ class TestWriteBlockValue:
         reply = b"\x01\x00" + crc + data + b"\x10\x03"
         sent = []
 
-        def fake_send_request(telegram, get_or_set):
+        async def fake_send_request(telegram, get_or_set):
             sent.append(telegram)
             return reply if get_or_set == "get" else b""
 
         device.send_request = fake_send_request
-        device.write_block_value(b"\x17", offset=2, length=2, value=b"\x00\xd2")
+        await device.write_block_value(b"\x17", offset=2, length=2, value=b"\x00\xd2")
 
         new_data = bytes.fromhex("1700D200AA0064")
         new_crc = device.thz_checksum(b"\x01\x80\x00" + new_data)

@@ -248,7 +248,7 @@ class SimulatedDirectDevice(Simulated2xxDevice):
         super().__init__({})
         self.registers: dict[bytes, bytes] = {}
 
-    def send_request(self, telegram: bytes, get_or_set: str) -> bytes:
+    async def send_request(self, telegram: bytes, get_or_set: str) -> bytes:
         self.sent.append(telegram)
         body = self.unescape(telegram[2:-2])[1:]
         command, data = body[:3], body[3:]
