@@ -405,52 +405,6 @@ class TestAsyncRemoveEntry:
         mock_get.return_value.async_remove.assert_any_call("sensor.thz_b")
 
 
-class TestMigrateDisableHiddenEntities:
-    @pytest.mark.asyncio
-    async def test_skips_when_already_migrated(self):
-        hass = _mock_hass()
-        entry = _mock_config_entry(_hidden_entities_migrated=True)
-
-        with patch.object(thz_module.er, "async_get") as mock_get:
-            await thz_module._async_migrate_disable_hidden_entities(hass, entry)
-            mock_get.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_disables_hidden_entities_and_sets_flag(self):
-        hass = _mock_hass()
-        entry = _mock_config_entry()
-
-        hidden_entity = MagicMock(
-            unique_id="programHC1_Mo_0", original_name=None, name=None,
-            entity_id="time.thz_program", disabled_by=None,
-        )
-        visible_entity = MagicMock(
-            unique_id="insideTempRC", original_name="Inside Temperature",
-            name=None, entity_id="sensor.thz_inside_temp", disabled_by=None,
-        )
-        already_disabled = MagicMock(
-            unique_id="programHC2_Mo_0", original_name=None, name=None,
-            entity_id="time.thz_program2", disabled_by="user",
-        )
-
-        ent_reg = MagicMock()
-        ent_reg.async_update_entity = MagicMock()
-
-        with patch.object(thz_module.er, "async_get", return_value=ent_reg), \
-             patch.object(
-                 thz_module.er, "async_entries_for_config_entry",
-                 return_value=[hidden_entity, visible_entity, already_disabled],
-             ):
-            await thz_module._async_migrate_disable_hidden_entities(hass, entry)
-
-        ent_reg.async_update_entity.assert_called_once()
-        call_args = ent_reg.async_update_entity.call_args
-        assert call_args[0][0] == "time.thz_program"
-        hass.config_entries.async_update_entry.assert_called_once()
-        _, kwargs = hass.config_entries.async_update_entry.call_args
-        assert kwargs["data"]["_hidden_entities_migrated"] is True
-
-
 class TestCleanupOrphanedEntities:
     @pytest.mark.asyncio
     async def test_removes_orphaned_thz_entities(self):

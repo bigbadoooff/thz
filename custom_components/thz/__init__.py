@@ -29,7 +29,6 @@ from .const import (
     ENTITY_VISIBILITY_EXTENDED,
     FIRMWARE_OVERRIDE_AUTO,
     should_hide_entity,
-    should_hide_entity_by_default,
 )
 from .services import async_refresh_block as async_refresh_block
 from .services import async_setup_services
@@ -272,73 +271,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     return True
 
 
-async def _async_migrate_disable_hidden_entities(
-    hass: HomeAssistant, config_entry: ConfigEntry
-) -> None:
-    """One-time migration: disable entities that should be hidden by default.
-
-    When upgrading from older versions, program/schedule, HC2, and advanced
-    parameter entities may already be registered as enabled. This migration
-    disables them once so they no longer clutter the UI.
-
-    Entities explicitly re-enabled by the user afterwards will stay enabled
-    because the migration only runs once (guarded by a stored flag).
-
-    Superseded going forward by _async_apply_entity_visibility_tier(), which
-    is what async_setup_entry() actually calls now -- that function's
-    backward-compatibility handling treats an entry with
-    "_hidden_entities_migrated" already set as equivalent to having applied
-    the "default" visibility tier once, so this function no longer needs to
-    run for new setups. Kept only for entries frozen mid-migration and for
-    its direct unit test coverage.
-
-    Args:
-        hass: The Home Assistant instance.
-        config_entry: The config entry to migrate entities for.
-    """
-    if config_entry.data.get("_hidden_entities_migrated"):
-        return
-
-    ent_reg = er.async_get(hass)
-    entries = er.async_entries_for_config_entry(ent_reg, config_entry.entry_id)
-    disabled_count = 0
-
-    for entity_entry in entries:
-        # Check unique_id for program/hc2 patterns (most reliable identifier)
-        uid = (entity_entry.unique_id or "").lower()
-        name = (entity_entry.original_name or entity_entry.name or "").lower()
-
-        should_hide = (
-            should_hide_entity_by_default(uid)
-            or should_hide_entity_by_default(name)
-            or "program" in uid
-        )
-
-        if should_hide and entity_entry.disabled_by is None:
-            disabler: er.RegistryEntryDisabler = er.RegistryEntryDisabler.INTEGRATION
-            ent_reg.async_update_entity(
-                entity_entry.entity_id,
-                disabled_by=disabler,
-            )
-            disabled_count += 1
-            _LOGGER.debug(
-                "Migration: disabled hidden entity %s (uid=%s)",
-                entity_entry.entity_id,
-                entity_entry.unique_id,
-            )
-
-    if disabled_count:
-        _LOGGER.info(
-            "Migration: disabled %d program/HC2/advanced entities", disabled_count
-        )
-
-    # Store flag so this migration only runs once
-    hass.config_entries.async_update_entry(
-        config_entry,
-        data={**config_entry.data, "_hidden_entities_migrated": True},
-    )
-
-
 def _entity_should_be_hidden(
     uid: str, name: str, visibility: str, enable_hc2: bool = False
 ) -> bool:
@@ -403,9 +335,9 @@ async def _async_apply_entity_visibility_tier(
 
     last_applied = config_entry.data.get("_entity_visibility_applied")
     if last_applied is None and config_entry.data.get("_hidden_entities_migrated"):
-        # Backward compatibility: the old one-time migration already ran and
-        # enforced the "default" tier's hidden set. Treat that as equivalent
-        # to having applied the "default" tier once.
+        # Backward compatibility: entries set up by older versions ran a
+        # one-time migration (since removed) that enforced the "default"
+        # tier's hidden set. Treat that as having applied "default" once.
         last_applied = ENTITY_VISIBILITY_DEFAULT
 
     last_applied_hc2 = config_entry.data.get("_entity_hc2_applied")
