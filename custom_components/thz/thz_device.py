@@ -917,33 +917,40 @@ class THZDevice:
 
         Args:
             block_addr: Single-byte block address (e.g. b'\x17' for block "pxx17").
-            offset: Byte offset of the parameter within the decoded block response.
-                    The decoded response starts with a CRC byte at index 0, so
-                    offset=4 corresponds to payload byte 3.
+            offset: Byte offset of the parameter within the decoded block response,
+                    which starts with the CRC byte at index 0 followed by the
+                    echoed block address.
             length: Number of bytes occupied by the parameter value.
             value: Encoded bytes to write (must be exactly ``length`` bytes).
 
         Raises:
             ValueError: If ``value`` is not ``length`` bytes, or if the offset/length
                         is out of range for the block.
-            RuntimeError: If the device read or write fails.
+            RuntimeError: If the device read or write fails, or the read-back
+                block does not echo ``block_addr``.
         """
         if len(value) != length:
             raise ValueError(
                 f"write_block_value: value length {len(value)} != expected {length}"
             )
 
-        # Read the current block.
-        # decode_response returns [CRC_byte] + PAYLOAD_BYTES, so response[1:] is the
-        # raw payload that must be sent back unchanged (except for the modified bytes).
+        # Read the current block. decode_response returns
+        # [CRC] + [address echo] + [data]; only the data is sent back, since
+        # read_write_register prepends block_addr itself (FHEM's THZ_Set
+        # likewise re-encodes the read-back message with the address once).
         response = self.read_write_register(block_addr, "get")
+        header_len = 1 + len(block_addr)
+        echo = response[1:header_len]
+        if echo != block_addr:
+            raise RuntimeError(
+                f"write_block_value: unexpected address echo {echo.hex()} "
+                f"for block {block_addr.hex()}"
+            )
+        payload = bytearray(response[header_len:])
 
-        # response[0] = calculated CRC; response[1:] = PAYLOAD_BYTES from device.
-        payload = bytearray(response[1:])
-
-        # Register map offsets are relative to the full decoded response (CRC at 0),
-        # so we subtract 1 to get the index into the payload slice.
-        payload_offset = offset - 1
+        # Register map offsets are relative to the full decoded response (CRC
+        # at 0, address echo after it), so shift them into the data slice.
+        payload_offset = offset - header_len
         if payload_offset < 0 or payload_offset + length > len(payload):
             raise ValueError(
                 f"write_block_value: offset={offset}/length={length} out of range "

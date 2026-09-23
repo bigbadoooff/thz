@@ -217,13 +217,14 @@ class TestFirmwareVersion:
 class TestWriteBlockValue:
     """Tests for write_block_value method (2xx firmware read-modify-write)."""
 
-    def _make_device_with_block(self, block_data: bytes):
-        """Create a THZDevice mock with read_write_register returning block_data."""
-        device = THZDevice(connection="usb", port="/dev/null")
+    def _make_device_with_block(self, block_addr: bytes, block_data: bytes):
+        """Create a THZDevice whose read_write_register returns block_data.
 
-        # Simulate decode_response output: [CRC] + PAYLOAD_BYTES
-        # block_data represents the raw PAYLOAD_BYTES (without CRC prefix).
-        simulated_response = b"\xAB" + block_data  # CRC=0xAB, payload=block_data
+        Simulates decode_response output for a real 2xx block read:
+        [CRC] + [address echo] + [data].
+        """
+        device = THZDevice(connection="usb", port="/dev/null")
+        simulated_response = b"\xAB" + block_addr + block_data
 
         call_log = []
 
@@ -237,46 +238,41 @@ class TestWriteBlockValue:
         return device, call_log
 
     def test_write_block_value_modifies_correct_bytes(self):
-        """Test that write_block_value replaces only the target bytes.
+        """Only the target bytes change, and the address is not sent twice.
 
-        p01RoomTempDay: nibble offset=4 in FHEM/register_map → byte offset=2 in full
-        response (CRC at byte 0).  write_block_value strips the CRC byte so the payload
-        index is offset-1 = 1.  The value is 2 bytes wide (nibble length 4 → byte 2).
+        p01RoomTempDay: nibble offset=4 in FHEM/register_map -> byte offset=2 in
+        the decoded response (CRC at 0, address echo at 1) -> data index 0.
         """
-        block_payload = bytes(range(20))  # [0,1,2,...,19]
-        device, call_log = self._make_device_with_block(block_payload)
+        block_data = bytes(range(20))
+        device, call_log = self._make_device_with_block(b"\x17", block_data)
 
-        new_value = b"\xAA\xBB"
-        # offset=2 is the byte offset in the full response (CRC at 0); payload index=1.
-        device.write_block_value(b"\x17", offset=2, length=2, value=new_value)
+        device.write_block_value(b"\x17", offset=2, length=2, value=b"\xAA\xBB")
 
         assert len(call_log) == 2
         assert call_log[0] == (b"\x17", "get", b"")
         addr, mode, written_payload = call_log[1]
         assert addr == b"\x17"
         assert mode == "set"
-        expected = bytearray(block_payload)
-        expected[1:3] = new_value  # payload_offset = offset-1 = 1
+        expected = bytearray(block_data)
+        expected[0:2] = b"\xAA\xBB"
         assert written_payload == bytes(expected)
 
     def test_write_block_value_preserves_other_bytes(self):
         """Test that write_block_value does not disturb other bytes in the block."""
-        block_payload = b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A"
-        device, call_log = self._make_device_with_block(block_payload)
+        block_data = b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A"
+        device, call_log = self._make_device_with_block(b"\x06", block_data)
 
-        # Write 2 bytes at offset 6 (payload index 5)
-        new_value = b"\xFF\xFE"
-        device.write_block_value(b"\x06", offset=6, length=2, value=new_value)
+        # offset 6 in the decoded response -> data index 4
+        device.write_block_value(b"\x06", offset=6, length=2, value=b"\xFF\xFE")
 
         _, _, written = call_log[1]
-        assert written[0:5] == block_payload[0:5]   # bytes before target unchanged
-        assert written[5:7] == b"\xFF\xFE"           # target bytes replaced
-        assert written[7:] == block_payload[7:]       # bytes after target unchanged
+        assert written[0:4] == block_data[0:4]
+        assert written[4:6] == b"\xFF\xFE"
+        assert written[6:] == block_data[6:]
 
     def test_write_block_value_wrong_length_raises(self):
         """Test that passing a value of wrong length raises ValueError."""
-        block_payload = bytes(10)
-        device, _ = self._make_device_with_block(block_payload)
+        device, _ = self._make_device_with_block(b"\x17", bytes(10))
 
         with pytest.raises(ValueError, match="value length"):
             device.write_block_value(
@@ -285,17 +281,46 @@ class TestWriteBlockValue:
 
     def test_write_block_value_out_of_range_raises(self):
         """Test that an out-of-range offset raises ValueError."""
-        block_payload = bytes(5)
-        device, _ = self._make_device_with_block(block_payload)
+        device, _ = self._make_device_with_block(b"\x17", bytes(5))
 
         with pytest.raises(ValueError, match="out of range"):
-            # offset=5 → payload_offset=4, length=2 → needs payload[4:6] but len=5
-            device.write_block_value(
-                b"\x17",
-                offset=5,
-                length=2,
-                value=b"\xAA\xBB",
-            )
+            # offset=6 -> data index 4; length=2 needs data[4:6] but len is 5.
+            device.write_block_value(b"\x17", offset=6, length=2, value=b"\xAA\xBB")
+
+    def test_write_block_value_offset_inside_header_raises(self):
+        """Offsets pointing at the CRC or address echo are rejected."""
+        device, _ = self._make_device_with_block(b"\x17", bytes(10))
+
+        with pytest.raises(ValueError, match="out of range"):
+            device.write_block_value(b"\x17", offset=1, length=1, value=b"\x00")
+
+    def test_write_block_value_wrong_echo_raises(self):
+        """A read-back that echoes a different block is never written back."""
+        device, call_log = self._make_device_with_block(b"\x05", bytes(10))
+
+        with pytest.raises(RuntimeError, match="address echo"):
+            device.write_block_value(b"\x17", offset=2, length=2, value=b"\x00\x01")
+        assert all(mode == "get" for _, mode, _ in call_log)
+
+    def test_write_block_value_sends_fhem_compatible_telegram(self):
+        """Golden test on the wire: the SET telegram carries the address once."""
+        device = THZDevice(connection="usb", port="/dev/null")
+        data = bytes.fromhex("17" "00C8" "00AA" "0064")
+        crc = device.thz_checksum(b"\x01\x00\x00" + data)
+        reply = b"\x01\x00" + crc + data + b"\x10\x03"
+        sent = []
+
+        def fake_send_request(telegram, get_or_set):
+            sent.append(telegram)
+            return reply if get_or_set == "get" else b""
+
+        device.send_request = fake_send_request
+        device.write_block_value(b"\x17", offset=2, length=2, value=b"\x00\xD2")
+
+        new_data = bytes.fromhex("17" "00D2" "00AA" "0064")
+        new_crc = device.thz_checksum(b"\x01\x80\x00" + new_data)
+        assert sent[1] == b"\x01\x80" + new_crc + new_data + b"\x10\x03"
+
 
 
 class TestFirmwareOverride:
