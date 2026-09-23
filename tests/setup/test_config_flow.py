@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.thz.const import DOMAIN
+from custom_components.thz.exceptions import THZProtocolError
 
 # ---------------------------------------------------------------------------
 # Module-level setup, mirroring tests/setup/test_config_flow_ports.py's approach:
@@ -458,7 +459,7 @@ class TestAsyncStepDetectBlocks:
         }
         mock_device = MagicMock()
         mock_device.async_initialize = AsyncMock(
-            side_effect=RuntimeError("firmware unknown")
+            side_effect=THZProtocolError("firmware unknown")
         )
 
         with patch.object(config_flow_module, "THZDevice", return_value=mock_device):

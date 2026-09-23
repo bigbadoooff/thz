@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from custom_components.thz.exceptions import THZProtocolError
 from custom_components.thz.time import (
     THZScheduleTime,
     THZTime,
@@ -377,7 +378,7 @@ class TestTHZScheduleTime:
         entity.name = "programHC1_Mo_0 Start"
         entity.hass = _make_hass()
         assert entity.available is True
-        device.async_execute = AsyncMock(side_effect=RuntimeError("comm error"))
+        device.async_execute = AsyncMock(side_effect=THZProtocolError("comm error"))
 
         await entity.async_update()
 

@@ -24,6 +24,7 @@ SERIAL_PORT = "/dev/ttyUSB0"
 TIMEOUT = 1
 DATALINKESCAPE = b"\x10"  # Data Link Escape
 STARTOFTEXT = b"\x02"  # Start of Text
+NAK = b"\x15"  # Negative acknowledge
 ENDOFTEXT = b"\x03"  # End of Text
 CONF_CONNECTION_TYPE = "connection_type"
 CONNECTION_USB = "usb"

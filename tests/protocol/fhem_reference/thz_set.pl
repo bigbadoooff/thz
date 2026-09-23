@@ -19,10 +19,12 @@
 #    "parsing": {type: [[title, pos, len, type, factor], ...]},
 #    "blocks": {"17": "<hex data after the address byte>", ...},
 #    "cases": [["p01RoomTempDay", "21"], ...],
-#    "parse": {"17": "<parsing type to decode block 17 with>", ...}}
+#    "parse": {"17": "<parsing type to decode block 17 with>", ...},
+#    "decode": ["<raw answer hex>", ...]}
 # Output (JSON on stdout):
 #   {"sets": {"<param> <value>": {"telegrams": [hex, ...]} | {"error": msg}},
-#    "parsed": {"<block>": "<THZ_Parse1 output>"}}
+#    "parsed": {"<block>": "<THZ_Parse1 output>"},
+#    "decoded": {"<raw answer hex>": "<THZ_decode error>" | null}}
 use strict;
 use warnings;
 use JSON::PP;
@@ -139,4 +141,9 @@ for my $addr (keys %{ $input->{parse} || {} }) {
     my $crc = THZ_checksum("0100XX" . $data . "1003");
     $parsed{$addr} = THZ_TestParse($hash, $crc . $data, $input->{parse}{$addr});
 }
-print encode_json({ sets => \%result, parsed => \%parsed });
+my %decoded;
+for my $answer (@{ $input->{decode} || [] }) {
+    my ($err) = THZ_decode(uc($answer));
+    $decoded{$answer} = $err;
+}
+print encode_json({ sets => \%result, parsed => \%parsed, decoded => \%decoded });

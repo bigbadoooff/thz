@@ -9,11 +9,20 @@ success and failure paths.
 
 import itertools
 import socket as socket_module
+import time
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from custom_components.thz.thz_device import THZDevice, THZRegisterNotSupportedError
+from custom_components.thz.exceptions import (
+    THZNotSupportedError,
+    THZProtocolError,
+    THZWriteRejectedError,
+)
+from custom_components.thz.thz_device import THZDevice
+
+# Answer of the device to an accepted SET (header 01 80, see FHEM THZ_decode).
+SET_ACK = b"\x01\x80\x81\x10\x03"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -424,14 +433,50 @@ class TestExchangeOnce:
         mocks["_receive_data_telegram"].assert_called_once()
         assert result == b"DATA"
 
-    def test_exchange_once_set_skips_data_read(self):
+    def test_exchange_once_set_requires_the_acknowledgement(self):
         device = _make_device()
         device._initialized = True
         mocks = self._make_mocks(alive=True)
+        mocks["_receive_data_telegram"].return_value = SET_ACK
         with patch.multiple(device, **mocks):
             result = device._exchange_once(b"telegram", "set", 0, 1)
-        mocks["_receive_data_telegram"].assert_not_called()
+        mocks["_receive_data_telegram"].assert_called_once()
         assert result == b""
+
+    @pytest.mark.parametrize(
+        ("answer", "reason"),
+        [
+            (b"\x15", "NAK"),
+            (b"\x01\x01\x02\x10\x03", "timing issue"),
+            (b"\x01\x02\x03\x10\x03", "CRC error in request"),
+            (b"\x01\x03\x04\x10\x03", "command not known"),
+            (b"\x01\x04\x05\x10\x03", "unknown register"),
+            (b"\x01\x99\x01\x10\x03", "unknown answer"),
+            (b"\x01\x00\x00\x0a\x10\x03", "CRC error in answer"),
+        ],
+    )
+    def test_exchange_once_set_rejected(self, answer, reason):
+        """Only the 01 80 header acknowledges a SET, as in FHEM's THZ_decode."""
+        device = _make_device()
+        device._initialized = True
+        mocks = self._make_mocks(alive=True)
+        mocks["_receive_data_telegram"].return_value = answer
+        with (
+            patch.multiple(device, **mocks),
+            pytest.raises(THZWriteRejectedError, match=reason),
+        ):
+            device._exchange_once(b"telegram", "set", 0, 1)
+
+    def test_exchange_once_get_nak_is_a_protocol_error(self):
+        device = _make_device()
+        device._initialized = True
+        mocks = self._make_mocks(alive=True)
+        mocks["_receive_data_telegram"].return_value = b"\x15"
+        with (
+            patch.multiple(device, **mocks),
+            pytest.raises(THZProtocolError, match="NAK"),
+        ):
+            device._exchange_once(b"telegram", "get", 0, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -491,7 +536,7 @@ class TestSendRequest:
             patch.object(
                 device,
                 "_exchange_once",
-                side_effect=[RuntimeError("proto"), b"ok2"],
+                side_effect=[THZProtocolError("proto"), b"ok2"],
             ),
             patch.object(device, "_reconnect") as mock_reconnect,
         ):
@@ -505,7 +550,7 @@ class TestSendRequest:
             patch.object(
                 device,
                 "_exchange_once",
-                side_effect=[RuntimeError("first"), RuntimeError("second")],
+                side_effect=[THZProtocolError("first"), THZProtocolError("second")],
             ),
             patch.object(device, "_reconnect"),
         ):
@@ -515,7 +560,9 @@ class TestSendRequest:
     def test_send_request_runtime_error_reconnect_also_fails(self):
         device = _make_device()
         with (
-            patch.object(device, "_exchange_once", side_effect=[RuntimeError("proto")]),
+            patch.object(
+                device, "_exchange_once", side_effect=[THZProtocolError("proto")]
+            ),
             patch.object(device, "_reconnect", side_effect=OSError("no port")),
         ):
             with pytest.raises(RuntimeError, match="proto"):
@@ -828,7 +875,7 @@ class TestDecodeResponse:
 
     def test_decode_response_register_not_supported_raises(self):
         device = _make_device()
-        with pytest.raises(THZRegisterNotSupportedError):
+        with pytest.raises(THZNotSupportedError):
             device.decode_response(b"\x01\x04\x00\x00\x00\x00")
 
     def test_decode_response_unknown_header_returns_none(self):
@@ -903,7 +950,7 @@ class TestReadFirmwareVersion:
 
     def test_read_firmware_version_runtimeerror_returns_empty(self):
         device = _make_device()
-        with patch.object(device, "read_value", side_effect=RuntimeError("proto")):
+        with patch.object(device, "read_value", side_effect=THZProtocolError("proto")):
             assert device.read_firmware_version() == ""
 
 
@@ -1087,8 +1134,8 @@ class TestFullRoundtripIntegration:
 
     def test_set_register_full_roundtrip(self):
         device = _make_device(read_timeout=1.0)
-        # Only handshake1 + handshake2 responses are needed for a "set".
-        response_stream = b"\x10" + b"\x10\x02"
+        # Handshake 1 and 2, then the device's acknowledgement of the SET.
+        response_stream = b"\x10" + b"\x10\x02" + SET_ACK
         fake_serial = ScriptedSerial(response_stream)
         device.ser = fake_serial
 
@@ -1096,6 +1143,24 @@ class TestFullRoundtripIntegration:
 
         assert result is None
         assert fake_serial.written.startswith(b"\x02")
+
+    def test_set_accepts_the_shortest_acknowledgement(self):
+        """FHEM reads a SET answer until it ends in 10 03, whatever its length."""
+        device = _make_device(read_timeout=1.0)
+        fake_serial = ScriptedSerial(b"\x10" + b"\x10\x02" + b"\x01\x80\x10\x03")
+        device.ser = fake_serial
+
+        device.write_value(b"\xfb", b"\x01\x02")
+
+    def test_set_nak_is_reported_without_waiting_for_the_timeout(self):
+        device = _make_device(read_timeout=5.0)
+        fake_serial = ScriptedSerial(b"\x10" + b"\x10\x02" + b"\x15")
+        device.ser = fake_serial
+
+        start = time.monotonic()
+        with pytest.raises(THZWriteRejectedError, match="NAK"):
+            device.write_value(b"\xfb", b"\x01\x02")
+        assert time.monotonic() - start < 1.0
 
     def test_get_register_handshake_failure_raises_after_retries(self):
         device = _make_device(read_timeout=0.05)
@@ -1123,10 +1188,28 @@ class TestSetIsNotRepeatedOnceSent:
         device = self._device()
         with (
             patch.object(device, "_do_handshake_1"),
-            patch.object(device, "_do_handshake_2", side_effect=RuntimeError("no ack")),
+            patch.object(
+                device, "_do_handshake_2", side_effect=THZProtocolError("no ack")
+            ),
             patch.object(device, "_write_bytes") as write,
             patch.object(device, "_reconnect") as reconnect,
             pytest.raises(RuntimeError, match="no ack"),
+        ):
+            device.send_request(b"TELEGRAM", "set")
+
+        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
+        assert len(telegram_writes) == 1
+        reconnect.assert_not_called()
+
+    def test_rejected_set_is_not_repeated(self):
+        device = self._device()
+        with (
+            patch.object(device, "_do_handshake_1"),
+            patch.object(device, "_do_handshake_2"),
+            patch.object(device, "_write_bytes") as write,
+            patch.object(device, "_reconnect") as reconnect,
+            patch.object(device, "_receive_data_telegram", return_value=b"\x15"),
+            pytest.raises(THZWriteRejectedError),
         ):
             device.send_request(b"TELEGRAM", "set")
 
@@ -1142,6 +1225,7 @@ class TestSetIsNotRepeatedOnceSent:
             patch.object(device, "_do_handshake_2"),
             patch.object(device, "_write_bytes") as write,
             patch.object(device, "_reconnect"),
+            patch.object(device, "_receive_data_telegram", return_value=SET_ACK),
         ):
             assert device.send_request(b"TELEGRAM", "set") == b""
 
@@ -1153,7 +1237,9 @@ class TestSetIsNotRepeatedOnceSent:
         with (
             patch.object(device, "_do_handshake_1"),
             patch.object(
-                device, "_do_handshake_2", side_effect=[RuntimeError("no ack"), None]
+                device,
+                "_do_handshake_2",
+                side_effect=[THZProtocolError("no ack"), None],
             ),
             patch.object(device, "_write_bytes") as write,
             patch.object(device, "_reconnect"),

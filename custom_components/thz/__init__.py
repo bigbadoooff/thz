@@ -40,9 +40,10 @@ from .devices import (
     async_remove_empty_subdevices,
     main_device_name,
 )
+from .exceptions import DEVICE_ERRORS, THZNotSupportedError
 from .runtime_data import THZRuntimeData, loaded_runtime_data
 from .services import async_refresh_block as async_refresh_block, async_setup_services
-from .thz_device import THZDevice, THZRegisterNotSupportedError
+from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -554,7 +555,7 @@ async def _async_update_block(
             result = bytes(buf)
 
         return result
-    except THZRegisterNotSupportedError:
+    except THZNotSupportedError:
         # Device permanently doesn't support this block — return None so the
         # coordinator marks the block as unsupported without triggering a reconnect
         # or raising UpdateFailed (which would propagate as ConfigEntryNotReady).
@@ -562,7 +563,7 @@ async def _async_update_block(
             "Block %s is not supported by this device firmware; skipping.", block_name
         )
         return None
-    except Exception as err:
+    except DEVICE_ERRORS as err:
         raise UpdateFailed(f"Error reading {block_name}: {err}") from err
 
 

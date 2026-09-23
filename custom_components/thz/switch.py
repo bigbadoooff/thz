@@ -16,6 +16,7 @@ from .const import (
     WRITE_REGISTER_OFFSET,
 )
 from .entity_translations import get_translation_key
+from .exceptions import DEVICE_ERRORS
 from .platform_setup import async_setup_write_platform
 from .thz_device import THZDevice
 from .value_codec import THZValueCodec
@@ -125,7 +126,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
 
             self._is_on = True
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-        except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error encoding switch %s to turn on: %s", self.name, err, exc_info=True
             )
@@ -147,7 +148,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
 
             self._is_on = False
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-        except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error encoding switch %s to turn off: %s",
                 self.name,

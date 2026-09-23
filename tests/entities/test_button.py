@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.thz.button import THZButton, async_setup_entry
+from custom_components.thz.exceptions import THZProtocolError
 from tests.helpers import make_runtime_data
 
 
@@ -143,7 +144,7 @@ class TestTHZButtonPress:
 
         entity = _make_entity()
         entity.hass = MagicMock()
-        entity._device.async_execute = AsyncMock(side_effect=RuntimeError("boom"))
+        entity._device.async_execute = AsyncMock(side_effect=THZProtocolError("boom"))
 
         with pytest.raises(HomeAssistantError):
             await entity.async_press()

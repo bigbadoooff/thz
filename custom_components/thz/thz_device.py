@@ -17,6 +17,14 @@ from homeassistant.core import HomeAssistant
 import serial
 
 from . import const
+from .exceptions import (
+    DEVICE_ERRORS,
+    THZConnectionError,
+    THZNotInitializedError,
+    THZNotSupportedError,
+    THZProtocolError,
+    THZWriteRejectedError,
+)
 from .register_maps.register_map_manager import (
     RegisterMapManager,
     RegisterMapManagerWrite,
@@ -25,13 +33,15 @@ from .register_maps.register_map_manager import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class THZRegisterNotSupportedError(RuntimeError):
-    """Raised when the device reports a register is not supported (0x01 0x04 response).
-
-    This is a permanent condition for a given register on a given device firmware,
-    not a transient communication error. Callers should treat this as an unavailable
-    value rather than retrying or failing setup.
-    """
+# Shortest answer to a SET: header (01 xx) and the 10 03 terminator.
+_SET_ANSWER_MIN = 4
+# Error headers of the answer to a SET, as named in FHEM's THZ_decode.
+_SET_ERRORS = {
+    b"\x01\x01": "timing issue",
+    b"\x01\x02": "CRC error in request",
+    b"\x01\x03": "command not known",
+    b"\x01\x04": "unknown register",
+}
 
 
 class THZDevice:
@@ -94,7 +104,7 @@ class THZDevice:
                 # Never guess a profile: an unanswered FD request would
                 # otherwise fall through to the 4.39 default maps, including
                 # their write commands.
-                raise ConnectionError("Firmware version could not be read")
+                raise THZConnectionError("Firmware version could not be read")
         except BaseException:
             self._force_close()
             raise
@@ -150,7 +160,9 @@ class THZDevice:
         ):
             return self._firmware_override
         if self._firmware_version is None:
-            raise RuntimeError("Device not initialized or firmware version unknown")
+            raise THZNotInitializedError(
+                "Device not initialized or firmware version unknown"
+            )
         return self._firmware_version
 
     def _connect_serial(self):
@@ -260,7 +272,7 @@ class THZDevice:
         """
         abandoned: threading.Event | None = getattr(self._call_state, "abandoned", None)
         if abandoned is not None and abandoned.is_set():
-            raise ConnectionError("Device call abandoned after its timeout")
+            raise THZConnectionError("Device call abandoned after its timeout")
 
     def _run_abandonable(
         self, abandoned: threading.Event, fn: Callable[..., Any], *args: Any
@@ -298,7 +310,7 @@ class THZDevice:
             timeout: Read timeout in seconds.
 
         Raises:
-            RuntimeError: If the device response is not 0x10.
+            THZProtocolError: If the device response is not 0x10.
         """
         self._write_bytes(const.STARTOFTEXT)
         response = self._read_exact(1, timeout)
@@ -306,7 +318,7 @@ class THZDevice:
             resp_hex = response.hex() if response else "no data"
             error_msg = f"Handshake 1 failed, received: {resp_hex}"
             _LOGGER.debug(error_msg)
-            raise RuntimeError(error_msg)
+            raise THZProtocolError(error_msg)
 
     def _do_handshake_2(self, timeout: float) -> None:
         """Perform handshake step 2: read and validate 0x10 0x02.
@@ -318,7 +330,7 @@ class THZDevice:
             timeout: Read timeout in seconds.
 
         Raises:
-            RuntimeError: If the combined two-byte response is not 0x10 0x02.
+            THZProtocolError: If the combined two-byte response is not 0x10 0x02.
         """
         response = self._read_exact(2, timeout)
 
@@ -337,7 +349,7 @@ class THZDevice:
                 byte_hex = second_byte.hex() if second_byte else "no data"
                 error_msg = f"Handshake 2 failed: received 0x10 then {byte_hex}"
                 _LOGGER.debug(error_msg)
-                raise RuntimeError(error_msg)
+                raise THZProtocolError(error_msg)
         elif response == const.STARTOFTEXT:
             # Sometimes device sends just 0x02 (as per Perl code line 1525)
             _LOGGER.debug("Received only 0x02 as response")
@@ -347,19 +359,21 @@ class THZDevice:
             resp_hex = response.hex() if response else "no data"
             error_msg = f"Handshake 2 failed, received: {resp_hex}"
             _LOGGER.debug(error_msg)
-            raise RuntimeError(error_msg)
+            raise THZProtocolError(error_msg)
 
-    def _receive_data_telegram(self, timeout: float) -> bytes:
+    def _receive_data_telegram(self, timeout: float, min_length: int = 8) -> bytes:
         """Send confirmation and read data telegram until 0x10 0x03 terminator.
 
         Args:
             timeout: Read timeout in seconds.
+            min_length: Shortest frame accepted, see _frame_complete.
 
         Returns:
-            The raw data telegram bytes (including the 0x10 0x03 terminator).
+            The raw data telegram bytes (including the 0x10 0x03 terminator),
+            or a single NAK byte.
 
         Raises:
-            RuntimeError: If no valid data telegram is received within timeout.
+            THZProtocolError: If no valid data telegram is received within timeout.
         """
         self._write_bytes(const.DATALINKESCAPE)
 
@@ -369,32 +383,36 @@ class THZDevice:
             chunk = self._read_available()
             if chunk:
                 data.extend(chunk)
-                if self._frame_complete(data):
+                if self._frame_complete(data, min_length) or data == const.NAK:
                     break
             else:
                 # Avoid busy-waiting when no data is currently available
                 time.sleep(0.01)
 
-        if not self._frame_complete(data):
+        if not self._frame_complete(data, min_length) and data != const.NAK:
             error_msg = (
                 "No valid response received after data request - "
                 "timeout or incomplete data"
             )
             _LOGGER.debug(error_msg)
-            raise RuntimeError(error_msg)
+            raise THZProtocolError(error_msg)
 
         return bytes(data)
 
     @staticmethod
-    def _frame_complete(data: bytes | bytearray) -> bool:
+    def _frame_complete(data: bytes | bytearray, min_length: int = 8) -> bool:
         """Return True if ``data`` ends with an unescaped 0x10 0x03 terminator.
+
+        ``min_length`` is the shortest frame accepted: a data telegram has at
+        least 8 bytes, the answer to a SET only a header and the terminator
+        (FHEM's THZ_ReadAnswer reads until a message starting 01 ends in 10 03).
 
         A data byte 0x10 is sent escaped as 0x10 0x10, so ``... 10 10 03``
         is an escaped 0x10 followed by a data byte 0x03, not the end of the
         frame. The terminator's 0x10 is real only if the run of 0x10 bytes
         before the final 0x03 has odd length.
         """
-        if len(data) < 8 or data[-1] != const.ENDOFTEXT[0]:
+        if len(data) < min_length or data[-1] != const.ENDOFTEXT[0]:
             return False
         run = 0
         for byte in reversed(data[:-1]):
@@ -421,8 +439,8 @@ class THZDevice:
             Response bytes (empty for set operations).
 
         Raises:
-            ConnectionError: If the underlying connection is broken.
-            RuntimeError: If a protocol/handshake error occurs.
+            THZConnectionError: If the underlying connection is broken.
+            THZProtocolError: If a protocol/handshake error occurs.
         """
         timeout = self.read_timeout
         self._raise_if_abandoned()
@@ -448,10 +466,41 @@ class THZDevice:
 
         self._do_handshake_2(timeout)
 
-        data = self._receive_data_telegram(timeout) if get_or_set == "get" else b""
+        if get_or_set == "get":
+            data = self._receive_data_telegram(timeout)
+            if data == const.NAK:
+                raise THZProtocolError("Device answered the request with NAK")
+        else:
+            # Like FHEM's THZ_Get_Comunication, read the device's answer to a
+            # SET too and require its acknowledgement (see _check_set_answer).
+            answer = self._receive_data_telegram(timeout, min_length=_SET_ANSWER_MIN)
+            self._check_set_answer(answer)
+            data = b""
 
         self._write_bytes(const.STARTOFTEXT)
         return data
+
+    def _check_set_answer(self, raw: bytes) -> None:
+        """Raise THZWriteRejectedError unless the answer acknowledges a SET.
+
+        Mirrors FHEM's THZ_decode: ``01 80`` is accepted as is, ``01 00``
+        if its checksum is correct; NAK (``15``), the ``01 01``..``01 04``
+        headers and anything else are errors.
+        """
+        answer = self.unescape(raw)
+        if answer == const.NAK:
+            raise THZWriteRejectedError("Device rejected the write (NAK)")
+        header = answer[:2]
+        if header == b"\x01\x80":
+            return
+        if header == b"\x01\x00":
+            if self.decode_response(raw) is not None:
+                return
+            raise THZWriteRejectedError(
+                "Device rejected the write: CRC error in answer"
+            )
+        reason = _SET_ERRORS.get(header, f"unknown answer {answer.hex()}")
+        raise THZWriteRejectedError(f"Device rejected the write: {reason}")
 
     def send_request(self, telegram: bytes, get_or_set: str) -> bytes:
         """Send request via USB or TCP, receive response.
@@ -459,8 +508,8 @@ class THZDevice:
         Automatically reconnects if connection is lost.
 
         Raises:
-            ConnectionError: If connection fails and reconnection is unsuccessful.
-            RuntimeError: If device communication fails (handshake, timeout,
+            THZConnectionError: If connection fails and reconnection is unsuccessful.
+            THZProtocolError: If device communication fails (handshake, timeout,
                 invalid response).
         """
         max_retries = 1  # Allow one retry on connection error
@@ -484,14 +533,14 @@ class THZDevice:
                         continue
                     except OSError as reconnect_error:
                         _LOGGER.warning("Reconnect failed: %s", reconnect_error)
-                raise ConnectionError(
+                raise THZConnectionError(
                     f"Connection failed after {max_retries + 1} attempts: {e}"
                 ) from e
 
-            except THZRegisterNotSupportedError:
+            except THZNotSupportedError:
                 raise  # legitimate device response — no reconnect
 
-            except RuntimeError as e:
+            except THZProtocolError as e:
                 _LOGGER.debug(
                     "Protocol error in send_request (attempt %d/%d): %s",
                     attempt + 1,
@@ -508,10 +557,10 @@ class THZDevice:
 
             except Exception as e:
                 _LOGGER.exception("Unexpected error in send_request: %s", e)
-                raise RuntimeError(f"Device communication failed: {e}") from e
+                raise THZProtocolError(f"Device communication failed: {e}") from e
 
         # Every iteration returns, raises or retries; the last never retries.
-        raise RuntimeError("send_request failed without specific error")
+        raise THZProtocolError("send_request failed without specific error")
 
     def _may_retry(self, get_or_set: str) -> bool:
         """Return True if a failed exchange may be repeated.
@@ -534,7 +583,7 @@ class THZDevice:
         """Send bytes depending on connection type.
 
         Raises:
-            ConnectionError: If the connection is closed or broken
+            THZConnectionError: If the connection is closed or broken
         """
         try:
             # self.connection is the authoritative discriminator (set once in
@@ -550,13 +599,13 @@ class THZDevice:
         except (OSError, BrokenPipeError) as e:
             # Connection reset, broken pipe, or other socket/serial errors
             _LOGGER.debug("Connection error during write: %s", e)
-            raise ConnectionError(f"Failed to write to connection: {e}") from e
+            raise THZConnectionError(f"Failed to write to connection: {e}") from e
         except (ValueError, AttributeError) as e:
             # Raised by select.select() when the fd is closed mid-write (pyserial sets
             # fd=None on close, so fileno() returns None, which is not an int).
             # Also catches AttributeError if self.ser is set to None by _force_close()
             # between the check above and the actual send/write call.
-            raise ConnectionError(f"Connection closed during write: {e}") from e
+            raise THZConnectionError(f"Connection closed during write: {e}") from e
 
     def _read_exact(self, size: int, timeout: float) -> bytes:
         """Read exactly n bytes, regardless of USB or TCP."""
@@ -574,7 +623,7 @@ class THZDevice:
         """Read available bytes.
 
         Raises:
-            ConnectionError: If the connection is closed or broken
+            THZConnectionError: If the connection is closed or broken
         """
         # self.connection is the authoritative discriminator (set once in
         # __init__ and never mutated); mypy can't narrow self.ser's union
@@ -595,12 +644,12 @@ class THZDevice:
             except OSError as e:
                 # Connection reset, broken pipe, or other socket errors
                 _LOGGER.debug("TCP socket error during read: %s", e)
-                raise ConnectionError(f"TCP connection error: {e}") from e
+                raise THZConnectionError(f"TCP connection error: {e}") from e
             except (ValueError, AttributeError) as e:
                 # select.select() raises ValueError when the socket fd is closed
                 # (fileno() returns None after close); AttributeError if self.ser
                 # becomes None between the check above and the recv call.
-                raise ConnectionError(f"Connection closed during read: {e}") from e
+                raise THZConnectionError(f"Connection closed during read: {e}") from e
             finally:
                 # Always restore the original timeout. UnboundLocalError covers
                 # the case where gettimeout() itself raised above, so
@@ -611,7 +660,7 @@ class THZDevice:
             if not data:
                 # A non-blocking recv() only returns b"" at end of stream:
                 # the peer (e.g. a restarted ser2net) closed the connection.
-                raise ConnectionError("TCP socket connection closed by peer")
+                raise THZConnectionError("TCP socket connection closed by peer")
             return bytes(data)
 
         # Serial connection
@@ -621,11 +670,13 @@ class THZDevice:
                 return self.ser.read(waiting)  # type: ignore[union-attr]
             return b""
         except (OSError, serial.SerialException) as e:
-            raise ConnectionError(f"Serial read error: {e}") from e
+            raise THZConnectionError(f"Serial read error: {e}") from e
         except (ValueError, AttributeError) as e:
             # pyserial's select.select() raises ValueError when the port fd
             # is None (set by close()); AttributeError if self.ser is None.
-            raise ConnectionError(f"Connection closed during serial read: {e}") from e
+            raise THZConnectionError(
+                f"Connection closed during serial read: {e}"
+            ) from e
 
     def _reset_input_buffer(self):
         """Delete any existing input buffer.
@@ -667,7 +718,7 @@ class THZDevice:
         try:
             await asyncio.wait_for(self.lock.acquire(), timeout=_LOCK_WAIT_TIMEOUT)
         except TimeoutError:
-            raise ConnectionError(
+            raise THZConnectionError(
                 f"Device busy: could not acquire lock within {_LOCK_WAIT_TIMEOUT:.0f}s"
             ) from None
 
@@ -681,10 +732,10 @@ class THZDevice:
             _LOGGER.warning(
                 "Device call timed out after %.1fs; closing connection", timeout
             )
-            raise ConnectionError(
+            raise THZConnectionError(
                 f"Device communication timed out after {timeout}s"
             ) from None
-        except THZRegisterNotSupportedError:
+        except THZNotSupportedError:
             raise  # device said "not supported" — connection is fine, keep it
         except BaseException:
             self._force_close()
@@ -806,12 +857,10 @@ class THZDevice:
                 _LOGGER.error("Unknown command")
                 return None
             if header == b"\x01\x04":
-                raise THZRegisterNotSupportedError(
-                    "Register not supported by device firmware"
-                )
+                raise THZNotSupportedError("Register not supported by device firmware")
             _LOGGER.error("Unknown response: %s", data.hex())
             return None
-        except THZRegisterNotSupportedError:
+        except THZNotSupportedError:
             raise  # propagate — not a decode error, not a connection failure
         except Exception as e:
             _LOGGER.exception("Error decoding response: %s", e)
@@ -826,9 +875,9 @@ class THZDevice:
         """Reads or writes a register from/to the THZ device.
 
         Raises:
-            ConnectionError: If connection fails
-            RuntimeError: If device communication fails
-            THZRegisterNotSupportedError: If the device reports the register is
+            THZConnectionError: If connection fails
+            THZProtocolError: If device communication fails
+            THZNotSupportedError: If the device reports the register is
                 not supported
         """
         header = b"\x01\x00" if get_or_set == "get" else b"\x01\x80"
@@ -844,7 +893,7 @@ class THZDevice:
         if get_or_set == "get":
             decoded = self.decode_response(raw_response)
             if decoded is None:
-                raise RuntimeError("Failed to decode device response")
+                raise THZProtocolError("Failed to decode device response")
             return decoded
 
         return b""
@@ -886,7 +935,7 @@ class THZDevice:
             firmware_version = int.from_bytes(value_raw, byteorder="big", signed=False)
             _LOGGER.debug("Firmware version read: %s", firmware_version)
             return str(firmware_version)
-        except (OSError, RuntimeError) as e:
+        except DEVICE_ERRORS as e:
             _LOGGER.warning("Could not read firmware version: %s", e)
             return ""
 
@@ -911,7 +960,7 @@ class THZDevice:
                 )
                 return False
             return True
-        except (RuntimeError, ConnectionError, OSError) as e:
+        except DEVICE_ERRORS as e:
             _LOGGER.warning(
                 "Cooling probe failed, assuming cooling is supported: %s", e
             )
@@ -976,7 +1025,7 @@ class THZDevice:
         Raises:
             ValueError: If ``value`` is not ``length`` bytes, or if the offset/length
                         is out of range for the block.
-            RuntimeError: If the device read or write fails, or the read-back
+            THZProtocolError: If the device read or write fails, or the read-back
                 block does not echo ``block_addr``.
         """
         if len(value) != length:
@@ -992,7 +1041,7 @@ class THZDevice:
         header_len = 1 + len(block_addr)
         echo = response[1:header_len]
         if echo != block_addr:
-            raise RuntimeError(
+            raise THZProtocolError(
                 f"write_block_value: unexpected address echo {echo.hex()} "
                 f"for block {block_addr.hex()}"
             )
@@ -1040,7 +1089,9 @@ class THZDevice:
     def firmware_version(self) -> str:
         """Return the firmware version of the device."""
         if self._firmware_version is None:
-            raise RuntimeError("Device not initialized or firmware version unknown")
+            raise THZNotInitializedError(
+                "Device not initialized or firmware version unknown"
+            )
         return self._firmware_version
 
     @property

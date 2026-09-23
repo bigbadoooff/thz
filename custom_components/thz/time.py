@@ -18,6 +18,7 @@ from .const import (
 )
 from .devices import assign_subdevices
 from .entity_translations import get_translation_key
+from .exceptions import DEVICE_ERRORS
 from .register_maps.register_map_manager import RegisterMapManagerWrite
 from .runtime_data import THZConfigEntry
 from .thz_device import THZDevice
@@ -353,7 +354,7 @@ class THZTime(THZBaseEntity, TimeEntity):
 
         try:
             await self._async_write_quarters(num)
-        except (ConnectionError, RuntimeError, OSError) as err:
+        except DEVICE_ERRORS as err:
             _LOGGER.error("Error writing time %s: %s", self.name, err, exc_info=True)
             return
 
@@ -572,7 +573,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
                 bytes.fromhex(self._command),
                 bytes(schedule_bytes),
             )
-        except (ConnectionError, RuntimeError, OSError) as err:
+        except DEVICE_ERRORS as err:
             _LOGGER.error(
                 "Error writing schedule time %s (%s): %s",
                 self.name,

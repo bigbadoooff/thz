@@ -486,11 +486,11 @@ class TestAsyncUpdateBlock:
 
     @pytest.mark.asyncio
     async def test_unsupported_register_returns_none(self):
-        from custom_components.thz.thz_device import THZRegisterNotSupportedError
+        from custom_components.thz.exceptions import THZNotSupportedError
 
         hass = _mock_hass()
         device = MagicMock()
-        device.async_execute = AsyncMock(side_effect=THZRegisterNotSupportedError("no"))
+        device.async_execute = AsyncMock(side_effect=THZNotSupportedError("no"))
 
         result = await thz_module._async_update_block(hass, device, "pxxFB")
 

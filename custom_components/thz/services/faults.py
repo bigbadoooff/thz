@@ -7,8 +7,8 @@ from typing import cast
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
+from ..exceptions import DEVICE_ERRORS, THZNotSupportedError
 from ..fault_memory import CLEAR_CONFIRMATION, clear_fault_memory, read_fault_memory
-from ..thz_device import THZRegisterNotSupportedError
 from .common import _require_target_entry_data
 
 
@@ -19,11 +19,11 @@ async def async_handle_probe_fault_memory(
     _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
     try:
         result = await read_fault_memory(hass, entry_data.device)
-    except THZRegisterNotSupportedError as err:
+    except THZNotSupportedError as err:
         raise HomeAssistantError(
             f"D1 fault memory is not supported by this device: {err}"
         ) from err
-    except (RuntimeError, ConnectionError, OSError) as err:
+    except DEVICE_ERRORS as err:
         raise HomeAssistantError(f"Could not read D1 fault memory: {err}") from err
     return cast("ServiceResponse", {"success": True, **result})
 
@@ -62,7 +62,7 @@ async def async_handle_clear_fault_memory(
     device = entry_data.device
     try:
         result = await clear_fault_memory(hass, device)
-    except RuntimeError as err:
+    except DEVICE_ERRORS as err:
         raise HomeAssistantError(str(err)) from err
     source = entry_data.fault_source
     if source is not None:

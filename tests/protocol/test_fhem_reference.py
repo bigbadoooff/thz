@@ -25,6 +25,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from custom_components.thz.exceptions import THZWriteRejectedError
 from custom_components.thz.number import THZNumber
 from custom_components.thz.parameter_io import (
     async_read_parameter,
@@ -37,6 +38,7 @@ from custom_components.thz.register_maps.register_map_manager import (
 )
 from custom_components.thz.select import THZSelect
 from custom_components.thz.switch import THZSwitch
+from custom_components.thz.thz_device import THZDevice
 from custom_components.thz.time import _create_time_entities
 from custom_components.thz.value_codec import THZValueCodec
 from custom_components.thz.value_maps import SELECT_MAP
@@ -365,4 +367,44 @@ async def test_direct_writes_match_fhem(firmware):
         # the first telegram is the one for the register itself.
         if (fhem.get("telegrams") or [None])[0] != ours:
             mismatches.append(f"{name}={fhem_arg}: fhem={fhem} ours={ours}")
+    assert not mismatches, "\n".join(mismatches)
+
+
+def _answer(header: bytes, payload: bytes = b"", crc: bytes | None = None) -> bytes:
+    """A device answer frame: header, checksum, payload, 10 03."""
+    device = THZDevice(connection="usb", port="/dev/null")
+    if crc is None:
+        crc = device.thz_checksum(header + b"\x00" + payload)
+    return header + crc + device.escape(payload) + b"\x10\x03"
+
+
+_SET_ANSWERS = [
+    b"\x15",  # NAK
+    _answer(b"\x01\x80"),  # acknowledgement
+    _answer(b"\x01\x80", b"\x0a\x01\x12"),
+    _answer(b"\x01\x00", b"\x0a\x01\x12"),  # data answer, checksum correct
+    _answer(b"\x01\x00", b"\x0a\x01\x12", crc=b"\x00"),  # checksum wrong
+    _answer(b"\x01\x01"),  # timing issue
+    _answer(b"\x01\x02"),  # CRC error in request
+    _answer(b"\x01\x03"),  # command not known
+    _answer(b"\x01\x04"),  # unknown register
+    _answer(b"\x01\x99"),  # unknown header
+]
+
+
+def test_set_answers_are_judged_like_fhem():
+    """A SET answer is an error for us exactly when FHEM's THZ_decode says so."""
+    decoded = _fhem("4.39", decode=[a.hex().upper() for a in _SET_ANSWERS])["decoded"]
+    device = THZDevice(connection="usb", port="/dev/null")
+
+    mismatches = []
+    for answer in _SET_ANSWERS:
+        fhem_error = decoded[answer.hex().upper()]
+        try:
+            device._check_set_answer(answer)
+            ours = None
+        except THZWriteRejectedError as err:
+            ours = str(err)
+        if (fhem_error is None) != (ours is None):
+            mismatches.append(f"{answer.hex()}: fhem={fhem_error!r} ours={ours!r}")
     assert not mismatches, "\n".join(mismatches)

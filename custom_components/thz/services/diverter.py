@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import HomeAssistantError
 
 from ..const import WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
+from ..exceptions import DEVICE_ERRORS
 from ..runtime_data import THZRuntimeData
 from ..thz_device import THZDevice
 from .common import _require_target_entry_data
@@ -141,7 +142,7 @@ async def _emergency_stop(hass: HomeAssistant, device: THZDevice) -> None:
             await device.async_execute(
                 hass, device.write_value, motor, _VALVE_MOTOR_OFF
             )
-        except (RuntimeError, ConnectionError, OSError) as err:
+        except DEVICE_ERRORS as err:
             _LOGGER.error(
                 "Could not stop diverter valve motor %s: %s", motor.hex(), err
             )
@@ -182,7 +183,7 @@ async def async_handle_set_diverter_valve(
         if motor_may_run:
             await asyncio.shield(_emergency_stop(hass, device))
         raise
-    except (RuntimeError, ConnectionError, OSError) as err:
+    except DEVICE_ERRORS as err:
         await _emergency_stop(hass, device)
         error_msg = f"Error sending diverter valve command: {err}"
         _LOGGER.exception(error_msg)

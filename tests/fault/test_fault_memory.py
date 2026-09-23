@@ -311,10 +311,10 @@ class TestClearFaultMemory:
 
     @pytest.mark.asyncio
     async def test_unsupported_register_prevents_any_write(self):
-        from custom_components.thz.thz_device import THZRegisterNotSupportedError
+        from custom_components.thz.exceptions import THZNotSupportedError
 
         device = MagicMock()
-        device.async_execute = AsyncMock(side_effect=THZRegisterNotSupportedError("x"))
+        device.async_execute = AsyncMock(side_effect=THZNotSupportedError("x"))
         with pytest.raises(RuntimeError, match="not supported"):
             await clear_fault_memory(MagicMock(), device)
 

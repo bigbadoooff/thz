@@ -26,6 +26,7 @@ from .const import (
 )
 from .devices import thz_device_info
 from .entity_id_style import resolve_suggested_object_id
+from .exceptions import DEVICE_ERRORS
 
 if TYPE_CHECKING:
     from .thz_device import THZDevice
@@ -259,7 +260,7 @@ class THZBaseEntity(Entity):
         """Await a device read with the availability handling described above."""
         try:
             value_bytes = await read
-        except (ConnectionError, RuntimeError, OSError) as err:
+        except DEVICE_ERRORS as err:
             if self._attr_available:
                 _LOGGER.warning("%s became unavailable: %s", self.name, err)
             self._attr_available = False

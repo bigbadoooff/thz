@@ -11,6 +11,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZBaseEntity
 from .entity_translations import get_translation_key
+from .exceptions import DEVICE_ERRORS
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
@@ -174,7 +175,7 @@ class THZNumber(THZBaseEntity, NumberEntity):
                 # Keep the block data this entity reads from in step with
                 # the write, so the next update does not show the old value.
                 await coordinator.async_request_refresh()
-        except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error encoding number %s value %s: %s",
                 self.name,
