@@ -6,6 +6,22 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Optional sub-devices** (#186): a new setting, *Split into sub-devices*,
+  groups the entities into sub-devices linked to the heat pump:
+  - heating circuit 1,
+  - heating circuit 2,
+  - hot water,
+  - ventilation,
+  - compressor,
+  - solar,
+  - cooling.
+
+  New setups have it on. Existing setups keep the single device until it is
+  switched on via Configure. Entity IDs stay the same, but displayed names
+  change, and automations that pick a device must be updated.
+
 ## [0.6.0] – 2026-09-19
 
 ### Added

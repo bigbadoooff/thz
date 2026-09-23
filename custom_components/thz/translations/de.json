@@ -9,7 +9,11 @@
           "alias": "Gerätename",
           "entity_id_style": "Entity-ID-Stil",
           "entity_visibility": "Sichtbarkeit der Entitäten",
-          "enable_hc2": "HK2-Entitäten aktivieren"
+          "enable_hc2": "HK2-Entitäten aktivieren",
+          "split_devices": "In Untergeräte aufteilen"
+        },
+        "data_description": {
+          "split_devices": "Entitäten in Untergeräte gruppieren (Heizkreise, Warmwasser, Lüftung, Verdichter, Solar, Kühlung). Ändert die angezeigten Entitätsnamen; die Entitäts-IDs bleiben gleich."
         }
       },
       "reconfigure": {
@@ -149,8 +153,12 @@
           "entity_id_style": "Entity-ID-Stil",
           "entity_visibility": "Sichtbarkeit der Entitäten",
           "enable_hc2": "HK2-Entitäten aktivieren",
+          "split_devices": "In Untergeräte aufteilen",
           "firmware_override": "Firmware-Profil überschreiben",
           "auto_sync_clock": "Uhrzeit automatisch synchronisieren"
+        },
+        "data_description": {
+          "split_devices": "Entitäten in Untergeräte gruppieren (Heizkreise, Warmwasser, Lüftung, Verdichter, Solar, Kühlung). Ändert die angezeigten Entitätsnamen; die Entitäts-IDs bleiben gleich."
         }
       },
       "setup_ip": {
@@ -321,6 +329,29 @@
     "error": {
       "invalid_host": "Ungültige IP-Adresse oder Hostname. Bitte geben Sie eine gültige IPv4-, IPv6-Adresse oder einen Hostnamen ein.",
       "invalid_port": "Ungültige Portnummer. Port muss zwischen 1 und 65535 liegen."
+    }
+  },
+  "device": {
+    "heating": {
+      "name": "{device_name} Heizkreis 1"
+    },
+    "heating_hc2": {
+      "name": "{device_name} Heizkreis 2"
+    },
+    "dhw": {
+      "name": "{device_name} Warmwasser"
+    },
+    "ventilation": {
+      "name": "{device_name} Lüftung"
+    },
+    "compressor": {
+      "name": "{device_name} Verdichter"
+    },
+    "solar": {
+      "name": "{device_name} Solar"
+    },
+    "cooling": {
+      "name": "{device_name} Kühlung"
     }
   },
   "entity": {

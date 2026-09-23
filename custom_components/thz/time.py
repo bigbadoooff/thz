@@ -18,6 +18,7 @@ from .const import (
     WRITE_REGISTER_LENGTH,
     WRITE_REGISTER_OFFSET,
 )
+from .devices import assign_subdevices
 from .entity_translations import get_translation_key
 from .register_maps.register_map_manager import RegisterMapManagerWrite
 from .thz_device import THZDevice
@@ -243,6 +244,7 @@ async def async_setup_entry(
             )
 
     _LOGGER.info("Created %d time entities", len(entities))
+    assign_subdevices(entities, config_entry.data)
     async_add_entities(entities, True)
 
     # Home Assistant's built-in time.set_value service cannot represent "no

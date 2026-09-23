@@ -32,7 +32,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._typing_compat import get_runtime_data
-from .const import DOMAIN
+from .devices import assign_subdevices, thz_device_info
 from .value_codec import decode_raw_value
 
 if TYPE_CHECKING:
@@ -145,6 +145,7 @@ async def async_setup_cop_sensors(
         )
 
     if cop_sensors:
+        assign_subdevices(cop_sensors, config_entry.data)
         async_add_entities(cop_sensors, True)
         _LOGGER.info("Created %d COP sensors", len(cop_sensors))
     else:
@@ -287,12 +288,17 @@ class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
         _LOGGER.debug("Calculated COP out of range: %.2f", cop)
         return None
 
+    # Sub-device group, set by devices.assign_subdevices before the entity
+    # is added; None links the entity to the heat pump itself.
+    _subdevice: str | None = None
+    _subdevice_device_name: str | None = None
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-        }
+        return thz_device_info(
+            self._device_id, self._subdevice, self._subdevice_device_name
+        )
 
 
 class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
@@ -356,12 +362,17 @@ class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
         except (ValueError, TypeError):
             return None
 
+    # Sub-device group, set by devices.assign_subdevices before the entity
+    # is added; None links the entity to the heat pump itself.
+    _subdevice: str | None = None
+    _subdevice_device_name: str | None = None
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-        }
+        return thz_device_info(
+            self._device_id, self._subdevice, self._subdevice_device_name
+        )
 
 
 class THZDailyCOPSensor(THZBaseCOPSensor):

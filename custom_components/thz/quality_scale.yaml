@@ -75,9 +75,7 @@ rules:
   repair-issues:
     status: todo
     comment: Persistent notifications are used where a repair issue would fit.
-  stale-devices:
-    status: exempt
-    comment: A config entry is exactly one heat pump.
+  stale-devices: done
 
   # Platinum
   async-dependency:

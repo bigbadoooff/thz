@@ -114,6 +114,7 @@ contents.
 | `clock_sync.py` | Periodic clock-drift check and optional correction |
 | `cop_sensor.py` | COP computed from energy and power registers |
 | `entity_translations.py`, `entity_id_style.py`, `const.py` | Translation keys, FHEM-style entity_ids, visibility tiers |
+| `devices.py` | Device info for all entities; optional split into functional sub-devices (by unique_id patterns) and cleanup of sub-devices |
 | `diagnostics.py` | Redacted diagnostics dump |
 | `notify.py` | Persistent notifications |
 

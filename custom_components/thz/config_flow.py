@@ -27,10 +27,12 @@ from .const import (
     CONF_ENTITY_ID_STYLE,
     CONF_ENTITY_VISIBILITY,
     CONF_FIRMWARE_OVERRIDE,
+    CONF_SPLIT_DEVICES,
     CONNECTION_IP,
     CONNECTION_USB,
     DEFAULT_BAUDRATE,
     DEFAULT_PORT,
+    DEFAULT_SPLIT_DEVICES_NEW_ENTRY,
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_WRITE_INTERVAL,
     DOMAIN,
@@ -103,6 +105,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT
             )
             self.enable_hc2 = user_input.get(CONF_ENABLE_HC2, False)
+            self.split_devices = user_input.get(
+                CONF_SPLIT_DEVICES, DEFAULT_SPLIT_DEVICES_NEW_ENTRY
+            )
             self.alias = user_input.get("alias", "").strip()
             if user_input["connection_type"] == CONNECTION_IP:
                 return await self.async_step_setup_ip()
@@ -143,6 +148,11 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # default; can be changed later via Reconfigure, which
                 # retroactively bulk enables/disables existing entities.
                 vol.Optional(CONF_ENABLE_HC2, default=False): bool,
+                # Group entities into sub-devices (heating circuits, hot
+                # water, ventilation, ...); can be changed via Reconfigure.
+                vol.Optional(
+                    CONF_SPLIT_DEVICES, default=DEFAULT_SPLIT_DEVICES_NEW_ENTRY
+                ): bool,
             }
         )
         return self.async_show_form(step_id="user", data_schema=schema)
@@ -401,6 +411,14 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Optional(
                 CONF_ENABLE_HC2,
                 default=defaults.get(CONF_ENABLE_HC2, False),
+            )
+        ] = bool
+
+        # Entries created before the option existed keep the single device.
+        schema_dict[
+            vol.Optional(
+                CONF_SPLIT_DEVICES,
+                default=defaults.get(CONF_SPLIT_DEVICES, False),
             )
         ] = bool
 
@@ -747,6 +765,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     self, "entity_visibility", ENTITY_VISIBILITY_DEFAULT
                 ),
                 CONF_ENABLE_HC2: getattr(self, "enable_hc2", False),
+                CONF_SPLIT_DEVICES: getattr(
+                    self, "split_devices", DEFAULT_SPLIT_DEVICES_NEW_ENTRY
+                ),
                 "alias": getattr(self, "alias", ""),
             }
             conn_target = data.get("host") or data.get("device")

@@ -1,23 +1,28 @@
 """Snapshot of the entities each firmware creates.
 
 Sets the integration up once per firmware (and firmware override) with all
-reading blocks and write groups enabled, and compares the resulting entity
-registry with the stored snapshot. A register-map change that adds, drops or
-renames entities, or changes their category, device class or unit, shows up
-as a snapshot diff that has to be reviewed and accepted with
-``pytest tests_ha --snapshot-update``.
+reading blocks and write groups enabled and the sub-device split on, and
+compares the resulting entity registry with the stored snapshot. A
+register-map change that adds, drops or renames entities, or changes their
+sub-device, category, device class or unit, shows up as a snapshot diff
+that has to be reviewed and accepted with ``pytest tests_ha --snapshot-update``.
 """
 
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from syrupy.assertion import SnapshotAssertion
 
-from custom_components.thz.const import CONF_FIRMWARE_OVERRIDE, DOMAIN
+from custom_components.thz.const import (
+    CONF_FIRMWARE_OVERRIDE,
+    CONF_SPLIT_DEVICES,
+    DOMAIN,
+)
+from custom_components.thz.devices import SUBDEVICES
 
 HOST = "192.0.2.20"
 
@@ -39,11 +44,12 @@ MATRIX = {
 }
 
 
-def _describe(entry: er.RegistryEntry, prefix: str) -> str:
+def _describe(entry: er.RegistryEntry, prefix: str, devices: dict[str, str]) -> str:
     unique_id = entry.unique_id.removeprefix(prefix)
     fields = [
         entry.domain,
         unique_id,
+        devices.get(entry.device_id or "", "?"),
         entry.translation_key or entry.original_name or "",
         entry.entity_category.value if entry.entity_category else "",
         entry.original_device_class or "",
@@ -69,6 +75,7 @@ async def test_entities_per_firmware(
         "port": 2323,
         "write_interval": 3600,
         "selected_write_groups": None,
+        CONF_SPLIT_DEVICES: True,
     }
     if override:
         data[CONF_FIRMWARE_OVERRIDE] = override
@@ -83,10 +90,25 @@ async def test_entities_per_firmware(
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)
     prefix = _common_prefix([e.unique_id for e in entities])
-    assert sorted(_describe(e, prefix) for e in entities) == snapshot
+    devices = {
+        device.id: _device_label(device)
+        for device in dr.async_entries_for_config_entry(
+            dr.async_get(hass), entry.entry_id
+        )
+    }
+    assert sorted(_describe(e, prefix, devices) for e in entities) == snapshot
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
+
+
+def _device_label(device: dr.DeviceEntry) -> str:
+    """Return the sub-device group of a device, or "heat_pump"."""
+    identifier = next(value for domain, value in device.identifiers if domain == DOMAIN)
+    return next(
+        (group for group in SUBDEVICES if identifier.endswith(f"_{group}")),
+        "heat_pump",
+    )
 
 
 def _common_prefix(values: list[str]) -> str:

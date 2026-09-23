@@ -111,6 +111,12 @@ ENTITY_VISIBILITY_LABELS: dict[str, str] = {
 # is explicitly enabled.
 CONF_ENABLE_HC2 = "enable_hc2"
 
+# Group entities into functional sub-devices (heating circuits, hot water,
+# ventilation, compressor, solar, cooling) linked to the heat pump; see
+# devices.py. Entries without the key keep the single device.
+CONF_SPLIT_DEVICES = "split_devices"
+DEFAULT_SPLIT_DEVICES_NEW_ENTRY = True
+
 # Write register offsets and lengths
 # These values are used when reading/writing individual parameters
 WRITE_REGISTER_OFFSET = 4  # Byte offset in response for parameter value

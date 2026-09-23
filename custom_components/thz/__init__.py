@@ -21,6 +21,7 @@ from .const import (
     CONF_ENTITY_ID_STYLE,
     CONF_ENTITY_VISIBILITY,
     CONF_FIRMWARE_OVERRIDE,
+    CONF_SPLIT_DEVICES,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
@@ -29,6 +30,11 @@ from .const import (
     ENTITY_VISIBILITY_EXTENDED,
     FIRMWARE_OVERRIDE_AUTO,
     should_hide_entity,
+)
+from .devices import (
+    async_release_subdevices,
+    async_remove_empty_subdevices,
+    main_device_name,
 )
 from .services import async_refresh_block as async_refresh_block, async_setup_services
 from .thz_device import THZDevice, THZRegisterNotSupportedError
@@ -110,7 +116,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         or getattr(device, "serial", None)
         or f"{conn_type}-{data.get('host') or data.get('device')}"
     )
-    device_name = data.get("alias") or f"THZ {data.get('host') or data.get('device')}"
+    device_name = main_device_name(data)
     kwargs: dict = {
         "config_entry_id": config_entry.entry_id,
         "identifiers": {(DOMAIN, unique_id)},
@@ -254,11 +260,18 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         hass, config_entry, device, write_manager
     )
 
+    split_devices = data.get(CONF_SPLIT_DEVICES, False)
+    if not split_devices:
+        async_release_subdevices(hass, config_entry, unique_id, device_entry.id)
+
     # Forward setup to platforms
     await hass.config_entries.async_forward_entry_setups(
         config_entry,
         PLATFORMS,
     )
+
+    if split_devices:
+        async_remove_empty_subdevices(hass, config_entry, unique_id)
 
     # Apply the configured entity_visibility tier (default/extended/all) to
     # the entity registry. Re-runs (and retroactively bulk enables/disables

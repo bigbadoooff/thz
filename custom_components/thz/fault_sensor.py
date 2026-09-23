@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._typing_compat import get_runtime_data
 from .const import DOMAIN
+from .devices import thz_device_info
 from .fault_state import STATUS_FAULT, STATUS_OK, STORAGE_VERSION, THZFaultTracker
 
 if TYPE_CHECKING:
@@ -104,10 +105,17 @@ class _THZFaultSensor(CoordinatorEntity, SensorEntity):
         self._attr_unique_id = f"thz_{device_id}_fault_{self.KEY}"
         self._attr_translation_key = f"fault_{self.KEY}"
 
+    # Sub-device group, set by devices.assign_subdevices before the entity
+    # is added; None links the entity to the heat pump itself.
+    _subdevice: str | None = None
+    _subdevice_device_name: str | None = None
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
-        return {"identifiers": {(DOMAIN, self._device_id)}}
+        return thz_device_info(
+            self._device_id, self._subdevice, self._subdevice_device_name
+        )
 
     @property
     def _state(self) -> dict[str, Any] | None:
