@@ -12,6 +12,9 @@ All notable changes to the THZ integration are documented here.
   the first config entry, and they stay registered after the last entry is
   removed. A call without a loaded THZ entry now fails with a validation
   error ("No THZ device is loaded").
+- **Reconfigure keeps the entry's unique id current** (#179): changing the
+  host or serial device updates it, and a host or device that another THZ
+  entry already uses is refused.
 
 ### Added
 
