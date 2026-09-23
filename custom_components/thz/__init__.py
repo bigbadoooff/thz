@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Mapping
 from datetime import timedelta
 import logging
 import random
@@ -11,7 +11,12 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    entity_registry as er,
+)
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from ._typing_compat import get_runtime_data, set_runtime_data
@@ -54,7 +59,16 @@ PLATFORMS = [
 ]
 
 
-async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:  # noqa: C901
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the THZ services once, independent of config entries."""
+    async_setup_services(hass)
+    return True
+
+
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up THZ from config entry."""
     # Only entries created by old versions carry a "log_level" option; for
     # all others leave the level to Home Assistant's `logger:` configuration
@@ -70,8 +84,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     await _async_cleanup_orphaned_entities(hass)
 
     data = config_entry.data
-    conn_type = data["connection_type"]
-    firmware_override = data.get(CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO)
     entity_id_style = data.get(CONF_ENTITY_ID_STYLE, ENTITY_ID_STYLE_DEFAULT)
     entity_visibility = data.get(CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT)
     # Short device name/alias, used (only for entity_id_style="fhem") as a
@@ -80,151 +92,28 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # the FHEM-style entity_id has no prefix at all.
     entity_id_prefix = data.get("alias") or None
 
-    # 1. Initialize device
-    if conn_type == "ip":
-        device = THZDevice(
-            connection="ip",
-            host=data["host"],
-            tcp_port=data["port"],
-            firmware_override=firmware_override,
-        )
-    elif conn_type == "usb":
-        device = THZDevice(
-            connection="usb",
-            port=data["device"],
-            firmware_override=firmware_override,
-        )
-    else:
-        raise ValueError("Invalid connection type")
-
+    device = _create_device(data)
     try:
         await device.async_initialize(hass)
     except OSError as err:
         raise ConfigEntryNotReady(
             f"Cannot connect to THZ device ({err}); will retry"
         ) from err
-
-    # 2. Query firmware version
     _LOGGER.info("THZ device fully initialized (FW %s)", device.firmware_version)
 
-    # --- create / update device in Home Assistant device registry ---
+    unique_id = _device_unique_id(device, data)
+    device_entry = _register_heat_pump(hass, config_entry, device, unique_id)
 
-    dev_reg = dr.async_get(hass)
-    # prefer a stable id from the device; fall back to conn info
-    unique_id = (
-        getattr(device, "unique_id", None)
-        or getattr(device, "serial", None)
-        or f"{conn_type}-{data.get('host') or data.get('device')}"
-    )
-    device_name = main_device_name(data)
-    kwargs: dict = {
-        "config_entry_id": config_entry.entry_id,
-        "identifiers": {(DOMAIN, unique_id)},
-        "name": device_name,
-        "manufacturer": "Stiebel Eltron / Tecalor",
-        "model": f"LWZ/THZ (FW: {device.firmware_version})",
-        "sw_version": device.firmware_version,
-    }
-    area = data.get("area")
-    if area:
-        kwargs["suggested_area"] = area
-    device_entry = dev_reg.async_get_or_create(**kwargs)
-    _LOGGER.debug("Device registry entry created/updated: %s", device_entry.id)
-
-    # 3. Load register mappings (local vars; stored per entry below)
     write_manager = device.write_register_map_manager
     register_manager = device.register_map_manager
-
-    # 5. Collect paired register blocks for energy sensors (cmd2 + cmd3)
+    # Paired register blocks for energy sensors (cmd2 + cmd3)
     paired_blocks = register_manager.get_paired_blocks() if register_manager else {}
     if paired_blocks:
         _LOGGER.debug("Paired register blocks for dual-read: %s", paired_blocks)
 
-    # 6. Prepare dict for storing all coordinators
-    coordinators = {}
-    # An explicitly empty dict means the user deselected every read block
-    # (Reconfigure); only a missing key (entries from very old versions)
-    # falls back to polling all available blocks.
-    refresh_intervals = config_entry.data.get("refresh_intervals")
-
-    if refresh_intervals is None:
-        available_blocks = device.available_reading_blocks
-        if available_blocks:
-            _LOGGER.warning(
-                "No refresh_intervals found in config, using default "
-                "interval of %s seconds for %d blocks",
-                DEFAULT_UPDATE_INTERVAL,
-                len(available_blocks),
-            )
-            refresh_intervals = {
-                block: DEFAULT_UPDATE_INTERVAL for block in available_blocks
-            }
-        else:
-            _LOGGER.error(
-                "No available reading blocks found on device "
-                "and no refresh_intervals in config"
-            )
-            # Continue with empty dict - no coordinators or sensors will be created
-            refresh_intervals = {}
-    else:
-        _LOGGER.debug(
-            "Creating coordinators with refresh intervals: %s", refresh_intervals
-        )
-
-    def _make_update_method(
-        block_name: str,
-    ) -> Callable[[], Coroutine[Any, Any, bytes | None]]:
-        async def _update() -> bytes | None:
-            return await _async_update_block(hass, device, block_name, paired_blocks)
-
-        return _update
-
-    # Create a coordinator for each block with its own interval
-    unsupported_blocks: set[str] = set()
-    failed_blocks: list[str] = []
-    for block, interval in refresh_intervals.items():
-        _LOGGER.debug(
-            "Creating coordinator for block %s with interval %s seconds",
-            block,
-            interval,
-        )
-        # Add per-coordinator jitter (up to 10 % of the interval, min 5 s) so
-        # that all coordinators do not fire at the same wall-clock second after
-        # the first period expires, avoiding lock contention thundering herds.
-        jitter = random.uniform(0, max(int(interval) * 0.10, 5))
-        coordinator = DataUpdateCoordinator(
-            hass,
-            _LOGGER,
-            name=f"THZ {block}",
-            update_interval=timedelta(seconds=int(interval) + jitter),
-            update_method=_make_update_method(block),
-        )
-        coordinators[block] = coordinator
-        try:
-            await coordinator.async_config_entry_first_refresh()
-        except ConfigEntryNotReady as exc:
-            # A communication error (timeout, busy, CRC, ...) is transient:
-            # keep the coordinator so its entities are created and recover
-            # on the next successful poll. Registers the firmware genuinely
-            # lacks are reported as data=None below instead.
-            failed_blocks.append(block)
-            _LOGGER.warning(
-                "Block %s could not be read at startup (%s); its entities "
-                "stay unavailable until the next successful poll.",
-                block,
-                exc,
-            )
-            continue
-        if coordinator.data is None:
-            unsupported_blocks.add(block)
-            _LOGGER.info(
-                "Block %s is unsupported on this firmware; "
-                "no entities will be created for it.",
-                block,
-            )
-        else:
-            _LOGGER.info("Initial data fetch completed for block %s", block)
-
+    coordinators, unsupported_blocks, failed_blocks = await _async_create_coordinators(
+        hass, device, _refresh_intervals(data, device), paired_blocks
+    )
     if coordinators and len(failed_blocks) == len(coordinators):
         # Not a single block answered: the device is not really reachable,
         # so let Home Assistant retry the whole entry instead of setting up
@@ -279,10 +168,154 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # applied, e.g. after the user changes this option via Reconfigure.
     await _async_apply_entity_visibility_tier(hass, config_entry)
 
-    # Register services
-    await async_setup_services(hass)
-
     return True
+
+
+def _create_device(data: Mapping[str, Any]) -> THZDevice:
+    """Create the THZDevice for the entry's connection (not yet connected)."""
+    firmware_override = data.get(CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO)
+    conn_type = data["connection_type"]
+    if conn_type == "ip":
+        return THZDevice(
+            connection="ip",
+            host=data["host"],
+            tcp_port=data["port"],
+            firmware_override=firmware_override,
+        )
+    if conn_type == "usb":
+        return THZDevice(
+            connection="usb",
+            port=data["device"],
+            firmware_override=firmware_override,
+        )
+    raise ValueError("Invalid connection type")
+
+
+def _device_unique_id(device: THZDevice, data: Mapping[str, Any]) -> str:
+    """Return the heat pump's device registry id; prefer one from the device."""
+    return str(
+        getattr(device, "unique_id", None)
+        or getattr(device, "serial", None)
+        or f"{data['connection_type']}-{data.get('host') or data.get('device')}"
+    )
+
+
+def _register_heat_pump(
+    hass: HomeAssistant, config_entry: ConfigEntry, device: THZDevice, unique_id: str
+) -> dr.DeviceEntry:
+    """Create or update the heat pump in the device registry."""
+    data = config_entry.data
+    kwargs: dict[str, Any] = {
+        "config_entry_id": config_entry.entry_id,
+        "identifiers": {(DOMAIN, unique_id)},
+        "name": main_device_name(data),
+        "manufacturer": "Stiebel Eltron / Tecalor",
+        "model": f"LWZ/THZ (FW: {device.firmware_version})",
+        "sw_version": device.firmware_version,
+    }
+    if data.get("area"):
+        kwargs["suggested_area"] = data["area"]
+    device_entry = dr.async_get(hass).async_get_or_create(**kwargs)
+    _LOGGER.debug("Device registry entry created/updated: %s", device_entry.id)
+    return device_entry
+
+
+def _refresh_intervals(data: Mapping[str, Any], device: THZDevice) -> dict[str, Any]:
+    """Return block → poll interval for the entry.
+
+    An explicitly empty dict means the user deselected every read block
+    (Reconfigure); only a missing key (entries from very old versions)
+    falls back to polling all available blocks.
+    """
+    refresh_intervals = data.get("refresh_intervals")
+    if refresh_intervals is not None:
+        _LOGGER.debug(
+            "Creating coordinators with refresh intervals: %s", refresh_intervals
+        )
+        return dict(refresh_intervals)
+
+    available_blocks = device.available_reading_blocks
+    if not available_blocks:
+        _LOGGER.error(
+            "No available reading blocks found on device "
+            "and no refresh_intervals in config"
+        )
+        return {}
+    _LOGGER.warning(
+        "No refresh_intervals found in config, using default "
+        "interval of %s seconds for %d blocks",
+        DEFAULT_UPDATE_INTERVAL,
+        len(available_blocks),
+    )
+    return {block: DEFAULT_UPDATE_INTERVAL for block in available_blocks}
+
+
+async def _async_create_coordinators(
+    hass: HomeAssistant,
+    device: THZDevice,
+    refresh_intervals: Mapping[str, Any],
+    paired_blocks: dict[str, str],
+) -> tuple[dict[str, DataUpdateCoordinator[Any]], set[str], list[str]]:
+    """Create and first-refresh one coordinator per block.
+
+    Returns the coordinators, the blocks the firmware does not support and
+    the blocks whose first read failed.
+    """
+
+    def _make_update_method(
+        block_name: str,
+    ) -> Callable[[], Coroutine[Any, Any, bytes | None]]:
+        async def _update() -> bytes | None:
+            return await _async_update_block(hass, device, block_name, paired_blocks)
+
+        return _update
+
+    coordinators: dict[str, DataUpdateCoordinator[Any]] = {}
+    unsupported_blocks: set[str] = set()
+    failed_blocks: list[str] = []
+    for block, interval in refresh_intervals.items():
+        _LOGGER.debug(
+            "Creating coordinator for block %s with interval %s seconds",
+            block,
+            interval,
+        )
+        # Add per-coordinator jitter (up to 10 % of the interval, min 5 s) so
+        # that all coordinators do not fire at the same wall-clock second after
+        # the first period expires, avoiding lock contention thundering herds.
+        jitter = random.uniform(0, max(int(interval) * 0.10, 5))
+        coordinator = DataUpdateCoordinator(
+            hass,
+            _LOGGER,
+            name=f"THZ {block}",
+            update_interval=timedelta(seconds=int(interval) + jitter),
+            update_method=_make_update_method(block),
+        )
+        coordinators[block] = coordinator
+        try:
+            await coordinator.async_config_entry_first_refresh()
+        except ConfigEntryNotReady as exc:
+            # A communication error (timeout, busy, CRC, ...) is transient:
+            # keep the coordinator so its entities are created and recover
+            # on the next successful poll. Registers the firmware genuinely
+            # lacks are reported as data=None below instead.
+            failed_blocks.append(block)
+            _LOGGER.warning(
+                "Block %s could not be read at startup (%s); its entities "
+                "stay unavailable until the next successful poll.",
+                block,
+                exc,
+            )
+            continue
+        if coordinator.data is None:
+            unsupported_blocks.add(block)
+            _LOGGER.info(
+                "Block %s is unsupported on this firmware; "
+                "no entities will be created for it.",
+                block,
+            )
+        else:
+            _LOGGER.info("Initial data fetch completed for block %s", block)
+    return coordinators, unsupported_blocks, failed_blocks
 
 
 def _entity_should_be_hidden(
@@ -546,26 +579,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             device = entry_data.get("device")
             if device:
                 await hass.async_add_executor_job(device.close)
-
-        # Remove services if this is the last config entry
-        remaining_entries = [
-            e
-            for e in hass.config_entries.async_entries(DOMAIN)
-            if e.entry_id != entry.entry_id
-        ]
-        if not remaining_entries:
-            _LOGGER.debug("Removing THZ services (last config entry)")
-            hass.services.async_remove(DOMAIN, "read_raw_register")
-            hass.services.async_remove(DOMAIN, "scan_raw_registers")
-            hass.services.async_remove(DOMAIN, "watch_raw_registers_changes")
-            hass.services.async_remove(DOMAIN, "refresh_block")
-            hass.services.async_remove(DOMAIN, "set_diverter_valve")
-            hass.services.async_remove(DOMAIN, "backup_parameters")
-            hass.services.async_remove(DOMAIN, "restore_parameters")
-            hass.services.async_remove(DOMAIN, "list_parameter_backups")
-            hass.services.async_remove(DOMAIN, "probe_fault_memory")
-            hass.services.async_remove(DOMAIN, "acknowledge_faults")
-            hass.services.async_remove(DOMAIN, "clear_fault_memory")
 
     return unload_ok
 

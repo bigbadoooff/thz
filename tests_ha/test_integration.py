@@ -5,7 +5,9 @@ from __future__ import annotations
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
 )
@@ -123,7 +125,7 @@ async def test_default_visibility_disables_schedules(hass, fake_device):
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
-async def test_services_follow_the_config_entry(hass, fake_device):
+async def test_services_outlive_the_config_entry(hass, fake_device):
     # Notifications use persistent_notification.async_create directly, so
     # this works without the persistent_notification service being set up.
     entry = await setup_entry(hass)
@@ -140,4 +142,14 @@ async def test_services_follow_the_config_entry(hass, fake_device):
     assert response["success"] is True
 
     assert await hass.config_entries.async_unload(entry.entry_id)
-    assert not hass.services.has_service(DOMAIN, "read_raw_register")
+    # The services belong to the integration and outlive the entry; without
+    # a loaded entry a call is a validation error.
+    assert hass.services.has_service(DOMAIN, "read_raw_register")
+    with pytest.raises(ServiceValidationError, match="No THZ device is loaded"):
+        await hass.services.async_call(
+            DOMAIN,
+            "read_raw_register",
+            {"command": "FD"},
+            blocking=True,
+            return_response=True,
+        )

@@ -321,7 +321,7 @@ class TestAsyncSetupEntry:
 
 class TestAsyncUnloadEntry:
     @pytest.mark.asyncio
-    async def test_unload_closes_device_and_removes_services_when_last_entry(self):
+    async def test_unload_closes_device_and_keeps_services_when_last_entry(self):
         hass = _mock_hass()
         entry = _mock_config_entry()
         device = _fake_device()
@@ -332,8 +332,8 @@ class TestAsyncUnloadEntry:
 
         assert result is True
         hass.async_add_executor_job.assert_awaited_once_with(device.close)
-        removed = {c.args[1] for c in hass.services.async_remove.call_args_list}
-        assert "read_raw_register" in removed
+        # Services are registered in async_setup and outlive every entry.
+        hass.services.async_remove.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_unload_keeps_services_with_remaining_entries(self):

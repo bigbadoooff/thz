@@ -328,8 +328,9 @@ registers that may not exist on the device (e.g. cooling-only blocks).
 
 1. Go to **Settings** → **Devices & Services** → **THZ**
 2. Click the three-dot menu on the integration entry and choose **Delete**
-3. Confirm the removal — this stops all polling, unregisters the `thz.*`
-   services, and removes the device and its entities from Home Assistant
+3. Confirm the removal — this stops all polling and removes the device and
+   its entities from Home Assistant. The `thz.*` services stay registered
+   until Home Assistant restarts without the integration.
 
 After deleting the integration in the UI, also remove the files depending on
 how it was installed:

@@ -323,7 +323,8 @@
       "missing_entry_id": "No config entry ID was provided. Cannot continue reconfiguration.",
       "invalid_entry_id": "The provided config entry ID is invalid. Cannot continue reconfiguration.",
       "no_data_in_entry": "No configuration data found in the entry. Cannot continue reconfiguration.",
-      "cannot_detect_blocks": "Failed to read firmware or available blocks from the device. Please check your connection and try again."
+      "cannot_detect_blocks": "Failed to read firmware or available blocks from the device. Please check your connection and try again.",
+      "already_configured": "This THZ device is already configured."
     },
     "error": {
       "invalid_host": "Invalid IP address or hostname. Please enter a valid IPv4, IPv6 address, or hostname.",

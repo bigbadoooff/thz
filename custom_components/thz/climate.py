@@ -69,6 +69,7 @@ read-only mode — ``target_temperature`` is still shown but
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
@@ -238,16 +239,175 @@ def _find_entry(write_registers: dict, names: list[str]) -> dict | None:
     return None
 
 
-async def async_setup_entry(  # noqa: C901
+@dataclass(frozen=True)
+class _ClimateSetup:
+    """What the climate entities of one config entry have in common."""
+
+    device: Any
+    device_id: str
+    write_registers: dict[str, Any]
+    register_manager: Any
+    entity_id_style: str
+    entity_id_prefix: str | None
+    cooling_coordinator: DataUpdateCoordinator | None
+    opmode_entry: dict[str, Any] | None
+    cooling_byte: int | None
+    cooling_bit: int | None
+    compressor_bit: int | None
+
+    def field(self, block: str, name: str) -> tuple[int, int] | None:
+        return _field_layout(self.register_manager, block, name)
+
+    def entity_kwargs(self) -> dict[str, Any]:
+        return {
+            "device": self.device,
+            "device_id": self.device_id,
+            "entity_id_style": self.entity_id_style,
+            "entity_id_prefix": self.entity_id_prefix,
+        }
+
+
+def _command_entry(write_registers: dict[str, Any], name: str) -> dict[str, Any] | None:
+    """Return a write-map entry if it exists and has a command."""
+    entry = write_registers.get(name)
+    return entry if isinstance(entry, dict) and entry.get("command") else None
+
+
+def _cooling_entries(
+    write_registers: dict[str, Any], switch_name: str, setpoint_name: str
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """Return the cooling switch and setpoint entries, only if both exist."""
+    switch = _command_entry(write_registers, switch_name)
+    setpoint = _command_entry(write_registers, setpoint_name)
+    if switch is None or setpoint is None:
+        return None, None
+    return switch, setpoint
+
+
+def _hc1_entity(
+    setup: _ClimateSetup, coordinator: DataUpdateCoordinator
+) -> THZClimate | None:
+    current = setup.field("pxxF4", "insideTempRC")
+    target = setup.field("pxxF4", "roomSetTemp")
+    opmode = setup.field("pxxF4", "hcOpMode")
+    if current is None or target is None or opmode is None:
+        _LOGGER.error(
+            "Required fields missing from pxxF4 map; skipping HC1 climate entity"
+        )
+        return None
+    registers = setup.write_registers
+    cool_switch, cool_setpoint = _cooling_entries(
+        registers, _HC1_COOL_SWITCH_NAME, _HC1_COOL_SETPOINT_NAME
+    )
+    return THZClimate(
+        coordinator=coordinator,
+        cooling_coordinator=setup.cooling_coordinator,
+        translation_key="heating_circuit",
+        current_temp_offset=current[0],
+        current_temp_length=current[1],
+        target_temp_offset=target[0],
+        target_temp_length=target[1],
+        op_mode_offset=opmode[0],
+        op_mode_length=opmode[1],
+        cooling_byte=setup.cooling_byte,
+        cooling_bit=setup.cooling_bit,
+        compressor_bit=setup.compressor_bit,
+        heat_setpoint_entry=_find_entry(registers, _HC1_HEAT_SETPOINT_NAMES),
+        night_setpoint_entry=_find_entry(registers, _HC1_NIGHT_SETPOINT_NAMES),
+        cool_switch_entry=cool_switch,
+        cool_setpoint_entry=cool_setpoint,
+        opmode_entry=setup.opmode_entry,
+        fan_stage_entry=_command_entry(registers, _FAN_STAGE_DAY_NAME),
+        **setup.entity_kwargs(),
+    )
+
+
+def _hc2_entity(
+    setup: _ClimateSetup, coordinator: DataUpdateCoordinator, enabled: bool
+) -> THZClimate | None:
+    target = setup.field("pxxF5", "hc2SetpointTemp")
+    if target is None:
+        _LOGGER.error(
+            "Required fields missing from pxxF5 map; skipping HC2 climate entity"
+        )
+        return None
+    opmode = setup.field("pxxF5", "hcOpMode")
+    if opmode is None:
+        _LOGGER.debug(
+            "pxxF5 has no hcOpMode field; HC2 climate reports a fixed "
+            "HEAT mode instead of live per-circuit status"
+        )
+    registers = setup.write_registers
+    heat_entry = _find_entry(registers, _HC2_HEAT_SETPOINT_NAMES)
+    if heat_entry is None:
+        return None
+    cool_switch, cool_setpoint = _cooling_entries(
+        registers, _HC2_COOL_SWITCH_NAME, _HC2_COOL_SETPOINT_NAME
+    )
+    return THZClimate(
+        coordinator=coordinator,
+        cooling_coordinator=setup.cooling_coordinator,
+        translation_key="heating_circuit_2",
+        current_temp_offset=None,
+        current_temp_length=None,
+        target_temp_offset=target[0],
+        target_temp_length=target[1],
+        op_mode_offset=opmode[0] if opmode else None,
+        op_mode_length=opmode[1] if opmode else None,
+        enabled_default=enabled,
+        cooling_byte=setup.cooling_byte,
+        cooling_bit=setup.cooling_bit,
+        compressor_bit=setup.compressor_bit,
+        heat_setpoint_entry=heat_entry,
+        night_setpoint_entry=_find_entry(registers, _HC2_NIGHT_SETPOINT_NAMES),
+        cool_switch_entry=cool_switch,
+        cool_setpoint_entry=cool_setpoint,
+        opmode_entry=setup.opmode_entry,
+        **setup.entity_kwargs(),
+    )
+
+
+def _dhw_entity(
+    setup: _ClimateSetup, coordinator: DataUpdateCoordinator
+) -> THZClimate | None:
+    current = setup.field("pxxF3", "dhwTemp")
+    target = setup.field("pxxF3", "dhwSetTemp")
+    opmode = setup.field("pxxF3", "dhwOpMode")
+    if current is None or target is None or opmode is None:
+        _LOGGER.error(
+            "Required fields missing from pxxF3 map; skipping DHW climate entity"
+        )
+        return None
+    registers = setup.write_registers
+    return THZClimate(
+        coordinator=coordinator,
+        cooling_coordinator=None,
+        translation_key="dhw_heating",
+        current_temp_offset=current[0],
+        current_temp_length=current[1],
+        target_temp_offset=target[0],
+        target_temp_length=target[1],
+        op_mode_offset=opmode[0],
+        op_mode_length=opmode[1],
+        heat_setpoint_entry=_find_entry(registers, _DHW_SETPOINT_NAMES),
+        night_setpoint_entry=_find_entry(registers, _DHW_NIGHT_SETPOINT_NAMES),
+        manual_setpoint_entry=_find_entry(registers, _DHW_MANUAL_SETPOINT_NAMES),
+        cool_switch_entry=None,
+        cool_setpoint_entry=None,
+        **setup.entity_kwargs(),
+    )
+
+
+async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up THZ climate entities from a config entry.
 
-    Creates an HC1 climate entity (from ``pxxF4`` coordinator) and a DHW
-    climate entity (from ``pxxF3`` coordinator) when the respective data
-    blocks are available.
+    Creates the HC1 (``pxxF4``), HC2 (``pxxF5``) and DHW (``pxxF3``)
+    climate entities for the blocks that are polled and whose fields the
+    firmware's register map defines.
 
     Args:
         hass: The Home Assistant instance.
@@ -256,180 +416,36 @@ async def async_setup_entry(  # noqa: C901
     """
     entry_data = get_runtime_data(config_entry)
     coordinators: dict[str, DataUpdateCoordinator] = entry_data["coordinators"]
-    device = entry_data["device"]
-    device_id: str = entry_data["device_id"]
-    write_registers: dict = entry_data["write_manager"].get_all_registers()
     register_manager = entry_data["register_manager"]
-    entity_id_style = entry_data.get("entity_id_style", ENTITY_ID_STYLE_DEFAULT)
-    entity_id_prefix = entry_data.get("entity_id_prefix")
-    enable_hc2 = bool(config_entry.data.get(CONF_ENABLE_HC2, False))
-
-    # Derive field byte-offsets and lengths from the active firmware's register map.
-    # Returns None when a field is absent; the entity is skipped in that case.
-    f4_current = _field_layout(register_manager, "pxxF4", "insideTempRC")
-    f4_target = _field_layout(register_manager, "pxxF4", "roomSetTemp")
-    f4_opmode = _field_layout(register_manager, "pxxF4", "hcOpMode")
-    f3_current = _field_layout(register_manager, "pxxF3", "dhwTemp")
-    f3_target = _field_layout(register_manager, "pxxF3", "dhwSetTemp")
-    f3_opmode = _field_layout(register_manager, "pxxF3", "dhwOpMode")
-    f5_target = _field_layout(register_manager, "pxxF5", "hc2SetpointTemp")
-    f5_opmode = _field_layout(register_manager, "pxxF5", "hcOpMode")
+    write_registers: dict[str, Any] = entry_data["write_manager"].get_all_registers()
 
     # Bit-field layouts for pxx0A0176 — None when not present in map
-    a176_cooling = _bit_field_layout(register_manager, "pxx0A0176", "cooling")
-    a176_compressor = _bit_field_layout(register_manager, "pxx0A0176", "compressor")
+    cooling = _bit_field_layout(register_manager, "pxx0A0176", "cooling")
+    compressor = _bit_field_layout(register_manager, "pxx0A0176", "compressor")
+    setup = _ClimateSetup(
+        device=entry_data["device"],
+        device_id=entry_data["device_id"],
+        write_registers=write_registers,
+        register_manager=register_manager,
+        entity_id_style=entry_data.get("entity_id_style", ENTITY_ID_STYLE_DEFAULT),
+        entity_id_prefix=entry_data.get("entity_id_prefix"),
+        cooling_coordinator=coordinators.get("pxx0A0176"),
+        opmode_entry=_command_entry(write_registers, _OPMODE_NAME),
+        cooling_byte=cooling[0] if cooling else None,
+        cooling_bit=cooling[1] if cooling else None,
+        compressor_bit=compressor[1] if compressor else None,
+    )
 
-    entities: list[THZClimate] = []
+    candidates: list[THZClimate | None] = []
+    if (hc1 := coordinators.get("pxxF4")) is not None:
+        candidates.append(_hc1_entity(setup, hc1))
+    if (hc2 := coordinators.get("pxxF5")) is not None:
+        enable_hc2 = bool(config_entry.data.get(CONF_ENABLE_HC2, False))
+        candidates.append(_hc2_entity(setup, hc2, enable_hc2))
+    if (dhw := coordinators.get("pxxF3")) is not None:
+        candidates.append(_dhw_entity(setup, dhw))
 
-    # Shared entries used by multiple entities
-    cooling_coord = coordinators.get("pxx0A0176")
-    opmode_entry: dict | None = write_registers.get(_OPMODE_NAME)
-    if not (isinstance(opmode_entry, dict) and opmode_entry.get("command")):
-        opmode_entry = None
-
-    # ── Heating Circuit 1 ──────────────────────────────────────────────────
-    hc1_coordinator = coordinators.get("pxxF4")
-    if hc1_coordinator is not None:
-        if f4_current is None or f4_target is None or f4_opmode is None:
-            _LOGGER.error(
-                "Required fields missing from pxxF4 map; skipping HC1 climate entity"
-            )
-        else:
-            heat_entry = _find_entry(write_registers, _HC1_HEAT_SETPOINT_NAMES)
-            night_entry = _find_entry(write_registers, _HC1_NIGHT_SETPOINT_NAMES)
-            cool_switch_entry = write_registers.get(_HC1_COOL_SWITCH_NAME)
-            cool_setpoint_entry = write_registers.get(_HC1_COOL_SETPOINT_NAME)
-
-            if not (
-                isinstance(cool_switch_entry, dict)
-                and cool_switch_entry.get("command")
-                and isinstance(cool_setpoint_entry, dict)
-                and cool_setpoint_entry.get("command")
-            ):
-                cool_switch_entry = None
-                cool_setpoint_entry = None
-
-            fan_stage_entry: dict | None = write_registers.get(_FAN_STAGE_DAY_NAME)
-            if not (
-                isinstance(fan_stage_entry, dict) and fan_stage_entry.get("command")
-            ):
-                fan_stage_entry = None
-
-            entities.append(
-                THZClimate(
-                    coordinator=hc1_coordinator,
-                    cooling_coordinator=cooling_coord,
-                    device=device,
-                    device_id=device_id,
-                    translation_key="heating_circuit",
-                    current_temp_offset=f4_current[0],
-                    current_temp_length=f4_current[1],
-                    target_temp_offset=f4_target[0],
-                    target_temp_length=f4_target[1],
-                    op_mode_offset=f4_opmode[0],
-                    op_mode_length=f4_opmode[1],
-                    cooling_byte=a176_cooling[0] if a176_cooling else None,
-                    cooling_bit=a176_cooling[1] if a176_cooling else None,
-                    compressor_bit=a176_compressor[1] if a176_compressor else None,
-                    heat_setpoint_entry=heat_entry,
-                    night_setpoint_entry=night_entry,
-                    cool_switch_entry=cool_switch_entry,
-                    cool_setpoint_entry=cool_setpoint_entry,
-                    opmode_entry=opmode_entry,
-                    fan_stage_entry=fan_stage_entry,
-                    entity_id_style=entity_id_style,
-                    entity_id_prefix=entity_id_prefix,
-                )
-            )
-
-    # ── Heating Circuit 2 ──────────────────────────────────────────────────
-    hc2_coordinator = coordinators.get("pxxF5")
-    if hc2_coordinator is not None:
-        if f5_target is None:
-            _LOGGER.error(
-                "Required fields missing from pxxF5 map; skipping HC2 climate entity"
-            )
-        else:
-            if f5_opmode is None:
-                _LOGGER.debug(
-                    "pxxF5 has no hcOpMode field; HC2 climate reports a fixed "
-                    "HEAT mode instead of live per-circuit status"
-                )
-            hc2_heat_entry = _find_entry(write_registers, _HC2_HEAT_SETPOINT_NAMES)
-            hc2_night_entry = _find_entry(write_registers, _HC2_NIGHT_SETPOINT_NAMES)
-            if hc2_heat_entry is not None:
-                hc2_cool_switch_entry = write_registers.get(_HC2_COOL_SWITCH_NAME)
-                hc2_cool_setpoint_entry = write_registers.get(_HC2_COOL_SETPOINT_NAME)
-                if not (
-                    isinstance(hc2_cool_switch_entry, dict)
-                    and hc2_cool_switch_entry.get("command")
-                    and isinstance(hc2_cool_setpoint_entry, dict)
-                    and hc2_cool_setpoint_entry.get("command")
-                ):
-                    hc2_cool_switch_entry = None
-                    hc2_cool_setpoint_entry = None
-
-                entities.append(
-                    THZClimate(
-                        coordinator=hc2_coordinator,
-                        cooling_coordinator=cooling_coord,
-                        device=device,
-                        device_id=device_id,
-                        translation_key="heating_circuit_2",
-                        current_temp_offset=None,
-                        current_temp_length=None,
-                        target_temp_offset=f5_target[0],
-                        target_temp_length=f5_target[1],
-                        op_mode_offset=f5_opmode[0] if f5_opmode else None,
-                        op_mode_length=f5_opmode[1] if f5_opmode else None,
-                        enabled_default=enable_hc2,
-                        cooling_byte=a176_cooling[0] if a176_cooling else None,
-                        cooling_bit=a176_cooling[1] if a176_cooling else None,
-                        compressor_bit=a176_compressor[1] if a176_compressor else None,
-                        heat_setpoint_entry=hc2_heat_entry,
-                        night_setpoint_entry=hc2_night_entry,
-                        cool_switch_entry=hc2_cool_switch_entry,
-                        cool_setpoint_entry=hc2_cool_setpoint_entry,
-                        opmode_entry=opmode_entry,
-                        entity_id_style=entity_id_style,
-                        entity_id_prefix=entity_id_prefix,
-                    )
-                )
-
-    # ── Domestic Hot Water ─────────────────────────────────────────────────
-    dhw_coordinator = coordinators.get("pxxF3")
-    if dhw_coordinator is not None:
-        if f3_current is None or f3_target is None or f3_opmode is None:
-            _LOGGER.error(
-                "Required fields missing from pxxF3 map; skipping DHW climate entity"
-            )
-        else:
-            dhw_entry = _find_entry(write_registers, _DHW_SETPOINT_NAMES)
-            dhw_night_entry = _find_entry(write_registers, _DHW_NIGHT_SETPOINT_NAMES)
-            dhw_manual_entry = _find_entry(write_registers, _DHW_MANUAL_SETPOINT_NAMES)
-            entities.append(
-                THZClimate(
-                    coordinator=dhw_coordinator,
-                    cooling_coordinator=None,
-                    device=device,
-                    device_id=device_id,
-                    translation_key="dhw_heating",
-                    current_temp_offset=f3_current[0],
-                    current_temp_length=f3_current[1],
-                    target_temp_offset=f3_target[0],
-                    target_temp_length=f3_target[1],
-                    op_mode_offset=f3_opmode[0],
-                    op_mode_length=f3_opmode[1],
-                    heat_setpoint_entry=dhw_entry,
-                    night_setpoint_entry=dhw_night_entry,
-                    manual_setpoint_entry=dhw_manual_entry,
-                    cool_switch_entry=None,
-                    cool_setpoint_entry=None,
-                    entity_id_style=entity_id_style,
-                    entity_id_prefix=entity_id_prefix,
-                )
-            )
-
+    entities = [entity for entity in candidates if entity is not None]
     if entities:
         assign_subdevices(entities, config_entry.data)
         async_add_entities(entities, True)

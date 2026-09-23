@@ -1,8 +1,8 @@
 """Tests for the parameter backup/restore services and clock-drift helpers.
 
 Covers the backup_parameters / restore_parameters / list_parameter_backups
-services in custom_components/thz/services.py, their small supporting
-helpers (_sanitize_label, _parse_hhmm, also in services.py), and the
+services in custom_components/thz/services/backup.py, their small supporting
+helpers (_sanitize_label, _parse_hhmm, also in backup.py), and the
 clock-drift helpers in custom_components/thz/clock_sync.py
 (async_read_device_clock, async_write_device_clock,
 async_check_and_maybe_sync_clock): the periodic drift check must read the
@@ -66,7 +66,7 @@ def _handler_for(hass, service_name: str):
 
 
 async def _get_handler(hass, name: str):
-    await async_setup_services(hass)
+    async_setup_services(hass)
     return _handler_for(hass, name)
 
 
@@ -88,23 +88,23 @@ class TestSanitizeLabel:
     """Tests for services._sanitize_label."""
 
     def test_none_returns_empty(self):
-        from custom_components.thz.services import _sanitize_label
+        from custom_components.thz.services.backup import _sanitize_label
 
         assert _sanitize_label(None) == ""
 
     def test_empty_string_returns_empty(self):
-        from custom_components.thz.services import _sanitize_label
+        from custom_components.thz.services.backup import _sanitize_label
 
         assert _sanitize_label("") == ""
 
     def test_valid_label_passes_through_with_prefix(self):
-        from custom_components.thz.services import _sanitize_label
+        from custom_components.thz.services.backup import _sanitize_label
 
         assert _sanitize_label("before_reset") == "_before_reset"
         assert _sanitize_label("test-123") == "_test-123"
 
     def test_invalid_characters_replaced_with_underscore(self):
-        from custom_components.thz.services import _sanitize_label
+        from custom_components.thz.services.backup import _sanitize_label
 
         # Spaces, slashes, dots etc are not alnum/-/_ so become "_", then
         # leading/trailing underscores are stripped.
@@ -112,13 +112,13 @@ class TestSanitizeLabel:
         assert _sanitize_label("../../etc/passwd") == "_etc_passwd"
 
     def test_only_invalid_characters_returns_empty(self):
-        from custom_components.thz.services import _sanitize_label
+        from custom_components.thz.services.backup import _sanitize_label
 
         assert _sanitize_label("!!!") == ""
         assert _sanitize_label("   ") == ""
 
     def test_strips_surrounding_whitespace(self):
-        from custom_components.thz.services import _sanitize_label
+        from custom_components.thz.services.backup import _sanitize_label
 
         assert _sanitize_label("  my label  ") == "_my_label"
 
@@ -127,30 +127,30 @@ class TestParseHHMM:
     """Tests for services._parse_hhmm."""
 
     def test_none_returns_none(self):
-        from custom_components.thz.services import _parse_hhmm
+        from custom_components.thz.services.backup import _parse_hhmm
 
         assert _parse_hhmm(None) is None
 
     def test_empty_string_returns_none(self):
-        from custom_components.thz.services import _parse_hhmm
+        from custom_components.thz.services.backup import _parse_hhmm
 
         assert _parse_hhmm("") is None
 
     def test_valid_hhmm(self):
-        from custom_components.thz.services import _parse_hhmm
+        from custom_components.thz.services.backup import _parse_hhmm
 
         assert _parse_hhmm("06:30") == dt_time(6, 30)
         assert _parse_hhmm("23:45") == dt_time(23, 45)
         assert _parse_hhmm("00:00") == dt_time(0, 0)
 
     def test_invalid_format_raises(self):
-        from custom_components.thz.services import _parse_hhmm
+        from custom_components.thz.services.backup import _parse_hhmm
 
         with pytest.raises(ValueError):
             _parse_hhmm("not-a-time")
 
     def test_missing_colon_raises(self):
-        from custom_components.thz.services import _parse_hhmm
+        from custom_components.thz.services.backup import _parse_hhmm
 
         with pytest.raises(ValueError):
             _parse_hhmm("0630")
@@ -166,7 +166,7 @@ class TestRequireTargetEntryData:
     """
 
     def test_single_entry_no_entry_id_needed(self):
-        from custom_components.thz.services import _require_target_entry_data
+        from custom_components.thz.services.common import _require_target_entry_data
 
         hass = MagicMock()
         entry = MagicMock()
@@ -180,16 +180,16 @@ class TestRequireTargetEntryData:
         assert resolved is entry.runtime_data
 
     def test_no_entries_raises(self):
-        from custom_components.thz.services import _require_target_entry_data
+        from custom_components.thz.services.common import _require_target_entry_data
 
         hass = MagicMock()
         hass.config_entries.async_entries = MagicMock(return_value=[])
 
-        with pytest.raises(HomeAssistantError, match="not initialized"):
+        with pytest.raises(HomeAssistantError, match="No THZ device is loaded"):
             _require_target_entry_data(hass, None)
 
     def test_multiple_entries_without_entry_id_raises(self):
-        from custom_components.thz.services import _require_target_entry_data
+        from custom_components.thz.services.common import _require_target_entry_data
 
         hass = MagicMock()
         entry_a = MagicMock(entry_id="entry_a", runtime_data={"device": MagicMock()})
@@ -200,7 +200,7 @@ class TestRequireTargetEntryData:
             _require_target_entry_data(hass, None)
 
     def test_multiple_entries_with_correct_entry_id(self):
-        from custom_components.thz.services import _require_target_entry_data
+        from custom_components.thz.services.common import _require_target_entry_data
 
         hass = MagicMock()
         entry_a = MagicMock(entry_id="entry_a", runtime_data={"device": MagicMock()})
@@ -213,7 +213,7 @@ class TestRequireTargetEntryData:
         assert resolved is entry_b.runtime_data
 
     def test_unknown_entry_id_raises(self):
-        from custom_components.thz.services import _require_target_entry_data
+        from custom_components.thz.services.common import _require_target_entry_data
 
         hass = MagicMock()
         entry = MagicMock(entry_id="entry_a", runtime_data={"device": MagicMock()})
@@ -569,7 +569,7 @@ class TestBackupParametersService:
             return buf
 
         with (
-            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
             patch("custom_components.thz.clock_sync.dt_util", fake_dt_util),
             patch("os.makedirs"),
             patch("builtins.open", side_effect=fake_open),
@@ -604,7 +604,7 @@ class TestBackupParametersService:
         call = MagicMock()
         call.data = {}
 
-        with pytest.raises(HomeAssistantError, match="not initialized"):
+        with pytest.raises(HomeAssistantError, match="No THZ device is loaded"):
             await handler(call)
 
 
@@ -777,7 +777,7 @@ class TestRestoreParametersService:
         fake_dt_util, fake_open = self._patch_common(mock_hass, backup_doc, device)
 
         with (
-            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
             patch("os.path.isfile", return_value=True),
             patch("builtins.open", side_effect=fake_open),
         ):
@@ -807,7 +807,7 @@ class TestRestoreParametersService:
         fake_dt_util, fake_open = self._patch_common(mock_hass, backup_doc, device)
 
         with (
-            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
             patch("os.path.isfile", return_value=True),
             patch("builtins.open", side_effect=fake_open),
         ):
@@ -834,7 +834,7 @@ class TestRestoreParametersService:
         fake_dt_util, fake_open = self._patch_common(mock_hass, backup_doc, device)
 
         with (
-            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
             patch("os.path.isfile", return_value=True),
             patch("builtins.open", side_effect=fake_open),
         ):
@@ -884,7 +884,7 @@ class TestRestoreParametersService:
         device.async_execute = AsyncMock(side_effect=fake_execute)
 
         with (
-            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
             patch("os.path.isfile", return_value=True),
             patch("builtins.open", side_effect=fake_open),
         ):
@@ -945,7 +945,7 @@ class TestRestoreParametersService:
         device.async_execute = AsyncMock(side_effect=fake_execute)
 
         with (
-            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
             patch("os.path.isfile", return_value=True),
             patch("builtins.open", side_effect=fake_open),
         ):

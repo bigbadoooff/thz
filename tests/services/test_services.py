@@ -67,7 +67,7 @@ class TestServiceRegistration:
     @pytest.mark.asyncio
     async def test_all_services_registered(self):
         hass = _mock_hass()
-        await async_setup_services(hass)
+        async_setup_services(hass)
 
         registered = {
             call[0][1] for call in hass.services.async_register.call_args_list
@@ -86,19 +86,12 @@ class TestServiceRegistration:
             "clear_fault_memory",
         }
 
-    @pytest.mark.asyncio
-    async def test_skips_registration_if_service_exists(self):
-        hass = _mock_hass()
-        hass.services.has_service = MagicMock(return_value=True)
-        await async_setup_services(hass)
-        hass.services.async_register.assert_not_called()
-
 
 class TestScanRawRegisters:
     @pytest.mark.asyncio
     async def test_max_results_must_be_positive(self):
         hass = _mock_hass()
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -109,7 +102,7 @@ class TestScanRawRegisters:
     @pytest.mark.asyncio
     async def test_requires_pattern_xor_range(self):
         hass = _mock_hass()
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -120,7 +113,7 @@ class TestScanRawRegisters:
     @pytest.mark.asyncio
     async def test_invalid_pattern_returns_error(self):
         hass = _mock_hass()
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -131,12 +124,12 @@ class TestScanRawRegisters:
     @pytest.mark.asyncio
     async def test_no_device_returns_error(self):
         hass = _mock_hass()
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
         call.data = {"pattern": "0A0176"}
-        with pytest.raises(HomeAssistantError, match="not initialized"):
+        with pytest.raises(HomeAssistantError, match="No THZ device is loaded"):
             await handler(call)
 
     @pytest.mark.asyncio
@@ -150,7 +143,7 @@ class TestScanRawRegisters:
         device.async_execute = AsyncMock(return_value=bytes.fromhex("0100" + "1234"))
         hass.data[DOMAIN]["entry1"] = {"device": device}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -171,7 +164,7 @@ class TestScanRawRegisters:
         device.async_execute = AsyncMock(side_effect=RuntimeError("boom"))
         hass.data[DOMAIN]["entry1"] = {"device": device}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -193,7 +186,7 @@ class TestScanRawRegisters:
         hass.data[DOMAIN]["entry1"] = {"device": _mock_device()}
         hass.data[DOMAIN]["entry2"] = {"device": _mock_device()}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -206,7 +199,7 @@ class TestScanRawRegisters:
         hass = _mock_hass()
         hass.data[DOMAIN]["entry1"] = {"device": _mock_device()}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "scan_raw_registers")
 
         call = MagicMock()
@@ -219,7 +212,7 @@ class TestWatchRawRegistersChanges:
     @pytest.mark.asyncio
     async def test_duration_must_be_at_least_one(self):
         hass = _mock_hass()
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "watch_raw_registers_changes")
 
         call = MagicMock()
@@ -230,7 +223,7 @@ class TestWatchRawRegistersChanges:
     @pytest.mark.asyncio
     async def test_interval_must_be_non_negative(self):
         hass = _mock_hass()
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "watch_raw_registers_changes")
 
         call = MagicMock()
@@ -245,12 +238,12 @@ class TestWatchRawRegistersChanges:
     @pytest.mark.asyncio
     async def test_no_device_returns_error(self):
         hass = _mock_hass()
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "watch_raw_registers_changes")
 
         call = MagicMock()
         call.data = {"pattern": "0A0176", "duration_seconds": 1}
-        with pytest.raises(HomeAssistantError, match="not initialized"):
+        with pytest.raises(HomeAssistantError, match="No THZ device is loaded"):
             await handler(call)
 
     @pytest.mark.asyncio
@@ -269,7 +262,7 @@ class TestWatchRawRegistersChanges:
         )
         hass.data[DOMAIN]["entry1"] = {"device": device}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "watch_raw_registers_changes")
 
         call = MagicMock()
@@ -289,7 +282,7 @@ class TestRefreshBlockService:
     @pytest.mark.asyncio
     async def test_missing_block_param_errors(self):
         hass = _mock_hass()
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "refresh_block")
 
         call = MagicMock()
@@ -304,7 +297,7 @@ class TestRefreshBlockService:
         coordinator.async_request_refresh = AsyncMock()
         hass.data[DOMAIN]["entry1"] = {"coordinators": {"pxxFB": coordinator}}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "refresh_block")
 
         call = MagicMock()
@@ -319,7 +312,7 @@ class TestRefreshBlockService:
         hass = _mock_hass()
         hass.data[DOMAIN]["entry1"] = {"coordinators": {}}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "refresh_block")
 
         call = MagicMock()
@@ -338,12 +331,12 @@ class TestSetDiverterValveService:
     @pytest.mark.asyncio
     async def test_no_entries_returns_error(self):
         hass = _mock_hass()
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
         call.data = {"position": "off"}
-        with pytest.raises(HomeAssistantError, match="not initialized"):
+        with pytest.raises(HomeAssistantError, match="No THZ device is loaded"):
             await handler(call)
 
     @pytest.mark.asyncio
@@ -352,7 +345,7 @@ class TestSetDiverterValveService:
         hass.data[DOMAIN]["entry1"] = {"device": _mock_device(), "coordinators": {}}
         hass.data[DOMAIN]["entry2"] = {"device": _mock_device(), "coordinators": {}}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -375,7 +368,7 @@ class TestSetDiverterValveService:
         )
         hass.data[DOMAIN]["entry1"] = {"device": device, "coordinators": {}}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -396,7 +389,7 @@ class TestSetDiverterValveService:
             "coordinators": {"pxxF2": cooling_coord},
         }
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -412,7 +405,7 @@ class TestSetDiverterValveService:
         device.async_execute = AsyncMock(side_effect=ConnectionError("lost"))
         hass.data[DOMAIN]["entry1"] = {"device": device, "coordinators": {}}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -424,7 +417,7 @@ class TestSetDiverterValveService:
 
     @pytest.mark.asyncio
     async def test_cancel_while_motor_runs_still_stops_both_motors(self):
-        from custom_components.thz import services as services_module
+        from custom_components.thz.services import diverter as services_module
 
         hass = _mock_hass()
         device = _mock_device()
@@ -435,7 +428,7 @@ class TestSetDiverterValveService:
             "coordinators": {"pxxF2": self._coordinator(bytes(12))},
         }
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -469,7 +462,7 @@ class TestSetDiverterValveService:
         device.async_execute = AsyncMock(side_effect=_execute)
         hass.data[DOMAIN]["entry1"] = {"device": device, "coordinators": {}}
 
-        await async_setup_services(hass)
+        async_setup_services(hass)
         handler = _handler_for(hass, "set_diverter_valve")
 
         call = MagicMock()
@@ -487,13 +480,13 @@ class TestDiverterBitPosition:
         from custom_components.thz.register_maps.register_map_manager import (
             RegisterMapManager,
         )
-        from custom_components.thz.services import _diverter_bit_position
+        from custom_components.thz.services.diverter import _diverter_bit_position
 
         for firmware in ("206", "214", "419", "439", "509", "539", "709"):
             assert _diverter_bit_position(RegisterMapManager(firmware)) == (11, 2)
 
     def test_even_nibble_is_the_high_nibble(self):
-        from custom_components.thz.services import _diverter_bit_position
+        from custom_components.thz.services.diverter import _diverter_bit_position
 
         manager = MagicMock()
         manager.get_registers_for_block.return_value = [
@@ -502,7 +495,7 @@ class TestDiverterBitPosition:
         assert _diverter_bit_position(manager) == (11, 5)
 
     def test_missing_flag_is_reported(self):
-        from custom_components.thz.services import _diverter_bit_position
+        from custom_components.thz.services.diverter import _diverter_bit_position
 
         manager = MagicMock()
         manager.get_registers_for_block.return_value = []

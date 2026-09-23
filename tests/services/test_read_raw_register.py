@@ -72,7 +72,7 @@ class TestReadRawRegisterService:
         """Test that service is registered correctly."""
         from custom_components.thz.services import async_setup_services
 
-        await async_setup_services(mock_hass)
+        async_setup_services(mock_hass)
 
         # Verify read_raw_register was registered among the services
         registered = [
@@ -83,19 +83,16 @@ class TestReadRawRegisterService:
             assert call[0][0] == DOMAIN  # domain
 
     @pytest.mark.asyncio
-    async def test_service_idempotent(self, mock_hass):
-        """Test that service registration is idempotent."""
-        from custom_components.thz.services import async_setup_services
+    async def test_async_setup_registers_every_service(self, mock_hass):
+        """async_setup registers each service once, without a config entry."""
+        from custom_components.thz import async_setup
+        from custom_components.thz.services import SERVICES
 
-        # First call should register
-        await async_setup_services(mock_hass)
-        first_count = mock_hass.services.async_register.call_count
-        assert first_count > 0
-
-        # Second call should not register (already exists)
-        mock_hass.services.has_service = MagicMock(return_value=True)
-        await async_setup_services(mock_hass)
-        assert mock_hass.services.async_register.call_count == first_count  # Unchanged
+        assert await async_setup(mock_hass, {})
+        registered = [
+            call.args[1] for call in mock_hass.services.async_register.call_args_list
+        ]
+        assert sorted(registered) == sorted(SERVICES)
 
     @pytest.mark.asyncio
     async def test_read_raw_register_success(self, mock_hass, mock_device):
@@ -111,7 +108,7 @@ class TestReadRawRegisterService:
         mock_device.async_execute = AsyncMock(return_value=test_data)
 
         # Register service and get handler
-        await async_setup_services(mock_hass)
+        async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         # Create service call
@@ -140,7 +137,7 @@ class TestReadRawRegisterService:
 
         mock_hass.data[DOMAIN]["test_entry"] = {"device": mock_device}
 
-        await async_setup_services(mock_hass)
+        async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -151,17 +148,17 @@ class TestReadRawRegisterService:
 
     @pytest.mark.asyncio
     async def test_read_raw_register_no_device(self, mock_hass):
-        """Test read when device is not initialized."""
+        """Test read when device is No THZ device is loaded."""
         from custom_components.thz.services import async_setup_services
 
         # No device in hass.data
-        await async_setup_services(mock_hass)
+        async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
         call.data = {"command": "FB"}
 
-        with pytest.raises(HomeAssistantError, match="not initialized"):
+        with pytest.raises(HomeAssistantError, match="No THZ device is loaded"):
             await handler(call)
 
     @pytest.mark.asyncio
@@ -175,7 +172,7 @@ class TestReadRawRegisterService:
         mock_hass.data[DOMAIN]["entry_a"] = {"device": mock_device}
         mock_hass.data[DOMAIN]["entry_b"] = {"device": mock_device}
 
-        await async_setup_services(mock_hass)
+        async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -199,7 +196,7 @@ class TestReadRawRegisterService:
         mock_hass.data[DOMAIN]["entry_a"] = {"device": mock_device}
         mock_hass.data[DOMAIN]["entry_b"] = {"device": mock_device}
 
-        await async_setup_services(mock_hass)
+        async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -218,7 +215,7 @@ class TestReadRawRegisterService:
 
         mock_hass.data[DOMAIN]["entry_a"] = {"device": mock_device}
 
-        await async_setup_services(mock_hass)
+        async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -239,7 +236,7 @@ class TestReadRawRegisterService:
             side_effect=RuntimeError("Communication error")
         )
 
-        await async_setup_services(mock_hass)
+        async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -259,7 +256,7 @@ class TestReadRawRegisterService:
         test_data = bytes(range(32))
         mock_device.async_execute = AsyncMock(return_value=test_data)
 
-        await async_setup_services(mock_hass)
+        async_setup_services(mock_hass)
         handler = self._handler_for(mock_hass, "read_raw_register")
 
         call = MagicMock()
@@ -280,31 +277,19 @@ class TestReadRawRegisterService:
         assert lines[1].startswith("  0010:")
 
     @pytest.mark.asyncio
-    async def test_service_cleanup_on_unload(self, mock_hass):
-        """Test that service is removed when last entry is unloaded."""
+    async def test_services_stay_after_last_entry_is_unloaded(self, mock_hass):
+        """Services belong to the integration, not to an entry."""
         from custom_components.thz import async_unload_entry
 
-        # Create mock config entry
         entry = MagicMock()
         entry.entry_id = "test_entry"
         entry.runtime_data = {"device": MagicMock(close=MagicMock())}
-
-        # Mock config_entries.async_entries to return no remaining entries
         mock_hass.config_entries = MagicMock()
         mock_hass.config_entries.async_entries = MagicMock(return_value=[])
         mock_hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
 
-        # Unload entry
-        result = await async_unload_entry(mock_hass, entry)
-
-        assert result is True
-        # Verify all registered services (including read_raw_register) were removed
-        removed = [
-            call.args[1] for call in mock_hass.services.async_remove.call_args_list
-        ]
-        assert "read_raw_register" in removed
-        for call in mock_hass.services.async_remove.call_args_list:
-            assert call.args[0] == DOMAIN
+        assert await async_unload_entry(mock_hass, entry) is True
+        mock_hass.services.async_remove.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_service_not_removed_with_remaining_entries(self, mock_hass):

@@ -3,7 +3,7 @@
 from copy import deepcopy
 import logging
 import sys
-from typing import Any
+from typing import Any, cast
 
 from . import (
     readings_map_2xx,  # noqa: F401
@@ -106,6 +106,47 @@ FIRMWARE_MAPS = {
         "read": ["readings_map_439"],
     },
 }
+
+
+# (nibble offset, nibble length, factor, decode type) of a read-map field.
+_FieldLayout = tuple[int, int, float, str]
+
+
+def _is_read_field(field: Any) -> bool:
+    """Return True for a read-map field tuple (name, offset, length, decode, factor)."""
+    return isinstance(field, tuple) and len(field) >= 5
+
+
+def _field_name(field: tuple[Any, ...]) -> str:
+    return str(field[0]).strip().rstrip(":").strip()
+
+
+def _field_layout(field: tuple[Any, ...]) -> _FieldLayout:
+    return (field[1], field[2], float(field[4]) if field[4] else 1.0, field[3])
+
+
+def _apply_block_layout(entry: dict[str, Any], layout: _FieldLayout) -> None:
+    """Store a read-map layout on a 2xx write entry for block read-modify-write.
+
+    Register map offsets/lengths are in nibbles (FHEM convention); they are
+    converted to bytes so read_value and write_block_value can use them
+    directly (same conversion as sensor.py async_setup_entry).
+    """
+    nibble_offset, nibble_length, factor, decode_type = layout
+    entry["offset"] = nibble_offset // 2
+    entry["length"] = (nibble_length + 1) // 2
+    entry["write_mode"] = "block"
+    # FHEM reads 2xx parameters as "hex" (unsigned) unless the map says
+    # "hex2int", e.g. 240 min in one byte is not -16.
+    entry["signed"] = decode_type == "hex2int"
+    if decode_type.startswith("bit") and decode_type[3:].isdigit():
+        # Single-bit flag (e.g. progHC1Monday) sharing its byte with other
+        # flags. Same nibble convention as sensor.py: an even nibble offset
+        # is the byte's high nibble.
+        bit = int(decode_type[3:])
+        entry["bit"] = bit + 4 if nibble_offset % 2 == 0 else bit
+    # step = 1/factor so encode/decode functions scale correctly.
+    entry["step"] = str((1.0 / factor) if factor else 1.0)
 
 
 class BaseRegisterMapManager:
@@ -342,101 +383,33 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
         merged.update(deepcopy(override) or {})
         return merged
 
-    def _enrich_2xx_write_entries(self) -> None:  # noqa: C901
+    def _enrich_2xx_write_entries(self) -> None:
         """Enrich 2xx firmware write entries with block address, offset, length and step.
 
         For 2xx firmware, each writable parameter lives inside a larger register block.
         Writing requires reading the complete block, modifying the relevant bytes, and
         writing the whole block back.  This method cross-references the read register
-        maps (register_map_206, register_map_214, register_map_214j) to discover the
-        byte offset, length, and scaling factor for each parameter, then stores those
-        values into the write-map entry alongside a ``write_mode="block"`` flag so that
-        entity code can dispatch to the correct write path.
+        maps to discover the byte offset, length, and scaling factor for each
+        parameter, then stores those values into the write-map entry alongside a
+        ``write_mode="block"`` flag so that entity code can dispatch to the correct
+        write path.
 
         Only entries with ``type="pclean"`` are promoted to ``type="number"`` here.
         Entries with ``type="ptime"`` (schedule start/end times) require a different
         time-encoding and are left unchanged for now.
         """
-        # Build lookup: stripped_param_name →
-        # (hex_block_addr, offset, length, factor, decode_type)
-        # from all 2xx-series read register maps.
-        param_lookup: dict[str, tuple[str, int, int, float, str]] = {}
-        # The first map that defines a parameter wins, so the running
-        # firmware's own map must come first: 2.14 lays out e.g. the pFan
-        # block (01) differently from 2.06.
-        map_order = ["register_map_206", "register_map_214", "register_map_214j"]
-        own_map = f"register_map_{self.firmware_version}"
-        if own_map in map_order:
-            map_order.remove(own_map)
-            map_order.insert(0, own_map)
-        for mod_name in map_order:
-            full_name = f"{self._package}.{mod_name}"
-            mod = sys.modules.get(full_name)
-            if mod is None:
-                continue
-            reg_map = getattr(mod, "REGISTER_MAP", {})
-            for block_key, entries in reg_map.items():
-                if not isinstance(entries, list) or not block_key.startswith("pxx"):
-                    continue
-                hex_addr = block_key[3:]  # e.g. "pxx17" → "17"
-                for entry in entries:
-                    if not isinstance(entry, tuple) or len(entry) < 5:
-                        continue
-                    # entry: (name_str, offset, length, decode_type, factor, ...)
-                    raw_name: str = entry[0].strip().rstrip(":").strip()
-                    offset: int = entry[1]
-                    length: int = entry[2]
-                    decode_type: str = entry[3]
-                    factor: float = float(entry[4]) if entry[4] else 1.0
-                    if raw_name and raw_name not in param_lookup:
-                        param_lookup[raw_name] = (
-                            hex_addr,
-                            offset,
-                            length,
-                            factor,
-                            decode_type,
-                        )
+        fallback_layouts = self._fallback_2xx_layouts()
+        own_layouts = self._own_block_layouts()
+        parent_block_map = self._parent_block_map()
 
-        # The running firmware's merged read map (what its sensors decode) is
-        # authoritative for the block a parameter lives in: e.g. 2.14 lays
-        # out the pFan block (01) with 1-byte fields where 2.06 uses 2 bytes,
-        # and that layout lives in readings_map_214, not register_map_214.
-        own_layout: dict[tuple[str, str], tuple[int, int, float, str]] = {}
-        own_maps = RegisterMapManager(
-            self.firmware_version, has_cooling=self._has_cooling
-        ).get_all_registers()
-        for block_key, entries in own_maps.items():
-            for entry in entries:
-                if not isinstance(entry, tuple) or len(entry) < 5:
-                    continue
-                raw_name = entry[0].strip().rstrip(":").strip()
-                own_layout.setdefault(
-                    (raw_name, block_key[3:].upper()),
-                    (
-                        entry[1],
-                        entry[2],
-                        float(entry[4]) if entry[4] else 1.0,
-                        entry[3],
-                    ),
-                )
-
-        # Load the parent→block-address mapping from write_map_206.
-        full_wm = f"{self._package}.write_map_206"
-        wm_mod = sys.modules.get(full_wm)
-        parent_block_map: dict[str, str] = (
-            getattr(wm_mod, "PARENT_BLOCK_MAP", {}) if wm_mod else {}
-        )
-
-        # Enrich write entries that have a "parent" field but no "command".
+        # Enrich write entries that have a "parent" field but no "command";
+        # entries with a command are already enriched or carry their own.
         for name, entry in self._merged_map.items():
-            if not isinstance(entry, dict):
+            if not isinstance(entry, dict) or "command" in entry:
                 continue
-            if "command" in entry:
-                continue  # Already enriched or a non-2xx entry with its own command.
             parent = entry.get("parent")
             if parent is None:
                 continue
-
             block_addr = parent_block_map.get(parent)
             if block_addr is None:
                 _LOGGER.debug(
@@ -447,31 +420,11 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
                 continue
 
             entry["command"] = block_addr
-
-            # Look up offset / length / factor from the read register maps.
-            layout = own_layout.get((name, block_addr.upper()))
-            if layout is None and name in param_lookup:
-                layout = param_lookup[name][1:]
+            layout = own_layouts.get((name, block_addr.upper()))
+            if layout is None:
+                layout = fallback_layouts.get(name)
             if layout is not None:
-                nibble_offset, nibble_length, factor, decode_type = layout
-                # Register map offsets/lengths are in nibbles (FHEM convention).
-                # Convert to bytes so read_value and write_block_value can use them
-                # directly (same conversion as sensor.py async_setup_entry).
-                entry["offset"] = nibble_offset // 2
-                entry["length"] = (nibble_length + 1) // 2
-                entry["write_mode"] = "block"
-                # FHEM reads 2xx parameters as "hex" (unsigned) unless the map
-                # says "hex2int", e.g. 240 min in one byte is not -16.
-                entry["signed"] = decode_type == "hex2int"
-                if decode_type.startswith("bit") and decode_type[3:].isdigit():
-                    # Single-bit flag (e.g. progHC1Monday) sharing its byte
-                    # with other flags. Same nibble convention as sensor.py:
-                    # an even nibble offset is the byte's high nibble.
-                    bit = int(decode_type[3:])
-                    entry["bit"] = bit + 4 if nibble_offset % 2 == 0 else bit
-                # step = 1/factor so encode/decode functions scale correctly.
-                step_val = (1.0 / factor) if factor else 1.0
-                entry["step"] = str(step_val)
+                _apply_block_layout(entry, layout)
             else:
                 _LOGGER.debug(
                     "No register map entry found for 2xx write parameter '%s'",
@@ -482,3 +435,60 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
             # "ptime" entries are left unchanged for now (different encoding needed).
             if entry.get("type") == "pclean":
                 entry["type"] = "number"
+
+    def _fallback_2xx_layouts(self) -> dict[str, _FieldLayout]:
+        """Return each parameter's layout from the 2xx read register maps.
+
+        The first map that defines a parameter wins, so the running
+        firmware's own map comes first: 2.14 lays out e.g. the pFan block
+        (01) differently from 2.06.
+        """
+        map_order = ["register_map_206", "register_map_214", "register_map_214j"]
+        own_map = f"register_map_{self.firmware_version}"
+        if own_map in map_order:
+            map_order.remove(own_map)
+            map_order.insert(0, own_map)
+
+        layouts: dict[str, _FieldLayout] = {}
+        for mod_name in map_order:
+            mod = sys.modules.get(f"{self._package}.{mod_name}")
+            if mod is None:
+                continue
+            for block_key, entries in getattr(mod, "REGISTER_MAP", {}).items():
+                if not isinstance(entries, list) or not block_key.startswith("pxx"):
+                    continue
+                for field in entries:
+                    if not _is_read_field(field):
+                        continue
+                    name = _field_name(field)
+                    if name and name not in layouts:
+                        layouts[name] = _field_layout(field)
+        return layouts
+
+    def _own_block_layouts(self) -> dict[tuple[str, str], _FieldLayout]:
+        """Return (name, block address) → layout from the firmware's read map.
+
+        The running firmware's merged read map (what its sensors decode) is
+        authoritative for the block a parameter lives in: e.g. 2.14 lays
+        out the pFan block (01) with 1-byte fields where 2.06 uses 2 bytes,
+        and that layout lives in readings_map_214, not register_map_214.
+        """
+        layouts: dict[tuple[str, str], _FieldLayout] = {}
+        own_maps = RegisterMapManager(
+            self.firmware_version, has_cooling=self._has_cooling
+        ).get_all_registers()
+        for block_key, entries in own_maps.items():
+            for field in entries:
+                if _is_read_field(field):
+                    layouts.setdefault(
+                        (_field_name(field), block_key[3:].upper()),
+                        _field_layout(field),
+                    )
+        return layouts
+
+    def _parent_block_map(self) -> dict[str, str]:
+        """Return write_map_206's mapping of parent name → block address."""
+        wm_mod = sys.modules.get(f"{self._package}.write_map_206")
+        return cast(
+            "dict[str, str]", getattr(wm_mod, "PARENT_BLOCK_MAP", {}) if wm_mod else {}
+        )
