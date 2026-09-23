@@ -92,8 +92,8 @@ ENTITY_ID_STYLE_LABELS: dict[str, str] = {
 # Selectable at initial setup and, unlike entity_id_style/firmware_override,
 # ALSO retroactively reconciles the entity registry when changed later via
 # Reconfigure (see __init__.py's _async_apply_entity_visibility_tier) --
-# entities the integration previously disabled to match an older tier get
-# re-enabled (or newly disabled) to match the new one. An entity a user has
+# entities the integration disabled for the old tier get re-enabled (or
+# newly disabled) to match the new one. An entity a user has
 # manually toggled by hand is left alone either way.
 CONF_ENTITY_VISIBILITY = "entity_visibility"
 ENTITY_VISIBILITY_DEFAULT = "default"

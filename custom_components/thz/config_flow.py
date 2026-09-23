@@ -131,7 +131,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ): _translated_select(ENTITY_ID_STYLE_LABELS, CONF_ENTITY_ID_STYLE),
                 # Entity visibility tier: which less-common entities (HC2,
                 # schedules, advanced technical parameters) start enabled.
-                # "default" hides all of them (matching prior behavior),
+                # "default" hides all of them,
                 # "extended" enables everything except schedules, "all"
                 # enables everything. Can be changed later via Reconfigure,
                 # which retroactively bulk enables/disables existing entities.
@@ -408,7 +408,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         refresh_intervals = defaults.get("refresh_intervals", {})
         all_read_blocks = list(refresh_intervals.keys())
         if selected_read_blocks is None:
-            # Legacy: all blocks in refresh_intervals are selected
+            # No selection stored: every polled block counts as selected.
             selected_read_blocks = all_read_blocks
 
         for block in all_read_blocks:
@@ -423,7 +423,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         selected_write_groups = defaults.get("selected_write_groups")
         all_write_groups = list(WRITE_GROUP_LABELS.keys())
         if selected_write_groups is None:
-            # Legacy: all groups enabled
+            # No selection stored: every group counts as enabled.
             selected_write_groups = all_write_groups
 
         for group in all_write_groups:

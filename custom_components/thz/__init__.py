@@ -421,14 +421,12 @@ async def _async_cleanup_orphaned_entities(hass: HomeAssistant) -> None:
     either is None, or no longer refers to any config entry that actually
     exists. Both cases can occur when the integration is deleted:
 
-    - config_entry_id=None: HA nulled the reference out (the case this
-      function originally handled).
+    - config_entry_id=None: HA nulled the reference out.
     - config_entry_id=<stale id>: HA left the entity pointing at the
-      now-deleted entry's id instead of nulling it. This is the more common
-      case in practice, and the original None-only check missed it entirely
-      -- the entity registry row (including its unique_id) survives every
-      "Delete integration" cycle, and the *next* time the integration is
-      added, entity_registry.async_get_or_create() matches the pre-existing
+      now-deleted entry's id. This is the more common case: the entity
+      registry row (including its unique_id) survives every "Delete
+      integration" cycle, and the *next* time the integration is added,
+      entity_registry.async_get_or_create() matches the pre-existing
       unique_id and silently reattaches to this same old row, reusing its
       original entity_id forever. Since suggested_object_id (the mechanism
       entity_id_style/entity_id_prefix rely on) is only consulted the very

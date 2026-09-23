@@ -83,16 +83,14 @@ FIRMWARE_MAPS = {
         "write": ["write_map_439_539", "write_map_539"],
         "read": ["readings_map_439", "readings_map_509"],
     },
-    # 709 has no register differences from 509 (readings_map_709 was a
-    # byte-for-byte duplicate of readings_map_509 -- same excluded
-    # compressor/power blocks); consolidated onto the 509 map.
+    # 709 has no register differences from 509 (same excluded
+    # compressor/power blocks), so it uses the 509 map.
     "709": {
         "write": ["write_map_439_539", "write_map_539"],
         "read": ["readings_map_439", "readings_map_509"],
     },
-    # Real 5.39 hardware gets its own explicit entry (previously this was the
-    # only thing behind "default", conflating "genuine 5.39" with "unrecognized
-    # firmware string" below).
+    # Real 5.39 hardware; kept apart from "default", which is for
+    # unrecognised firmware strings.
     "539": {
         "write": ["write_map_439_539", "write_map_539"],
         "read": ["readings_map_439", "readings_map_539"],

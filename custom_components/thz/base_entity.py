@@ -97,14 +97,12 @@ class THZBaseEntity(Entity):
         self._device_id = device_id
         self._attr_available = True
 
-        # Per Home Assistant documentation, has_entity_name=True is MANDATORY for
-        # new integrations.
-        # See: https://developers.home-assistant.io/docs/core/entity/#entity-naming
+        # has_entity_name=True is mandatory for new integrations, see
+        # https://developers.home-assistant.io/docs/core/entity/#entity-naming
         #
-        # CRITICAL: Home Assistant ignores translation_key when _attr_name is set!
-        # The fix: Only set _attr_translation_key (not _attr_name) when translation
-        # is available.
-        # When no translation: set _attr_name as fallback.
+        # Home Assistant ignores translation_key when _attr_name is set, so
+        # only one of the two is set: the translation key when there is one,
+        # otherwise the name as a fallback.
         #
         # Icon: entities with a translation_key get their icon from
         # icons.json (icon translations) instead of a hardcoded _attr_icon,
@@ -117,7 +115,7 @@ class THZBaseEntity(Entity):
         else:
             self._attr_name = name
             self._attr_icon = icon or "mdi:eye"
-            # has_entity_name not set for legacy entities without translations
+            # Entities without a translation keep has_entity_name unset.
 
         # Generate unique ID if not provided
         self._attr_unique_id = unique_id or self._generate_unique_id(command, name)
@@ -129,8 +127,8 @@ class THZBaseEntity(Entity):
         # IMPORTANT: Home Assistant's Entity class has no "_attr_suggested_object_id"
         # hook -- Entity.suggested_object_id is a read-only @property computed from
         # self.name/translations, and never reads any "_attr_*" instance attribute.
-        # Setting one (as this code used to do) is a silent no-op: HA falls straight
-        # through to its own has_entity_name/device-name/area-based naming instead.
+        # Setting one is a silent no-op: HA falls straight through to its own
+        # has_entity_name/device-name/area-based naming instead.
         #
         # The actually-supported mechanism (see entity_platform.py's
         # EntityPlatform._async_add_entity) is to set self.entity_id directly

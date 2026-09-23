@@ -5,9 +5,8 @@ It creates BinarySensorEntity instances for all register map entries that
 use bit-decoded types (``bit*`` / ``nbit*``), such as compressor state,
 pump activity, filter alarms, valve positions, and similar on/off signals.
 
-These were previously exposed as regular SensorEntity values (True/False).
-The binary_sensor platform gives them proper HA device classes and enables
-native automations and notifications (e.g., filter-change reminders).
+As binary sensors they get proper HA device classes and work with native
+automations and notifications (e.g., filter-change reminders).
 """
 
 from __future__ import annotations
