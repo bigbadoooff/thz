@@ -48,7 +48,7 @@ from .parameter_io import (
     parameter_length,
 )
 from .thz_device import THZDevice, THZRegisterNotSupportedError
-from .time import quarters_to_time, time_to_quarters
+from .time import quarters_to_time, time_byte_index, time_to_quarters
 from .value_codec import THZValueCodec, decode_raw_value
 from .value_maps import SELECT_MAP
 
@@ -924,7 +924,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                             value_bytes, entry.get("decode_type")
                         )
                     else:  # "time"
-                        t = quarters_to_time(value_bytes[0])
+                        t = quarters_to_time(
+                            value_bytes[time_byte_index(entry.get("decode_type"))]
+                        )
                         value = t.strftime("%H:%M") if t else None
 
                 parameters[name] = {
@@ -1125,7 +1127,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 elif reg_type == "time":
                     t_value = _parse_hhmm(value)
                     num = time_to_quarters(t_value)
-                    value_bytes = bytes([num, 0])
+                    payload = bytearray(2)
+                    payload[time_byte_index(entry.get("decode_type"))] = num
+                    value_bytes = bytes(payload)
                 elif reg_type == "schedule":
                     start_value = _parse_hhmm(value.get("start")) if value else None
                     end_value = _parse_hhmm(value.get("end")) if value else None

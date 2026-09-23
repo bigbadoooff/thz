@@ -13,7 +13,7 @@
 #    "blocks": {"17": "<hex data after the address byte>", ...},
 #    "cases": [["p01RoomTempDay", "21"], ...]}
 # Output (JSON on stdout):
-#   {"sets": {"<param> <value>": {"telegram": hex} | {"error": msg}},
+#   {"sets": {"<param> <value>": {"telegrams": [hex, ...]} | {"error": msg}},
 #    "parsed": {"<block>": "<THZ_Parse1 output for the initial block>"}}
 use strict;
 use warnings;
@@ -93,10 +93,10 @@ for my $case (@{ $input->{cases} }) {
     my $key = "$param $value";
     if ($@) {
         $result{$key} = { error => "$@" };
-    } elsif (@sent != 1) {
-        $result{$key} = { error => "sent " . scalar(@sent) . " SETs: " . ($ret // "") };
+    } elsif (!@sent) {
+        $result{$key} = { error => "no SET sent: " . ($ret // "") };
     } else {
-        $result{$key} = { telegram => $sent[0] };
+        $result{$key} = { telegrams => [@sent] };
     }
 }
 my %parsed;

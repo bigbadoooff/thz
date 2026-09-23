@@ -20,6 +20,7 @@ import shutil
 import subprocess
 
 import pytest
+from unittest.mock import MagicMock
 
 from custom_components.thz.parameter_io import (
     async_read_parameter,
@@ -127,7 +128,7 @@ async def test_block_writes_match_fhem(firmware):
     for name, value in cases:
         fhem = reference[f"{name} {value}"]
         ours = await _our_telegram(entries[name], value, blocks)
-        if fhem.get("telegram") != ours:
+        if fhem.get("telegrams") != [ours]:
             mismatches.append(f"{name}={value}: fhem={fhem} ours={ours}")
     assert not mismatches, "\n".join(mismatches)
 
@@ -159,4 +160,138 @@ async def test_block_reads_match_fhem(firmware):
         )
         if ours != pytest.approx(float(fhem)):
             mismatches.append(f"{name}: fhem={fhem} ours={ours}")
+    assert not mismatches, "\n".join(mismatches)
+
+
+# ---------------------------------------------------------------------------
+# 4.x / 5.x: every parameter is its own register, written with a direct SET.
+# ---------------------------------------------------------------------------
+
+_DIRECT_FIRMWARES = {"439": "4.39", "539": "5.39"}
+
+# Deliberate differences from FHEM, each needing a decision rather than a
+# silent fix. Anything not listed here must match FHEM exactly.
+_KNOWN_DIFFERENCES = {
+    # Not defined in FHEM at all (added from other sources).
+    "p20FlowProportionHC2": "not in FHEM",
+    "pSolarHysteresis": "not in FHEM",
+    "pDHWVaporizationDelay": "not in FHEM",
+    "p99CoolingHC1AreaFan": "not in FHEM",
+    # FHEM caps the DHW day/night setpoints at 55 degC; the map allows 65.
+    "p04DHWsetDayTemp=65": "FHEM max 55",
+    "p05DHWsetNightTemp=65": "FHEM max 55",
+    # FHEM allows 0..2 on 4.39 (0..4 only on 5.39); the select offers 0..4.
+    "439:p75passiveCooling=3": "FHEM 4.39 max 2",
+    "439:p75passiveCooling=4": "FHEM 4.39 max 2",
+}
+
+
+class SimulatedDirectDevice(Simulated2xxDevice):
+    """4.x/5.x device: each 3-byte command holds its own two data bytes."""
+
+    def __init__(self) -> None:
+        super().__init__({})
+        self.registers: dict[bytes, bytes] = {}
+
+    def send_request(self, telegram: bytes, get_or_set: str) -> bytes:
+        self.sent.append(telegram)
+        body = self.unescape(telegram[2:-2])[1:]
+        command, data = body[:3], body[3:]
+        if get_or_set == "set":
+            self.registers[command] = data
+            return b""
+        data = command + self.registers.get(command, b"\x00\x00")
+        crc = self.thz_checksum(b"\x01\x00\x00" + data)
+        return self.escape(b"\x01\x00" + crc + data) + b"\x10\x03"
+
+
+def _direct_cases(entries: dict) -> list[tuple[str, str, object]]:
+    """(name, FHEM argument, our value) triples for every writable entry."""
+    from datetime import time as dt_time
+
+    from custom_components.thz.value_maps import SELECT_MAP
+
+    cases: list[tuple[str, str, object]] = []
+    for name, entry in entries.items():
+        kind, decode = entry["type"], entry.get("decode_type")
+        if kind == "number":
+            low, high = float(entry["min"]), float(entry["max"])
+            for value in sorted({low, float(round((low + high) / 2)), high}):
+                arg = f"{value:g}"
+                cases.append((name, arg, value))
+        elif kind == "switch":
+            cases += [(name, "0", False), (name, "1", True)]
+        elif kind == "select":
+            for key, option in SELECT_MAP[decode].items():
+                fhem_arg = option if decode == "2opmode" else str(int(key))
+                cases.append((name, fhem_arg, option))
+        elif kind == "time" and decode == "9holy":
+            cases.append((name, "07:30", dt_time(7, 30)))
+        elif kind == "schedule":
+            cases.append(
+                (name, "06:15--22:00", (dt_time(6, 15), dt_time(22, 0)))
+            )
+    return cases
+
+
+async def _our_direct_telegram(name: str, entry: dict, value) -> str:
+    from custom_components.thz.number import THZNumber
+    from custom_components.thz.select import THZSelect
+    from custom_components.thz.switch import THZSwitch
+    from custom_components.thz.time import _create_time_entities
+
+    device = SimulatedDirectDevice()
+
+    def _prepare(entity):
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        return entity
+
+    kind = entry["type"]
+    if kind == "number":
+        entity = _prepare(THZNumber(name, entry, device, "dev"))
+        await entity.async_set_native_value(value)
+    elif kind == "switch":
+        entity = _prepare(THZSwitch(name, entry, device, "dev"))
+        await (entity.async_turn_on() if value else entity.async_turn_off())
+    elif kind == "select":
+        entity = _prepare(THZSelect(name, entry, device, "dev"))
+        await entity.async_select_option(value)
+    elif kind == "time":
+        entity = _prepare(_create_time_entities(name, entry, device, "dev", 60))
+        await entity.async_set_value(value)
+    else:  # schedule: HA exposes start and end as two entities
+        start, end = _create_time_entities(name, entry, device, "dev", 60)
+        await _prepare(start).async_set_value(value[0])
+        await _prepare(end).async_set_value(value[1])
+
+    sets = [t for t in device.sent if t[:2] == b"\x01\x80"]
+    assert sets, f"{name}: nothing written"
+    return sets[-1].hex().upper()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("firmware", sorted(_DIRECT_FIRMWARES))
+async def test_direct_writes_match_fhem(firmware):
+    entries = {
+        name: entry
+        for name, entry in RegisterMapManagerWrite(firmware).get_all_registers().items()
+        if entry.get("type") in ("number", "switch", "select", "time", "schedule")
+    }
+    cases = _direct_cases(entries)
+    reference = _fhem_reference(
+        _DIRECT_FIRMWARES[firmware], {}, [(n, arg) for n, arg, _ in cases]
+    )["sets"]
+
+    mismatches = []
+    for name, fhem_arg, value in cases:
+        keys = (name, f"{name}={fhem_arg}", f"{firmware}:{name}={fhem_arg}")
+        if any(key in _KNOWN_DIFFERENCES for key in keys):
+            continue
+        fhem = reference[f"{name} {fhem_arg}"]
+        ours = await _our_direct_telegram(name, entries[name], value)
+        # Mo-So / Mo-Fr programs make FHEM fan out to the single days too;
+        # the first telegram is the one for the register itself.
+        if (fhem.get("telegrams") or [None])[0] != ours:
+            mismatches.append(f"{name}={fhem_arg}: fhem={fhem} ours={ours}")
     assert not mismatches, "\n".join(mismatches)

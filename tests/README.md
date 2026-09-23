@@ -46,8 +46,10 @@ mypy
   (through the Perl harness in `fhem_reference/`, which only stubs FHEM's
   runtime and the serial line) against the same simulated 2xx blocks as our
   code and requires identical SET telegrams and decoded values for every 2xx
-  parameter. FHEM is the reference known to work on real 2.06/2.14 devices;
-  the test is skipped when `perl` is not installed.
+  parameter, and identical SET telegrams for the 4.39/5.39 number, switch,
+  select, holiday-time and schedule entities. FHEM is the reference known to
+  work on real devices; deliberate differences are listed in
+  `_KNOWN_DIFFERENCES`. The test is skipped when `perl` is not installed.
 - `test_async_execute.py` runs `THZDevice.async_execute` against a real thread
   pool to cover timeouts, cancellation and lock hand-over.
 - Codec changes should keep the round-trip tests in
