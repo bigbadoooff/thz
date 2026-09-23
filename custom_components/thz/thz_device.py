@@ -66,8 +66,6 @@ class THZDevice:
 
         # Serialises device access across coroutines (see async_execute).
         self.lock = asyncio.Lock()
-        self._last_access = 0
-        self._min_interval = 0.1  # minimum time between reads in seconds
         # Per-thread abandon signal of the async_execute call being served.
         self._call_state = threading.local()
         # Whether the current exchange already sent its telegram.
@@ -296,7 +294,7 @@ class THZDevice:
 
             _LOGGER.info("Reconnection successful")
         except OSError as e:
-            _LOGGER.exception("Reconnection failed: %s", e)
+            _LOGGER.debug("Reconnection failed: %s", e)
             raise
 
     def _do_handshake_1(self, timeout: float) -> None:
@@ -313,7 +311,7 @@ class THZDevice:
         if response != const.DATALINKESCAPE:
             resp_hex = response.hex() if response else "no data"
             error_msg = f"Handshake 1 failed, received: {resp_hex}"
-            _LOGGER.error(error_msg)
+            _LOGGER.debug(error_msg)
             raise RuntimeError(error_msg)
 
     def _do_handshake_2(self, timeout: float) -> None:
@@ -344,7 +342,7 @@ class THZDevice:
             else:
                 byte_hex = second_byte.hex() if second_byte else "no data"
                 error_msg = f"Handshake 2 failed: received 0x10 then {byte_hex}"
-                _LOGGER.error(error_msg)
+                _LOGGER.debug(error_msg)
                 raise RuntimeError(error_msg)
         elif response == const.STARTOFTEXT:
             # Sometimes device sends just 0x02 (as per Perl code line 1525)
@@ -354,7 +352,7 @@ class THZDevice:
         if response != const.DATALINKESCAPE + const.STARTOFTEXT:
             resp_hex = response.hex() if response else "no data"
             error_msg = f"Handshake 2 failed, received: {resp_hex}"
-            _LOGGER.error(error_msg)
+            _LOGGER.debug(error_msg)
             raise RuntimeError(error_msg)
 
     def _receive_data_telegram(self, timeout: float) -> bytes:
@@ -388,7 +386,7 @@ class THZDevice:
                 "No valid response received after data request - "
                 "timeout or incomplete data"
             )
-            _LOGGER.error(error_msg)
+            _LOGGER.debug(error_msg)
             raise RuntimeError(error_msg)
 
         return bytes(data)
@@ -471,7 +469,6 @@ class THZDevice:
                 invalid response).
         """
         max_retries = 1  # Allow one retry on connection error
-        last_error: Exception | None = None
 
         for attempt in range(max_retries + 1):
             self._request_sent = False
@@ -479,8 +476,8 @@ class THZDevice:
                 return self._exchange_once(telegram, get_or_set, attempt, max_retries)
 
             except ConnectionError as e:
-                last_error = e
-                _LOGGER.exception(
+                # Final failures are raised and reported once by the caller.
+                _LOGGER.debug(
                     "Connection error in send_request (attempt %d/%d): %s",
                     attempt + 1, max_retries + 1, e,
                 )
@@ -489,7 +486,7 @@ class THZDevice:
                         self._reconnect()
                         continue
                     except OSError as reconnect_error:
-                        _LOGGER.exception("Reconnect failed: %s", reconnect_error)
+                        _LOGGER.warning("Reconnect failed: %s", reconnect_error)
                 raise ConnectionError(
                     f"Connection failed after {max_retries + 1} attempts: {e}"
                 ) from e
@@ -498,24 +495,23 @@ class THZDevice:
                 raise  # legitimate device response — no reconnect
 
             except RuntimeError as e:
-                last_error = e
-                _LOGGER.exception("Protocol error in send_request: %s", e)
+                _LOGGER.debug(
+                    "Protocol error in send_request (attempt %d/%d): %s",
+                    attempt + 1, max_retries + 1, e,
+                )
                 if attempt < max_retries and self._may_retry(get_or_set):
                     try:
                         self._reconnect()
                         continue
                     except OSError as reconnect_error:
-                        _LOGGER.exception("Reconnect failed: %s", reconnect_error)
+                        _LOGGER.warning("Reconnect failed: %s", reconnect_error)
                 raise
 
             except Exception as e:  # noqa: BLE001
-                last_error = e
                 _LOGGER.exception("Unexpected error in send_request: %s", e)
                 raise RuntimeError(f"Device communication failed: {e}") from e
 
-        # Should not reach here, but just in case
-        if last_error:
-            raise last_error
+        # Every iteration returns, raises or retries; the last never retries.
         raise RuntimeError("send_request failed without specific error")
 
     def _may_retry(self, get_or_set: str) -> bool:
@@ -554,7 +550,7 @@ class THZDevice:
                 self.ser.flush()  # type: ignore[union-attr]
         except (OSError, socket.error, BrokenPipeError) as e:
             # Connection reset, broken pipe, or other socket/serial errors
-            _LOGGER.exception("Connection error during write: %s", e)
+            _LOGGER.debug("Connection error during write: %s", e)
             raise ConnectionError(f"Failed to write to connection: {e}") from e
         except (ValueError, AttributeError) as e:
             # Raised by select.select() when the fd is closed mid-write (pyserial sets
@@ -599,7 +595,7 @@ class THZDevice:
                 return b""
             except (OSError, socket.error) as e:
                 # Connection reset, broken pipe, or other socket errors
-                _LOGGER.exception("TCP socket error during read: %s", e)
+                _LOGGER.debug("TCP socket error during read: %s", e)
                 raise ConnectionError(f"TCP connection error: {e}") from e
             except (ValueError, AttributeError) as e:
                 # select.select() raises ValueError when the socket fd is closed
@@ -844,11 +840,11 @@ class THZDevice:
                 not supported
         """
         header = b"\x01\x00" if get_or_set == "get" else b"\x01\x80"
-        # Standard Header für "get" und "set"
-        footer = const.DATALINKESCAPE + const.ENDOFTEXT  # Standard Footer
+        # Standard header for "get" and "set"
+        footer = const.DATALINKESCAPE + const.ENDOFTEXT  # Standard footer
 
         checksum = self.thz_checksum(header + b"\x00" + addr_bytes + payload_to_deliver)
-        # b'\x00' = Platzhalter für die Checksumme
+        # b'\x00' = placeholder for the checksum byte
         telegram = self.construct_telegram(
             addr_bytes + payload_to_deliver, header, footer, checksum
         )
@@ -894,14 +890,14 @@ class THZDevice:
             value_raw = self.read_value(b"\xfd", "get", 2, 2)
             if value_raw is None:
                 _LOGGER.error(
-                    "Firmware-Version konnte nicht gelesen werden: Keine Antwort"
+                    "Could not read firmware version: no response"
                 )
                 return ""
             firmware_version = int.from_bytes(value_raw, byteorder="big", signed=False)
-            _LOGGER.debug("Firmware-Version gelesen: %s", firmware_version)
+            _LOGGER.debug("Firmware version read: %s", firmware_version)
             return str(firmware_version)
         except (OSError, RuntimeError) as e:
-            _LOGGER.exception("Firmware-Version konnte nicht gelesen werden: %s", e)
+            _LOGGER.warning("Could not read firmware version: %s", e)
             return ""
 
     def _probe_cooling_support(self) -> bool:

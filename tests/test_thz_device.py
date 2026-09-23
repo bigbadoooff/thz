@@ -83,12 +83,6 @@ class TestTHZDeviceInitialization:
 
         assert isinstance(device.lock, asyncio.Lock)
 
-    def test_min_interval_default(self):
-        """Test default minimum interval between reads."""
-        device = THZDevice(connection="usb", port="/dev/ttyUSB0")
-
-        assert device._min_interval == 0.1
-
 
 class TestTHZDeviceProtocol:
     """Tests for protocol utility functions."""

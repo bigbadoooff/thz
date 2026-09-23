@@ -27,9 +27,6 @@ from . import (
     write_map_X39tech,  # noqa: F401
 )
 
-supported_firmwares = [
-    "206, 214, 419, 439, 509, 539, 709"
-]  # Add other supported firmware versions here
 _LOGGER = logging.getLogger(__name__)
 
 # Cooling-only entries within the 5.39 maps.
