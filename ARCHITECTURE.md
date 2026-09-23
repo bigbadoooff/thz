@@ -22,8 +22,12 @@ parameter_io.py             the single read/write path for write-map parameters
   ▼
 value_codec.py              bytes <-> values (numbers, temperatures, selects, times)
   ▼
-thz_device.py               telegrams, escaping, checksum, framing, locking,
-  │                         timeouts, reconnects (blocking, runs in the executor)
+thz_device.py               client: lock, timeouts, abandon, retry policy,
+  │                         handshakes, register access (runs in the executor)
+  ├─ protocol.py            pure: telegrams, checksum, escaping, framing,
+  │                         judging the device's answers (FHEM THZ_decode)
+  ▼
+transport.py                SerialTransport / TcpTransport: move bytes only
   ▼
 Serial port or ser2net TCP socket
 ```

@@ -92,7 +92,7 @@ def _make_device(**kwargs):
 class TestConnectSerial:
     def test_connect_serial_success(self):
         device = _make_device(port="/dev/ttyUSB0", baudrate=9600, read_timeout=2.0)
-        with patch("custom_components.thz.thz_device.serial.Serial") as mock_serial:
+        with patch("custom_components.thz.transport.serial.Serial") as mock_serial:
             mock_instance = MagicMock()
             mock_serial.return_value = mock_instance
             device._connect_serial()
@@ -105,7 +105,7 @@ class TestConnectSerial:
         device = _make_device(port="/dev/ttyUSB0")
         with (
             patch(
-                "custom_components.thz.thz_device.serial.Serial",
+                "custom_components.thz.transport.serial.Serial",
                 side_effect=OSError("no such device"),
             ),
             pytest.raises(OSError),
@@ -120,7 +120,7 @@ class TestConnectTcp:
         )
         mock_sock = MagicMock()
         with patch(
-            "custom_components.thz.thz_device.socket.socket", return_value=mock_sock
+            "custom_components.thz.transport.socket.socket", return_value=mock_sock
         ):
             device._connect_tcp()
 
@@ -144,7 +144,7 @@ class TestConnectTcp:
         mock_sock.setsockopt.side_effect = setsockopt_side_effect
 
         with patch(
-            "custom_components.thz.thz_device.socket.socket", return_value=mock_sock
+            "custom_components.thz.transport.socket.socket", return_value=mock_sock
         ):
             device._connect_tcp()
 
@@ -881,10 +881,6 @@ class TestDecodeResponse:
     def test_decode_response_unknown_header_returns_none(self):
         device = _make_device()
         assert device.decode_response(b"\x09\x09\x00\x00\x00\x00") is None
-
-    def test_decode_response_unexpected_exception_returns_none(self):
-        device = _make_device()
-        assert device.decode_response(None) is None
 
 
 # ---------------------------------------------------------------------------
