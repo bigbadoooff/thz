@@ -22,8 +22,8 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-    from .thz_device import THZDevice
     from .register_maps.register_map_manager import RegisterMapManagerWrite
+    from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ async def async_setup_write_platform(
                 "Creating %s for %s with command %s",
                 entity_type.__name__,
                 name,
-                entry["command"]
+                entry["command"],
             )
 
             entity = entity_type(
@@ -97,4 +97,3 @@ async def async_setup_write_platform(
 
     _LOGGER.info("Created %d %s entities", len(entities), platform_type)
     async_add_entities(entities, True)
-

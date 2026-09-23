@@ -50,7 +50,11 @@ _LOGGER = logging.getLogger(__name__)
 # was taken, and pClockYear's declared min/max ("12".."20") is a stale
 # bound that would otherwise get a real year like 26 clamped down to 20.
 CLOCK_REGISTER_NAMES = (
-    "pClockYear", "pClockMonth", "pClockDay", "pClockHour", "pClockMinutes",
+    "pClockYear",
+    "pClockMonth",
+    "pClockDay",
+    "pClockHour",
+    "pClockMinutes",
 )
 # Device clock has no seconds field, so a little rounding slop is expected;
 # only flag/act on drift beyond these thresholds.
@@ -62,7 +66,7 @@ CLOCK_READ_ATTEMPTS = 3
 
 
 async def _read_clock_parts(
-    hass: HomeAssistant, device: "THZDevice", write_manager
+    hass: HomeAssistant, device: THZDevice, write_manager
 ) -> dict[str, int] | None:
     """Read the five pClock* components, retrying each read a few times.
 
@@ -83,7 +87,10 @@ async def _read_clock_parts(
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug(
                     "clock_sync: failed to read %s (attempt %d/%d): %s",
-                    name, attempt, CLOCK_READ_ATTEMPTS, err,
+                    name,
+                    attempt,
+                    CLOCK_READ_ATTEMPTS,
+                    err,
                 )
                 value_bytes = None
             if value_bytes:
@@ -116,7 +123,7 @@ def _parts_to_datetime(parts: dict[str, int]) -> datetime | None:
 
 
 async def async_read_device_clock(
-    hass: HomeAssistant, device: "THZDevice", write_manager
+    hass: HomeAssistant, device: THZDevice, write_manager
 ) -> datetime | None:
     """Read the device's current date/time from its 5 pClock* registers.
 
@@ -129,7 +136,7 @@ async def async_read_device_clock(
 
 
 async def async_write_device_clock(
-    hass: HomeAssistant, device: "THZDevice", write_manager, when: datetime
+    hass: HomeAssistant, device: THZDevice, write_manager, when: datetime
 ) -> bool:
     """Write ``when`` (a local wall-clock time) onto the 5 pClock* registers.
 
@@ -167,7 +174,8 @@ async def async_write_device_clock(
     if any(readback.get(name) != value for name, value in values.items()):
         _LOGGER.warning(
             "clock_sync: clock readback %s does not match the written time %s",
-            _parts_to_datetime(readback), when,
+            _parts_to_datetime(readback),
+            when,
         )
         return False
     return True
@@ -175,8 +183,8 @@ async def async_write_device_clock(
 
 async def async_check_and_maybe_sync_clock(
     hass: HomeAssistant,
-    config_entry: "ConfigEntry",
-    device: "THZDevice",
+    config_entry: ConfigEntry,
+    device: THZDevice,
     write_manager,
 ) -> None:
     """Periodic check: log clock drift, and auto-correct it if opted in.
@@ -194,9 +202,10 @@ async def async_check_and_maybe_sync_clock(
     if abs(drift) <= CLOCK_DRIFT_WARN_SECONDS:
         return
     _LOGGER.warning(
-        "THZ device clock drifted %.0f minute(s) from local time "
-        "(device=%s, local=%s)",
-        drift / 60, device_dt, local_now,
+        "THZ device clock drifted %.0f minute(s) from local time (device=%s, local=%s)",
+        drift / 60,
+        device_dt,
+        local_now,
     )
     if config_entry.data.get("auto_sync_clock", False):
         await async_write_device_clock(hass, device, write_manager, local_now)
@@ -229,7 +238,7 @@ async def async_check_and_maybe_sync_clock(
 
 
 def async_setup_clock_check(
-    hass: HomeAssistant, config_entry: "ConfigEntry", device: "THZDevice", write_manager
+    hass: HomeAssistant, config_entry: ConfigEntry, device: THZDevice, write_manager
 ):
     """Register the periodic clock-drift check for a config entry.
 

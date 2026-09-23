@@ -10,14 +10,13 @@ once during ``async_setup_entry``.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import time as dt_time
 import itertools
 import json
 import logging
 import os
 from typing import Any, cast
-
-import voluptuous as vol
 
 from homeassistant.core import (
     HomeAssistant,
@@ -28,6 +27,7 @@ from homeassistant.core import (
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import homeassistant.helpers.config_validation as cv
 from homeassistant.util import dt as dt_util
+import voluptuous as vol
 
 from ._typing_compat import get_runtime_data
 from .clock_sync import (
@@ -226,7 +226,7 @@ def _format_hex_dump(data: bytes) -> str:
     return "\n".join(formatted_lines)
 
 
-def _guess_decode_candidates(data: bytes) -> dict[str, int | float | bool | str]:
+def _guess_decode_candidates(data: bytes) -> dict[str, int | float | bool | str]:  # noqa: C901
     """Best-effort decode candidates for raw payload bytes."""
     candidates: dict[str, int | float | bool | str] = {
         "raw_hex": data.hex(),
@@ -256,22 +256,16 @@ def _guess_decode_candidates(data: bytes) -> dict[str, int | float | bool | str]
     if len(data) >= 4:
         four = data[:4]
         try:
-            candidates["u32"] = int.from_bytes(
-                four, byteorder="big", signed=False
-            )
-            candidates["s32"] = int.from_bytes(
-                four, byteorder="big", signed=True
-            )
+            candidates["u32"] = int.from_bytes(four, byteorder="big", signed=False)
+            candidates["s32"] = int.from_bytes(four, byteorder="big", signed=True)
         except Exception:  # noqa: BLE001
             pass
 
     # Generic boolean hint used by many THZ switch-like values
-    try:
+    with contextlib.suppress(Exception):
         candidates["bool_nonzero"] = bool(
             int.from_bytes(data[: min(2, len(data))], byteorder="big", signed=False)
         )
-    except Exception:  # noqa: BLE001
-        pass
 
     # Try known select maps against common value widths
     map_hits: dict[str, str] = {}
@@ -307,10 +301,10 @@ def _guess_decode_candidates(data: bytes) -> dict[str, int | float | bool | str]
 # NOT auto-stop the motor, so the service always stops it again after 3 s,
 # including when the call fails or is cancelled.
 # ---------------------------------------------------------------------------
-_VALVE_MOTOR_HEATING  = bytes.fromhex("0A0653")  # motor direction: heating circuit
-_VALVE_MOTOR_DHW      = bytes.fromhex("0A0652")  # motor direction: DHW (warm water)
-_VALVE_MOTOR_ON       = bytes.fromhex("0001")     # engage motor
-_VALVE_MOTOR_OFF      = bytes.fromhex("0000")     # stop motor
+_VALVE_MOTOR_HEATING = bytes.fromhex("0A0653")  # motor direction: heating circuit
+_VALVE_MOTOR_DHW = bytes.fromhex("0A0652")  # motor direction: DHW (warm water)
+_VALVE_MOTOR_ON = bytes.fromhex("0001")  # engage motor
+_VALVE_MOTOR_OFF = bytes.fromhex("0000")  # stop motor
 
 # Safety source: diverterValve bit in the pxxF2 block, located through the
 # register map (see _diverter_bit_position). Bit = 1 means the heat pump has
@@ -409,7 +403,7 @@ async def async_refresh_block(
     return found
 
 
-async def async_setup_services(hass: HomeAssistant) -> None:
+async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: C901
     """Set up services for the THZ integration.
 
     Registers the read_raw_register service that allows users to read
@@ -508,7 +502,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "formatted": formatted,
             }
 
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:
             error_msg = f"Error reading register {command_str}: {err}"
             _LOGGER.error(error_msg, exc_info=True)
             async_notify(
@@ -700,20 +694,23 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             len(changed_registers),
         )
 
-        return cast("ServiceResponse", {
-            "success": True,
-            "summary": {
-                "mode": scan_mode,
-                "duration_seconds": duration_seconds,
-                "interval_seconds": interval_seconds,
-                "iterations": iterations,
-                "scanned": len(commands),
-                "valid_count": len(valid_registers),
-                "total_reads": total_reads,
-                "changes_detected": len(changed_registers),
+        return cast(
+            "ServiceResponse",
+            {
+                "success": True,
+                "summary": {
+                    "mode": scan_mode,
+                    "duration_seconds": duration_seconds,
+                    "interval_seconds": interval_seconds,
+                    "iterations": iterations,
+                    "scanned": len(commands),
+                    "valid_count": len(valid_registers),
+                    "total_reads": total_reads,
+                    "changes_detected": len(changed_registers),
+                },
+                "changed_registers": changed_registers,
             },
-            "changed_registers": changed_registers,
-        })
+        )
 
     # Register the service
     async def _async_handle_refresh_block(call: ServiceCall) -> ServiceResponse:
@@ -735,7 +732,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         _LOGGER.warning(error_msg)
         raise ServiceValidationError(error_msg)
 
-    async def _async_handle_set_diverter_valve(call: ServiceCall) -> ServiceResponse:
+    async def _async_handle_set_diverter_valve(call: ServiceCall) -> ServiceResponse:  # noqa: C901
         """Handle the set_diverter_valve service call.
 
         Moves the 3-way diverter valve motor toward the requested position.
@@ -797,19 +794,28 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 hass, device.write_value, _VALVE_MOTOR_DHW, _VALVE_MOTOR_OFF
             )
             h_state = await device.async_execute(
-                hass, device.read_value, _VALVE_MOTOR_HEATING, "get",
-                WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH,
+                hass,
+                device.read_value,
+                _VALVE_MOTOR_HEATING,
+                "get",
+                WRITE_REGISTER_OFFSET,
+                WRITE_REGISTER_LENGTH,
             )
             d_state = await device.async_execute(
-                hass, device.read_value, _VALVE_MOTOR_DHW, "get",
-                WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH,
+                hass,
+                device.read_value,
+                _VALVE_MOTOR_DHW,
+                "get",
+                WRITE_REGISTER_OFFSET,
+                WRITE_REGISTER_LENGTH,
             )
 
             if h_state != _VALVE_MOTOR_OFF or d_state != _VALVE_MOTOR_OFF:
                 _LOGGER.warning(
                     "Diverter valve motor not confirmed off (heating=%s dhw=%s), "
                     "retrying stop",
-                    h_state.hex(), d_state.hex(),
+                    h_state.hex(),
+                    d_state.hex(),
                 )
                 await device.async_execute(
                     hass, device.write_value, _VALVE_MOTOR_HEATING, _VALVE_MOTOR_OFF
@@ -831,7 +837,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 except (RuntimeError, ConnectionError, OSError) as err:
                     _LOGGER.error(
                         "Could not stop diverter valve motor %s: %s",
-                        motor.hex(), err,
+                        motor.hex(),
+                        err,
                     )
 
         # Set before the ON write: a write whose acknowledgement failed may
@@ -869,11 +876,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         _LOGGER.info(
             "Diverter valve command sent: position=%s confirmed_off=%s",
-            position, confirmed,
+            position,
+            confirmed,
         )
         return {"success": True, "position": position, "confirmed_off": confirmed}
 
-    async def _async_handle_backup_parameters(call: ServiceCall) -> ServiceResponse:
+    async def _async_handle_backup_parameters(call: ServiceCall) -> ServiceResponse:  # noqa: C901
         """Handle the backup_parameters service call.
 
         Reads the live value of every writable parameter — number, switch,
@@ -924,7 +932,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         step_raw = entry.get("step", 1)
                         step = float(step_raw) if step_raw != "" else 1.0
                         value = THZValueCodec.decode_number(
-                            value_bytes, step, entry["decode_type"],
+                            value_bytes,
+                            step,
+                            entry["decode_type"],
                             entry.get("signed", True),
                         )
                     elif reg_type == "switch":
@@ -940,7 +950,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                         value = t.strftime("%H:%M") if t else None
 
                 parameters[name] = {
-                    "type": reg_type, "command": command, "value": value,
+                    "type": reg_type,
+                    "command": command,
+                    "value": value,
                 }
             except THZRegisterNotSupportedError as err:
                 read_errors.append(f"{name}: {err}")
@@ -974,7 +986,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 _LOGGER.warning(
                     "backup_parameters: device clock was off by %.0f minute(s) "
                     "(device=%s, local=%s); corrected to local time.",
-                    clock_drift_seconds / 60, device_dt, local_now,
+                    clock_drift_seconds / 60,
+                    device_dt,
+                    local_now,
                 )
         else:
             _LOGGER.debug(
@@ -1010,7 +1024,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
         _LOGGER.info(
             "THZ backup_parameters: saved %d parameters to %s (%d read errors)",
-            len(parameters), path, len(read_errors),
+            len(parameters),
+            path,
+            len(read_errors),
         )
         return {
             "success": True,
@@ -1023,7 +1039,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "clock_corrected": clock_corrected,
         }
 
-    async def _async_handle_restore_parameters(call: ServiceCall) -> ServiceResponse:
+    async def _async_handle_restore_parameters(call: ServiceCall) -> ServiceResponse:  # noqa: C901
         """Handle the restore_parameters service call.
 
         Reads a JSON snapshot previously written by backup_parameters and
@@ -1054,7 +1070,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             if not os.path.isdir(backups_dir):
                 return None
             files = [
-                f for f in os.listdir(backups_dir)
+                f
+                for f in os.listdir(backups_dir)
                 if f.startswith("thz_backup_") and f.endswith(".json")
             ]
             if not files:
@@ -1073,7 +1090,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError(error_msg)
 
         def _read_backup() -> dict:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return cast("dict", json.load(f))
 
         try:
@@ -1115,17 +1132,15 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     num_value = float(value)
                     min_raw, max_raw = entry.get("min"), entry.get("max")
                     if min_raw not in (None, ""):
-                        try:
+                        with contextlib.suppress(TypeError, ValueError):
                             num_value = max(num_value, float(min_raw))
-                        except (TypeError, ValueError):
-                            pass
                     if max_raw not in (None, ""):
-                        try:
+                        with contextlib.suppress(TypeError, ValueError):
                             num_value = min(num_value, float(max_raw))
-                        except (TypeError, ValueError):
-                            pass
                     value_bytes = THZValueCodec.encode_number(
-                        num_value, step, entry["decode_type"],
+                        num_value,
+                        step,
+                        entry["decode_type"],
                         parameter_length(entry),
                     )
                 elif reg_type == "switch":
@@ -1184,7 +1199,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "THZ restore_parameters: %s%d restored, %d skipped (missing), "
             "%d failed, clock_synced=%s, from %s",
             "[DRY RUN] " if dry_run else "",
-            restored, len(skipped_missing), len(failed), clock_synced, path,
+            restored,
+            len(skipped_missing),
+            len(failed),
+            clock_synced,
+            path,
         )
 
         notification_message = (
@@ -1206,28 +1225,28 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         )
         async_notify(
             hass,
-            title=(
-                f"THZ Parameter Restore "
-                f"{'(dry run) ' if dry_run else ''}Complete"
-            ),
+            title=(f"THZ Parameter Restore {'(dry run) ' if dry_run else ''}Complete"),
             message=notification_message,
             notification_id="thz_restore_parameters",
         )
 
-        return cast("ServiceResponse", {
-            "success": True,
-            "dry_run": dry_run,
-            "file": os.path.basename(path),
-            "backup_created": backup_doc.get("created"),
-            "total_in_backup": len(saved_parameters),
-            "restored": restored,
-            "skipped_missing": skipped_missing[:20],
-            "skipped_missing_count": len(skipped_missing),
-            "failed": failed[:20],
-            "failed_count": len(failed),
-            "clock_synced": clock_synced,
-            "clock_target": local_now.isoformat(timespec="minutes"),
-        })
+        return cast(
+            "ServiceResponse",
+            {
+                "success": True,
+                "dry_run": dry_run,
+                "file": os.path.basename(path),
+                "backup_created": backup_doc.get("created"),
+                "total_in_backup": len(saved_parameters),
+                "restored": restored,
+                "skipped_missing": skipped_missing[:20],
+                "skipped_missing_count": len(skipped_missing),
+                "failed": failed[:20],
+                "failed_count": len(failed),
+                "clock_synced": clock_synced,
+                "clock_target": local_now.isoformat(timespec="minutes"),
+            },
+        )
 
     async def _async_handle_list_parameter_backups(
         call: ServiceCall,
@@ -1252,7 +1271,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     "size_bytes": os.path.getsize(fpath),
                 }
                 try:
-                    with open(fpath, "r", encoding="utf-8") as f:
+                    with open(fpath, encoding="utf-8") as f:
                         doc = json.load(f)
                     info["created"] = doc.get("created")
                     info["parameter_count"] = doc.get("parameter_count")
@@ -1305,8 +1324,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """Clear the heat pump's D1 fault memory (guarded, verified by readback)."""
         if call.data["confirmation"] != CLEAR_CONFIRMATION:
             raise ServiceValidationError(
-                "Confirmation phrase incorrect. "
-                f"Expected exactly: {CLEAR_CONFIRMATION}"
+                f"Confirmation phrase incorrect. Expected exactly: {CLEAR_CONFIRMATION}"
             )
         _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
         device = entry_data["device"]
@@ -1324,10 +1342,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         DOMAIN,
         "read_raw_register",
         _async_handle_read_raw_register,
-        schema=vol.Schema({
-            vol.Required("command"): cv.string,
-            vol.Optional("entry_id"): cv.string,
-        }),
+        schema=vol.Schema(
+            {
+                vol.Required("command"): cv.string,
+                vol.Optional("entry_id"): cv.string,
+            }
+        ),
         supports_response=SupportsResponse.OPTIONAL,
     )
 
@@ -1380,42 +1400,50 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         DOMAIN,
         "refresh_block",
         _async_handle_refresh_block,
-        schema=vol.Schema({
-            vol.Required("block"): cv.string,
-            vol.Optional("entry_id"): cv.string,
-        }),
+        schema=vol.Schema(
+            {
+                vol.Required("block"): cv.string,
+                vol.Optional("entry_id"): cv.string,
+            }
+        ),
         supports_response=SupportsResponse.OPTIONAL,
     )
     hass.services.async_register(
         DOMAIN,
         "set_diverter_valve",
         _async_handle_set_diverter_valve,
-        schema=vol.Schema({
-            vol.Required("position"): vol.In(["heating", "dhw", "off"]),
-            vol.Optional("entry_id"): cv.string,
-        }),
+        schema=vol.Schema(
+            {
+                vol.Required("position"): vol.In(["heating", "dhw", "off"]),
+                vol.Optional("entry_id"): cv.string,
+            }
+        ),
         supports_response=SupportsResponse.OPTIONAL,
     )
     hass.services.async_register(
         DOMAIN,
         "backup_parameters",
         _async_handle_backup_parameters,
-        schema=vol.Schema({
-            vol.Optional("entry_id"): cv.string,
-            vol.Optional("label"): cv.string,
-        }),
+        schema=vol.Schema(
+            {
+                vol.Optional("entry_id"): cv.string,
+                vol.Optional("label"): cv.string,
+            }
+        ),
         supports_response=SupportsResponse.OPTIONAL,
     )
     hass.services.async_register(
         DOMAIN,
         "restore_parameters",
         _async_handle_restore_parameters,
-        schema=vol.Schema({
-            vol.Optional("entry_id"): cv.string,
-            vol.Optional("filename"): cv.string,
-            vol.Optional("dry_run", default=False): cv.boolean,
-            vol.Optional("only"): [cv.string],
-        }),
+        schema=vol.Schema(
+            {
+                vol.Optional("entry_id"): cv.string,
+                vol.Optional("filename"): cv.string,
+                vol.Optional("dry_run", default=False): cv.boolean,
+                vol.Optional("only"): [cv.string],
+            }
+        ),
         supports_response=SupportsResponse.OPTIONAL,
     )
     hass.services.async_register(

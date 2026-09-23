@@ -119,7 +119,7 @@ class THZFaultStatusSensor(_THZFaultSensor):
 
     KEY = "status"
     _attr_device_class = SensorDeviceClass.ENUM
-    _attr_options = [STATUS_OK, STATUS_FAULT]
+    _attr_options = [STATUS_OK, STATUS_FAULT]  # noqa: RUF012 - HA attribute
 
     @property
     def native_value(self) -> str | None:

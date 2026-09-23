@@ -5,9 +5,8 @@ It creates BinarySensorEntity instances for all register map entries that
 use bit-decoded types (``bit*`` / ``nbit*``), such as compressor state,
 pump activity, filter alarms, valve positions, and similar on/off signals.
 
-These were previously exposed as regular SensorEntity values (True/False).
-The binary_sensor platform gives them proper HA device classes and enables
-native automations and notifications (e.g., filter-change reminders).
+As binary sensors they get proper HA device classes and work with native
+automations and notifications (e.g., filter-change reminders).
 """
 
 from __future__ import annotations
@@ -125,7 +124,7 @@ async def async_setup_entry(
         block_bytes = bytes.fromhex(block_hex)
 
         for entry_tuple in entries:
-            name, offset, length, decode_type, factor = entry_tuple[:5]
+            name, offset, length, decode_type, _factor = entry_tuple[:5]
             tuple_meta = entry_tuple[5] if len(entry_tuple) > 5 else {}
 
             # Only handle bit-decoded entries
@@ -246,8 +245,8 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_device_class = _get_device_class(self._entity_name)
 
         # Visibility: hide advanced/technical entities per the configured tier
-        self._attr_entity_registry_enabled_default = (
-            not should_hide_entity(self._entity_name, entity_visibility)
+        self._attr_entity_registry_enabled_default = not should_hide_entity(
+            self._entity_name, entity_visibility
         )
 
         # Entity-ID naming style: independent of translation_key/unique_id.

@@ -14,6 +14,7 @@ Key Components:
 The integration reads register mappings from the THZ device, decodes sensor
 values according to their metadata, and exposes them as HA sensor entities.
 """
+
 from __future__ import annotations
 
 import logging
@@ -40,8 +41,8 @@ from .const import (
     should_hide_entity_by_default,
 )
 from .cop_sensor import async_setup_cop_sensors
-from .fault_sensor import async_setup_fault_sensors
 from .entity_id_style import resolve_suggested_object_id
+from .fault_sensor import async_setup_fault_sensors
 from .register_maps.register_map_manager import RegisterMapManager
 from .value_codec import decode_raw_value
 
@@ -139,7 +140,7 @@ async def async_setup_entry(
                 continue
 
             # Strip whitespace and trailing colons from sensor name
-            sensor_name = name.strip().rstrip(':')
+            sensor_name = name.strip().rstrip(":")
 
             # Skip duplicate sensor names - only create the first occurrence
             if sensor_name in seen_sensor_names:
@@ -367,11 +368,11 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             self._icon = e.get("icon")
 
         # Set default visibility based on entity naming conventions
-        # Uses HA's standard _attr_ pattern – no explicit @property override.
+        # Uses HA's standard _attr_ pattern - no explicit @property override.
         # See base_entity.py for rationale on avoiding @property overrides
         # for entity_registry_enabled_default.
-        self._attr_entity_registry_enabled_default = (
-            not should_hide_entity(self._entity_name, entity_visibility)
+        self._attr_entity_registry_enabled_default = not should_hide_entity(
+            self._entity_name, entity_visibility
         )
 
         # Entity-ID naming style: independent of translation_key/unique_id.
@@ -438,10 +439,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         once per episode (until a plausible value is read again) so a
         permanently faulty sensor does not flood the log on every poll.
         """
-        if (
-            self._device_class != "temperature"
-            or isinstance(value, (bool, str))
-        ):
+        if self._device_class != "temperature" or isinstance(value, (bool, str)):
             return value
         key = getattr(self, "_attr_translation_key", None)
         low, high = (
@@ -457,7 +455,11 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             _LOGGER.warning(
                 "Sensor %s read an implausible value %s (outside %s..%s) from "
                 "raw bytes %s; discarding it as a corrupted response",
-                self._entity_name, value, low, high, raw_bytes.hex(),
+                self._entity_name,
+                value,
+                low,
+                high,
+                raw_bytes.hex(),
             )
         return None
 
@@ -509,7 +511,6 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         """
         name_slug = self._entity_name.lower().replace(" ", "_")
         return f"thz_{self._block}_{self._offset}_{name_slug}"
-
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

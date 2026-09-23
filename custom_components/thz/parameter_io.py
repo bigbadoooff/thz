@@ -50,9 +50,7 @@ def block_coordinator_key(entry: Mapping[str, Any]) -> str | None:
     return f"pxx{str(entry['command']).upper()}"
 
 
-def parameter_from_block(
-    entry: Mapping[str, Any], block_data: bytes
-) -> bytes | None:
+def parameter_from_block(entry: Mapping[str, Any], block_data: bytes) -> bytes | None:
     """Cut a block parameter's value out of an already-read block response.
 
     ``block_data`` has the layout the block coordinators store (the decoded

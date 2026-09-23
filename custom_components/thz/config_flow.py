@@ -6,11 +6,9 @@ connections via USB serial or network (ser2net).
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
-
-import serial.tools.list_ports
-import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_DEVICE, CONF_HOST, CONF_PORT
@@ -20,6 +18,8 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectSelectorMode,
 )
+import serial.tools.list_ports
+import voluptuous as vol
 
 from .const import (
     CONF_CONNECTION_TYPE,
@@ -131,7 +131,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ): _translated_select(ENTITY_ID_STYLE_LABELS, CONF_ENTITY_ID_STYLE),
                 # Entity visibility tier: which less-common entities (HC2,
                 # schedules, advanced technical parameters) start enabled.
-                # "default" hides all of them (matching prior behavior),
+                # "default" hides all of them,
                 # "extended" enables everything except schedules, "all"
                 # enables everything. Can be changed later via Reconfigure,
                 # which retroactively bulk enables/disables existing entities.
@@ -147,9 +147,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="user", data_schema=schema)
 
-    async def async_step_setup_ip(
-        self, user_input=None
-    ) -> ConfigFlowResult:
+    async def async_step_setup_ip(self, user_input=None) -> ConfigFlowResult:
         """Input for IP connection."""
         errors = {}
 
@@ -159,9 +157,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             port = user_input.get(CONF_PORT)
 
             # Basic IP validation
-            if not host:
-                errors[CONF_HOST] = "invalid_host"
-            elif not self._is_valid_ip_or_hostname(host):
+            if not host or not self._is_valid_ip_or_hostname(host):
                 errors[CONF_HOST] = "invalid_host"
 
             # Port validation
@@ -196,8 +192,8 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         Returns:
             True if valid, False otherwise.
         """
-        import re
         import ipaddress
+        import re
 
         # Try to parse as IP address
         try:
@@ -208,11 +204,8 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Check if it's a valid hostname
         # Hostname can contain letters, numbers, dots, and hyphens
-        hostname_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-\.]{0,253}[a-zA-Z0-9])?$'
-        if re.match(hostname_pattern, host):
-            return True
-
-        return False
+        hostname_pattern = r"^[a-zA-Z0-9]([a-zA-Z0-9\-\.]{0,253}[a-zA-Z0-9])?$"
+        return bool(re.match(hostname_pattern, host))
 
     async def async_step_setup_usb(
         self, user_input: dict[str, Any] | None = None
@@ -235,7 +228,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="setup_usb", data_schema=schema)
 
-    async def async_step_reconfigure(
+    async def async_step_reconfigure(  # noqa: C901
         self, user_input: dict | None = None
     ) -> ConfigFlowResult:
         """Handle reconfiguration initiated from the device UI."""
@@ -282,18 +275,11 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             updated_data["selected_read_blocks"] = selected_read_blocks
 
             if "refresh_intervals" in updated_data:
-
                 updated_data["refresh_intervals"] = {
-
                     k: v
-
                     for k, v in updated_data["refresh_intervals"].items()
-
                     if k in selected_read_blocks
-
                 }
-
-
 
             updated_data["selected_write_groups"] = selected_write_groups
 
@@ -330,33 +316,45 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if conn_type == CONNECTION_USB:
             stored_device = defaults.get(CONF_DEVICE)
             ports, default_device = await self.get_ports(stored_device)
-            schema_dict[vol.Required(
-                CONF_DEVICE,
-                default=default_device,
-            )] = vol.In(ports) if ports else str
-            schema_dict[vol.Required(
-                "Baudrate",
-                default=defaults.get("Baudrate", DEFAULT_BAUDRATE),
-            )] = int
+            schema_dict[
+                vol.Required(
+                    CONF_DEVICE,
+                    default=default_device,
+                )
+            ] = vol.In(ports) if ports else str
+            schema_dict[
+                vol.Required(
+                    "Baudrate",
+                    default=defaults.get("Baudrate", DEFAULT_BAUDRATE),
+                )
+            ] = int
         else:  # IP connection
-            schema_dict[vol.Required(
-                CONF_HOST,
-                default=defaults.get(CONF_HOST, ""),
-            )] = str
-            schema_dict[vol.Required(
-                CONF_PORT,
-                default=defaults.get(CONF_PORT, DEFAULT_PORT),
-            )] = int
+            schema_dict[
+                vol.Required(
+                    CONF_HOST,
+                    default=defaults.get(CONF_HOST, ""),
+                )
+            ] = str
+            schema_dict[
+                vol.Required(
+                    CONF_PORT,
+                    default=defaults.get(CONF_PORT, DEFAULT_PORT),
+                )
+            ] = int
 
         # Common fields
-        schema_dict[vol.Optional(
-            "alias",
-            default=defaults.get("alias", ""),
-        )] = str
-        schema_dict[vol.Optional(
-            "area",
-            default=defaults.get("area", ""),
-        )] = vol.In(areas)
+        schema_dict[
+            vol.Optional(
+                "alias",
+                default=defaults.get("alias", ""),
+            )
+        ] = str
+        schema_dict[
+            vol.Optional(
+                "area",
+                default=defaults.get("area", ""),
+            )
+        ] = vol.In(areas)
 
         # Entity group selection: read blocks
         selected_read_blocks = defaults.get("selected_read_blocks")
@@ -365,10 +363,12 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # reports; any other choice forces a specific FHEM-style profile
         # (e.g. to add technician-level write entities, or to work around an
         # auto-detected firmware string with no dedicated register-map entry).
-        schema_dict[vol.Optional(
-            CONF_FIRMWARE_OVERRIDE,
-            default=defaults.get(CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO),
-        )] = _translated_select(FIRMWARE_PROFILE_LABELS, CONF_FIRMWARE_OVERRIDE)
+        schema_dict[
+            vol.Optional(
+                CONF_FIRMWARE_OVERRIDE,
+                default=defaults.get(CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO),
+            )
+        ] = _translated_select(FIRMWARE_PROFILE_LABELS, CONF_FIRMWARE_OVERRIDE)
 
         # Entity ID naming style: purely cosmetic, does not affect device
         # communication. "fhem" only changes HA's suggested_object_id for a
@@ -376,66 +376,80 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # exist in the registry (their entity_id stays whatever it already
         # is). Only newly-added blocks/entities, or ones removed and
         # recreated, pick up the new style after switching this here.
-        schema_dict[vol.Optional(
-            CONF_ENTITY_ID_STYLE,
-            default=defaults.get(CONF_ENTITY_ID_STYLE, ENTITY_ID_STYLE_DEFAULT),
-        )] = _translated_select(ENTITY_ID_STYLE_LABELS, CONF_ENTITY_ID_STYLE)
+        schema_dict[
+            vol.Optional(
+                CONF_ENTITY_ID_STYLE,
+                default=defaults.get(CONF_ENTITY_ID_STYLE, ENTITY_ID_STYLE_DEFAULT),
+            )
+        ] = _translated_select(ENTITY_ID_STYLE_LABELS, CONF_ENTITY_ID_STYLE)
 
         # Entity visibility tier: unlike entity_id_style, changing this HERE
         # retroactively bulk enables/disables entities already in the
         # registry (see _async_apply_entity_visibility_tier in __init__.py),
         # not just newly-created ones.
-        schema_dict[vol.Optional(
-            CONF_ENTITY_VISIBILITY,
-            default=defaults.get(CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT),
-        )] = _translated_select(ENTITY_VISIBILITY_LABELS, CONF_ENTITY_VISIBILITY)
+        schema_dict[
+            vol.Optional(
+                CONF_ENTITY_VISIBILITY,
+                default=defaults.get(CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT),
+            )
+        ] = _translated_select(ENTITY_VISIBILITY_LABELS, CONF_ENTITY_VISIBILITY)
 
         # Heating Circuit 2 entities: independent of the tier above. Like
         # entity_visibility, changing this retroactively bulk enables/
         # disables entities already in the registry.
-        schema_dict[vol.Optional(
-            CONF_ENABLE_HC2,
-            default=defaults.get(CONF_ENABLE_HC2, False),
-        )] = bool
+        schema_dict[
+            vol.Optional(
+                CONF_ENABLE_HC2,
+                default=defaults.get(CONF_ENABLE_HC2, False),
+            )
+        ] = bool
 
         # Refresh intervals for each block
         refresh_intervals = defaults.get("refresh_intervals", {})
         all_read_blocks = list(refresh_intervals.keys())
         if selected_read_blocks is None:
-            # Legacy: all blocks in refresh_intervals are selected
+            # No selection stored: every polled block counts as selected.
             selected_read_blocks = all_read_blocks
 
         for block in all_read_blocks:
-            schema_dict[vol.Optional(
-                f"read_{block}",
-                default=block in selected_read_blocks,
-            )] = bool
+            schema_dict[
+                vol.Optional(
+                    f"read_{block}",
+                    default=block in selected_read_blocks,
+                )
+            ] = bool
 
         # Entity group selection: write groups
         selected_write_groups = defaults.get("selected_write_groups")
         all_write_groups = list(WRITE_GROUP_LABELS.keys())
         if selected_write_groups is None:
-            # Legacy: all groups enabled
+            # No selection stored: every group counts as enabled.
             selected_write_groups = all_write_groups
 
         for group in all_write_groups:
-            schema_dict[vol.Optional(
-                f"write_{group}",
-                default=group in selected_write_groups,
-            )] = bool
+            schema_dict[
+                vol.Optional(
+                    f"write_{group}",
+                    default=group in selected_write_groups,
+                )
+            ] = bool
 
         # Refresh intervals for each block
         for block, interval in refresh_intervals.items():
-            schema_dict[vol.Optional(
-                f"refresh_{block}",
-                default=interval,
-            )] = vol.All(int, vol.Range(min=5, max=86400))
+            schema_dict[
+                vol.Optional(
+                    f"refresh_{block}",
+                    default=interval,
+                )
+            ] = vol.All(int, vol.Range(min=5, max=86400))
 
         # Write interval
-        schema_dict[vol.Optional(
-            "write_interval",
-            default=defaults.get("write_interval", DEFAULT_WRITE_INTERVAL),
-        )] = vol.All(int, vol.Range(min=5, max=86400))
+        schema_dict[
+            vol.Optional(
+                "write_interval",
+                default=defaults.get("write_interval", DEFAULT_WRITE_INTERVAL),
+            )
+        ] = vol.All(int, vol.Range(min=5, max=86400))
 
         # Auto-sync the device's real-time clock. Off by default: the clock
         # is always checked every 15 minutes and drift beyond a minute is
@@ -444,10 +458,12 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # of the backup_parameters / restore_parameters services, which
         # always correct/sync the clock outright — this only governs the
         # ongoing background check.)
-        schema_dict[vol.Optional(
-            "auto_sync_clock",
-            default=defaults.get("auto_sync_clock", False),
-        )] = bool
+        schema_dict[
+            vol.Optional(
+                "auto_sync_clock",
+                default=defaults.get("auto_sync_clock", False),
+            )
+        ] = bool
 
         return vol.Schema(schema_dict)
 
@@ -488,10 +504,8 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if os.path.isdir(by_id_dir):
                 for name in os.listdir(by_id_dir):
                     symlink = os.path.join(by_id_dir, name)
-                    try:
+                    with contextlib.suppress(OSError):
                         by_id_map[os.path.realpath(symlink)] = symlink
-                    except OSError:
-                        pass
         except OSError:
             pass
         return by_id_map
@@ -520,10 +534,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             by_id_path = by_id_map.get(real_device)
 
             desc = p.description
-            if desc and desc != p.device:
-                label = f"{desc} ({p.device})"
-            else:
-                label = p.device
+            label = f"{desc} ({p.device})" if desc and desc != p.device else p.device
 
             if by_id_path:
                 label = f"{label} [{os.path.basename(by_id_path)}]"
@@ -615,9 +626,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         result = THZConfigFlow._build_result_dict(ports_info, by_id_map)
         return THZConfigFlow._resolve_canonical(result, current_device)
 
-    async def async_step_detect_blocks(
-        self, user_input=None
-    ) -> ConfigFlowResult:
+    async def async_step_detect_blocks(self, user_input=None) -> ConfigFlowResult:
         """Dynamically read available blocks from the heat pump."""
         data = self.connection_data
         conn_type = data["connection_type"]
@@ -678,9 +687,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.connection_data["firmware"] = firmware
         return await self.async_step_select_groups()
 
-    async def async_step_select_groups(
-        self, user_input=None
-    ) -> ConfigFlowResult:
+    async def async_step_select_groups(self, user_input=None) -> ConfigFlowResult:
         """Allow user to select which entity groups to enable."""
         if user_input is not None:
             # Collect selected read blocks
@@ -702,15 +709,11 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Read block checkboxes
         for block in self.blocks:
-            schema_dict[
-                vol.Optional(f"read_{block}", default=True)
-            ] = bool
+            schema_dict[vol.Optional(f"read_{block}", default=True)] = bool
 
         # Write group checkboxes
         for group in self.write_groups_available:
-            schema_dict[
-                vol.Optional(f"write_{group}", default=True)
-            ] = bool
+            schema_dict[vol.Optional(f"write_{group}", default=True)] = bool
 
         schema = vol.Schema(schema_dict)
         return self.async_show_form(
@@ -718,9 +721,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=schema,
         )
 
-    async def async_step_refresh_blocks(
-        self, user_input=None
-    ) -> ConfigFlowResult:
+    async def async_step_refresh_blocks(self, user_input=None) -> ConfigFlowResult:
         """Ask for individual refresh intervals per block."""
         selected_read_blocks = self.connection_data.get("selected_read_blocks")
         if selected_read_blocks is None:
@@ -761,9 +762,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Add write interval for number/switch/select/time entities
         write_key = vol.Optional("write_interval", default=DEFAULT_WRITE_INTERVAL)
-        schema_dict[write_key] = vol.All(
-            int, vol.Range(min=5, max=86400)
-        )
+        schema_dict[write_key] = vol.All(int, vol.Range(min=5, max=86400))
 
         # Optional firmware profile override (defaults to auto-detect; the
         # blocks listed above always reflect the auto-detected firmware,
@@ -773,9 +772,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # is safe for same-family choices like plain "439" -> "439technician",
         # which only adds write entities. To pick a different family's
         # profile, use Reconfigure after initial setup instead.)
-        schema_dict[vol.Optional(
-            CONF_FIRMWARE_OVERRIDE, default=FIRMWARE_OVERRIDE_AUTO
-        )] = _translated_select(FIRMWARE_PROFILE_LABELS, CONF_FIRMWARE_OVERRIDE)
+        schema_dict[
+            vol.Optional(CONF_FIRMWARE_OVERRIDE, default=FIRMWARE_OVERRIDE_AUTO)
+        ] = _translated_select(FIRMWARE_PROFILE_LABELS, CONF_FIRMWARE_OVERRIDE)
 
         schema = vol.Schema(schema_dict)
         return self.async_show_form(

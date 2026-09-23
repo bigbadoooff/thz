@@ -66,6 +66,7 @@ older 2.06 maps that omit the ``command`` field) the entity is created in
 read-only mode — ``target_temperature`` is still shown but
 ``set_temperature`` is a no-op.
 """
+
 from __future__ import annotations
 
 import logging
@@ -160,7 +161,7 @@ _OP_MODE_TO_HVAC: dict[str, HVACMode] = cast(
 _DEFAULT_MIN_TEMP = 10.0
 _DEFAULT_MAX_TEMP = 60.0
 
-# Fan stage ↔ HA fan mode names  (stage 0 = off/bypass, 1–3 = low/medium/high)
+# Fan stage ↔ HA fan mode names  (stage 0 = off/bypass, 1-3 = low/medium/high)
 _FAN_MODES: list[str] = ["off", "low", "medium", "high"]
 _FAN_MODE_TO_STAGE: dict[str, int] = {m: i for i, m in enumerate(_FAN_MODES)}
 _FAN_STAGE_TO_MODE: dict[int, str] = {i: m for i, m in enumerate(_FAN_MODES)}
@@ -237,7 +238,7 @@ def _find_entry(write_registers: dict, names: list[str]) -> dict | None:
     return None
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: C901
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
@@ -266,16 +267,16 @@ async def async_setup_entry(
     # Derive field byte-offsets and lengths from the active firmware's register map.
     # Returns None when a field is absent; the entity is skipped in that case.
     f4_current = _field_layout(register_manager, "pxxF4", "insideTempRC")
-    f4_target  = _field_layout(register_manager, "pxxF4", "roomSetTemp")
-    f4_opmode  = _field_layout(register_manager, "pxxF4", "hcOpMode")
+    f4_target = _field_layout(register_manager, "pxxF4", "roomSetTemp")
+    f4_opmode = _field_layout(register_manager, "pxxF4", "hcOpMode")
     f3_current = _field_layout(register_manager, "pxxF3", "dhwTemp")
-    f3_target  = _field_layout(register_manager, "pxxF3", "dhwSetTemp")
-    f3_opmode  = _field_layout(register_manager, "pxxF3", "dhwOpMode")
-    f5_target  = _field_layout(register_manager, "pxxF5", "hc2SetpointTemp")
-    f5_opmode  = _field_layout(register_manager, "pxxF5", "hcOpMode")
+    f3_target = _field_layout(register_manager, "pxxF3", "dhwSetTemp")
+    f3_opmode = _field_layout(register_manager, "pxxF3", "dhwOpMode")
+    f5_target = _field_layout(register_manager, "pxxF5", "hc2SetpointTemp")
+    f5_opmode = _field_layout(register_manager, "pxxF5", "hcOpMode")
 
     # Bit-field layouts for pxx0A0176 — None when not present in map
-    a176_cooling    = _bit_field_layout(register_manager, "pxx0A0176", "cooling")
+    a176_cooling = _bit_field_layout(register_manager, "pxx0A0176", "cooling")
     a176_compressor = _bit_field_layout(register_manager, "pxx0A0176", "compressor")
 
     entities: list[THZClimate] = []
@@ -449,7 +450,7 @@ def _read_temp(data: bytes, offset: int, length: int) -> float | None:
     if len(data) < offset + length:
         return None
     try:
-        raw = data[offset:offset + length]
+        raw = data[offset : offset + length]
         value = decode_raw_value(raw, "hex2int", _TEMP_FACTOR)
         if isinstance(value, (int, float)):
             return float(value)
@@ -472,7 +473,7 @@ def _read_op_mode_raw(data: bytes, offset: int, length: int) -> str | None:
     if len(data) < offset + length:
         return None
     try:
-        raw = data[offset:offset + length]
+        raw = data[offset : offset + length]
         mode_str = decode_raw_value(raw, "opmodehc", 1.0)
         if isinstance(mode_str, str):
             return mode_str
@@ -535,7 +536,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             register (``pOpMode``), or ``None`` when not available.
         _fan_stage_entry: Write-register entry for the day fan-stage register
             (``p07FanStageDay``), or ``None`` when not available.
-        _fan_stage_cache: Last known fan stage (0–3), populated on startup.
+        _fan_stage_cache: Last known fan stage (0-3), populated on startup.
     """
 
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
@@ -994,14 +995,10 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         if self._opmode_entry is None:
             return
         if preset_mode not in (self._attr_preset_modes or []):
-            _LOGGER.warning(
-                "Unknown preset mode '%s' for %s", preset_mode, self.name
-            )
+            _LOGGER.warning("Unknown preset mode '%s' for %s", preset_mode, self.name)
             return
         try:
-            value_bytes = THZValueCodec.encode_select(
-                preset_mode, _OPMODE_DECODE_TYPE
-            )
+            value_bytes = THZValueCodec.encode_select(preset_mode, _OPMODE_DECODE_TYPE)
             await async_write_parameter(
                 self.hass, self._device, self._opmode_entry, value_bytes
             )
@@ -1055,9 +1052,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         step = _get_step(entry)
         decode_type = entry.get("decode_type", "5temp")
         try:
-            value_bytes = await async_read_parameter(
-                self.hass, self._device, entry
-            )
+            value_bytes = await async_read_parameter(self.hass, self._device, entry)
             if value_bytes:
                 return THZValueCodec.decode_number(
                     value_bytes, step, decode_type, entry.get("signed", True)
@@ -1126,7 +1121,11 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         _LOGGER.debug(
             "Writing heat setpoint %.1f °C to %s (cmd=%s, step=%s, register=%s)",
-            temperature, self.name, target_entry["command"], step, target_label,
+            temperature,
+            self.name,
+            target_entry["command"],
+            step,
+            target_label,
         )
         try:
             value_bytes = THZValueCodec.encode_number(
@@ -1160,7 +1159,10 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         _LOGGER.debug(
             "Writing cool setpoint %.1f °C to %s (cmd=%s, step=%s)",
-            temperature, self.name, entry["command"], step,
+            temperature,
+            self.name,
+            entry["command"],
+            step,
         )
         try:
             value_bytes = THZValueCodec.encode_number(
@@ -1184,7 +1186,9 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         _LOGGER.debug(
             "Setting cooling switch on %s to %s (cmd=%s)",
-            self.name, enabled, self._cool_switch_entry["command"],
+            self.name,
+            enabled,
+            self._cool_switch_entry["command"],
         )
         try:
             await async_write_parameter(
@@ -1208,16 +1212,15 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         decode_type = entry.get("decode_type", "5temp")
 
         try:
-            value_bytes = await async_read_parameter(
-                self.hass, self._device, entry
-            )
+            value_bytes = await async_read_parameter(self.hass, self._device, entry)
             if value_bytes:
                 self._cooling_target_temp = THZValueCodec.decode_number(
                     value_bytes, step, decode_type
                 )
                 _LOGGER.debug(
                     "Cached cooling setpoint for %s: %.1f °C",
-                    self.name, self._cooling_target_temp,
+                    self.name,
+                    self._cooling_target_temp,
                 )
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
             _LOGGER.warning(
@@ -1232,9 +1235,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         step = _get_step(entry)
         decode_type = entry.get("decode_type", "1clean")
         try:
-            value_bytes = await async_read_parameter(
-                self.hass, self._device, entry
-            )
+            value_bytes = await async_read_parameter(self.hass, self._device, entry)
             if value_bytes:
                 raw = THZValueCodec.decode_number(
                     value_bytes, step, decode_type, entry.get("signed", True)
@@ -1244,9 +1245,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                     "Cached fan stage for %s: %d", self.name, self._fan_stage_cache
                 )
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
-            _LOGGER.warning(
-                "Could not read fan stage for %s: %s", self.name, err
-            )
+            _LOGGER.warning("Could not read fan stage for %s: %s", self.name, err)
 
     async def _async_read_op_mode(self) -> None:
         """Read and cache the current global operating mode (pOpMode)."""
@@ -1254,9 +1253,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             return
         entry = self._opmode_entry
         try:
-            value_bytes = await async_read_parameter(
-                self.hass, self._device, entry
-            )
+            value_bytes = await async_read_parameter(self.hass, self._device, entry)
             if value_bytes:
                 self._op_mode_cache = THZValueCodec.decode_select(
                     value_bytes, _OPMODE_DECODE_TYPE
@@ -1265,9 +1262,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                     "Cached operating mode for %s: %s", self.name, self._op_mode_cache
                 )
         except (ValueError, TypeError, RuntimeError, ConnectionError, OSError) as err:
-            _LOGGER.warning(
-                "Could not read operating mode for %s: %s", self.name, err
-            )
+            _LOGGER.warning("Could not read operating mode for %s: %s", self.name, err)
 
     # ── Device registry ─────────────────────────────────────────────────────
 

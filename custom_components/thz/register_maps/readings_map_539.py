@@ -15,7 +15,7 @@ Where:
     - meta_dict (optional): HA entity metadata (unit, device_class, state_class, icon,
       translation_key)
 
-Energy sensors use paired registers – see readings_map_439.py for details.
+Energy sensors use paired registers - see readings_map_439.py for details.
 """
 
 _TEMP = {"unit": "°C", "device_class": "temperature", "state_class": "measurement"}

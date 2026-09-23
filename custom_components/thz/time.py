@@ -1,8 +1,9 @@
 """Time entity for THZ devices."""
+
 from __future__ import annotations
 
-import logging
 from datetime import time
+import logging
 
 from homeassistant.components.time import TimeEntity
 from homeassistant.config_entries import ConfigEntry
@@ -14,8 +15,8 @@ from ._typing_compat import get_runtime_data
 from .base_entity import THZBaseEntity
 from .const import (
     TIME_VALUE_UNSET,
-    WRITE_REGISTER_OFFSET,
     WRITE_REGISTER_LENGTH,
+    WRITE_REGISTER_OFFSET,
 )
 from .entity_translations import get_translation_key
 from .register_maps.register_map_manager import RegisterMapManagerWrite
@@ -78,7 +79,7 @@ def quarters_to_time(num: int) -> time | None:
     ----------
     num : int
         Number of 15-minute intervals (quarters) since midnight. The expected range is
-        0–95 (0 => 00:00, 95 => 23:45). The special value 96 represents 24:00
+        0-95 (0 => 00:00, 95 => 23:45). The special value 96 represents 24:00
         (end-of-day) and is returned as time(0, 0). A special sentinel value 0x80
         indicates "no time" and causes the function to return None.
 
@@ -90,7 +91,7 @@ def quarters_to_time(num: int) -> time | None:
 
     Notes:
     -----
-    - The function validates the 0–95 range (plus 96 for end-of-day) and logs a
+    - The function validates the 0-95 range (plus 96 for end-of-day) and logs a
       warning for other out-of-range values.
     - Invalid values outside 0-96 are clamped to the valid range (0-95) to prevent
       crashes.
@@ -122,7 +123,7 @@ def quarters_to_time(num: int) -> time | None:
             "Invalid quarters value %s "
             "(expected 0-95 or 96 for end-of-day). Value will be clamped. "
             "This may indicate a byte order issue in reading the time value.",
-            num
+            num,
         )
         num = max(0, min(95, num))
 
@@ -130,8 +131,6 @@ def quarters_to_time(num: int) -> time | None:
     hour = (num - quarters) // 4
     _LOGGER.debug("Converting %s to time: %s:%s", num, hour, quarters * 15)
     return time(hour, quarters * 15)
-
-
 
 
 def time_byte_index(decode_type: str | None) -> int:
@@ -214,6 +213,7 @@ async def async_setup_entry(
     entity_id_prefix = entry_data.get("entity_id_prefix")
 
     from .const import DEFAULT_WRITE_INTERVAL
+
     write_interval = config_entry.data.get("write_interval", DEFAULT_WRITE_INTERVAL)
 
     write_registers = write_manager.get_all_registers()
@@ -224,7 +224,9 @@ async def async_setup_entry(
         if entry["type"] in ("time", "schedule"):
             _LOGGER.debug(
                 "Creating time entities for %s (type: %s) with command %s",
-                name, entry["type"], entry["command"]
+                name,
+                entry["type"],
+                entry["command"],
             )
             new_entities = _create_time_entities(
                 name,
@@ -254,8 +256,6 @@ async def async_setup_entry(
         {},
         "async_clear_value",
     )
-
-
 
 
 class THZTime(THZBaseEntity, TimeEntity):
@@ -409,8 +409,6 @@ class THZTime(THZBaseEntity, TimeEntity):
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
 
 
-
-
 class THZScheduleTime(THZBaseEntity, TimeEntity):
     """Time entity for THZ schedule start/end times."""
 
@@ -513,15 +511,15 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             )
             return
 
-        if self._time_type == "start":
-            num = value_bytes[0]
-        else:  # "end"
-            num = value_bytes[1]
+        num = value_bytes[0] if self._time_type == "start" else value_bytes[1]
 
         self._attr_native_value = quarters_to_time(num)
         _LOGGER.debug(
             "Updated schedule time %s (%s): %s quarters -> %s",
-            self.name, self._time_type, num, self._attr_native_value
+            self.name,
+            self._time_type,
+            num,
+            self._attr_native_value,
         )
 
     async def async_set_value(self, value: time) -> None:
@@ -542,7 +540,10 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         new_num = time_to_quarters(t_value, is_end_time=(self._time_type == "end"))
         _LOGGER.debug(
             "Setting schedule time %s (%s) to %s (%s quarters)",
-            self.name, self._time_type, t_value, new_num
+            self.name,
+            self._time_type,
+            t_value,
+            new_num,
         )
 
         try:
@@ -573,7 +574,10 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         except (ConnectionError, RuntimeError, OSError) as err:
             _LOGGER.error(
                 "Error writing schedule time %s (%s): %s",
-                self.name, self._time_type, err, exc_info=True,
+                self.name,
+                self._time_type,
+                err,
+                exc_info=True,
             )
             return
 
@@ -611,7 +615,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             await self.hass.async_add_executor_job(
                 self._device.write_value,
                 bytes.fromhex(self._command),
-                bytes(schedule_bytes)
+                bytes(schedule_bytes),
             )
 
         self._attr_native_value = None

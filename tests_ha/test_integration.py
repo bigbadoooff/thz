@@ -1,12 +1,11 @@
 """End-to-end tests of the integration inside a real Home Assistant."""
+
 from __future__ import annotations
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
 )
@@ -16,36 +15,11 @@ from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManagerWrite,
 )
 
-HOST = "192.0.2.10"
-BLOCKS = {"pxxFB": 600, "pxxF3": 600, "pxxF4": 600}
-
-
-def _entry() -> MockConfigEntry:
-    return MockConfigEntry(
-        domain=DOMAIN,
-        title=f"THZ (ip: {HOST})",
-        unique_id=f"ip-{HOST}",
-        data={
-            "connection_type": "ip",
-            "host": HOST,
-            "port": 2323,
-            "refresh_intervals": BLOCKS,
-            "write_interval": 3600,
-            "selected_write_groups": None,
-        },
-    )
-
-
-async def _setup(hass: HomeAssistant) -> MockConfigEntry:
-    entry = _entry()
-    entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-    return entry
+from .common import HOST, setup_entry
 
 
 async def test_setup_creates_entities_and_unloads(hass, fake_device):
-    entry = await _setup(hass)
+    entry = await setup_entry(hass)
     assert entry.state is ConfigEntryState.LOADED
 
     registry = er.async_get(hass)
@@ -55,7 +29,8 @@ async def test_setup_creates_entities_and_unloads(hass, fake_device):
 
     # Translated names reach the state machine (has_entity_name + strings).
     climate = next(
-        e for e in entities
+        e
+        for e in entities
         if e.domain == "climate" and e.unique_id.endswith("heating_circuit")
     )
     state = hass.states.get(climate.entity_id)
@@ -69,13 +44,14 @@ async def test_setup_creates_entities_and_unloads(hass, fake_device):
 
 
 async def test_number_service_writes_the_register(hass, fake_device):
-    entry = await _setup(hass)
+    entry = await setup_entry(hass)
     registry = er.async_get(hass)
-    command = RegisterMapManagerWrite("439").get_all_registers()[
-        "p01RoomTempDayHC1"
-    ]["command"]
+    command = RegisterMapManagerWrite("439").get_all_registers()["p01RoomTempDayHC1"][
+        "command"
+    ]
     number = next(
-        e for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        e
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
         if e.domain == "number" and command.lower() in e.unique_id
     )
     assert number.disabled_by is None
@@ -124,7 +100,7 @@ async def test_config_flow_creates_entry_and_closes_probe(hass, fake_device):
 
 
 async def test_diagnostics_do_not_leak_the_host(hass, hass_client, fake_device):
-    entry = await _setup(hass)
+    entry = await setup_entry(hass)
 
     diagnostics = await get_diagnostics_for_config_entry(hass, hass_client, entry)
 
@@ -135,23 +111,22 @@ async def test_diagnostics_do_not_leak_the_host(hass, hass_client, fake_device):
 
 
 async def test_default_visibility_disables_schedules(hass, fake_device):
-    entry = await _setup(hass)
+    entry = await setup_entry(hass)
     registry = er.async_get(hass)
     schedules = [
-        e for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        e
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
         if e.domain == "time" and "program" in e.unique_id.lower()
     ]
     assert schedules
-    assert all(
-        e.disabled_by is er.RegistryEntryDisabler.INTEGRATION for e in schedules
-    )
+    assert all(e.disabled_by is er.RegistryEntryDisabler.INTEGRATION for e in schedules)
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
 async def test_services_follow_the_config_entry(hass, fake_device):
     # Notifications use persistent_notification.async_create directly, so
     # this works without the persistent_notification service being set up.
-    entry = await _setup(hass)
+    entry = await setup_entry(hass)
     assert hass.services.has_service(DOMAIN, "read_raw_register")
     assert hass.services.has_service(DOMAIN, "backup_parameters")
 

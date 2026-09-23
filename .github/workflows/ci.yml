@@ -40,6 +40,8 @@ jobs:
         run: pip install -r requirements_test.txt
       - name: Run ruff
         run: ruff check custom_components/thz tests tests_ha
+      - name: Check formatting
+        run: ruff format --check custom_components/thz tests tests_ha
 
   typecheck:
     name: Type check (mypy)
@@ -78,7 +80,7 @@ jobs:
         run: >
           python3 -m pytest tests/ -v
           --cov=custom_components/thz --cov-report=term-missing
-          --cov-fail-under=85
+          --cov-fail-under=95
 
   test-home-assistant:
     name: Test suite (real Home Assistant)

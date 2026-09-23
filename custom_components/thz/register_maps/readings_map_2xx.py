@@ -189,10 +189,9 @@ REGISTER_MAP = {
         (" p73TempDuration: ", 14, 4, "hex", 1, {"translation_key": "temp_duration"}),
         (" p74TempIncrease: ", 18, 4, "hex", 10, {"translation_key": "temp_increase"}),
     ],
-    # sSol -- solar circuit readings (cmd 16, FHEM "16sol"). Previously entirely
-    # unported for the 2xx firmware family even though FHEM's %getsonly2xx
-    # requests it identically for 206/214/214j. Same table/offsets as the
-    # 4.39/5.39 port in readings_map_439.py's pxx16 block.
+    # sSol -- solar circuit readings (cmd 16, FHEM "16sol"). FHEM's
+    # %getsonly2xx requests it identically for 206/214/214j. Same
+    # table/offsets as the 4.39/5.39 port in readings_map_439.py's pxx16 block.
     "pxx16": [
         ("collectorTemp: ", 4, 4, "hex2int", 10, {**_TEMP, "icon": "mdi:solar-power", "translation_key": "solar_collector_temp"}),
         (" dhwTemp: ", 8, 4, "hex2int", 10, {**_TEMP, "icon": "mdi:water-boiler", "translation_key": "solar_dhw_temp"}),

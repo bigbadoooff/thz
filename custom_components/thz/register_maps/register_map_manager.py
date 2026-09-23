@@ -83,16 +83,14 @@ FIRMWARE_MAPS = {
         "write": ["write_map_439_539", "write_map_539"],
         "read": ["readings_map_439", "readings_map_509"],
     },
-    # 709 has no register differences from 509 (readings_map_709 was a
-    # byte-for-byte duplicate of readings_map_509 -- same excluded
-    # compressor/power blocks); consolidated onto the 509 map.
+    # 709 has no register differences from 509 (same excluded
+    # compressor/power blocks), so it uses the 509 map.
     "709": {
         "write": ["write_map_439_539", "write_map_539"],
         "read": ["readings_map_439", "readings_map_509"],
     },
-    # Real 5.39 hardware gets its own explicit entry (previously this was the
-    # only thing behind "default", conflating "genuine 5.39" with "unrecognized
-    # firmware string" below).
+    # Real 5.39 hardware; kept apart from "default", which is for
+    # unrecognised firmware strings.
     "539": {
         "write": ["write_map_439_539", "write_map_539"],
         "read": ["readings_map_439", "readings_map_539"],
@@ -187,20 +185,28 @@ class BaseRegisterMapManager:
             filtered_map = self._filter_cooling_entries(module_name, filtered_map)
         return filtered_map
 
-    def _filter_cooling_entries(self, module_name: str, register_map: dict[str, Any]) -> dict[str, Any]:
+    def _filter_cooling_entries(
+        self, module_name: str, register_map: dict[str, Any]
+    ) -> dict[str, Any]:
         """Remove cooling-only entries from 5.39 maps for non-cooling devices."""
         if module_name == "readings_map_539":
-            return {k: v for k, v in register_map.items() if k not in _COOLING_READ_BLOCKS}
+            return {
+                k: v for k, v in register_map.items() if k not in _COOLING_READ_BLOCKS
+            }
         if module_name == "write_map_539":
-            return {k: v for k, v in register_map.items() if k not in _COOLING_WRITE_KEYS}
+            return {
+                k: v for k, v in register_map.items() if k not in _COOLING_WRITE_KEYS
+            }
         return register_map
 
-    def _normalize_name(self, name) -> str:
+    def _normalize_name(self, name: Any) -> Any:
         """Normalize a sensor name for comparison by stripping whitespace."""
         return name.strip() if isinstance(name, str) else name
 
     @staticmethod
-    def _inherit_meta(entry, base_entry):
+    def _inherit_meta(
+        entry: tuple[Any, ...], base_entry: tuple[Any, ...] | None
+    ) -> tuple[Any, ...]:
         """Return ``entry`` with ``base_entry``'s meta dict if it has none.
 
         Read-map entries are ``(name, offset, length, decode, factor[, meta])``.
@@ -209,7 +215,9 @@ class BaseRegisterMapManager:
             return entry
         return (*entry, base_entry[5])
 
-    def _merge_maps(self, base: dict, override: dict) -> dict:
+    def _merge_maps(
+        self, base: dict[str, Any], override: dict[str, Any]
+    ) -> dict[str, Any]:
         """Merge base and override maps in a predictable way."""
         merged = deepcopy(base) if base else {}
         if not override:
@@ -238,7 +246,8 @@ class BaseRegisterMapManager:
                         override_names = set()
                     # Keep entries from base that are not in override, then add all override entries
                     merged[block] = [
-                        e for e in merged[block]
+                        e
+                        for e in merged[block]
                         if self._normalize_name(e[0]) not in override_names
                     ] + entries
                 else:
@@ -248,7 +257,7 @@ class BaseRegisterMapManager:
                 merged[block] = deepcopy(entries)
         return merged
 
-    def get_all_registers(self) -> dict:
+    def get_all_registers(self) -> dict[str, Any]:
         """Get the merged register map."""
         return self._merged_map
 
@@ -325,13 +334,15 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
         if firmware_version and firmware_version.startswith("2"):
             self._enrich_2xx_write_entries()
 
-    def _merge_maps(self, base: dict, override: dict) -> dict:
+    def _merge_maps(
+        self, base: dict[str, Any], override: dict[str, Any]
+    ) -> dict[str, Any]:
         """For write maps prefer a simple dict update behaviour."""
         merged = deepcopy(base) if base else {}
         merged.update(deepcopy(override) or {})
         return merged
 
-    def _enrich_2xx_write_entries(self) -> None:
+    def _enrich_2xx_write_entries(self) -> None:  # noqa: C901
         """Enrich 2xx firmware write entries with block address, offset, length and step.
 
         For 2xx firmware, each writable parameter lives inside a larger register block.
@@ -379,7 +390,11 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
                     factor: float = float(entry[4]) if entry[4] else 1.0
                     if raw_name and raw_name not in param_lookup:
                         param_lookup[raw_name] = (
-                            hex_addr, offset, length, factor, decode_type
+                            hex_addr,
+                            offset,
+                            length,
+                            factor,
+                            decode_type,
                         )
 
         # The running firmware's merged read map (what its sensors decode) is
@@ -397,7 +412,12 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
                 raw_name = entry[0].strip().rstrip(":").strip()
                 own_layout.setdefault(
                     (raw_name, block_key[3:].upper()),
-                    (entry[1], entry[2], float(entry[4]) if entry[4] else 1.0, entry[3]),
+                    (
+                        entry[1],
+                        entry[2],
+                        float(entry[4]) if entry[4] else 1.0,
+                        entry[3],
+                    ),
                 )
 
         # Load the parent→block-address mapping from write_map_206.
@@ -462,4 +482,3 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
             # "ptime" entries are left unchanged for now (different encoding needed).
             if entry.get("type") == "pclean":
                 entry["type"] = "number"
-
