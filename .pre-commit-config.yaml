@@ -1,0 +1,23 @@
+# Install once with `pip install pre-commit && pre-commit install`.
+# The ruff version must match requirements_test.txt so that local hooks and
+# CI agree.
+# docs/legacy holds third-party reference material and stays untouched.
+exclude: ^docs/legacy/
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.8
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      # Runs the mypy from the active environment: it needs homeassistant-stubs
+      # (installed with --no-deps, see tests/README.md) and Python 3.13, which
+      # an isolated pre-commit environment cannot provide.
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        pass_filenames: false

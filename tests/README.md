@@ -13,8 +13,13 @@ python3 -m pytest tests/                       # all tests
 python3 -m pytest tests/test_parameter_io.py   # one file
 python3 -m pytest tests/ --cov=custom_components/thz --cov-report=term-missing
 
-ruff check custom_components/thz tests
+ruff check custom_components/thz tests tests_ha
+ruff format custom_components/thz tests tests_ha
 ```
+
+`pre-commit install` runs ruff (lint and format) and mypy on every commit;
+see `.pre-commit-config.yaml`. The mypy hook uses the mypy of the active
+environment, set up as described below.
 
 ### Type check
 
