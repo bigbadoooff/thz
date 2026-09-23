@@ -22,12 +22,11 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
-    SensorDeviceClass,
     SensorEntity,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -51,6 +50,8 @@ PARALLEL_UPDATES = 0
 # notation:
 #   byte_offset = raw_offset // 2  (nibble 8 → byte 4)
 #   byte_length = (raw_length + 1) // 2  (nibble-length 8 → 4 bytes)
+_POWER_BLOCK = "pxxFB"
+
 # All energy blocks are PAIRED (cmd2 + cmd3 combined as high*1000 + low), so the
 # coordinator stores a 4-byte signed integer at bytes 4:8 — hence byte_length=4.
 _ENERGY_SENSOR_BLOCKS: dict[str, tuple[str, int, int, str, float]] = {
@@ -101,12 +102,17 @@ async def async_setup_cop_sensors(
 
     cop_sensors: list[SensorEntity] = []
 
-    # Create COP sensors based on available data
-    # Check if we have power sensors for current COP (mainly in fw 206, 214)
-    if _has_power_sensors(coordinators):
-        cop_sensors.append(
-            THZCurrentCOPSensor(coordinators, device_id, "current_cop_total")
-        )
+    # Current COP from the instantaneous power readings in pxxFB, located via
+    # the active firmware's register map rather than guessed.
+    power_coordinator = coordinators.get(_POWER_BLOCK)
+    register_manager = entry_data.get("register_manager")
+    if power_coordinator is not None and register_manager is not None:
+        qc = _power_field_layout(register_manager, "actualPower_Qc")
+        pel = _power_field_layout(register_manager, "actualPower_Pel")
+        if qc is not None and pel is not None:
+            cop_sensors.append(
+                THZCurrentCOPSensor(power_coordinator, device_id, qc, pel)
+            )
 
     # Check if we have energy sensors for daily/lifetime COP (mainly in fw 439)
     if _has_energy_sensors(coordinators):
@@ -165,23 +171,21 @@ def _has_energy_values(firmware_version: str) -> bool:
     return fw_int >= 439
 
 
-def _has_power_sensors(coordinators: dict[str, Any]) -> bool:
-    """Check if power sensors are available in coordinator data.
+def _power_field_layout(
+    register_manager: Any, field_name: str
+) -> tuple[int, int, float] | None:
+    """Return (byte_offset, byte_length, factor) of a pxxFB power field.
 
-    Args:
-        coordinators: Dictionary of coordinators by block.
-
-    Returns:
-        bool: True if power sensors are available, False otherwise.
+    Only "esp_mant" (float) entries qualify; firmwares that list the field
+    as a placeholder (e.g. "n.a." on 2.06) return None.
     """
-    # Power sensors (actualPower_Qc, actualPower_Pel) are typically in block pxx0B
-    # Check if we have that block with valid data
-    for block_name, coordinator in coordinators.items():
-        if coordinator.data is not None and len(coordinator.data) > 100:
-            # Power sensors are at offset 94 and 102, need at least 110 bytes
-            # This is a heuristic check
-            return True
-    return False
+    for entry in register_manager.get_registers_for_block(_POWER_BLOCK):
+        if entry[0].strip().rstrip(":").strip() != field_name:
+            continue
+        if entry[3] != "esp_mant":
+            return None
+        return entry[1] // 2, (entry[2] + 1) // 2, float(entry[4] or 1)
+    return None
 
 
 def _has_energy_sensors(coordinators: dict[str, Any]) -> bool:
@@ -210,36 +214,32 @@ def _has_energy_sensors(coordinators: dict[str, Any]) -> bool:
 class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
     """Sensor for current/instantaneous COP based on power values.
 
-    COP = actualPower_Qc / actualPower_Pel
-    where:
-    - actualPower_Qc: Thermal power output (kW)
-    - actualPower_Pel: Electrical power input (kW)
+    COP = actualPower_Qc / actualPower_Pel, both read from pxxFB at the
+    offsets the active firmware's register map declares.
     """
 
-    def __init__(self, coordinators: dict[str, Any], device_id: str, name: str) -> None:
+    def __init__(
+        self,
+        coordinator: Any,
+        device_id: str,
+        qc_layout: tuple[int, int, float],
+        pel_layout: tuple[int, int, float],
+    ) -> None:
         """Initialize the current COP sensor.
 
         Args:
-            coordinators: Dictionary of coordinators by block.
+            coordinator: The pxxFB coordinator.
             device_id: The unique device identifier.
-            name: Internal name for the sensor.
+            qc_layout: (byte_offset, byte_length, factor) of actualPower_Qc.
+            pel_layout: (byte_offset, byte_length, factor) of actualPower_Pel.
         """
-        # Find the coordinator with power data (typically pxx0B)
-        self._power_coordinator = None
-        for block_name, coordinator in coordinators.items():
-            if coordinator.data is not None and len(coordinator.data) > 100:
-                self._power_coordinator = coordinator
-                break
-
-        if self._power_coordinator is None:
-            # Use first available coordinator as fallback
-            self._power_coordinator = next(iter(coordinators.values()))
-
-        super().__init__(self._power_coordinator)
+        super().__init__(coordinator)
+        self._qc_layout = qc_layout
+        self._pel_layout = pel_layout
 
         self._device_id = device_id
         self._attr_unique_id = f"thz_{device_id}_current_cop"
-        self._attr_device_class = SensorDeviceClass.POWER_FACTOR
+        # A COP is a plain ratio: no device class fits (POWER_FACTOR is 0-1/%).
         self._attr_state_class = SensorStateClass.MEASUREMENT
         # Icon comes from icons.json (icon translations), not a hardcoded
         # _attr_icon, per HA's icon-translations quality-scale rule.
@@ -248,10 +248,11 @@ class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
         self._attr_translation_key = "current_cop"
         self._attr_has_entity_name = True
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        """Handle updated data from the coordinator."""
-        super()._handle_coordinator_update()
+    @staticmethod
+    def _read_power(payload: bytes, layout: tuple[int, int, float]) -> float:
+        offset, length, factor = layout
+        value = decode_raw_value(payload[offset : offset + length], "esp_mant", factor)
+        return float(value)
 
     @property
     def native_value(self) -> StateType | float | None:
@@ -260,54 +261,33 @@ class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
         Returns:
             float | None: The current COP value, or None if data is unavailable.
         """
-        if self.coordinator.data is None:
+        payload = self.coordinator.data
+        if payload is None:
+            return None
+
+        min_length = max(o + n for o, n, _ in (self._qc_layout, self._pel_layout))
+        if len(payload) < min_length:
+            _LOGGER.debug(
+                "Payload too short for power sensors: %d bytes, need %d",
+                len(payload), min_length,
+            )
             return None
 
         try:
-            payload = self.coordinator.data
-
-            # Extract actualPower_Qc and actualPower_Pel using nibble→byte conversion
-            # Register map uses nibble offsets/lengths (register_map_all.py):
-            #   actualPower_Qc:  nibble offset=94, nibble length=8
-            #   actualPower_Pel: nibble offset=102, nibble length=8
-            # byte_offset = nibble_offset // 2; byte_length = (nibble_length + 1) // 2
-            qc_byte_offset = 94 // 2    # = 47
-            qc_byte_length = (8 + 1) // 2  # = 4
-            pel_byte_offset = 102 // 2  # = 51
-            pel_byte_length = (8 + 1) // 2  # = 4
-            min_length = pel_byte_offset + pel_byte_length  # = 55
-
-            if len(payload) < min_length:
-                _LOGGER.debug(
-                    "Payload too short for power sensors: %d bytes, need %d",
-                    len(payload),
-                    min_length,
-                )
-                return None
-
-            qc_bytes = payload[qc_byte_offset : qc_byte_offset + qc_byte_length]
-            pel_bytes = payload[pel_byte_offset : pel_byte_offset + pel_byte_length]
-
-            # Decode using esp_mant format
-            qc_value = decode_raw_value(qc_bytes, "esp_mant", 1.0)  # kW
-            pel_value = decode_raw_value(pel_bytes, "esp_mant", 1.0)  # kW
-
-            # Calculate COP
-            if isinstance(pel_value, (int, float)) and pel_value > 0:
-                if isinstance(qc_value, (int, float)) and qc_value >= 0:
-                    cop = qc_value / pel_value
-                    # Sanity check: COP should be between 0 and 10 for heat pumps
-                    if 0 <= cop <= 10:
-                        return round(cop, 2)
-                    else:
-                        _LOGGER.debug("Calculated COP out of range: %.2f", cop)
-                        return None
-
-            return None
-
-        except (ValueError, IndexError, TypeError, ZeroDivisionError) as err:
+            qc_value = self._read_power(payload, self._qc_layout)
+            pel_value = self._read_power(payload, self._pel_layout)
+        except (ValueError, IndexError, TypeError) as err:
             _LOGGER.debug("Error calculating current COP: %s", err)
             return None
+
+        if pel_value <= 0 or qc_value < 0:
+            return None
+        cop = qc_value / pel_value
+        # Sanity check: COP should be between 0 and 10 for heat pumps
+        if 0 <= cop <= 10:
+            return round(cop, 2)
+        _LOGGER.debug("Calculated COP out of range: %.2f", cop)
+        return None
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -340,7 +320,7 @@ class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
         super().__init__(primary_coordinator)
 
         self._device_id = device_id
-        self._attr_device_class = SensorDeviceClass.POWER_FACTOR
+        # A COP is a plain ratio: no device class fits (POWER_FACTOR is 0-1/%).
         self._attr_state_class = SensorStateClass.MEASUREMENT
         # Icon comes from icons.json (icon translations), not a hardcoded
         # _attr_icon, per HA's icon-translations quality-scale rule.
