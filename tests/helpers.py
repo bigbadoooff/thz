@@ -29,3 +29,26 @@ class Simulated2xxDevice(THZDevice):
 
     async def async_execute(self, hass, fn, *args, timeout: float = 8.0):  # noqa: ASYNC109
         return fn(*args)
+
+
+def make_runtime_data(**fields):
+    """Build THZRuntimeData for tests; unspecified fields get neutral values."""
+    from unittest.mock import MagicMock
+
+    from custom_components.thz.runtime_data import THZRuntimeData
+
+    fields.setdefault("device", MagicMock())
+    fields.setdefault("device_id", "test_device")
+    fields.setdefault("write_manager", None)
+    fields.setdefault("register_manager", None)
+    return THZRuntimeData(**fields)
+
+
+def as_runtime_data(value):
+    """Turn a non-empty dict into THZRuntimeData; other values pass through.
+
+    An empty dict (or None) stands for an entry that is not loaded.
+    """
+    if isinstance(value, dict) and value:
+        return make_runtime_data(**value)
+    return value

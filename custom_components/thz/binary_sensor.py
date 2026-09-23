@@ -18,13 +18,11 @@ from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._typing_compat import get_runtime_data
 from .const import (
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
@@ -34,6 +32,7 @@ from .const import (
 from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
 from .register_maps.register_map_manager import RegisterMapManager
+from .runtime_data import THZConfigEntry
 from .value_codec import decode_raw_value
 
 if TYPE_CHECKING:
@@ -87,7 +86,7 @@ def _get_device_class(name: str) -> BinarySensorDeviceClass | None:
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: THZConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up THZ binary sensor entities from a config entry.
@@ -100,13 +99,13 @@ async def async_setup_entry(
         config_entry: The configuration entry for this integration.
         async_add_entities: Callback to add entities to Home Assistant.
     """
-    entry_data = get_runtime_data(config_entry)
-    register_manager: RegisterMapManager = entry_data["register_manager"]
-    coordinators = entry_data["coordinators"]
-    device_id = entry_data["device_id"]
-    entity_id_style = entry_data.get("entity_id_style", ENTITY_ID_STYLE_DEFAULT)
-    entity_visibility = entry_data.get("entity_visibility", ENTITY_VISIBILITY_DEFAULT)
-    entity_id_prefix = entry_data.get("entity_id_prefix")
+    entry_data = config_entry.runtime_data
+    register_manager: RegisterMapManager = entry_data.register_manager
+    coordinators = entry_data.coordinators
+    device_id = entry_data.device_id
+    entity_id_style = entry_data.entity_id_style
+    entity_visibility = entry_data.entity_visibility
+    entity_id_prefix = entry_data.entity_id_prefix
 
     entities: list[THZBinarySensor] = []
     seen_sensor_names: set[str] = set()

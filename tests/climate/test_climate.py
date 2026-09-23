@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 from homeassistant.components.climate import HVACAction, HVACMode
 import pytest
 
+from tests.helpers import as_runtime_data
+
 # Real register-map byte offsets (derived the same way _field_layout does:
 # nibble_offset // 2) used across several tests below.
 F4_INSIDE_TEMP_OFFSET = 34
@@ -1019,7 +1021,7 @@ class TestClimateAsyncSetupEntry:
         entry_data = cls._entry_data(register_manager, coordinators, write_registers)
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
-        config_entry.runtime_data = entry_data
+        config_entry.runtime_data = as_runtime_data(entry_data)
         return hass, config_entry
 
     _F4_ENTRIES = [

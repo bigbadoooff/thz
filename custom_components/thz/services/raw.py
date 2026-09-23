@@ -220,7 +220,7 @@ async def async_handle_read_raw_register(
             notification_id=f"thz_raw_{command_str}",
         )
         raise
-    device = entry_data["device"]
+    device = entry_data.device
 
     # Read the register
     try:
@@ -290,7 +290,7 @@ async def async_handle_scan_raw_registers(
     commands, scan_mode = _resolve_scan_commands(pattern, start, end, max_results)
 
     _, entry_data = _require_target_entry_data(hass, requested_entry_id)
-    device = entry_data["device"]
+    device = entry_data.device
 
     result_value = str | int | bool | dict[str, int | float | bool | str]
     results: list[dict[str, result_value]] = []
@@ -402,7 +402,7 @@ async def async_handle_watch_raw_registers_changes(
     commands, scan_mode = _resolve_scan_commands(pattern, start, end, max_results)
 
     _, entry_data = _require_target_entry_data(hass, requested_entry_id)
-    device = entry_data["device"]
+    device = entry_data.device
 
     valid_registers: dict[str, str] = {}
     for command_str in commands:

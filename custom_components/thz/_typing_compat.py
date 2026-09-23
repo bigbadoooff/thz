@@ -8,7 +8,7 @@ confines the resulting workarounds to one place instead of scattering
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     try:
@@ -37,20 +37,4 @@ if TYPE_CHECKING:
 __all__ = [
     "AddConfigEntryEntitiesCallback",
     "ConfigFlowResult",
-    "get_runtime_data",
-    "set_runtime_data",
 ]
-
-
-def get_runtime_data(entry: Any) -> Any:
-    """Return ``entry.runtime_data`` (a real ConfigEntry attribute since HA 2024.6).
-
-    Small accessor so the "no attribute runtime_data" gap in older stub
-    snapshots only needs silencing here instead of at every call site.
-    """
-    return entry.runtime_data
-
-
-def set_runtime_data(entry: Any, value: Any) -> None:
-    """Set ``entry.runtime_data`` (a real ConfigEntry attribute since HA 2024.6)."""
-    entry.runtime_data = value

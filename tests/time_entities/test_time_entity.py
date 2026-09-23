@@ -18,6 +18,7 @@ from custom_components.thz.time import (
     _create_time_entities,
     async_setup_entry,
 )
+from tests.helpers import make_runtime_data
 
 
 def _make_device():
@@ -78,11 +79,13 @@ class TestAsyncSetupEntry:
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
         config_entry.data = {}
-        config_entry.runtime_data = {
-            "write_manager": write_manager,
-            "device": device,
-            "device_id": "dev1",
-        }
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "write_manager": write_manager,
+                "device": device,
+                "device_id": "dev1",
+            }
+        )
 
         async_add_entities = MagicMock()
 
@@ -108,11 +111,13 @@ class TestAsyncSetupEntry:
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
         config_entry.data = {"write_interval": 300}
-        config_entry.runtime_data = {
-            "write_manager": write_manager,
-            "device": device,
-            "device_id": "dev1",
-        }
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "write_manager": write_manager,
+                "device": device,
+                "device_id": "dev1",
+            }
+        )
 
         async_add_entities = MagicMock()
         await async_setup_entry(hass, config_entry, async_add_entities)

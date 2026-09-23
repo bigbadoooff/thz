@@ -71,7 +71,9 @@ includes entities, climate, clock sync and backup/restore.
      start unavailable.
    - If every block fails, setup raises `ConfigEntryNotReady`.
 3. Runtime state (`device`, `coordinators`, both map managers, visibility and
-   naming settings) is stored as the entry's runtime data.
+   naming settings) is stored as the entry's runtime data, a
+   `THZRuntimeData` dataclass (`runtime_data.py`); the platforms take a
+   typed `THZConfigEntry`.
 4. The platforms create their entities (`platform_setup.py` for the write-map
    platforms):
    - Read-map entities are `CoordinatorEntity`s and decode from

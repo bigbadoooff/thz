@@ -14,6 +14,7 @@ import pytest
 
 from custom_components.thz.const import DOMAIN
 from custom_components.thz.services import async_setup_services
+from tests.helpers import as_runtime_data
 
 
 def _mock_hass():
@@ -41,7 +42,7 @@ def _mock_hass():
         for entry_id, runtime_data in hass.data.get(domain, {}).items():
             entry = MagicMock()
             entry.entry_id = entry_id
-            entry.runtime_data = runtime_data
+            entry.runtime_data = as_runtime_data(runtime_data)
             entries.append(entry)
         return entries
 

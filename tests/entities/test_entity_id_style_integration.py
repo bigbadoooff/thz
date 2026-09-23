@@ -19,6 +19,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from custom_components.thz.entity_id_style import fhem_style_object_id
+from tests.helpers import make_runtime_data
 
 
 def _make_mock_device():
@@ -323,22 +324,24 @@ class TestPlatformSetupPassesEntityIdStyle:
         config_entry = MagicMock()
         config_entry.entry_id = entry_id
         config_entry.data = {}
-        config_entry.runtime_data = {
-            "write_manager": MagicMock(
-                get_all_registers=MagicMock(
-                    return_value={
-                        "zPumpHC": {
-                            "command": "0A0052",
-                            "type": "switch",
-                            "icon": "",
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "write_manager": MagicMock(
+                    get_all_registers=MagicMock(
+                        return_value={
+                            "zPumpHC": {
+                                "command": "0A0052",
+                                "type": "switch",
+                                "icon": "",
+                            }
                         }
-                    }
-                )
-            ),
-            "device": _make_mock_device(),
-            "device_id": "test_device",
-            # deliberately no "entity_id_style" key
-        }
+                    )
+                ),
+                "device": _make_mock_device(),
+                "device_id": "test_device",
+                # deliberately no "entity_id_style" key
+            }
+        )
 
         added = []
         async_add_entities = MagicMock(
@@ -372,24 +375,26 @@ class TestPlatformSetupPassesEntityIdStyle:
         config_entry = MagicMock()
         config_entry.entry_id = entry_id
         config_entry.data = {}
-        config_entry.runtime_data = {
-            "write_manager": MagicMock(
-                get_all_registers=MagicMock(
-                    return_value={
-                        "zResetLast10errors": {
-                            "command": "0A0700",
-                            "type": "button",
-                            "icon": "",
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "write_manager": MagicMock(
+                    get_all_registers=MagicMock(
+                        return_value={
+                            "zResetLast10errors": {
+                                "command": "0A0700",
+                                "type": "button",
+                                "icon": "",
+                            }
                         }
-                    }
-                )
-            ),
-            "device": _make_mock_device(),
-            "device_id": "test_device",
-            "entity_id_style": "fhem",
-            "entity_visibility": "default",
-            "entity_id_prefix": "lwz",
-        }
+                    )
+                ),
+                "device": _make_mock_device(),
+                "device_id": "test_device",
+                "entity_id_style": "fhem",
+                "entity_visibility": "default",
+                "entity_id_prefix": "lwz",
+            }
+        )
 
         added = []
         async_add_entities = MagicMock(
@@ -540,23 +545,25 @@ class TestEntityIdPrefix:
         config_entry = MagicMock()
         config_entry.entry_id = entry_id
         config_entry.data = {}
-        config_entry.runtime_data = {
-            "write_manager": MagicMock(
-                get_all_registers=MagicMock(
-                    return_value={
-                        "zPumpHC": {
-                            "command": "0A0052",
-                            "type": "switch",
-                            "icon": "",
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "write_manager": MagicMock(
+                    get_all_registers=MagicMock(
+                        return_value={
+                            "zPumpHC": {
+                                "command": "0A0052",
+                                "type": "switch",
+                                "icon": "",
+                            }
                         }
-                    }
-                )
-            ),
-            "device": _make_mock_device(),
-            "device_id": "test_device",
-            "entity_id_style": "fhem",
-            "entity_id_prefix": "lwz",
-        }
+                    )
+                ),
+                "device": _make_mock_device(),
+                "device_id": "test_device",
+                "entity_id_style": "fhem",
+                "entity_id_prefix": "lwz",
+            }
+        )
 
         added = []
         async_add_entities = MagicMock(

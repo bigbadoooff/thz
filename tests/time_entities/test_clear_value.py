@@ -17,6 +17,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from tests.helpers import make_runtime_data
+
 
 def _make_hass():
     """Create a mock hass whose async_add_executor_job actually calls through."""
@@ -176,14 +178,16 @@ class TestClearValueServiceRegistration:
         config_entry = MagicMock()
         config_entry.entry_id = entry_id
         config_entry.data = {}
-        config_entry.runtime_data = {
-            "write_manager": write_manager,
-            "device": device,
-            "device_id": "dev1",
-            "entity_id_style": "default",
-            "entity_visibility": "default",
-            "entity_id_prefix": None,
-        }
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "write_manager": write_manager,
+                "device": device,
+                "device_id": "dev1",
+                "entity_id_style": "default",
+                "entity_visibility": "default",
+                "entity_id_prefix": None,
+            }
+        )
         async_add_entities = MagicMock()
 
         await async_setup_entry(hass, config_entry, async_add_entities)

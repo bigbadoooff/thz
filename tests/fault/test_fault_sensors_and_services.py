@@ -22,6 +22,7 @@ from custom_components.thz.register_maps.register_map_manager import (
 )
 from custom_components.thz.services import async_setup_services
 from tests.fault.test_fault_memory import R3, R5, R11, FakeStore, _payload
+from tests.helpers import as_runtime_data, make_runtime_data
 
 
 def _tracker():
@@ -116,11 +117,13 @@ class TestSensors:
 def _entry(coordinators, register_manager):
     config_entry = MagicMock()
     config_entry.entry_id = "entry1"
-    config_entry.runtime_data = {
-        "coordinators": coordinators,
-        "register_manager": register_manager,
-        "device_id": "dev",
-    }
+    config_entry.runtime_data = make_runtime_data(
+        **{
+            "coordinators": coordinators,
+            "register_manager": register_manager,
+            "device_id": "dev",
+        }
+    )
     return config_entry
 
 
@@ -136,8 +139,8 @@ class TestSetup:
         (entities,), _ = add.call_args
         assert len(entities) == 4
         data = config_entry.runtime_data
-        assert isinstance(data["fault_tracker"], THZFaultTracker)
-        assert data["fault_source"] is coordinator
+        assert isinstance(data.fault_tracker, THZFaultTracker)
+        assert data.fault_source is coordinator
         coordinator.async_add_listener.assert_called_once()
         config_entry.async_on_unload.assert_called_once()
 
@@ -157,7 +160,7 @@ class TestSetup:
         config_entry = _entry({}, RegisterMapManager("439"))
         await async_setup_fault_sensors(MagicMock(), config_entry, add)
         add.assert_not_called()
-        assert "fault_tracker" not in config_entry.runtime_data
+        assert config_entry.runtime_data.fault_tracker is None
 
     @pytest.mark.asyncio
     async def test_nothing_on_an_unsupported_layout(self):
@@ -178,7 +181,7 @@ class TestSetup:
         with patch.object(fault_sensor, "Store", return_value=store):
             await async_setup_fault_sensors(hass, config_entry, MagicMock())
         listener = coordinator.async_add_listener.call_args[0][0]
-        tracker = config_entry.runtime_data["fault_tracker"]
+        tracker = config_entry.runtime_data.fault_tracker
 
         coordinator.data = _payload(R3, R5)
         listener()
@@ -198,7 +201,7 @@ def _hass_with(entry_data):
     hass.services.async_register = MagicMock()
     entry = MagicMock()
     entry.entry_id = "entry1"
-    entry.runtime_data = entry_data
+    entry.runtime_data = as_runtime_data(entry_data)
     hass.config_entries = MagicMock()
     hass.config_entries.async_entries = MagicMock(return_value=[entry])
     return hass

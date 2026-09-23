@@ -224,8 +224,8 @@ async def async_handle_backup_parameters(
     snapshot under config/thz_backups/.
     """
     entry_id, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
-    write_manager = entry_data["write_manager"]
-    device: THZDevice = entry_data["device"]
+    write_manager = entry_data.write_manager
+    device: THZDevice = entry_data.device
 
     parameters, read_errors = await _read_all_parameters(
         hass, device, write_manager.get_all_registers()
@@ -237,7 +237,7 @@ async def async_handle_backup_parameters(
     created = dt_util.utcnow().isoformat()
     backup_doc = {
         "created": created,
-        "device_id": entry_data.get("device_id"),
+        "device_id": entry_data.device_id,
         "entry_id": entry_id,
         "firmware_version": getattr(device, "firmware_version", None),
         "parameter_count": len(parameters),
@@ -393,8 +393,8 @@ async def async_handle_restore_parameters(
     only_set = set(only) if only else None
 
     _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
-    write_manager = entry_data["write_manager"]
-    device: THZDevice = entry_data["device"]
+    write_manager = entry_data.write_manager
+    device: THZDevice = entry_data.device
 
     path = await hass.async_add_executor_job(
         _resolve_backup_path, hass, requested_filename

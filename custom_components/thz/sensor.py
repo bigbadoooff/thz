@@ -25,14 +25,12 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._typing_compat import get_runtime_data
 from .const import (
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
@@ -44,6 +42,7 @@ from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
 from .fault_sensor import async_setup_fault_sensors
 from .register_maps.register_map_manager import RegisterMapManager
+from .runtime_data import THZConfigEntry
 from .value_codec import decode_raw_value
 
 if TYPE_CHECKING:
@@ -78,7 +77,7 @@ PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: THZConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up THZ sensor entities from a config entry.
@@ -95,14 +94,14 @@ async def async_setup_entry(
     Returns:
         None
     """
-    entry_data = get_runtime_data(config_entry)
-    register_manager: RegisterMapManager = entry_data["register_manager"]
-    coordinators = entry_data["coordinators"]
-    device_id = entry_data["device_id"]
-    unsupported_blocks: set[str] = entry_data.get("unsupported_blocks", set())
-    entity_id_style = entry_data.get("entity_id_style", ENTITY_ID_STYLE_DEFAULT)
-    entity_visibility = entry_data.get("entity_visibility", ENTITY_VISIBILITY_DEFAULT)
-    entity_id_prefix = entry_data.get("entity_id_prefix")
+    entry_data = config_entry.runtime_data
+    register_manager: RegisterMapManager = entry_data.register_manager
+    coordinators = entry_data.coordinators
+    device_id = entry_data.device_id
+    unsupported_blocks: set[str] = entry_data.unsupported_blocks
+    entity_id_style = entry_data.entity_id_style
+    entity_visibility = entry_data.entity_visibility
+    entity_id_prefix = entry_data.entity_id_prefix
 
     # Create sensors
     sensors = []

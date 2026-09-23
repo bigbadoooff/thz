@@ -4,6 +4,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from tests.helpers import make_runtime_data
+
 
 class TestDiagnosticsRawBlocks:
     """Tests for diagnostics raw blocks feature."""
@@ -50,10 +52,12 @@ class TestDiagnosticsRawBlocks:
             "connection_type": "usb",
             "device": "/dev/ttyUSB0",
         }
-        config_entry.runtime_data = {
-            "device": mock_device,
-            "coordinators": coordinators,
-        }
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "device": mock_device,
+                "coordinators": coordinators,
+            }
+        )
 
         # Call diagnostics
         result = await async_get_config_entry_diagnostics(hass, config_entry)
@@ -97,10 +101,12 @@ class TestDiagnosticsRawBlocks:
         config_entry.title = "Test THZ"
         config_entry.version = 1
         config_entry.data = {"connection_type": "usb", "device": "/dev/ttyUSB0"}
-        config_entry.runtime_data = {
-            "device": mock_device,
-            "coordinators": coordinators,
-        }
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "device": mock_device,
+                "coordinators": coordinators,
+            }
+        )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 
@@ -127,10 +133,12 @@ class TestDiagnosticsRawBlocks:
         config_entry.title = "Test THZ"
         config_entry.version = 1
         config_entry.data = {"connection_type": "usb", "device": "/dev/ttyUSB0"}
-        config_entry.runtime_data = {
-            "device": mock_device,
-            "coordinators": {},
-        }
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "device": mock_device,
+                "coordinators": {},
+            }
+        )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 
@@ -164,10 +172,12 @@ class TestDiagnosticsRawBlocks:
         config_entry.title = "Test THZ"
         config_entry.version = 1
         config_entry.data = {"connection_type": "usb", "device": "/dev/ttyUSB0"}
-        config_entry.runtime_data = {
-            "device": mock_device,
-            "coordinators": coordinators,
-        }
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "device": mock_device,
+                "coordinators": coordinators,
+            }
+        )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 

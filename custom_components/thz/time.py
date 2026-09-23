@@ -6,12 +6,10 @@ from datetime import time
 import logging
 
 from homeassistant.components.time import TimeEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from ._typing_compat import get_runtime_data
 from .base_entity import THZBaseEntity
 from .const import (
     TIME_VALUE_UNSET,
@@ -21,6 +19,7 @@ from .const import (
 from .devices import assign_subdevices
 from .entity_translations import get_translation_key
 from .register_maps.register_map_manager import RegisterMapManagerWrite
+from .runtime_data import THZConfigEntry
 from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -200,18 +199,18 @@ def _create_time_entities(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: THZConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up THZ Time entities from a config entry."""
     # Use platform setup for both "time" and "schedule" types
-    entry_data = get_runtime_data(config_entry)
-    write_manager: RegisterMapManagerWrite = entry_data["write_manager"]
-    device: THZDevice = entry_data["device"]
-    device_id = entry_data["device_id"]
-    entity_id_style = entry_data.get("entity_id_style", "default")
-    entity_visibility = entry_data.get("entity_visibility", "default")
-    entity_id_prefix = entry_data.get("entity_id_prefix")
+    entry_data = config_entry.runtime_data
+    write_manager: RegisterMapManagerWrite = entry_data.write_manager
+    device: THZDevice = entry_data.device
+    device_id = entry_data.device_id
+    entity_id_style = entry_data.entity_id_style
+    entity_visibility = entry_data.entity_visibility
+    entity_id_prefix = entry_data.entity_id_prefix
 
     from .const import DEFAULT_WRITE_INTERVAL
 

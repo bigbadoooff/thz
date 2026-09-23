@@ -17,6 +17,7 @@ from custom_components.thz.const import (
     ENTITY_VISIBILITY_ALL,
     ENTITY_VISIBILITY_DEFAULT,
 )
+from tests.helpers import make_runtime_data
 
 _F5_REAL = [
     ("hc2SetpointTemp:", 16, 4, "hex2int", 10, {}),
@@ -34,15 +35,17 @@ def _setup(enable_hc2, f5_entries=_F5_REAL):
     )
     config_entry = MagicMock()
     config_entry.data = {"enable_hc2": enable_hc2}
-    config_entry.runtime_data = {
-        "coordinators": {"pxxF5": MagicMock()},
-        "device": MagicMock(),
-        "device_id": "dev",
-        "write_manager": MagicMock(
-            get_all_registers=MagicMock(return_value=_HC2_WRITE)
-        ),
-        "register_manager": register_manager,
-    }
+    config_entry.runtime_data = make_runtime_data(
+        **{
+            "coordinators": {"pxxF5": MagicMock()},
+            "device": MagicMock(),
+            "device_id": "dev",
+            "write_manager": MagicMock(
+                get_all_registers=MagicMock(return_value=_HC2_WRITE)
+            ),
+            "register_manager": register_manager,
+        }
+    )
     added = []
     add = MagicMock(side_effect=lambda ents, *a: added.extend(ents))
     return config_entry, add, added

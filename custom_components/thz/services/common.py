@@ -3,36 +3,34 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 
 from ..const import DOMAIN
+from ..runtime_data import THZRuntimeData, loaded_runtime_data
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def _loaded_entries(hass: HomeAssistant, key: str) -> dict[str, dict[str, Any]]:
-    """Return the runtime data of every loaded THZ entry that carries ``key``."""
-    # An unloaded entry has no runtime_data attribute at all.
+def _loaded_entries(hass: HomeAssistant) -> dict[str, THZRuntimeData]:
+    """Return the runtime data of every loaded THZ entry by entry id."""
     return {
         entry.entry_id: data
         for entry in hass.config_entries.async_entries(DOMAIN)
-        if isinstance(data := getattr(entry, "runtime_data", None), dict)
-        and key in data
+        if (data := loaded_runtime_data(entry)) is not None
     }
 
 
 def _require_target_entry_data(
     hass: HomeAssistant, requested_entry_id: str | None
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str, THZRuntimeData]:
     """Resolve the target THZ config-entry id and data for a service call.
 
     Raises ServiceValidationError when entry_id is unknown, when it is omitted
     while several entries are loaded, or when no THZ entry is loaded at all.
     """
-    available_entries = _loaded_entries(hass, "device")
+    available_entries = _loaded_entries(hass)
 
     if requested_entry_id:
         entry_data = available_entries.get(requested_entry_id)
@@ -87,7 +85,7 @@ async def async_refresh_block(
         ``True`` if at least one coordinator was refreshed, ``False`` otherwise.
     """
     normalized = _normalize_block_name(block)
-    available_entries = _loaded_entries(hass, "coordinators")
+    available_entries = _loaded_entries(hass)
 
     if entry_id:
         entry_data = available_entries.get(entry_id)
@@ -102,7 +100,7 @@ async def async_refresh_block(
 
     found = False
     for entry_data in candidates:
-        coordinator = entry_data["coordinators"].get(normalized)
+        coordinator = entry_data.coordinators.get(normalized)
         if coordinator is not None:
             await coordinator.async_request_refresh()
             _LOGGER.debug("Refreshed coordinator for block %s", normalized)
