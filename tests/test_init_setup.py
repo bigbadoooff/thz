@@ -185,6 +185,21 @@ class TestAsyncSetupEntry:
         assert set(stored["coordinators"]) == {"pxxFB", "pxxF2"}
 
     @pytest.mark.asyncio
+    async def test_all_blocks_deselected_polls_nothing(self):
+        # Reconfigure with every read block deselected stores {}; that must
+        # not fall back to polling every available block.
+        hass = _mock_hass()
+        entry = _mock_config_entry(refresh_intervals={})
+        device = _fake_device(blocks=["pxxFB", "pxxF2"])
+        factory = MagicMock(side_effect=lambda *a, **kw: _fake_coordinator())
+
+        with _patched_setup(device=device, coordinator_factory=factory):
+            await thz_module.async_setup_entry(hass, entry)
+
+        assert entry.runtime_data["coordinators"] == {}
+        factory.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_no_refresh_intervals_and_no_available_blocks_creates_none(self):
         hass = _mock_hass()
         entry = _mock_config_entry()

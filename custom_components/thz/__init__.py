@@ -134,11 +134,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     # 6. Prepare dict for storing all coordinators
     coordinators = {}
-    refresh_intervals = config_entry.data.get("refresh_intervals", {})
+    # An explicitly empty dict means the user deselected every read block
+    # (Reconfigure); only a missing key (entries from very old versions)
+    # falls back to polling all available blocks.
+    refresh_intervals = config_entry.data.get("refresh_intervals")
 
-    # If refresh_intervals is empty or missing, populate with defaults
-    # for all available blocks
-    if not refresh_intervals:
+    if refresh_intervals is None:
         available_blocks = device.available_reading_blocks
         if available_blocks:
             _LOGGER.warning(
@@ -157,6 +158,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 "and no refresh_intervals in config"
             )
             # Continue with empty dict - no coordinators or sensors will be created
+            refresh_intervals = {}
     else:
         _LOGGER.debug(
             "Creating coordinators with refresh intervals: %s", refresh_intervals
