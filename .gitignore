@@ -8,6 +8,7 @@ __pycache__/
 
 # Testing
 .pytest_cache/
+.hypothesis/
 htmlcov/
 .coverage
 deploy.ps1
