@@ -90,72 +90,72 @@ class TestTHZDeviceProtocol:
     def test_checksum_calculation(self):
         """Test checksum calculation."""
         device = THZDevice(connection="usb", port="/dev/null")
-        data = b'\x01\x00\x00\xfb'
+        data = b"\x01\x00\x00\xfb"
 
         checksum = device.thz_checksum(data)
 
         # Sum: 0x01 + 0x00 + 0xfb (skip index 2) = 0xfc
-        assert checksum == b'\xfc'
+        assert checksum == b"\xfc"
 
     def test_checksum_with_overflow(self):
         """Test checksum with modulo 256."""
         device = THZDevice(connection="usb", port="/dev/null")
-        data = b'\xff\xff\x00\xff'
+        data = b"\xff\xff\x00\xff"
 
         checksum = device.thz_checksum(data)
 
         # Sum: 0xff + 0xff + 0xff = 0x2fd, mod 256 = 0xfd
-        assert checksum == b'\xfd'
+        assert checksum == b"\xfd"
 
     def test_escape_0x10(self):
         """Test escaping 0x10 byte."""
         device = THZDevice(connection="usb", port="/dev/null")
-        data = b'\x10'
+        data = b"\x10"
 
         escaped = device.escape(data)
 
-        assert escaped == b'\x10\x10'
+        assert escaped == b"\x10\x10"
 
     def test_escape_0x2b(self):
         """Test escaping 0x2B byte."""
         device = THZDevice(connection="usb", port="/dev/null")
-        data = b'\x2b'
+        data = b"\x2b"
 
         escaped = device.escape(data)
 
-        assert escaped == b'\x2b\x18'
+        assert escaped == b"\x2b\x18"
 
     def test_escape_mixed_data(self):
         """Test escaping mixed data."""
         device = THZDevice(connection="usb", port="/dev/null")
-        data = b'\x01\x10\x2b\x03'
+        data = b"\x01\x10\x2b\x03"
 
         escaped = device.escape(data)
 
-        assert escaped == b'\x01\x10\x10\x2b\x18\x03'
+        assert escaped == b"\x01\x10\x10\x2b\x18\x03"
 
     def test_unescape_0x10(self):
         """Test unescaping 0x10 sequence."""
         device = THZDevice(connection="usb", port="/dev/null")
-        data = b'\x10\x10'
+        data = b"\x10\x10"
 
         unescaped = device.unescape(data)
 
-        assert unescaped == b'\x10'
+        assert unescaped == b"\x10"
 
     def test_unescape_0x2b(self):
         """Test unescaping 0x2B sequence."""
         device = THZDevice(connection="usb", port="/dev/null")
-        data = b'\x2b\x18'
+        data = b"\x2b\x18"
 
         unescaped = device.unescape(data)
 
-        assert unescaped == b'\x2b'
+        assert unescaped == b"\x2b"
 
     def test_round_trip_escape_unescape(self):
         """Test escape and unescape are inverse operations."""
         device = THZDevice(connection="usb", port="/dev/null")
-        original = b'\x01\x10\x2b\x03'
+        original = b"\x01\x10\x2b\x03"
 
         escaped = device.escape(original)
         unescaped = device.unescape(escaped)
@@ -165,29 +165,29 @@ class TestTHZDeviceProtocol:
     def test_construct_telegram_basic(self):
         """Test constructing a basic telegram."""
         device = THZDevice(connection="usb", port="/dev/null")
-        addr_bytes = b'\xfb'
-        header = b'\x01\x00'
-        footer = b'\x10\x03'
-        checksum = b'\x5a'
+        addr_bytes = b"\xfb"
+        header = b"\x01\x00"
+        footer = b"\x10\x03"
+        checksum = b"\x5a"
 
         telegram = device.construct_telegram(addr_bytes, header, footer, checksum)
 
         # Should be: header + escaped(checksum + addr_bytes) + footer
-        assert telegram == b'\x01\x00\x5a\xfb\x10\x03'
+        assert telegram == b"\x01\x00\x5a\xfb\x10\x03"
 
     def test_construct_telegram_with_escaping(self):
         """Test telegram construction with escaping."""
         device = THZDevice(connection="usb", port="/dev/null")
-        addr_bytes = b'\x10'  # Needs escaping
-        header = b'\x01\x00'
-        footer = b'\x10\x03'
-        checksum = b'\x20'
+        addr_bytes = b"\x10"  # Needs escaping
+        header = b"\x01\x00"
+        footer = b"\x10\x03"
+        checksum = b"\x20"
 
         telegram = device.construct_telegram(addr_bytes, header, footer, checksum)
 
         # checksum + addr_bytes = b'\x20\x10'
         # After escaping: b'\x20\x10\x10'
-        assert telegram == b'\x01\x00\x20\x10\x10\x10\x03'
+        assert telegram == b"\x01\x00\x20\x10\x10\x10\x03"
 
 
 class TestFirmwareVersion:
@@ -218,7 +218,7 @@ class TestWriteBlockValue:
         [CRC] + [address echo] + [data].
         """
         device = THZDevice(connection="usb", port="/dev/null")
-        simulated_response = b"\xAB" + block_addr + block_data
+        simulated_response = b"\xab" + block_addr + block_data
 
         call_log = []
 
@@ -240,7 +240,7 @@ class TestWriteBlockValue:
         block_data = bytes(range(20))
         device, call_log = self._make_device_with_block(b"\x17", block_data)
 
-        device.write_block_value(b"\x17", offset=2, length=2, value=b"\xAA\xBB")
+        device.write_block_value(b"\x17", offset=2, length=2, value=b"\xaa\xbb")
 
         assert len(call_log) == 2
         assert call_log[0] == (b"\x17", "get", b"")
@@ -248,20 +248,20 @@ class TestWriteBlockValue:
         assert addr == b"\x17"
         assert mode == "set"
         expected = bytearray(block_data)
-        expected[0:2] = b"\xAA\xBB"
+        expected[0:2] = b"\xaa\xbb"
         assert written_payload == bytes(expected)
 
     def test_write_block_value_preserves_other_bytes(self):
         """Test that write_block_value does not disturb other bytes in the block."""
-        block_data = b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A"
+        block_data = b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a"
         device, call_log = self._make_device_with_block(b"\x06", block_data)
 
         # offset 6 in the decoded response -> data index 4
-        device.write_block_value(b"\x06", offset=6, length=2, value=b"\xFF\xFE")
+        device.write_block_value(b"\x06", offset=6, length=2, value=b"\xff\xfe")
 
         _, _, written = call_log[1]
         assert written[0:4] == block_data[0:4]
-        assert written[4:6] == b"\xFF\xFE"
+        assert written[4:6] == b"\xff\xfe"
         assert written[6:] == block_data[6:]
 
     def test_write_block_value_wrong_length_raises(self):
@@ -270,7 +270,10 @@ class TestWriteBlockValue:
 
         with pytest.raises(ValueError, match="value length"):
             device.write_block_value(
-                b"\x17", offset=2, length=2, value=b"\xAA"  # 1 byte, expected 2
+                b"\x17",
+                offset=2,
+                length=2,
+                value=b"\xaa",  # 1 byte, expected 2
             )
 
     def test_write_block_value_out_of_range_raises(self):
@@ -279,7 +282,7 @@ class TestWriteBlockValue:
 
         with pytest.raises(ValueError, match="out of range"):
             # offset=6 -> data index 4; length=2 needs data[4:6] but len is 5.
-            device.write_block_value(b"\x17", offset=6, length=2, value=b"\xAA\xBB")
+            device.write_block_value(b"\x17", offset=6, length=2, value=b"\xaa\xbb")
 
     def test_write_block_value_offset_inside_header_raises(self):
         """Offsets pointing at the CRC or address echo are rejected."""
@@ -299,7 +302,7 @@ class TestWriteBlockValue:
     def test_write_block_value_sends_fhem_compatible_telegram(self):
         """Golden test on the wire: the SET telegram carries the address once."""
         device = THZDevice(connection="usb", port="/dev/null")
-        data = bytes.fromhex("17" "00C8" "00AA" "0064")
+        data = bytes.fromhex("1700C800AA0064")
         crc = device.thz_checksum(b"\x01\x00\x00" + data)
         reply = b"\x01\x00" + crc + data + b"\x10\x03"
         sent = []
@@ -309,12 +312,11 @@ class TestWriteBlockValue:
             return reply if get_or_set == "get" else b""
 
         device.send_request = fake_send_request
-        device.write_block_value(b"\x17", offset=2, length=2, value=b"\x00\xD2")
+        device.write_block_value(b"\x17", offset=2, length=2, value=b"\x00\xd2")
 
-        new_data = bytes.fromhex("17" "00D2" "00AA" "0064")
+        new_data = bytes.fromhex("1700D200AA0064")
         new_crc = device.thz_checksum(b"\x01\x80\x00" + new_data)
         assert sent[1] == b"\x01\x80" + new_crc + new_data + b"\x10\x03"
-
 
 
 class TestFirmwareOverride:
@@ -333,9 +335,7 @@ class TestFirmwareOverride:
 
     def test_firmware_override_stored(self):
         """Test that a configured override is stored on the device."""
-        device = THZDevice(
-            connection="usb", port="/dev/null", firmware_override="539"
-        )
+        device = THZDevice(connection="usb", port="/dev/null", firmware_override="539")
         assert device._firmware_override == "539"
 
     def test_no_override_uses_detected_firmware(self):
@@ -346,9 +346,7 @@ class TestFirmwareOverride:
 
     def test_auto_override_uses_detected_firmware(self):
         """Test that an explicit "auto" override behaves like no override."""
-        device = THZDevice(
-            connection="usb", port="/dev/null", firmware_override="auto"
-        )
+        device = THZDevice(connection="usb", port="/dev/null", firmware_override="auto")
         device._firmware_version = "438"
         assert device._resolve_effective_firmware() == "438"
 

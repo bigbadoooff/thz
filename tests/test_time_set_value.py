@@ -47,21 +47,25 @@ class TestTimeEntityOverridePoint:
     def test_thz_time_defines_async_set_value(self):
         """THZTime must override async_set_value (the real TimeEntity hook)."""
         from custom_components.thz.time import THZTime
+
         assert "async_set_value" in vars(THZTime)
 
     def test_thz_time_does_not_define_async_set_native_value(self):
         """async_set_native_value is the Number/Select convention, not Time's."""
         from custom_components.thz.time import THZTime
+
         assert "async_set_native_value" not in vars(THZTime)
 
     def test_thz_schedule_time_defines_async_set_value(self):
         """THZScheduleTime must override async_set_value too."""
         from custom_components.thz.time import THZScheduleTime
+
         assert "async_set_value" in vars(THZScheduleTime)
 
     def test_thz_schedule_time_does_not_define_async_set_native_value(self):
         """Same regression guard for the schedule start/end entity."""
         from custom_components.thz.time import THZScheduleTime
+
         assert "async_set_native_value" not in vars(THZScheduleTime)
 
 
@@ -71,6 +75,7 @@ class TestTHZTimeSetValue:
     @staticmethod
     def _make_entity(device):
         from custom_components.thz.time import THZTime
+
         entity = THZTime(
             name="Test Time",
             entry={"command": "0B0005"},
@@ -150,6 +155,7 @@ class TestTHZScheduleTimeSetValue:
     @staticmethod
     def _make_entity(device, time_type):
         from custom_components.thz.time import THZScheduleTime
+
         entity = THZScheduleTime(
             name=f"Test Schedule {time_type.title()}",
             base_name="programHC1_Mo_0",

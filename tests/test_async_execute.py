@@ -4,6 +4,7 @@ The worker thread of a timed-out call cannot be cancelled; these tests check
 that it can no longer reconnect or talk to the device, and that the lock is
 held until it has finished, so it never overlaps with the next caller.
 """
+
 import asyncio
 import threading
 import time
@@ -54,8 +55,10 @@ async def test_abandoned_worker_neither_reconnects_nor_overlaps_next_call():
     def worker_done(*_args):
         events.append(("worker done", time.monotonic()))
 
-    with patch.object(device, "_exchange_once", side_effect=exchange), \
-            patch.object(device, "_connect_tcp") as connect:
+    with (
+        patch.object(device, "_exchange_once", side_effect=exchange),
+        patch.object(device, "_connect_tcp") as connect,
+    ):
         original = device._run_abandonable
 
         def tracked(*args):

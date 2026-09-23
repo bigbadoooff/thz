@@ -4,6 +4,7 @@ Complements tests/test_diagnostics_raw_blocks.py by exercising the
 register_manager / write_manager branches, coordinator timestamp/interval
 formatting, and missing entry_data / device defaults.
 """
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -177,8 +178,11 @@ class TestDiagnosticsMissingEntryData:
         hass = MagicMock()
         config_entry = _make_config_entry(
             data={
-                "host": "10.0.0.5", "device": "/dev/ttyUSB0",
-                "alias": "Keller", "area": "Basement", "other": "value",
+                "host": "10.0.0.5",
+                "device": "/dev/ttyUSB0",
+                "alias": "Keller",
+                "area": "Basement",
+                "other": "value",
             }
         )
         config_entry.title = "THZ (ip: 10.0.0.5)"

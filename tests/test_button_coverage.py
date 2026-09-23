@@ -1,4 +1,5 @@
 """Coverage tests for button.py (THZButton entity and async_setup_entry)."""
+
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
@@ -139,9 +140,7 @@ class TestTHZButtonPress:
 
         entity = _make_entity()
         entity.hass = MagicMock()
-        entity._device.async_execute = AsyncMock(
-            side_effect=RuntimeError("boom")
-        )
+        entity._device.async_execute = AsyncMock(side_effect=RuntimeError("boom"))
 
         with pytest.raises(HomeAssistantError):
             await entity.async_press()

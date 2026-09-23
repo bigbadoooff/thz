@@ -1,4 +1,5 @@
 """Tests for the THZ climate platform."""
+
 from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.components.climate import HVACAction, HVACMode
@@ -26,16 +27,19 @@ class TestClimateModule:
     def test_import_climate_module(self):
         """Test that climate module can be imported."""
         from custom_components.thz import climate
+
         assert climate is not None
 
     def test_climate_has_async_setup_entry(self):
         """Test that climate module has async_setup_entry function."""
         from custom_components.thz.climate import async_setup_entry
+
         assert callable(async_setup_entry)
 
     def test_climate_has_entity_class(self):
         """Test that climate module has THZClimate class."""
         from custom_components.thz.climate import THZClimate
+
         assert THZClimate is not None
 
 
@@ -50,13 +54,13 @@ class TestFieldLayout:
 
     def test_field_layout_converts_nibbles_to_bytes(self):
         from custom_components.thz.climate import _field_layout
-        manager = self._register_manager(
-            [("roomSetTemp:", 56, 4, "hex2int", 10, {})]
-        )
+
+        manager = self._register_manager([("roomSetTemp:", 56, 4, "hex2int", 10, {})])
         assert _field_layout(manager, "pxxF4", "roomSetTemp") == (28, 2)
 
     def test_field_layout_strips_trailing_colon_and_whitespace(self):
         from custom_components.thz.climate import _field_layout
+
         manager = self._register_manager(
             [(" roomSetTemp : ", 56, 4, "hex2int", 10, {})]
         )
@@ -64,27 +68,32 @@ class TestFieldLayout:
 
     def test_field_layout_returns_none_when_missing(self):
         from custom_components.thz.climate import _field_layout
+
         manager = self._register_manager([])
         assert _field_layout(manager, "pxxF4", "roomSetTemp") is None
 
     def test_field_layout_min_length_one(self):
         """A single-nibble field still yields byte length >= 1."""
         from custom_components.thz.climate import _field_layout
+
         manager = self._register_manager([("flag:", 10, 1, "bit0", 1, {})])
         assert _field_layout(manager, "pxxF2", "flag") == (5, 1)
 
     def test_bit_field_layout_parses_bit_index(self):
         from custom_components.thz.climate import _bit_field_layout
+
         manager = self._register_manager([("cooling:", 11, 1, "bit3", 1, {})])
         assert _bit_field_layout(manager, "pxx0A0176", "cooling") == (5, 3)
 
     def test_bit_field_layout_returns_none_for_non_bit_decode(self):
         from custom_components.thz.climate import _bit_field_layout
+
         manager = self._register_manager([("dhwTemp:", 4, 4, "hex2int", 10, {})])
         assert _bit_field_layout(manager, "pxxF3", "dhwTemp") is None
 
     def test_bit_field_layout_returns_none_when_missing(self):
         from custom_components.thz.climate import _bit_field_layout
+
         manager = self._register_manager([])
         assert _bit_field_layout(manager, "pxx0A0176", "cooling") is None
 
@@ -95,29 +104,34 @@ class TestClimateHelpers:
     def test_get_step_from_step_key(self):
         """_get_step returns float from 'step' key."""
         from custom_components.thz.climate import _get_step
+
         assert _get_step({"step": 0.1}) == pytest.approx(0.1)
 
     def test_get_step_from_factor_key(self):
         """_get_step falls back to 'factor' key."""
         from custom_components.thz.climate import _get_step
+
         assert _get_step({"factor": "0.1"}) == pytest.approx(0.1)
 
     def test_get_step_default(self):
         """_get_step returns 1.0 when neither key is present."""
         from custom_components.thz.climate import _get_step
+
         assert _get_step({}) == pytest.approx(1.0)
 
     def test_get_step_invalid_value_falls_back(self):
         """_get_step returns 1.0 when the value cannot be converted to float."""
         from custom_components.thz.climate import _get_step
+
         assert _get_step({"step": "not-a-number"}) == pytest.approx(1.0)
 
     def test_find_entry_returns_first_match(self):
         """_find_entry returns first entry with a command field."""
         from custom_components.thz.climate import _find_entry
+
         regs = {
             "p01RoomTempDayHC1": {"command": "0B0005", "step": 0.1},
-            "p01RoomTempDay":    {"command": "0B0006", "step": 1.0},
+            "p01RoomTempDay": {"command": "0B0006", "step": 1.0},
         }
         result = _find_entry(regs, ["p01RoomTempDayHC1", "p01RoomTempDay"])
         assert result is not None
@@ -126,8 +140,9 @@ class TestClimateHelpers:
     def test_find_entry_skips_missing_command(self):
         """_find_entry skips entries without a 'command' field."""
         from custom_components.thz.climate import _find_entry
+
         regs = {
-            "p01RoomTempDay":    {"step": 1.0},          # no command
+            "p01RoomTempDay": {"step": 1.0},  # no command
             "p01RoomTempDayHC1": {"command": "0B0005"},
         }
         result = _find_entry(regs, ["p01RoomTempDay", "p01RoomTempDayHC1"])
@@ -137,11 +152,13 @@ class TestClimateHelpers:
     def test_find_entry_returns_none_when_not_found(self):
         """_find_entry returns None when no candidate matches."""
         from custom_components.thz.climate import _find_entry
+
         assert _find_entry({}, ["p01RoomTempDayHC1"]) is None
 
     def test_read_temp_valid(self):
         """_read_temp decodes a signed 16-bit temperature correctly."""
         from custom_components.thz.climate import _read_temp
+
         # 215 big-endian → 21.5 °C (factor 10)
         data = bytes(10) + bytes([0x00, 0xD7]) + bytes(10)
         result = _read_temp(data, 10, 2)
@@ -150,11 +167,13 @@ class TestClimateHelpers:
     def test_read_temp_too_short(self):
         """_read_temp returns None when data is too short."""
         from custom_components.thz.climate import _read_temp
+
         assert _read_temp(b"\x00", 5, 2) is None
 
     def test_read_temp_negative_value(self):
         """_read_temp decodes negative (below zero) temperatures."""
         from custom_components.thz.climate import _read_temp
+
         # -50 as signed 16-bit big-endian → -5.0 °C (factor 10)
         data = (-50).to_bytes(2, byteorder="big", signed=True)
         assert _read_temp(data, 0, 2) == pytest.approx(-5.0)
@@ -162,6 +181,7 @@ class TestClimateHelpers:
     def test_read_op_mode_normal(self):
         """_read_op_mode maps opmodehc 'normal' (1) to HEAT."""
         from custom_components.thz.climate import _read_op_mode
+
         # value 1 → "normal" → HEAT
         data = bytes(24) + bytes([0x01]) + bytes(5)
         assert _read_op_mode(data, 24, 1) == HVACMode.HEAT
@@ -169,28 +189,33 @@ class TestClimateHelpers:
     def test_read_op_mode_standby(self):
         """_read_op_mode maps opmodehc 'standby' (3) to OFF."""
         from custom_components.thz.climate import _read_op_mode
+
         data = bytes(24) + bytes([0x03]) + bytes(5)
         assert _read_op_mode(data, 24, 1) == HVACMode.OFF
 
     def test_read_op_mode_setback_maps_to_heat(self):
         """_read_op_mode maps 'setback' (2) to HEAT."""
         from custom_components.thz.climate import _read_op_mode
+
         data = bytes(24) + bytes([0x02]) + bytes(5)
         assert _read_op_mode(data, 24, 1) == HVACMode.HEAT
 
     def test_read_op_mode_too_short_defaults_to_heat(self):
         """_read_op_mode defaults to HEAT when data is too short to decode."""
         from custom_components.thz.climate import _read_op_mode
+
         assert _read_op_mode(b"\x00", 24, 1) == HVACMode.HEAT
 
     def test_read_op_mode_raw_too_short_returns_none(self):
         """_read_op_mode_raw returns None when data is too short."""
         from custom_components.thz.climate import _read_op_mode_raw
+
         assert _read_op_mode_raw(b"\x00", 24, 1) is None
 
     def test_bit_active_true(self):
         """_bit_active returns True when the target bit is set."""
         from custom_components.thz.climate import _bit_active
+
         data = bytearray(10)
         data[5] = 1 << 3
         assert _bit_active(bytes(data), 5, 3) is True
@@ -198,11 +223,13 @@ class TestClimateHelpers:
     def test_bit_active_false(self):
         """_bit_active returns False when the target bit is clear."""
         from custom_components.thz.climate import _bit_active
+
         assert _bit_active(bytes(10), 5, 3) is False
 
     def test_bit_active_short_data(self):
         """_bit_active returns False for data shorter than byte_idx."""
         from custom_components.thz.climate import _bit_active
+
         assert _bit_active(b"\x00", 5, 3) is False
 
 
@@ -245,6 +272,7 @@ class TestTHZClimateEntity:
     ):
         """Instantiate an HC1-style THZClimate entity with minimal config."""
         from custom_components.thz.climate import THZClimate
+
         coordinator = TestTHZClimateEntity._make_coordinator(coord_data)
         device = device if device is not None else TestTHZClimateEntity._make_device()
         return THZClimate(
@@ -275,8 +303,11 @@ class TestTHZClimateEntity:
         """Entity with both cool switch and setpoint entries supports COOL."""
         cool_switch = {"command": "0B0287", "decode_type": "1clean"}
         cool_setpoint = {
-            "command": "0B0582", "step": 0.1, "decode_type": "5temp",
-            "min": "12", "max": "27",
+            "command": "0B0582",
+            "step": 0.1,
+            "decode_type": "5temp",
+            "min": "12",
+            "max": "27",
         }
         entity = self._make_hc1_entity(
             cool_switch_entry=cool_switch,
@@ -293,18 +324,21 @@ class TestTHZClimateEntity:
     def test_supported_features_none_without_setpoint_or_cooling(self):
         """No TARGET_TEMPERATURE feature when there's no writable setpoint at all."""
         from homeassistant.components.climate import ClimateEntityFeature
+
         entity = self._make_hc1_entity()
         features = entity._attr_supported_features
         assert not (features & ClimateEntityFeature.TARGET_TEMPERATURE)
 
     def test_preset_mode_feature_enabled_with_opmode_entry(self):
         from homeassistant.components.climate import ClimateEntityFeature
+
         entity = self._make_hc1_entity(opmode_entry={"command": "0A0001"})
         assert entity._attr_supported_features & ClimateEntityFeature.PRESET_MODE
         assert entity._attr_preset_modes is not None
 
     def test_fan_mode_feature_enabled_with_fan_stage_entry(self):
         from homeassistant.components.climate import ClimateEntityFeature
+
         entity = self._make_hc1_entity(fan_stage_entry={"command": "070001"})
         assert entity._attr_supported_features & ClimateEntityFeature.FAN_MODE
         assert entity._attr_fan_modes is not None
@@ -327,6 +361,7 @@ class TestTHZClimateEntity:
     def test_current_temperature_none_when_offset_none(self):
         """current_temperature is None when current_temp_offset is None (e.g. HC2)."""
         from custom_components.thz.climate import THZClimate
+
         entity = THZClimate(
             coordinator=self._make_coordinator(bytes(40)),
             cooling_coordinator=None,
@@ -353,7 +388,7 @@ class TestTHZClimateEntity:
         """
         data = bytearray(60)
         data[F4_INSIDE_TEMP_OFFSET] = 0x00
-        data[F4_INSIDE_TEMP_OFFSET + 1] = 0xCD   # 205 / 10 = 20.5
+        data[F4_INSIDE_TEMP_OFFSET + 1] = 0xCD  # 205 / 10 = 20.5
         entity = self._make_hc1_entity(coord_data=bytes(data))
         assert entity.current_temperature == pytest.approx(20.5)
 
@@ -372,7 +407,7 @@ class TestTHZClimateEntity:
         """
         data = bytearray(60)
         data[F4_ROOM_SET_TEMP_OFFSET] = 0x00
-        data[F4_ROOM_SET_TEMP_OFFSET + 1] = 0xD2   # 210 / 10 = 21.0
+        data[F4_ROOM_SET_TEMP_OFFSET + 1] = 0xD2  # 210 / 10 = 21.0
         entity = self._make_hc1_entity(coord_data=bytes(data))
         assert entity.target_temperature == pytest.approx(21.0)
 
@@ -418,8 +453,11 @@ class TestTHZClimateEntity:
         """hvac_mode is COOL when the cooling coordinator reports cooling active."""
         cool_switch = {"command": "0B0287", "decode_type": "1clean"}
         cool_setpoint = {
-            "command": "0B0582", "step": 0.1, "decode_type": "5temp",
-            "min": "12", "max": "27",
+            "command": "0B0582",
+            "step": 0.1,
+            "decode_type": "5temp",
+            "min": "12",
+            "max": "27",
         }
 
         hc1_data = bytearray(60)
@@ -520,8 +558,13 @@ class TestTHZClimateEntity:
 
     def test_min_max_temp_from_heat_entry(self):
         """min/max temp come from the heat setpoint entry bounds."""
-        heat_entry = {"command": "0B0005", "min": "12", "max": "32", "step": 0.1,
-                      "decode_type": "5temp"}
+        heat_entry = {
+            "command": "0B0005",
+            "min": "12",
+            "max": "32",
+            "step": 0.1,
+            "decode_type": "5temp",
+        }
         entity = self._make_hc1_entity(heat_entry=heat_entry)
         assert entity.min_temp == pytest.approx(12.0)
         assert entity.max_temp == pytest.approx(32.0)
@@ -529,6 +572,7 @@ class TestTHZClimateEntity:
     def test_min_max_temp_default_when_no_entry(self):
         """min/max temp fall back to defaults when no heat entry provided."""
         from custom_components.thz.climate import _DEFAULT_MAX_TEMP, _DEFAULT_MIN_TEMP
+
         entity = self._make_hc1_entity()
         assert entity.min_temp == pytest.approx(_DEFAULT_MIN_TEMP)
         assert entity.max_temp == pytest.approx(_DEFAULT_MAX_TEMP)
@@ -537,12 +581,18 @@ class TestTHZClimateEntity:
         """In COOL mode min/max come from the cooling setpoint bounds."""
         cool_switch = {"command": "0B0287", "decode_type": "1clean"}
         cool_setpoint = {
-            "command": "0B0582", "step": 0.1, "decode_type": "5temp",
-            "min": "12", "max": "27",
+            "command": "0B0582",
+            "step": 0.1,
+            "decode_type": "5temp",
+            "min": "12",
+            "max": "27",
         }
         heat_entry = {
-            "command": "0B0005", "min": "14", "max": "32",
-            "step": 0.1, "decode_type": "5temp",
+            "command": "0B0005",
+            "min": "14",
+            "max": "32",
+            "step": 0.1,
+            "decode_type": "5temp",
         }
 
         # Trigger COOL mode via cooling coordinator
@@ -565,6 +615,7 @@ class TestTHZClimateEntity:
     def test_device_info_uses_domain_and_device_id(self):
         """device_info links the entity to the correct device."""
         from custom_components.thz.const import DOMAIN
+
         entity = self._make_hc1_entity()
         assert (DOMAIN, "test_device") in entity.device_info["identifiers"]
 
@@ -573,6 +624,7 @@ class TestTHZClimateEntity:
     def test_dhw_entity_no_cooling_modes(self):
         """DHW climate entity never supports COOL mode."""
         from custom_components.thz.climate import THZClimate
+
         entity = THZClimate(
             coordinator=self._make_coordinator(bytes(40)),
             cooling_coordinator=None,
@@ -595,6 +647,7 @@ class TestTHZClimateEntity:
 
 def _is_coro(func):
     import asyncio
+
     return asyncio.iscoroutinefunction(func)
 
 
@@ -674,7 +727,9 @@ class TestTHZClimateAsyncAddedToHass:
             heat_setpoint_entry=None,
             cool_switch_entry={"command": "0B0287", "decode_type": "1clean"},
             cool_setpoint_entry={
-                "command": "0B0582", "step": 0.1, "decode_type": "5temp",
+                "command": "0B0582",
+                "step": 0.1,
+                "decode_type": "5temp",
             },
             fan_stage_entry={"command": "070001", "decode_type": "1clean"},
         )
@@ -736,7 +791,9 @@ class TestTHZClimateServiceCalls:
         entity = self._entity(
             cool_switch_entry=cool_switch,
             cool_setpoint_entry=cool_setpoint,
-            cooling_coordinator=TestTHZClimateEntity._make_coordinator(bytes(a176_data)),
+            cooling_coordinator=TestTHZClimateEntity._make_coordinator(
+                bytes(a176_data)
+            ),
             device=device,
         )
         entity.hass = MagicMock()
@@ -814,6 +871,7 @@ class TestTHZClimateServiceCalls:
     @pytest.mark.asyncio
     async def test_set_preset_mode_no_entry_is_noop(self):
         from homeassistant.components.climate import PRESET_COMFORT
+
         entity = self._entity()
         entity.hass = MagicMock()
         await entity.async_set_preset_mode(PRESET_COMFORT)
@@ -987,11 +1045,13 @@ class TestClimateAsyncSetupEntry:
     async def test_creates_hc1_and_dhw_entities(self):
         from custom_components.thz.climate import async_setup_entry
 
-        register_manager = self._register_manager({
-            "pxxF4": self._F4_ENTRIES,
-            "pxxF3": self._F3_ENTRIES,
-            "pxx0A0176": self._A176_ENTRIES,
-        })
+        register_manager = self._register_manager(
+            {
+                "pxxF4": self._F4_ENTRIES,
+                "pxxF3": self._F3_ENTRIES,
+                "pxx0A0176": self._A176_ENTRIES,
+            }
+        )
         coordinators = {
             "pxxF4": MagicMock(),
             "pxxF3": MagicMock(),
@@ -1000,7 +1060,9 @@ class TestClimateAsyncSetupEntry:
         write_registers = {
             "p01RoomTempDayHC1": HEAT_ENTRY,
             "p04DHWsetDayTemp": {
-                "command": "0B0006", "step": 0.1, "decode_type": "5temp",
+                "command": "0B0006",
+                "step": 0.1,
+                "decode_type": "5temp",
             },
         }
         hass, config_entry = self._make_hass(
@@ -1047,7 +1109,9 @@ class TestClimateAsyncSetupEntry:
         coordinators = {"pxxF5": MagicMock()}
         write_registers = {
             "p01RoomTempDayHC2": {
-                "command": "0B0007", "step": 0.1, "decode_type": "5temp",
+                "command": "0B0007",
+                "step": 0.1,
+                "decode_type": "5temp",
             },
         }
         hass, config_entry = self._make_hass(

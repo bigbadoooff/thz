@@ -4,6 +4,7 @@ Covers __init__ branches, _generate_unique_id, async_added_to_hass /
 async_will_remove_from_hass (periodic update timer subscribe/unsubscribe),
 _async_scheduled_update, extra_state_attributes and device_info.
 """
+
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 

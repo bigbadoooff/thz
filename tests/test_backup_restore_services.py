@@ -10,6 +10,7 @@ device clock via the dedicated pClock* helper rather than pulling it out of
 the "restorable parameters" dict (which filters out "pclean"-typed
 registers and would silently never see the clock at all).
 """
+
 from datetime import datetime, time as dt_time
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -74,7 +75,6 @@ async def _get_handler(hass, name: str):
 # ---------------------------------------------------------------------------
 
 
-
 def _reset_notifications():
     """Return the (stubbed) persistent_notification.async_create, reset."""
     from custom_components.thz import notify
@@ -82,6 +82,7 @@ def _reset_notifications():
     create = notify.persistent_notification.async_create
     create.reset_mock()
     return create
+
 
 class TestSanitizeLabel:
     """Tests for services._sanitize_label."""
@@ -475,7 +476,9 @@ def _sample_write_registers():
         "pClockDay": {"command": "0A0103", "type": "pclean", "decode_type": "0clean"},
         "pClockHour": {"command": "0A0104", "type": "pclean", "decode_type": "0clean"},
         "pClockMinutes": {
-            "command": "0A0105", "type": "pclean", "decode_type": "0clean",
+            "command": "0A0105",
+            "type": "pclean",
+            "decode_type": "0clean",
         },
         "HeatingCurve": {
             "command": "0A0200",
@@ -565,10 +568,12 @@ class TestBackupParametersService:
             buf.close = close
             return buf
 
-        with patch("custom_components.thz.services.dt_util", fake_dt_util), \
-             patch("custom_components.thz.clock_sync.dt_util", fake_dt_util), \
-             patch("os.makedirs"), \
-             patch("builtins.open", side_effect=fake_open):
+        with (
+            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("custom_components.thz.clock_sync.dt_util", fake_dt_util),
+            patch("os.makedirs"),
+            patch("builtins.open", side_effect=fake_open),
+        ):
             handler = await _get_handler(mock_hass, "backup_parameters")
             call = MagicMock()
             call.data = {"label": "my label!"}
@@ -651,10 +656,12 @@ class TestListParameterBackupsService:
 
         mock_hass.async_add_executor_job = AsyncMock(side_effect=fake_executor_job)
 
-        with patch("os.path.isdir", return_value=True), \
-             patch("os.listdir", return_value=files), \
-             patch("os.path.getsize", return_value=123), \
-             patch("builtins.open", side_effect=fake_open):
+        with (
+            patch("os.path.isdir", return_value=True),
+            patch("os.listdir", return_value=files),
+            patch("os.path.getsize", return_value=123),
+            patch("builtins.open", side_effect=fake_open),
+        ):
             handler = await _get_handler(mock_hass, "list_parameter_backups")
             call = MagicMock()
             call.data = {}
@@ -769,9 +776,11 @@ class TestRestoreParametersService:
         backup_doc = self._backup_doc()
         fake_dt_util, fake_open = self._patch_common(mock_hass, backup_doc, device)
 
-        with patch("custom_components.thz.services.dt_util", fake_dt_util), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", side_effect=fake_open):
+        with (
+            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", side_effect=fake_open),
+        ):
             handler = await _get_handler(mock_hass, "restore_parameters")
             call = MagicMock()
             call.data = {"filename": "thz_backup_x.json", "dry_run": True}
@@ -783,7 +792,8 @@ class TestRestoreParametersService:
         assert result["clock_synced"] is False
         # No device writes should have happened in dry-run mode.
         write_calls = [
-            c for c in device.async_execute.await_args_list
+            c
+            for c in device.async_execute.await_args_list
             if len(c.args) > 1 and c.args[1] is device.write_value
         ]
         assert write_calls == []
@@ -796,9 +806,11 @@ class TestRestoreParametersService:
         backup_doc = self._backup_doc()
         fake_dt_util, fake_open = self._patch_common(mock_hass, backup_doc, device)
 
-        with patch("custom_components.thz.services.dt_util", fake_dt_util), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", side_effect=fake_open):
+        with (
+            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", side_effect=fake_open),
+        ):
             handler = await _get_handler(mock_hass, "restore_parameters")
             call = MagicMock()
             call.data = {
@@ -821,9 +833,11 @@ class TestRestoreParametersService:
         backup_doc = self._backup_doc()
         fake_dt_util, fake_open = self._patch_common(mock_hass, backup_doc, device)
 
-        with patch("custom_components.thz.services.dt_util", fake_dt_util), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", side_effect=fake_open):
+        with (
+            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", side_effect=fake_open),
+        ):
             handler = await _get_handler(mock_hass, "restore_parameters")
             call = MagicMock()
             call.data = {"filename": "thz_backup_x.json", "dry_run": True}
@@ -869,9 +883,11 @@ class TestRestoreParametersService:
 
         device.async_execute = AsyncMock(side_effect=fake_execute)
 
-        with patch("custom_components.thz.services.dt_util", fake_dt_util), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", side_effect=fake_open):
+        with (
+            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", side_effect=fake_open),
+        ):
             handler = await _get_handler(mock_hass, "restore_parameters")
             call = MagicMock()
             call.data = {
@@ -928,9 +944,11 @@ class TestRestoreParametersService:
 
         device.async_execute = AsyncMock(side_effect=fake_execute)
 
-        with patch("custom_components.thz.services.dt_util", fake_dt_util), \
-             patch("os.path.isfile", return_value=True), \
-             patch("builtins.open", side_effect=fake_open):
+        with (
+            patch("custom_components.thz.services.dt_util", fake_dt_util),
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", side_effect=fake_open),
+        ):
             handler = await _get_handler(mock_hass, "restore_parameters")
             call = MagicMock()
             call.data = {"filename": "thz_backup_x.json", "only": [], "dry_run": False}

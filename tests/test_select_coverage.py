@@ -1,4 +1,5 @@
 """Coverage tests for select.py (THZSelect entity and async_setup_entry)."""
+
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
@@ -150,9 +151,7 @@ class TestTHZSelectAvailability:
         entity = _make_entity(entry=_select_entry(decode_type="2opmode"))
         entity.hass = MagicMock()
         assert entity.available is True
-        entity._device.async_execute = AsyncMock(
-            side_effect=RuntimeError("comm error")
-        )
+        entity._device.async_execute = AsyncMock(side_effect=RuntimeError("comm error"))
 
         await entity.async_update()
 
@@ -221,8 +220,11 @@ class TestOptionsWithinMapBounds:
         from custom_components.thz.select import THZSelect
 
         entry = {
-            "command": "0A0575", "min": "0", "max": "2",
-            "type": "select", "decode_type": "passive_cooling",
+            "command": "0A0575",
+            "min": "0",
+            "max": "2",
+            "type": "select",
+            "decode_type": "passive_cooling",
         }
         select = THZSelect("p75passiveCooling", entry, MagicMock(), "dev")
         assert select._attr_options == ["off", "exhaust_air", "supply_air"]

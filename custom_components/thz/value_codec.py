@@ -25,9 +25,7 @@ def _dec_hex(raw: bytes, factor: float) -> int | float:
 
 def _dec_esp_mant(raw: bytes, factor: float) -> float:
     if len(raw) != 4:
-        raise ValueError(
-            f"Invalid esp_mant length: expected 4 bytes, got {len(raw)}"
-        )
+        raise ValueError(f"Invalid esp_mant length: expected 4 bytes, got {len(raw)}")
     try:
         mant: float = struct.unpack(">f", raw)[0]
     except struct.error as err:
@@ -44,9 +42,7 @@ def _dec_hexdate(raw: bytes, factor: float) -> str:
 
 def _dec_clockdate(raw: bytes, factor: float) -> str:
     if len(raw) != 3:
-        raise ValueError(
-            f"Invalid clockdate length: expected 3 bytes, got {len(raw)}"
-        )
+        raise ValueError(f"Invalid clockdate length: expected 3 bytes, got {len(raw)}")
     year = raw[0] + 2000
     month = raw[1]
     day = raw[2]
@@ -273,9 +269,7 @@ class THZValueCodec:
             value_int = round(value / step)
             # Negative values are two's complement; positive ones may use the
             # full unsigned range (e.g. 240 min in a single byte), as in FHEM.
-            return value_int.to_bytes(
-                length, byteorder="big", signed=value_int < 0
-            )
+            return value_int.to_bytes(length, byteorder="big", signed=value_int < 0)
 
     @staticmethod
     def decode_number(
@@ -388,7 +382,7 @@ class THZValueCodec:
             "Unknown value %s for decode_type %s, available: %s",
             value_str,
             decode_type,
-            list(SELECT_MAP[decode_type].keys())
+            list(SELECT_MAP[decode_type].keys()),
         )
         return None
 

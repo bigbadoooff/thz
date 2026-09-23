@@ -63,8 +63,9 @@ class _FakeConfigFlow(metaclass=_FakeConfigFlowMeta):
     context: dict = {}
     unique_id: str | None = None
 
-    def async_show_form(self, *, step_id, data_schema=None, errors=None,
-                         description_placeholders=None):
+    def async_show_form(
+        self, *, step_id, data_schema=None, errors=None, description_placeholders=None
+    ):
         return {
             "type": "form",
             "step_id": step_id,
@@ -219,24 +220,25 @@ class TestAsyncStepSetupIp:
     @pytest.mark.asyncio
     async def test_invalid_host_error(self, flow):
         result = await flow.async_step_setup_ip(
-            {CONF_HOST: "not a valid host!!", CONF_PORT: 2323,
-             "connection_type": CONNECTION_IP}
+            {
+                CONF_HOST: "not a valid host!!",
+                CONF_PORT: 2323,
+                "connection_type": CONNECTION_IP,
+            }
         )
         assert result["errors"][CONF_HOST] == "invalid_host"
 
     @pytest.mark.asyncio
     async def test_invalid_port_none(self, flow):
         result = await flow.async_step_setup_ip(
-            {CONF_HOST: "10.0.0.5", CONF_PORT: None,
-             "connection_type": CONNECTION_IP}
+            {CONF_HOST: "10.0.0.5", CONF_PORT: None, "connection_type": CONNECTION_IP}
         )
         assert result["errors"][CONF_PORT] == "invalid_port"
 
     @pytest.mark.asyncio
     async def test_invalid_port_out_of_range(self, flow):
         result = await flow.async_step_setup_ip(
-            {CONF_HOST: "10.0.0.5", CONF_PORT: 70000,
-             "connection_type": CONNECTION_IP}
+            {CONF_HOST: "10.0.0.5", CONF_PORT: 70000, "connection_type": CONNECTION_IP}
         )
         assert result["errors"][CONF_PORT] == "invalid_port"
 
@@ -247,11 +249,13 @@ class TestAsyncStepSetupIp:
         mock_device.firmware_version = "133"
         mock_device.available_reading_blocks = ["p01", "p02"]
 
-        with patch.object(config_flow_module, "THZDevice",
-                    return_value=mock_device):
+        with patch.object(config_flow_module, "THZDevice", return_value=mock_device):
             result = await flow.async_step_setup_ip(
-                {CONF_HOST: "  10.0.0.5  ", CONF_PORT: 2323,
-                 "connection_type": CONNECTION_IP}
+                {
+                    CONF_HOST: "  10.0.0.5  ",
+                    CONF_PORT: 2323,
+                    "connection_type": CONNECTION_IP,
+                }
             )
 
         # Host should have been stripped and stored.
@@ -298,8 +302,7 @@ class TestAsyncStepSetupUsb:
         mock_device.firmware_version = "426"
         mock_device.available_reading_blocks = ["p01"]
 
-        with patch.object(config_flow_module, "THZDevice",
-                    return_value=mock_device):
+        with patch.object(config_flow_module, "THZDevice", return_value=mock_device):
             result = await flow.async_step_setup_usb(
                 {
                     CONF_DEVICE: "/dev/ttyUSB0",
@@ -329,8 +332,9 @@ class TestAsyncStepDetectBlocks:
         mock_device.firmware_version = "319"
         mock_device.available_reading_blocks = ["p01", "p02", "p03"]
 
-        with patch.object(config_flow_module, "THZDevice",
-                    return_value=mock_device) as mock_cls:
+        with patch.object(
+            config_flow_module, "THZDevice", return_value=mock_device
+        ) as mock_cls:
             result = await flow.async_step_detect_blocks()
 
         mock_cls.assert_called_once_with(
@@ -352,12 +356,15 @@ class TestAsyncStepDetectBlocks:
         mock_device.firmware_version = "426"
         mock_device.available_reading_blocks = ["p01"]
 
-        with patch.object(config_flow_module, "THZDevice",
-                    return_value=mock_device) as mock_cls:
+        with patch.object(
+            config_flow_module, "THZDevice", return_value=mock_device
+        ) as mock_cls:
             result = await flow.async_step_detect_blocks()
 
         mock_cls.assert_called_once_with(
-            connection="ip", host="10.0.0.5", tcp_port=2323,
+            connection="ip",
+            host="10.0.0.5",
+            tcp_port=2323,
             baudrate=DEFAULT_BAUDRATE,
         )
         assert result["step_id"] == "select_groups"
@@ -430,8 +437,7 @@ class TestAsyncStepDetectBlocks:
         mock_device = MagicMock()
         mock_device.async_initialize = AsyncMock(side_effect=OSError("boom"))
 
-        with patch.object(config_flow_module, "THZDevice",
-                    return_value=mock_device):
+        with patch.object(config_flow_module, "THZDevice", return_value=mock_device):
             result = await flow.async_step_detect_blocks()
 
         assert result == {"type": "abort", "reason": "cannot_detect_blocks"}
@@ -448,8 +454,7 @@ class TestAsyncStepDetectBlocks:
             side_effect=RuntimeError("firmware unknown")
         )
 
-        with patch.object(config_flow_module, "THZDevice",
-                    return_value=mock_device):
+        with patch.object(config_flow_module, "THZDevice", return_value=mock_device):
             result = await flow.async_step_detect_blocks()
 
         assert result == {"type": "abort", "reason": "cannot_detect_blocks"}
@@ -496,6 +501,7 @@ class TestAsyncStepRefreshBlocks:
         assert result["type"] == "create_entry"
         assert result["title"] == "THZ (usb: /dev/ttyUSB0)"
         from custom_components.thz.const import DEFAULT_WRITE_INTERVAL
+
         assert result["data"]["write_interval"] == DEFAULT_WRITE_INTERVAL
 
 
@@ -537,8 +543,9 @@ class TestAsyncStepReconfigure:
         flow.hass.config_entries.async_get_entry.return_value = entry
 
         with (
-            patch.object(config_flow_module.ar, "async_get",
-                  return_value=_fake_area_registry()),
+            patch.object(
+                config_flow_module.ar, "async_get", return_value=_fake_area_registry()
+            ),
             _no_serial_ports(),
         ):
             result = await flow.async_step_reconfigure()
@@ -563,8 +570,9 @@ class TestAsyncStepReconfigure:
         area.id = "living_room"
         area.name = "Living Room"
 
-        with patch.object(config_flow_module.ar, "async_get",
-                    return_value=_fake_area_registry([area])):
+        with patch.object(
+            config_flow_module.ar, "async_get", return_value=_fake_area_registry([area])
+        ):
             result = await flow.async_step_reconfigure()
 
         assert result["type"] == "form"
@@ -631,8 +639,9 @@ class TestReconfigureSchema:
     @pytest.mark.asyncio
     async def test_usb_branch_builds_device_and_baudrate_fields(self, flow):
         with (
-            patch.object(config_flow_module.ar, "async_get",
-                  return_value=_fake_area_registry()),
+            patch.object(
+                config_flow_module.ar, "async_get", return_value=_fake_area_registry()
+            ),
             _no_serial_ports(),
             patch.object(config_flow_module.vol, "Required") as mock_required,
         ):
@@ -647,8 +656,9 @@ class TestReconfigureSchema:
     @pytest.mark.asyncio
     async def test_ip_branch_builds_host_and_port_fields(self, flow):
         with (
-            patch.object(config_flow_module.ar, "async_get",
-                  return_value=_fake_area_registry()),
+            patch.object(
+                config_flow_module.ar, "async_get", return_value=_fake_area_registry()
+            ),
             patch.object(config_flow_module.vol, "Required") as mock_required,
         ):
             await flow.reconfigure_schema(
@@ -662,8 +672,9 @@ class TestReconfigureSchema:
     @pytest.mark.asyncio
     async def test_defaults_none_falls_back_to_empty_dict(self, flow):
         with (
-            patch.object(config_flow_module.ar, "async_get",
-                  return_value=_fake_area_registry()),
+            patch.object(
+                config_flow_module.ar, "async_get", return_value=_fake_area_registry()
+            ),
             _no_serial_ports(),
         ):
             schema = await flow.reconfigure_schema(None)
@@ -674,8 +685,9 @@ class TestReconfigureSchema:
     @pytest.mark.asyncio
     async def test_refresh_intervals_and_write_interval_fields_built(self, flow):
         with (
-            patch.object(config_flow_module.ar, "async_get",
-                  return_value=_fake_area_registry()),
+            patch.object(
+                config_flow_module.ar, "async_get", return_value=_fake_area_registry()
+            ),
             _no_serial_ports(),
             patch.object(config_flow_module.vol, "Optional") as mock_optional,
         ):

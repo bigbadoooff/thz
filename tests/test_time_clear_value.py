@@ -43,10 +43,12 @@ class TestClearValueOverridePoint:
 
     def test_thz_time_defines_async_clear_value(self):
         from custom_components.thz.time import THZTime
+
         assert "async_clear_value" in vars(THZTime)
 
     def test_thz_schedule_time_defines_async_clear_value(self):
         from custom_components.thz.time import THZScheduleTime
+
         assert "async_clear_value" in vars(THZScheduleTime)
 
 
@@ -56,6 +58,7 @@ class TestThzTimeClearValue:
     @staticmethod
     def _make_entity(device):
         from custom_components.thz.time import THZTime
+
         entity = THZTime(
             name="Test Time",
             entry={"command": "0B0005"},
@@ -99,6 +102,7 @@ class TestThzScheduleTimeClearValue:
     @staticmethod
     def _make_entity(device, time_type):
         from custom_components.thz.time import THZScheduleTime
+
         entity = THZScheduleTime(
             name=f"Test Schedule {time_type.title()}",
             base_name="programHC1_Mo_0",

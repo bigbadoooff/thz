@@ -8,6 +8,7 @@ speed/airflow/power) at all, distinct from the already-implemented
 p80EnableSolar (on/off switch), solar_pump (running-status bit), and the
 p07/08/09/12/43-46/99 fan-stage *setting* write entities.
 """
+
 import pytest
 
 from custom_components.thz.register_maps import readings_map_439
@@ -39,9 +40,9 @@ class TestSolarBlockDefinition:
         self, index, name, offset, length, decode, factor
     ):
         entries = readings_map_439.REGISTER_MAP["pxx16"]
-        entry_name, entry_offset, entry_length, entry_decode, entry_factor = (
-            entries[index][:5]
-        )
+        entry_name, entry_offset, entry_length, entry_decode, entry_factor = entries[
+            index
+        ][:5]
         assert entry_name.strip().rstrip(":") == name
         assert (entry_offset, entry_length, entry_decode, entry_factor) == (
             offset,
@@ -74,9 +75,9 @@ class TestFanBlockDefinition:
     )
     def test_entries_match_fhem_e8fan(self, index, name, offset, length):
         entries = readings_map_439.REGISTER_MAP["pxxE8"]
-        entry_name, entry_offset, entry_length, entry_decode, _factor = (
-            entries[index][:5]
-        )
+        entry_name, entry_offset, entry_length, entry_decode, _factor = entries[index][
+            :5
+        ]
         assert entry_name.strip().rstrip(":") == name
         assert (entry_offset, entry_length, entry_decode) == (offset, length, "hex")
 

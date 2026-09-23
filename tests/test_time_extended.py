@@ -40,8 +40,8 @@ class TestTimeConversionEdgeCases:
     def test_time_to_quarters_rounding_comprehensive(self):
         """Test comprehensive rounding behavior."""
         # Test values that should round down
-        assert time_to_quarters(time(10, 1)) == 40   # Rounds to 10:00
-        assert time_to_quarters(time(10, 7)) == 40   # Rounds to 10:00
+        assert time_to_quarters(time(10, 1)) == 40  # Rounds to 10:00
+        assert time_to_quarters(time(10, 7)) == 40  # Rounds to 10:00
         assert time_to_quarters(time(10, 14)) == 40  # Rounds to 10:00
 
         # Test values at quarter boundaries
@@ -105,6 +105,7 @@ class TestTimeModuleConstants:
     def test_time_value_unset_constant(self):
         """Test TIME_VALUE_UNSET constant value."""
         from custom_components.thz.time import TIME_VALUE_UNSET as TIME_UNSET_LOCAL
+
         assert TIME_UNSET_LOCAL == 0x80
         assert TIME_UNSET_LOCAL == 128
 

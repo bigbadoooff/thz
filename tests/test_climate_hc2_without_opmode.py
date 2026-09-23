@@ -93,12 +93,19 @@ class TestHc2DisabledByDefault:
 
     def test_other_climate_entities_are_unaffected(self):
         entity = THZClimate(
-            coordinator=MagicMock(), cooling_coordinator=None, device=MagicMock(),
-            device_id="dev", translation_key="heating_circuit",
-            current_temp_offset=0, current_temp_length=2,
-            target_temp_offset=2, target_temp_length=2,
-            op_mode_offset=4, op_mode_length=1,
-            heat_setpoint_entry=None, cool_switch_entry=None,
+            coordinator=MagicMock(),
+            cooling_coordinator=None,
+            device=MagicMock(),
+            device_id="dev",
+            translation_key="heating_circuit",
+            current_temp_offset=0,
+            current_temp_length=2,
+            target_temp_offset=2,
+            target_temp_length=2,
+            op_mode_offset=4,
+            op_mode_length=1,
+            heat_setpoint_entry=None,
+            cool_switch_entry=None,
             cool_setpoint_entry=None,
         )
         assert entity.entity_registry_enabled_default is True
@@ -127,6 +134,8 @@ class TestVisibilityReconcile:
 
     def test_hc1_climate_is_never_hidden(self):
         assert not _entity_should_be_hidden(
-            "thz_dev_climate_heating_circuit", "heating circuit",
-            ENTITY_VISIBILITY_DEFAULT, False,
+            "thz_dev_climate_heating_circuit",
+            "heating circuit",
+            ENTITY_VISIBILITY_DEFAULT,
+            False,
         )

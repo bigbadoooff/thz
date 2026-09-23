@@ -60,8 +60,10 @@ def _make_dhw_entity(*, night_setpoint_entry=None, manual_setpoint_entry=None):
 
 def _mock_read_setpoint(values: dict):
     """Return a fake _async_read_setpoint bound to specific entry -> value pairs."""
+
     async def _read(entry):
         return values.get(id(entry))
+
     return _read
 
 

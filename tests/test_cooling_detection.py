@@ -42,9 +42,7 @@ class TestProbeCoolingSupport:
         """Probe failure defaults to cooling supported (safe fallback)."""
         device = THZDevice(connection="usb", port="/dev/null")
 
-        with patch.object(
-            device, "read_block", side_effect=RuntimeError("timeout")
-        ):
+        with patch.object(device, "read_block", side_effect=RuntimeError("timeout")):
             assert device._probe_cooling_support() is True
 
     def test_probe_returns_true_on_connection_error(self):
@@ -143,9 +141,7 @@ class TestRegisterMapManagerHasCooling:
         """206 firmware maps are not affected by has_cooling flag."""
         manager_with = RegisterMapManager("206", has_cooling=True)
         manager_without = RegisterMapManager("206", has_cooling=False)
-        assert (
-            manager_with.readings_map_names == manager_without.readings_map_names
-        )
+        assert manager_with.readings_map_names == manager_without.readings_map_names
 
     def test_539_firmware_no_cooling_filters_539_entries(self):
         """Explicit 5.39 firmware keeps 5.39 maps but filters cooling entries."""

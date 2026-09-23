@@ -5,6 +5,7 @@ should_hide_entity_by_default() for the "default" tier (backward
 compatibility -- see test_const.py for the exhaustive should_hide_entity_by_default
 test suite, which must keep passing unchanged after the classifier refactor).
 """
+
 import pytest
 
 from custom_components.thz.const import (
@@ -54,7 +55,7 @@ VISIBLE_NAMES = [
 
 
 class TestShouldHideEntityDefaultTier:
-    """"default" tier must exactly match should_hide_entity_by_default()."""
+    """The "default" tier must exactly match should_hide_entity_by_default()."""
 
     @pytest.mark.parametrize("name", SCHEDULE_NAMES + HC2_NAMES + ADVANCED_NAMES)
     def test_hidden_names_match_legacy_function(self, name):
@@ -75,7 +76,7 @@ class TestShouldHideEntityDefaultTier:
 
 
 class TestShouldHideEntityExtendedTier:
-    """"extended" tier hides ONLY schedule/program entities.
+    """The "extended" tier hides ONLY schedule/program entities.
 
     HC2 is gated separately by enable_hc2, independent of the tier -- see
     TestShouldHideEntityHC2Flag.
@@ -99,7 +100,7 @@ class TestShouldHideEntityExtendedTier:
 
 
 class TestShouldHideEntityAllTier:
-    """"all" tier hides nothing EXCEPT HC2.
+    """The "all" tier hides nothing EXCEPT HC2.
 
     HC2 is gated independently by enable_hc2 regardless of tier -- see
     TestShouldHideEntityHC2Flag.

@@ -1,4 +1,5 @@
 """THZ Switch Entity Platform."""
+
 from __future__ import annotations
 
 import logging
@@ -35,8 +36,6 @@ async def async_setup_entry(
     await async_setup_write_platform(
         hass, config_entry, async_add_entities, THZSwitch, "switch"
     )
-
-
 
 
 class THZSwitch(THZBaseEntity, SwitchEntity):
@@ -91,9 +90,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
 
     async def async_update(self) -> None:
         """Update the switch state by reading the current value from the device."""
-        _LOGGER.debug(
-            "Updating switch %s with command %s", self.name, self._command
-        )
+        _LOGGER.debug("Updating switch %s with command %s", self.name, self._command)
 
         value_bytes = await self._async_read_register(
             WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH
@@ -108,9 +105,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             self._is_on = THZValueCodec.decode_switch(value_bytes)
             _LOGGER.debug("Decoded switch state for %s: %s", self.name, self._is_on)
         except (ValueError, IndexError, TypeError) as err:
-            _LOGGER.error(
-                "Error decoding switch %s: %s", self.name, err, exc_info=True
-            )
+            _LOGGER.error("Error decoding switch %s: %s", self.name, err, exc_info=True)
             # Keep previous value on error
 
     async def async_turn_on(self, **kwargs: Any) -> None:
@@ -132,8 +127,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
         except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
             _LOGGER.error(
-                "Error encoding switch %s to turn on: %s",
-                self.name, err, exc_info=True
+                "Error encoding switch %s to turn on: %s", self.name, err, exc_info=True
             )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
@@ -156,5 +150,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
         except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
             _LOGGER.error(
                 "Error encoding switch %s to turn off: %s",
-                self.name, err, exc_info=True
+                self.name,
+                err,
+                exc_info=True,
             )

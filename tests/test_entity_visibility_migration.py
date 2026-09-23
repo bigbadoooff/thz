@@ -84,7 +84,8 @@ class TestApplyEntityVisibilityTier:
 
         ent_reg = fake_ent_reg
         disabled_ids = {
-            call.args[0] for call in ent_reg.async_update_entity.call_args_list
+            call.args[0]
+            for call in ent_reg.async_update_entity.call_args_list
             if call.kwargs.get("disabled_by") == er.RegistryEntryDisabler.INTEGRATION
         }
         assert disabled_ids == {
@@ -105,10 +106,12 @@ class TestApplyEntityVisibilityTier:
     async def test_same_tier_is_a_noop(self):
         """Re-running with the same already-applied tier touches nothing."""
         hass = _make_hass()
-        config_entry = _make_config_entry({
-            "entity_visibility": "default",
-            "_entity_visibility_applied": "default",
-        })
+        config_entry = _make_config_entry(
+            {
+                "entity_visibility": "default",
+                "_entity_visibility_applied": "default",
+            }
+        )
 
         with (
             patch.object(er, "async_get") as mock_async_get,
@@ -128,24 +131,32 @@ class TestApplyEntityVisibilityTier:
         and isn't set here; schedules stay hidden.
         """
         hass = _make_hass()
-        config_entry = _make_config_entry({
-            "entity_visibility": "extended",
-            "_entity_visibility_applied": "default",
-        })
+        config_entry = _make_config_entry(
+            {
+                "entity_visibility": "extended",
+                "_entity_visibility_applied": "default",
+            }
+        )
 
         integration_disabled = er.RegistryEntryDisabler.INTEGRATION
         entries = [
             _entity(
-                "time.programhc1_mo_0_start", "thz_..._programhc1_mo_0",
-                "programHC1_Mo_0", disabled_by=integration_disabled,
+                "time.programhc1_mo_0_start",
+                "thz_..._programhc1_mo_0",
+                "programHC1_Mo_0",
+                disabled_by=integration_disabled,
             ),
             _entity(
-                "number.hc2_flow_setpoint", "thz_..._hc2_flow",
-                "HC2 Flow Setpoint", disabled_by=integration_disabled,
+                "number.hc2_flow_setpoint",
+                "thz_..._hc2_flow",
+                "HC2 Flow Setpoint",
+                disabled_by=integration_disabled,
             ),
             _entity(
-                "number.p21_hyst1", "thz_..._p21hyst1",
-                "p21Hyst1", disabled_by=integration_disabled,
+                "number.p21_hyst1",
+                "thz_..._p21hyst1",
+                "p21Hyst1",
+                disabled_by=integration_disabled,
             ),
         ]
 
@@ -182,18 +193,22 @@ class TestApplyEntityVisibilityTier:
         The tier/flag change detection has to track both independently.
         """
         hass = _make_hass()
-        config_entry = _make_config_entry({
-            "entity_visibility": "default",
-            "_entity_visibility_applied": "default",
-            "enable_hc2": True,
-            # _entity_hc2_applied intentionally omitted -> defaults to False
-        })
+        config_entry = _make_config_entry(
+            {
+                "entity_visibility": "default",
+                "_entity_visibility_applied": "default",
+                "enable_hc2": True,
+                # _entity_hc2_applied intentionally omitted -> defaults to False
+            }
+        )
 
         integration_disabled = er.RegistryEntryDisabler.INTEGRATION
         entries = [
             _entity(
-                "number.hc2_flow_setpoint", "thz_..._hc2_flow",
-                "HC2 Flow Setpoint", disabled_by=integration_disabled,
+                "number.hc2_flow_setpoint",
+                "thz_..._hc2_flow",
+                "HC2 Flow Setpoint",
+                disabled_by=integration_disabled,
             ),
         ]
 
@@ -224,18 +239,22 @@ class TestApplyEntityVisibilityTier:
         happens to match what was submitted.
         """
         hass = _make_hass()
-        config_entry = _make_config_entry({
-            "entity_visibility": "extended",
-            "_entity_visibility_applied": "extended",
-            "enable_hc2": False,
-            # _entity_hc2_applied intentionally absent -- simulates an entry
-            # that has never gone through hc2-aware reconciliation before.
-        })
+        config_entry = _make_config_entry(
+            {
+                "entity_visibility": "extended",
+                "_entity_visibility_applied": "extended",
+                "enable_hc2": False,
+                # _entity_hc2_applied intentionally absent -- simulates an entry
+                # that has never gone through hc2-aware reconciliation before.
+            }
+        )
 
         entries = [
             _entity(
-                "number.hc2_flow_setpoint", "thz_..._hc2_flow",
-                "HC2 Flow Setpoint", disabled_by=None,  # currently enabled
+                "number.hc2_flow_setpoint",
+                "thz_..._hc2_flow",
+                "HC2 Flow Setpoint",
+                disabled_by=None,  # currently enabled
             ),
         ]
 
@@ -262,11 +281,13 @@ class TestApplyEntityVisibilityTier:
         for entries that were never affected.
         """
         hass = _make_hass()
-        config_entry = _make_config_entry({
-            "entity_visibility": "default",
-            "_entity_visibility_applied": "default",
-            # enable_hc2 and _entity_hc2_applied both absent -> both infer False
-        })
+        config_entry = _make_config_entry(
+            {
+                "entity_visibility": "default",
+                "_entity_visibility_applied": "default",
+                # enable_hc2 and _entity_hc2_applied both absent -> both infer False
+            }
+        )
 
         with (
             patch.object(er, "async_get") as mock_async_get,
@@ -282,12 +303,14 @@ class TestApplyEntityVisibilityTier:
     async def test_same_tier_and_hc2_flag_is_a_noop(self):
         """Re-running with both the tier AND the hc2 flag unchanged touches nothing."""
         hass = _make_hass()
-        config_entry = _make_config_entry({
-            "entity_visibility": "extended",
-            "_entity_visibility_applied": "extended",
-            "enable_hc2": True,
-            "_entity_hc2_applied": True,
-        })
+        config_entry = _make_config_entry(
+            {
+                "entity_visibility": "extended",
+                "_entity_visibility_applied": "extended",
+                "enable_hc2": True,
+                "_entity_hc2_applied": True,
+            }
+        )
 
         with (
             patch.object(er, "async_get") as mock_async_get,
@@ -303,10 +326,12 @@ class TestApplyEntityVisibilityTier:
     async def test_never_touches_user_disabled_entity(self):
         """An entity the user disabled themselves must never be re-enabled."""
         hass = _make_hass()
-        config_entry = _make_config_entry({
-            "entity_visibility": "all",
-            "_entity_visibility_applied": "default",
-        })
+        config_entry = _make_config_entry(
+            {
+                "entity_visibility": "all",
+                "_entity_visibility_applied": "default",
+            }
+        )
 
         user_disabled = MagicMock(name="USER_disabler_sentinel")
         # Ensure this sentinel is distinguishable from INTEGRATION's sentinel
@@ -314,8 +339,10 @@ class TestApplyEntityVisibilityTier:
 
         entries = [
             _entity(
-                "time.programhc1_mo_0_start", "thz_..._programhc1_mo_0",
-                "programHC1_Mo_0", disabled_by=user_disabled,
+                "time.programhc1_mo_0_start",
+                "thz_..._programhc1_mo_0",
+                "programHC1_Mo_0",
+                disabled_by=user_disabled,
             ),
         ]
 
@@ -333,10 +360,12 @@ class TestApplyEntityVisibilityTier:
     async def test_legacy_migrated_flag_treated_as_default_tier_applied(self):
         """A migrated=True entry still on 'default' is already reconciled."""
         hass = _make_hass()
-        config_entry = _make_config_entry({
-            "entity_visibility": "default",
-            "_hidden_entities_migrated": True,
-        })
+        config_entry = _make_config_entry(
+            {
+                "entity_visibility": "default",
+                "_hidden_entities_migrated": True,
+            }
+        )
 
         with (
             patch.object(er, "async_get") as mock_async_get,
@@ -351,16 +380,20 @@ class TestApplyEntityVisibilityTier:
     async def test_legacy_migrated_flag_still_reconciles_on_tier_change(self):
         """A migrated=True entry switched to 'all' must still trigger reconciliation."""
         hass = _make_hass()
-        config_entry = _make_config_entry({
-            "entity_visibility": "all",
-            "_hidden_entities_migrated": True,
-        })
+        config_entry = _make_config_entry(
+            {
+                "entity_visibility": "all",
+                "_hidden_entities_migrated": True,
+            }
+        )
 
         integration_disabled = er.RegistryEntryDisabler.INTEGRATION
         entries = [
             _entity(
-                "time.programhc1_mo_0_start", "thz_..._programhc1_mo_0",
-                "programHC1_Mo_0", disabled_by=integration_disabled,
+                "time.programhc1_mo_0_start",
+                "thz_..._programhc1_mo_0",
+                "programHC1_Mo_0",
+                disabled_by=integration_disabled,
             ),
         ]
 

@@ -3,6 +3,7 @@
 Guards against orphan translation_key entries (icons.json referencing a key
 with no matching strings.json name) and malformed icon values.
 """
+
 import json
 import pathlib
 
@@ -58,8 +59,14 @@ class TestIconsJsonStructure:
         # json.load already collapses duplicate keys, so this just documents
         # the expected domain set stays within known HA entity platforms.
         known_domains = {
-            "sensor", "binary_sensor", "number", "switch",
-            "select", "time", "button", "climate",
+            "sensor",
+            "binary_sensor",
+            "number",
+            "switch",
+            "select",
+            "time",
+            "button",
+            "climate",
         }
         assert set(icons_json["entity"]) <= known_domains
 

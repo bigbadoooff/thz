@@ -79,7 +79,7 @@ async def async_setup_write_platform(
                 "Creating %s for %s with command %s",
                 entity_type.__name__,
                 name,
-                entry["command"]
+                entry["command"],
             )
 
             entity = entity_type(
@@ -97,4 +97,3 @@ async def async_setup_write_platform(
 
     _LOGGER.info("Created %d %s entities", len(entities), platform_type)
     async_add_entities(entities, True)
-

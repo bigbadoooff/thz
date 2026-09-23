@@ -1,6 +1,5 @@
 """Tests for constants and utility functions."""
 
-
 from custom_components.thz.const import (
     CONF_CONNECTION_TYPE,
     CONNECTION_IP,
@@ -198,6 +197,7 @@ class TestShouldHideEntityByDefault:
         translation fix) instead of the internal entity name.  The fix extracts
         the internal name from the unique_id using split("_", 3)[3].
         """
+
         def extract_name(unique_id: str) -> str:
             """Simulate the extraction logic used in __init__.py."""
             if unique_id.startswith("thz_set_"):

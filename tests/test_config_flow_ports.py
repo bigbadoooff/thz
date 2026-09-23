@@ -31,14 +31,17 @@ from unittest.mock import MagicMock, patch
 # fresh with the proper base class.
 # ---------------------------------------------------------------------------
 
+
 class _FakeConfigFlowMeta(type):
     """Metaclass that silently swallows class-keyword arguments like domain=."""
+
     def __new__(mcs, name, bases, namespace, **_kwargs):
         return super().__new__(mcs, name, bases, namespace)
 
 
 class _FakeConfigFlow(metaclass=_FakeConfigFlowMeta):
     """Stand-in base class for config_entries.ConfigFlow."""
+
     context: dict = {}
 
 
@@ -69,6 +72,7 @@ from custom_components.thz.config_flow import THZConfigFlow  # noqa: E402
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_port(device: str, description: str) -> MagicMock:
     """Create a mock serial port object."""
     p = MagicMock()
@@ -81,7 +85,11 @@ class TestListSerialPorts:
     """Unit tests for THZConfigFlow._list_serial_ports()."""
 
     def _call(
-        self, ports, by_id_dir_exists, by_id_entries, realpath_map,
+        self,
+        ports,
+        by_id_dir_exists,
+        by_id_entries,
+        realpath_map,
         current_device=None,
     ):
         """Call _list_serial_ports with mocked OS / pyserial."""
@@ -632,9 +640,7 @@ class TestEntityVisibilityOption:
         flow.async_create_entry = fake_create_entry
 
         asyncio.run(
-            flow.async_step_refresh_blocks(
-                {"write_interval": DEFAULT_UPDATE_INTERVAL}
-            )
+            flow.async_step_refresh_blocks({"write_interval": DEFAULT_UPDATE_INTERVAL})
         )
 
         assert captured["data"][CONF_ENTITY_VISIBILITY] == "extended"
@@ -724,11 +730,7 @@ class TestAliasOption:
         flow.async_create_entry = fake_create_entry
 
         asyncio.run(
-            flow.async_step_refresh_blocks(
-                {"write_interval": DEFAULT_UPDATE_INTERVAL}
-            )
+            flow.async_step_refresh_blocks({"write_interval": DEFAULT_UPDATE_INTERVAL})
         )
 
         assert captured["data"]["alias"] == "lwz"
-
-

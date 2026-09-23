@@ -1,6 +1,5 @@
 """Tests for entity translation mappings."""
 
-
 from custom_components.thz.entity_translations import (
     ENTITY_TRANSLATION_KEYS,
     get_translation_key,

@@ -7,6 +7,7 @@ through the real config-entry, entity-registry, translation and service
 machinery. Only the serial/TCP line is replaced by FakeTHZDevice, a real
 THZDevice whose send_request answers from in-memory registers.
 """
+
 from __future__ import annotations
 
 from collections.abc import Generator
@@ -84,7 +85,8 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 def fake_device() -> Generator[type[FakeTHZDevice]]:
     """Replace the device class used by setup and the config flow."""
     FakeTHZDevice.instances = []
-    with patch("custom_components.thz.THZDevice", FakeTHZDevice), patch(
-        "custom_components.thz.config_flow.THZDevice", FakeTHZDevice
+    with (
+        patch("custom_components.thz.THZDevice", FakeTHZDevice),
+        patch("custom_components.thz.config_flow.THZDevice", FakeTHZDevice),
     ):
         yield FakeTHZDevice

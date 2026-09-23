@@ -187,12 +187,18 @@ class BaseRegisterMapManager:
             filtered_map = self._filter_cooling_entries(module_name, filtered_map)
         return filtered_map
 
-    def _filter_cooling_entries(self, module_name: str, register_map: dict[str, Any]) -> dict[str, Any]:
+    def _filter_cooling_entries(
+        self, module_name: str, register_map: dict[str, Any]
+    ) -> dict[str, Any]:
         """Remove cooling-only entries from 5.39 maps for non-cooling devices."""
         if module_name == "readings_map_539":
-            return {k: v for k, v in register_map.items() if k not in _COOLING_READ_BLOCKS}
+            return {
+                k: v for k, v in register_map.items() if k not in _COOLING_READ_BLOCKS
+            }
         if module_name == "write_map_539":
-            return {k: v for k, v in register_map.items() if k not in _COOLING_WRITE_KEYS}
+            return {
+                k: v for k, v in register_map.items() if k not in _COOLING_WRITE_KEYS
+            }
         return register_map
 
     def _normalize_name(self, name: Any) -> Any:
@@ -242,7 +248,8 @@ class BaseRegisterMapManager:
                         override_names = set()
                     # Keep entries from base that are not in override, then add all override entries
                     merged[block] = [
-                        e for e in merged[block]
+                        e
+                        for e in merged[block]
                         if self._normalize_name(e[0]) not in override_names
                     ] + entries
                 else:
@@ -385,7 +392,11 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
                     factor: float = float(entry[4]) if entry[4] else 1.0
                     if raw_name and raw_name not in param_lookup:
                         param_lookup[raw_name] = (
-                            hex_addr, offset, length, factor, decode_type
+                            hex_addr,
+                            offset,
+                            length,
+                            factor,
+                            decode_type,
                         )
 
         # The running firmware's merged read map (what its sensors decode) is
@@ -403,7 +414,12 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
                 raw_name = entry[0].strip().rstrip(":").strip()
                 own_layout.setdefault(
                     (raw_name, block_key[3:].upper()),
-                    (entry[1], entry[2], float(entry[4]) if entry[4] else 1.0, entry[3]),
+                    (
+                        entry[1],
+                        entry[2],
+                        float(entry[4]) if entry[4] else 1.0,
+                        entry[3],
+                    ),
                 )
 
         # Load the parent→block-address mapping from write_map_206.
@@ -468,4 +484,3 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
             # "ptime" entries are left unchanged for now (different encoding needed).
             if entry.get("type") == "pclean":
                 entry["type"] = "number"
-

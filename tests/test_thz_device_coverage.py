@@ -94,10 +94,13 @@ class TestConnectSerial:
 
     def test_connect_serial_propagates_error(self):
         device = _make_device(port="/dev/ttyUSB0")
-        with patch(
-            "custom_components.thz.thz_device.serial.Serial",
-            side_effect=OSError("no such device"),
-        ), pytest.raises(OSError):
+        with (
+            patch(
+                "custom_components.thz.thz_device.serial.Serial",
+                side_effect=OSError("no such device"),
+            ),
+            pytest.raises(OSError),
+        ):
             device._connect_serial()
 
 
@@ -236,9 +239,10 @@ class TestReconnect:
 
     def test_reconnect_propagates_connect_error(self):
         device = _make_device(connection="usb")
-        with patch.object(
-            device, "_connect_serial", side_effect=OSError("no device")
-        ), pytest.raises(OSError):
+        with (
+            patch.object(device, "_connect_serial", side_effect=OSError("no device")),
+            pytest.raises(OSError),
+        ):
             device._reconnect()
 
 
@@ -250,25 +254,30 @@ class TestReconnect:
 class TestHandshake1:
     def test_handshake1_success(self):
         device = _make_device()
-        with patch.object(device, "_write_bytes") as mock_write, patch.object(
-            device, "_read_exact", return_value=b"\x10"
-        ) as mock_read:
+        with (
+            patch.object(device, "_write_bytes") as mock_write,
+            patch.object(device, "_read_exact", return_value=b"\x10") as mock_read,
+        ):
             device._do_handshake_1(1.0)
         mock_write.assert_called_once_with(b"\x02")
         mock_read.assert_called_once_with(1, 1.0)
 
     def test_handshake1_wrong_byte_raises(self):
         device = _make_device()
-        with patch.object(device, "_write_bytes"), patch.object(
-            device, "_read_exact", return_value=b"\x05"
-        ), pytest.raises(RuntimeError, match="Handshake 1 failed"):
+        with (
+            patch.object(device, "_write_bytes"),
+            patch.object(device, "_read_exact", return_value=b"\x05"),
+            pytest.raises(RuntimeError, match="Handshake 1 failed"),
+        ):
             device._do_handshake_1(1.0)
 
     def test_handshake1_no_data_raises(self):
         device = _make_device()
-        with patch.object(device, "_write_bytes"), patch.object(
-            device, "_read_exact", return_value=b""
-        ), pytest.raises(RuntimeError, match="no data"):
+        with (
+            patch.object(device, "_write_bytes"),
+            patch.object(device, "_read_exact", return_value=b""),
+            pytest.raises(RuntimeError, match="no data"),
+        ):
             device._do_handshake_1(1.0)
 
 
@@ -286,25 +295,25 @@ class TestHandshake2:
 
     def test_handshake2_split_dle_then_stx(self):
         device = _make_device()
-        with patch.object(
-            device, "_read_exact", side_effect=[b"\x10", b"\x02"]
-        ):
+        with patch.object(device, "_read_exact", side_effect=[b"\x10", b"\x02"]):
             device._do_handshake_2(1.0)
 
     def test_handshake2_split_dle_then_stx_with_fw2_delay(self):
         device = _make_device()
         device._firmware_version = "206"
-        with patch.object(
-            device, "_read_exact", side_effect=[b"\x10", b"\x02"]
-        ), patch("custom_components.thz.thz_device.time.sleep") as mock_sleep:
+        with (
+            patch.object(device, "_read_exact", side_effect=[b"\x10", b"\x02"]),
+            patch("custom_components.thz.thz_device.time.sleep") as mock_sleep,
+        ):
             device._do_handshake_2(1.0)
         mock_sleep.assert_called_once_with(0.005)
 
     def test_handshake2_split_dle_then_wrong_byte_raises(self):
         device = _make_device()
-        with patch.object(
-            device, "_read_exact", side_effect=[b"\x10", b"\x99"]
-        ), pytest.raises(RuntimeError, match="Handshake 2 failed"):
+        with (
+            patch.object(device, "_read_exact", side_effect=[b"\x10", b"\x99"]),
+            pytest.raises(RuntimeError, match="Handshake 2 failed"),
+        ):
             device._do_handshake_2(1.0)
 
     def test_handshake2_split_dle_then_no_data_raises(self):
@@ -334,8 +343,9 @@ class TestReceiveDataTelegram:
     def test_receive_data_telegram_success(self):
         device = _make_device()
         telegram = b"\x01\x00\xce\x00\xc8\x05\x10\x03"
-        with patch.object(device, "_write_bytes") as mock_write, patch.object(
-            device, "_read_available", side_effect=[telegram]
+        with (
+            patch.object(device, "_write_bytes") as mock_write,
+            patch.object(device, "_read_available", side_effect=[telegram]),
         ):
             result = device._receive_data_telegram(1.0)
         mock_write.assert_called_once_with(b"\x10")
@@ -344,26 +354,31 @@ class TestReceiveDataTelegram:
     def test_receive_data_telegram_accumulates_chunks(self):
         device = _make_device()
         chunks = [b"\x01\x00\xce", b"\x00\xc8\x05", b"\x10\x03"]
-        with patch.object(device, "_write_bytes"), patch.object(
-            device, "_read_available", side_effect=chunks
+        with (
+            patch.object(device, "_write_bytes"),
+            patch.object(device, "_read_available", side_effect=chunks),
         ):
             result = device._receive_data_telegram(1.0)
         assert result == b"\x01\x00\xce\x00\xc8\x05\x10\x03"
 
     def test_receive_data_telegram_timeout_raises(self):
         device = _make_device()
-        with patch.object(device, "_write_bytes"), patch.object(
-            device, "_read_available", return_value=b""
-        ), pytest.raises(RuntimeError, match="No valid response"):
+        with (
+            patch.object(device, "_write_bytes"),
+            patch.object(device, "_read_available", return_value=b""),
+            pytest.raises(RuntimeError, match="No valid response"),
+        ):
             device._receive_data_telegram(0.03)
 
     def test_receive_data_telegram_incomplete_data_raises(self):
         device = _make_device()
         # Never reaches the 8-byte + DLE/ETX terminator condition.
         chunks = itertools.chain([b"\x01\x02"], itertools.repeat(b""))
-        with patch.object(device, "_write_bytes"), patch.object(
-            device, "_read_available", side_effect=chunks
-        ), pytest.raises(RuntimeError, match="No valid response"):
+        with (
+            patch.object(device, "_write_bytes"),
+            patch.object(device, "_read_available", side_effect=chunks),
+            pytest.raises(RuntimeError, match="No valid response"),
+        ):
             device._receive_data_telegram(0.03)
 
 
@@ -436,67 +451,82 @@ class TestSendRequest:
 
     def test_send_request_connection_error_then_success(self):
         device = _make_device()
-        with patch.object(
-            device,
-            "_exchange_once",
-            side_effect=[ConnectionError("dropped"), b"ok"],
-        ), patch.object(device, "_reconnect") as mock_reconnect:
+        with (
+            patch.object(
+                device,
+                "_exchange_once",
+                side_effect=[ConnectionError("dropped"), b"ok"],
+            ),
+            patch.object(device, "_reconnect") as mock_reconnect,
+        ):
             result = device.send_request(b"telegram", "get")
         assert result == b"ok"
         mock_reconnect.assert_called_once()
 
     def test_send_request_connection_error_exhausts_retries(self):
         device = _make_device()
-        with patch.object(
-            device,
-            "_exchange_once",
-            side_effect=[ConnectionError("a"), ConnectionError("b")],
-        ), patch.object(device, "_reconnect"):
+        with (
+            patch.object(
+                device,
+                "_exchange_once",
+                side_effect=[ConnectionError("a"), ConnectionError("b")],
+            ),
+            patch.object(device, "_reconnect"),
+        ):
             with pytest.raises(ConnectionError, match="Connection failed after 2"):
                 device.send_request(b"telegram", "get")
 
     def test_send_request_connection_error_reconnect_fails(self):
         device = _make_device()
-        with patch.object(
-            device, "_exchange_once", side_effect=[ConnectionError("a")]
-        ), patch.object(device, "_reconnect", side_effect=OSError("no port")):
+        with (
+            patch.object(device, "_exchange_once", side_effect=[ConnectionError("a")]),
+            patch.object(device, "_reconnect", side_effect=OSError("no port")),
+        ):
             with pytest.raises(ConnectionError, match="Connection failed after 2"):
                 device.send_request(b"telegram", "get")
 
     def test_send_request_runtime_error_then_success(self):
         device = _make_device()
-        with patch.object(
-            device,
-            "_exchange_once",
-            side_effect=[RuntimeError("proto"), b"ok2"],
-        ), patch.object(device, "_reconnect") as mock_reconnect:
+        with (
+            patch.object(
+                device,
+                "_exchange_once",
+                side_effect=[RuntimeError("proto"), b"ok2"],
+            ),
+            patch.object(device, "_reconnect") as mock_reconnect,
+        ):
             result = device.send_request(b"telegram", "get")
         assert result == b"ok2"
         mock_reconnect.assert_called_once()
 
     def test_send_request_runtime_error_exhausts_retries(self):
         device = _make_device()
-        with patch.object(
-            device,
-            "_exchange_once",
-            side_effect=[RuntimeError("first"), RuntimeError("second")],
-        ), patch.object(device, "_reconnect"):
+        with (
+            patch.object(
+                device,
+                "_exchange_once",
+                side_effect=[RuntimeError("first"), RuntimeError("second")],
+            ),
+            patch.object(device, "_reconnect"),
+        ):
             with pytest.raises(RuntimeError, match="second"):
                 device.send_request(b"telegram", "get")
 
     def test_send_request_runtime_error_reconnect_also_fails(self):
         device = _make_device()
-        with patch.object(
-            device, "_exchange_once", side_effect=[RuntimeError("proto")]
-        ), patch.object(device, "_reconnect", side_effect=OSError("no port")):
+        with (
+            patch.object(device, "_exchange_once", side_effect=[RuntimeError("proto")]),
+            patch.object(device, "_reconnect", side_effect=OSError("no port")),
+        ):
             with pytest.raises(RuntimeError, match="proto"):
                 device.send_request(b"telegram", "get")
 
     def test_send_request_unexpected_exception_wrapped(self):
         device = _make_device()
-        with patch.object(
-            device, "_exchange_once", side_effect=[ValueError("oops")]
-        ), pytest.raises(RuntimeError, match="Device communication failed"):
+        with (
+            patch.object(device, "_exchange_once", side_effect=[ValueError("oops")]),
+            pytest.raises(RuntimeError, match="Device communication failed"),
+        ):
             device.send_request(b"telegram", "get")
 
 
@@ -673,9 +703,9 @@ class TestFrameComplete:
     @pytest.mark.parametrize(
         ("hex_data", "complete"),
         [
-            ("0100aa1122334410" "03", True),
+            ("0100aa112233441003", True),
             # escaped data byte 0x10 followed by data byte 0x03: not the end
-            ("0100aa1122331010" "03", False),
+            ("0100aa112233101003", False),
             # escaped 0x10 as last data byte, then the real terminator
             ("0100aa11223310101003", True),
             ("0100aa1122334410", False),
@@ -691,8 +721,11 @@ class TestFrameComplete:
         # The first chunk ends right after "10 10 03", which used to be taken
         # for the terminator and truncated the frame.
         chunks = iter([frame[:9], frame[9:]])
-        with patch.object(device, "_write_bytes"), patch.object(
-            device, "_read_available", side_effect=lambda: next(chunks, b"")
+        with (
+            patch.object(device, "_write_bytes"),
+            patch.object(
+                device, "_read_available", side_effect=lambda: next(chunks, b"")
+            ),
         ):
             assert device._receive_data_telegram(1.0) == frame
 
@@ -815,11 +848,12 @@ class TestDecodeResponse:
 class TestReadWriteRegisterUnit:
     def test_read_write_register_get_returns_decoded(self):
         device = _make_device()
-        with patch.object(
-            device, "send_request", return_value=b"raw"
-        ) as mock_send, patch.object(
-            device, "decode_response", return_value=b"decoded"
-        ) as mock_decode:
+        with (
+            patch.object(device, "send_request", return_value=b"raw") as mock_send,
+            patch.object(
+                device, "decode_response", return_value=b"decoded"
+            ) as mock_decode,
+        ):
             result = device.read_write_register(b"\xfb", "get")
         assert result == b"decoded"
         mock_send.assert_called_once()
@@ -830,8 +864,9 @@ class TestReadWriteRegisterUnit:
 
     def test_read_write_register_get_decode_failure_raises(self):
         device = _make_device()
-        with patch.object(device, "send_request", return_value=b"raw"), patch.object(
-            device, "decode_response", return_value=None
+        with (
+            patch.object(device, "send_request", return_value=b"raw"),
+            patch.object(device, "decode_response", return_value=None),
         ):
             with pytest.raises(RuntimeError, match="Failed to decode"):
                 device.read_write_register(b"\xfb", "get")
@@ -936,9 +971,11 @@ class TestAsyncInitialize:
     @pytest.mark.asyncio
     async def test_async_initialize_usb_low_firmware_no_cooling_probe(self):
         device = _make_device(connection="usb")
-        with patch.object(device, "_connect_serial") as mock_connect, patch.object(
-            device, "read_firmware_version", return_value="206"
-        ), patch.object(device, "_probe_cooling_support") as mock_probe:
+        with (
+            patch.object(device, "_connect_serial") as mock_connect,
+            patch.object(device, "read_firmware_version", return_value="206"),
+            patch.object(device, "_probe_cooling_support") as mock_probe,
+        ):
             await device.async_initialize(FakeHass())
 
         mock_connect.assert_called_once()
@@ -951,11 +988,13 @@ class TestAsyncInitialize:
     @pytest.mark.asyncio
     async def test_async_initialize_ip_high_firmware_runs_cooling_probe(self):
         device = _make_device(connection="ip", host="h", tcp_port=1)
-        with patch.object(device, "_connect_tcp") as mock_connect, patch.object(
-            device, "read_firmware_version", return_value="539"
-        ), patch.object(
-            device, "_probe_cooling_support", return_value=False
-        ) as mock_probe:
+        with (
+            patch.object(device, "_connect_tcp") as mock_connect,
+            patch.object(device, "read_firmware_version", return_value="539"),
+            patch.object(
+                device, "_probe_cooling_support", return_value=False
+            ) as mock_probe,
+        ):
             await device.async_initialize(FakeHass())
 
         mock_connect.assert_called_once()
@@ -966,17 +1005,17 @@ class TestAsyncInitialize:
     @pytest.mark.asyncio
     async def test_async_initialize_high_firmware_with_cooling(self):
         device = _make_device(connection="usb")
-        with patch.object(device, "_connect_serial"), patch.object(
-            device, "read_firmware_version", return_value="539"
-        ), patch.object(device, "_probe_cooling_support", return_value=True):
+        with (
+            patch.object(device, "_connect_serial"),
+            patch.object(device, "read_firmware_version", return_value="539"),
+            patch.object(device, "_probe_cooling_support", return_value=True),
+        ):
             await device.async_initialize(FakeHass())
         assert device.has_cooling is True
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("firmware", [None, ""])
-    async def test_async_initialize_unread_firmware_raises_and_closes(
-        self, firmware
-    ):
+    async def test_async_initialize_unread_firmware_raises_and_closes(self, firmware):
         # read_firmware_version() returns "" on failure; that must not fall
         # through to the 4.39 default profile.
         device = _make_device(connection="usb")
@@ -985,8 +1024,10 @@ class TestAsyncInitialize:
         def _connect():
             device.ser = port
 
-        with patch.object(device, "_connect_serial", side_effect=_connect), \
-                patch.object(device, "read_firmware_version", return_value=firmware):
+        with (
+            patch.object(device, "_connect_serial", side_effect=_connect),
+            patch.object(device, "read_firmware_version", return_value=firmware),
+        ):
             with pytest.raises(ConnectionError, match="could not be read"):
                 await device.async_initialize(FakeHass())
 
@@ -1006,8 +1047,9 @@ class TestAsyncInitialize:
             return await original(func, *args)
 
         hass.async_add_executor_job = _record
-        with patch.object(device, "_connect_tcp") as mock_connect, patch.object(
-            device, "read_firmware_version", return_value="439"
+        with (
+            patch.object(device, "_connect_tcp") as mock_connect,
+            patch.object(device, "read_firmware_version", return_value="439"),
         ):
             await device.async_initialize(hass)
 
@@ -1079,11 +1121,13 @@ class TestSetIsNotRepeatedOnceSent:
 
     def test_set_failing_after_telegram_is_not_repeated(self):
         device = self._device()
-        with patch.object(device, "_do_handshake_1"), patch.object(
-            device, "_do_handshake_2", side_effect=RuntimeError("no ack")
-        ), patch.object(device, "_write_bytes") as write, patch.object(
-            device, "_reconnect"
-        ) as reconnect, pytest.raises(RuntimeError, match="no ack"):
+        with (
+            patch.object(device, "_do_handshake_1"),
+            patch.object(device, "_do_handshake_2", side_effect=RuntimeError("no ack")),
+            patch.object(device, "_write_bytes") as write,
+            patch.object(device, "_reconnect") as reconnect,
+            pytest.raises(RuntimeError, match="no ack"),
+        ):
             device.send_request(b"TELEGRAM", "set")
 
         telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
@@ -1093,10 +1137,11 @@ class TestSetIsNotRepeatedOnceSent:
     def test_set_failing_before_telegram_is_retried(self):
         device = self._device()
         handshake = MagicMock(side_effect=[ConnectionError("down"), None])
-        with patch.object(device, "_do_handshake_1", handshake), patch.object(
-            device, "_do_handshake_2"
-        ), patch.object(device, "_write_bytes") as write, patch.object(
-            device, "_reconnect"
+        with (
+            patch.object(device, "_do_handshake_1", handshake),
+            patch.object(device, "_do_handshake_2"),
+            patch.object(device, "_write_bytes") as write,
+            patch.object(device, "_reconnect"),
         ):
             assert device.send_request(b"TELEGRAM", "set") == b""
 
@@ -1105,11 +1150,15 @@ class TestSetIsNotRepeatedOnceSent:
 
     def test_get_is_still_retried_after_telegram(self):
         device = self._device()
-        with patch.object(device, "_do_handshake_1"), patch.object(
-            device, "_do_handshake_2", side_effect=[RuntimeError("no ack"), None]
-        ), patch.object(device, "_write_bytes") as write, patch.object(
-            device, "_reconnect"
-        ), patch.object(device, "_receive_data_telegram", return_value=b"data"):
+        with (
+            patch.object(device, "_do_handshake_1"),
+            patch.object(
+                device, "_do_handshake_2", side_effect=[RuntimeError("no ack"), None]
+            ),
+            patch.object(device, "_write_bytes") as write,
+            patch.object(device, "_reconnect"),
+            patch.object(device, "_receive_data_telegram", return_value=b"data"),
+        ):
             assert device.send_request(b"TELEGRAM", "get") == b"data"
 
         telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]

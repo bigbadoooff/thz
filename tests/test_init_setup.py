@@ -5,6 +5,7 @@ which cannot be spec'd against another Mock (our `hass` fixture) — so these
 tests patch `custom_components.thz.DataUpdateCoordinator` with a factory that
 returns a fully-controllable fake coordinator instance.
 """
+
 from contextlib import ExitStack, contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -35,9 +36,7 @@ def _fake_device(firmware="539", blocks=None):
 
 
 def _default_dev_reg():
-    return MagicMock(
-        async_get_or_create=MagicMock(return_value=MagicMock(id="dev1"))
-    )
+    return MagicMock(async_get_or_create=MagicMock(return_value=MagicMock(id="dev1")))
 
 
 @contextmanager
@@ -59,7 +58,8 @@ def _patched_setup(device=None, coordinator_factory=None, dev_reg=None):
         if coordinator_factory is not None:
             stack.enter_context(
                 patch.object(
-                    thz_module, "DataUpdateCoordinator",
+                    thz_module,
+                    "DataUpdateCoordinator",
                     side_effect=coordinator_factory,
                 )
             )
@@ -393,11 +393,15 @@ class TestAsyncRemoveEntry:
         entity1 = MagicMock(entity_id="sensor.thz_a")
         entity2 = MagicMock(entity_id="sensor.thz_b")
 
-        with patch.object(
-            thz_module.er, "async_get", return_value=MagicMock()
-        ) as mock_get, patch.object(
-            thz_module.er, "async_entries_for_config_entry",
-            return_value=[entity1, entity2],
+        with (
+            patch.object(
+                thz_module.er, "async_get", return_value=MagicMock()
+            ) as mock_get,
+            patch.object(
+                thz_module.er,
+                "async_entries_for_config_entry",
+                return_value=[entity1, entity2],
+            ),
         ):
             await thz_module.async_remove_entry(hass, entry)
 

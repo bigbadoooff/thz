@@ -79,8 +79,11 @@ class TestNormalizeEntry:
     def test_normalize_six_element_tuple(self):
         """Test normalizing a 6-element tuple with metadata dict."""
         meta = {
-            "unit": "°C", "device_class": "temperature", "state_class": "measurement",
-            "icon": "mdi:thermometer", "translation_key": "outside_temp",
+            "unit": "°C",
+            "device_class": "temperature",
+            "state_class": "measurement",
+            "icon": "mdi:thermometer",
+            "translation_key": "outside_temp",
         }
         entry = ("outsideTemp:", 8, 4, "hex2int", 10, meta)
         result = normalize_entry(entry)
@@ -115,19 +118,19 @@ class TestSensorNameCleaning:
     def test_strip_trailing_colon_from_name(self):
         """Test that trailing colons are stripped."""
         name = "outsideTemp:"
-        cleaned = name.strip().rstrip(':')
+        cleaned = name.strip().rstrip(":")
         assert cleaned == "outsideTemp"
 
     def test_strip_whitespace_and_colon(self):
         """Test that whitespace and colons are stripped."""
         name = "  flowTemp:  "
-        cleaned = name.strip().rstrip(':')
+        cleaned = name.strip().rstrip(":")
         assert cleaned == "flowTemp"
 
     def test_name_without_special_chars(self):
         """Test names without special characters."""
         name = "returnTemp"
-        cleaned = name.strip().rstrip(':')
+        cleaned = name.strip().rstrip(":")
         assert cleaned == "returnTemp"
 
 
@@ -214,7 +217,7 @@ class TestBlockHexProcessing:
         """Test converting hex string to bytes."""
         block_hex = "0100"
         block_bytes = bytes.fromhex(block_hex)
-        assert block_bytes == b'\x01\x00'
+        assert block_bytes == b"\x01\x00"
         assert len(block_bytes) == 2
 
 

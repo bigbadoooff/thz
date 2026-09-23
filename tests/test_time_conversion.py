@@ -1,4 +1,5 @@
 """Tests for time conversion functions."""
+
 from datetime import time
 
 from custom_components.thz.const import TIME_VALUE_UNSET

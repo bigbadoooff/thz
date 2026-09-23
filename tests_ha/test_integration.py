@@ -1,4 +1,5 @@
 """End-to-end tests of the integration inside a real Home Assistant."""
+
 from __future__ import annotations
 
 from homeassistant import config_entries
@@ -55,7 +56,8 @@ async def test_setup_creates_entities_and_unloads(hass, fake_device):
 
     # Translated names reach the state machine (has_entity_name + strings).
     climate = next(
-        e for e in entities
+        e
+        for e in entities
         if e.domain == "climate" and e.unique_id.endswith("heating_circuit")
     )
     state = hass.states.get(climate.entity_id)
@@ -71,11 +73,12 @@ async def test_setup_creates_entities_and_unloads(hass, fake_device):
 async def test_number_service_writes_the_register(hass, fake_device):
     entry = await _setup(hass)
     registry = er.async_get(hass)
-    command = RegisterMapManagerWrite("439").get_all_registers()[
-        "p01RoomTempDayHC1"
-    ]["command"]
+    command = RegisterMapManagerWrite("439").get_all_registers()["p01RoomTempDayHC1"][
+        "command"
+    ]
     number = next(
-        e for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        e
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
         if e.domain == "number" and command.lower() in e.unique_id
     )
     assert number.disabled_by is None
@@ -138,13 +141,12 @@ async def test_default_visibility_disables_schedules(hass, fake_device):
     entry = await _setup(hass)
     registry = er.async_get(hass)
     schedules = [
-        e for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        e
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
         if e.domain == "time" and "program" in e.unique_id.lower()
     ]
     assert schedules
-    assert all(
-        e.disabled_by is er.RegistryEntryDisabler.INTEGRATION for e in schedules
-    )
+    assert all(e.disabled_by is er.RegistryEntryDisabler.INTEGRATION for e in schedules)
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 

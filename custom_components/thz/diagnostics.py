@@ -1,4 +1,5 @@
 """Diagnostics support for THZ integration."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -72,9 +73,7 @@ async def async_get_config_entry_diagnostics(
     if register_manager:
         all_registers = register_manager.get_all_registers()
         register_counts["read_blocks"] = len(all_registers)
-        total_sensors = sum(
-            len(entries) for entries in all_registers.values()
-        )
+        total_sensors = sum(len(entries) for entries in all_registers.values())
         register_counts["read_sensors"] = total_sensors
 
     if write_manager:

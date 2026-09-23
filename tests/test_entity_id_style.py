@@ -3,6 +3,7 @@
 Covers fhem_style_object_id()'s slugification of raw register-map/parameter
 names, and resolve_suggested_object_id()'s style gating.
 """
+
 import pytest
 
 from custom_components.thz.entity_id_style import (

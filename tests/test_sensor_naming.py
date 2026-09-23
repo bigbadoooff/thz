@@ -6,32 +6,31 @@ naming and translation key assignment.
 """
 
 
-
 class TestSensorNameCleaning:
     """Test sensor name cleaning logic."""
 
     def test_strip_trailing_colon(self):
         """Test that trailing colons are stripped from sensor names."""
         name = "outsideTemp:"
-        cleaned = name.strip().rstrip(':')
+        cleaned = name.strip().rstrip(":")
         assert cleaned == "outsideTemp"
 
     def test_strip_whitespace_and_colon(self):
         """Test that both whitespace and colons are stripped."""
         name = "  flowTemp:  "
-        cleaned = name.strip().rstrip(':')
+        cleaned = name.strip().rstrip(":")
         assert cleaned == "flowTemp"
 
     def test_no_colon(self):
         """Test that names without colons are unchanged."""
         name = "returnTemp"
-        cleaned = name.strip().rstrip(':')
+        cleaned = name.strip().rstrip(":")
         assert cleaned == "returnTemp"
 
     def test_multiple_trailing_colons(self):
         """Test that multiple trailing colons are all stripped."""
         name = "dhwTemp:::"
-        cleaned = name.strip().rstrip(':')
+        cleaned = name.strip().rstrip(":")
         assert cleaned == "dhwTemp"
 
 
@@ -116,7 +115,7 @@ class TestEntityHiding:
             "dhwTemp",
             "p01RoomTempDay",
             "p04DHWsetTempDay",
-            "pOpMode"
+            "pOpMode",
         ]
         for entity in basic_entities:
             assert not should_hide_entity_by_default(entity), (
@@ -140,6 +139,7 @@ class TestSensorUniqueIdExtraction:
     def _extract_name_from_sensor_uid(unique_id: str) -> str | None:
         """Simulate the regex extraction logic from __init__.py."""
         import re
+
         match = re.search(r"^thz_.+_(\d+)_([a-z][a-z0-9_-]*)$", unique_id)
         return match.group(2) if match else None
 

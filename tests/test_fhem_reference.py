@@ -13,6 +13,7 @@ turns them into telegrams. Our code and FHEM then write the same values into
 the same simulated registers and must produce byte-identical SET telegrams;
 for 2.x blocks the values we decode must also equal FHEM's decoding.
 """
+
 from datetime import time as dt_time
 import json
 from pathlib import Path
@@ -226,8 +227,15 @@ _DIRECT_FIRMWARES = {"439": "4.39", "539": "5.39"}
 # Selects and switches without one of these types are plain 2-byte
 # integers, i.e. FHEM's "1clean".
 _FHEM_VALUE_TYPES = {
-    "0clean", "1clean", "2opmode", "4temp", "5temp", "6gradient",
-    "7prog", "8party", "9holy",
+    "0clean",
+    "1clean",
+    "2opmode",
+    "4temp",
+    "5temp",
+    "6gradient",
+    "7prog",
+    "8party",
+    "9holy",
 }
 
 
@@ -303,9 +311,7 @@ def _direct_cases(entries: dict) -> list[tuple[str, str, object]]:
         elif kind == "time":
             cases.append((name, "07:30", dt_time(7, 30)))
         else:  # schedule
-            cases.append(
-                (name, "06:15--22:00", (dt_time(6, 15), dt_time(22, 0)))
-            )
+            cases.append((name, "06:15--22:00", (dt_time(6, 15), dt_time(22, 0))))
     return cases
 
 

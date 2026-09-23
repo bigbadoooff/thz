@@ -4,6 +4,7 @@ These tests exercise async_setup_entry, the _create_time_entities factory,
 and the read/write paths of both time entity classes, which are not covered
 by the pure-function tests in test_time_conversion.py / test_time_extended.py.
 """
+
 import asyncio
 from datetime import time as dtime
 from unittest.mock import AsyncMock, MagicMock
@@ -45,9 +46,7 @@ class TestCreateTimeEntitiesFactory:
     def test_schedule_type_creates_two_entities(self):
         device = _make_device()
         entry = _schedule_entry()
-        result = _create_time_entities(
-            "programHC1_Mo_0", entry, device, "dev1", 600
-        )
+        result = _create_time_entities("programHC1_Mo_0", entry, device, "dev1", 600)
         assert isinstance(result, list)
         assert len(result) == 2
         assert all(isinstance(e, THZScheduleTime) for e in result)
@@ -57,9 +56,7 @@ class TestCreateTimeEntitiesFactory:
     def test_plain_time_type_creates_single_entity(self):
         device = _make_device()
         entry = _time_entry()
-        result = _create_time_entities(
-            "pHolidayBeginTime", entry, device, "dev1", 600
-        )
+        result = _create_time_entities("pHolidayBeginTime", entry, device, "dev1", 600)
         assert isinstance(result, THZTime)
 
 
@@ -232,6 +229,7 @@ class TestTHZTime:
         assert entity.available is True
         assert entity.native_value == dtime(1, 30)
 
+
 class TestTHZScheduleTime:
     """Tests for the THZScheduleTime entity class."""
 
@@ -399,7 +397,6 @@ class TestTHZScheduleTime:
 
         assert entity.available is True
         assert entity.native_value == dtime(2, 0)
-
 
 
 class TestHolidayAndPartyTimeByte:

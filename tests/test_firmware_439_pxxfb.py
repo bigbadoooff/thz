@@ -30,9 +30,9 @@ def _entries(manager, block="pxxFB"):
 class TestMergeInheritsMeta:
     def _merge(self, base_entries, override_entries):
         manager = RegisterMapManager("439")
-        return manager._merge_maps(
-            {"blk": base_entries}, {"blk": override_entries}
-        )["blk"]
+        return manager._merge_maps({"blk": base_entries}, {"blk": override_entries})[
+            "blk"
+        ]
 
     def test_override_without_meta_keeps_base_meta(self):
         meta = {"unit": "W", "translation_key": "x"}

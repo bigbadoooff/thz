@@ -246,8 +246,8 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_device_class = _get_device_class(self._entity_name)
 
         # Visibility: hide advanced/technical entities per the configured tier
-        self._attr_entity_registry_enabled_default = (
-            not should_hide_entity(self._entity_name, entity_visibility)
+        self._attr_entity_registry_enabled_default = not should_hide_entity(
+            self._entity_name, entity_visibility
         )
 
         # Entity-ID naming style: independent of translation_key/unique_id.

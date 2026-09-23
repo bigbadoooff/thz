@@ -1,4 +1,5 @@
 """THZ Number Entity Platform."""
+
 from __future__ import annotations
 
 import logging
@@ -145,9 +146,7 @@ class THZNumber(THZBaseEntity, NumberEntity):
             _LOGGER.debug("Decoded value for %s: %s", self.name, value)
             self._attr_native_value = value
         except (ValueError, IndexError, TypeError) as err:
-            _LOGGER.error(
-                "Error decoding number %s: %s", self.name, err, exc_info=True
-            )
+            _LOGGER.error("Error decoding number %s: %s", self.name, err, exc_info=True)
             # Keep previous value on error
 
     async def async_set_native_value(self, value: float) -> None:
@@ -178,5 +177,8 @@ class THZNumber(THZBaseEntity, NumberEntity):
         except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
             _LOGGER.error(
                 "Error encoding number %s value %s: %s",
-                self.name, value, err, exc_info=True
+                self.name,
+                value,
+                err,
+                exc_info=True,
             )

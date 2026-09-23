@@ -9,6 +9,7 @@ reattached on every subsequent setup, permanently freezing that entity's
 entity_id to whatever it was the very first time it was ever created,
 regardless of any later entity_id_style/alias changes.
 """
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -34,9 +35,7 @@ class TestCleanupOrphanedEntities:
         hass = MagicMock()
         hass.config_entries.async_get_entry.return_value = MagicMock()
 
-        with patch.object(
-            er, "async_get", return_value=registry
-        ):
+        with patch.object(er, "async_get", return_value=registry):
             await _async_cleanup_orphaned_entities(hass)
 
         registry.async_remove.assert_called_once_with("number.thz_foo")
@@ -56,15 +55,11 @@ class TestCleanupOrphanedEntities:
         # No config entry exists with this id anymore.
         hass.config_entries.async_get_entry.return_value = None
 
-        with patch.object(
-            er, "async_get", return_value=registry
-        ):
+        with patch.object(er, "async_get", return_value=registry):
             await _async_cleanup_orphaned_entities(hass)
 
         registry.async_remove.assert_called_once_with("number.thz_stale")
-        hass.config_entries.async_get_entry.assert_called_once_with(
-            "deleted_entry_id"
-        )
+        hass.config_entries.async_get_entry.assert_called_once_with("deleted_entry_id")
 
     @pytest.mark.asyncio
     async def test_keeps_entity_with_valid_config_entry_id(self):
@@ -75,9 +70,7 @@ class TestCleanupOrphanedEntities:
         hass = MagicMock()
         hass.config_entries.async_get_entry.return_value = MagicMock()  # exists
 
-        with patch.object(
-            er, "async_get", return_value=registry
-        ):
+        with patch.object(er, "async_get", return_value=registry):
             await _async_cleanup_orphaned_entities(hass)
 
         registry.async_remove.assert_not_called()
@@ -91,9 +84,7 @@ class TestCleanupOrphanedEntities:
         hass = MagicMock()
         hass.config_entries.async_get_entry.return_value = None
 
-        with patch.object(
-            er, "async_get", return_value=registry
-        ):
+        with patch.object(er, "async_get", return_value=registry):
             await _async_cleanup_orphaned_entities(hass)
 
         registry.async_remove.assert_not_called()
@@ -113,9 +104,7 @@ class TestCleanupOrphanedEntities:
 
         hass.config_entries.async_get_entry.side_effect = fake_get_entry
 
-        with patch.object(
-            er, "async_get", return_value=registry
-        ):
+        with patch.object(er, "async_get", return_value=registry):
             await _async_cleanup_orphaned_entities(hass)
 
         registry.async_remove.assert_called_once_with("number.thz_stale")

@@ -120,9 +120,7 @@ class THZBaseEntity(Entity):
             # has_entity_name not set for legacy entities without translations
 
         # Generate unique ID if not provided
-        self._attr_unique_id = (
-            unique_id or self._generate_unique_id(command, name)
-        )
+        self._attr_unique_id = unique_id or self._generate_unique_id(command, name)
 
         # Entity-ID naming style: independent of unique_id/translation_key
         # (see resolve_suggested_object_id's docstring for details). Only
@@ -147,9 +145,10 @@ class THZBaseEntity(Entity):
         # Debug log entity attributes
         _LOGGER.debug(
             "Entity %s initialized: has_entity_name=%s, name=%s, translation_key=%s",
-            name, getattr(self, '_attr_has_entity_name', False),
-            getattr(self, '_attr_name', None),
-            getattr(self, '_attr_translation_key', None)
+            name,
+            getattr(self, "_attr_has_entity_name", False),
+            getattr(self, "_attr_name", None),
+            getattr(self, "_attr_translation_key", None),
         )
 
         # Store update interval for use in async_added_to_hass

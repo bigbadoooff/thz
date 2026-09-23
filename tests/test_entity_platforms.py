@@ -1,23 +1,25 @@
 """Basic tests for number, select, switch, and time modules."""
 
 
-
 class TestNumberModule:
     """Test number module can be imported and has expected structure."""
 
     def test_import_number_module(self):
         """Test that number module can be imported."""
         from custom_components.thz import number
+
         assert number is not None
 
     def test_number_has_async_setup_entry(self):
         """Test that number module has async_setup_entry function."""
         from custom_components.thz.number import async_setup_entry
+
         assert callable(async_setup_entry)
 
     def test_number_has_entity_class(self):
         """Test that number module has THZNumber class."""
         from custom_components.thz.number import THZNumber
+
         assert THZNumber is not None
 
 
@@ -27,16 +29,19 @@ class TestSelectModule:
     def test_import_select_module(self):
         """Test that select module can be imported."""
         from custom_components.thz import select
+
         assert select is not None
 
     def test_select_has_async_setup_entry(self):
         """Test that select module has async_setup_entry function."""
         from custom_components.thz.select import async_setup_entry
+
         assert callable(async_setup_entry)
 
     def test_select_has_entity_class(self):
         """Test that select module has THZSelect class."""
         from custom_components.thz.select import THZSelect
+
         assert THZSelect is not None
 
 
@@ -46,18 +51,20 @@ class TestSwitchModule:
     def test_import_switch_module(self):
         """Test that switch module can be imported."""
         from custom_components.thz import switch
+
         assert switch is not None
 
     def test_switch_has_async_setup_entry(self):
         """Test that switch module has async_setup_entry function."""
         from custom_components.thz.switch import async_setup_entry
+
         assert callable(async_setup_entry)
 
     def test_switch_has_entity_class(self):
         """Test that switch module has THZSwitch class."""
         from custom_components.thz.switch import THZSwitch
-        assert THZSwitch is not None
 
+        assert THZSwitch is not None
 
 
 class TestTimeModule:
@@ -66,21 +73,25 @@ class TestTimeModule:
     def test_import_time_module(self):
         """Test that time module can be imported."""
         from custom_components.thz import time
+
         assert time is not None
 
     def test_time_has_async_setup_entry(self):
         """Test that time module has async_setup_entry function."""
         from custom_components.thz.time import async_setup_entry
+
         assert callable(async_setup_entry)
 
     def test_time_has_entity_class(self):
         """Test that time module has THZTime class."""
         from custom_components.thz.time import THZTime
+
         assert THZTime is not None
 
     def test_time_has_conversion_functions(self):
         """Test that time module has conversion functions."""
         from custom_components.thz.time import quarters_to_time, time_to_quarters
+
         assert callable(quarters_to_time)
         assert callable(time_to_quarters)
 
@@ -91,16 +102,19 @@ class TestConfigFlowModule:
     def test_import_config_flow_module(self):
         """Test that config_flow module can be imported."""
         from custom_components.thz import config_flow
+
         assert config_flow is not None
 
     def test_config_flow_has_flow_class(self):
         """Test that config_flow module has THZConfigFlow class."""
         from custom_components.thz.config_flow import THZConfigFlow
+
         assert THZConfigFlow is not None
 
     def test_config_flow_has_log_levels(self):
         """Test that config_flow module has LOG_LEVELS constant."""
         from custom_components.thz.config_flow import LOG_LEVELS
+
         assert isinstance(LOG_LEVELS, dict)
         assert len(LOG_LEVELS) > 0
 
@@ -111,16 +125,19 @@ class TestInitModule:
     def test_import_init_module(self):
         """Test that __init__ module can be imported."""
         from custom_components.thz import __init__
+
         assert __init__ is not None
 
     def test_init_has_async_setup_entry(self):
         """Test that __init__ module has async_setup_entry function."""
         from custom_components.thz import async_setup_entry
+
         assert callable(async_setup_entry)
 
     def test_init_has_async_unload_entry(self):
         """Test that __init__ module has async_unload_entry function."""
         from custom_components.thz import async_unload_entry
+
         assert callable(async_unload_entry)
 
 
@@ -133,6 +150,7 @@ class TestModuleConstants:
             WRITE_REGISTER_LENGTH,
             WRITE_REGISTER_OFFSET,
         )
+
         assert WRITE_REGISTER_OFFSET == 4
         assert WRITE_REGISTER_LENGTH == 2
 
@@ -140,17 +158,20 @@ class TestModuleConstants:
         """Test that select module or its dependencies use DOMAIN constant."""
         # DOMAIN is now used via platform_setup helper
         from custom_components.thz.const import DOMAIN
+
         assert DOMAIN == "thz"
 
     def test_switch_uses_domain(self):
         """Test that switch module or its dependencies use DOMAIN constant."""
         # DOMAIN is now used via platform_setup helper
         from custom_components.thz.const import DOMAIN
+
         assert DOMAIN == "thz"
 
     def test_time_has_time_value_unset(self):
         """Test that time module uses TIME_VALUE_UNSET."""
         from custom_components.thz.time import TIME_VALUE_UNSET
+
         assert TIME_VALUE_UNSET == 0x80
 
 
@@ -160,16 +181,19 @@ class TestEntityTranslationIntegration:
     def test_number_uses_translation_keys(self):
         """Test that number module imports translation function."""
         from custom_components.thz.number import get_translation_key
+
         assert callable(get_translation_key)
 
     def test_select_uses_translation_keys(self):
         """Test that select module imports translation function."""
         from custom_components.thz.select import get_translation_key
+
         assert callable(get_translation_key)
 
     def test_switch_uses_translation_keys(self):
         """Test that switch module imports translation function."""
         from custom_components.thz.switch import get_translation_key
+
         assert callable(get_translation_key)
 
 
@@ -179,19 +203,23 @@ class TestEntityHidingIntegration:
     def test_number_uses_should_hide_entity(self):
         """Test that base_entity module provides should_hide_entity_by_default."""
         from custom_components.thz.const import should_hide_entity_by_default
+
         assert callable(should_hide_entity_by_default)
         # Verify it's used by base entity
         from custom_components.thz.base_entity import THZBaseEntity
+
         assert THZBaseEntity is not None
 
     def test_select_uses_should_hide_entity(self):
         """Test that base_entity module provides should_hide_entity_by_default."""
         from custom_components.thz.const import should_hide_entity_by_default
+
         assert callable(should_hide_entity_by_default)
 
     def test_switch_uses_should_hide_entity(self):
         """Test that base_entity module provides should_hide_entity_by_default."""
         from custom_components.thz.const import should_hide_entity_by_default
+
         assert callable(should_hide_entity_by_default)
 
 
@@ -206,6 +234,7 @@ class TestEntityRegistryEnabledDefault:
     def _make_mock_device():
         """Create a mock THZDevice for entity instantiation."""
         from unittest.mock import MagicMock
+
         device = MagicMock()
         device.lock = MagicMock()
         return device
@@ -458,21 +487,25 @@ class TestBinarySensorModule:
     def test_import_binary_sensor_module(self):
         """Test that binary_sensor module can be imported."""
         from custom_components.thz import binary_sensor
+
         assert binary_sensor is not None
 
     def test_binary_sensor_has_async_setup_entry(self):
         """Test that binary_sensor module has async_setup_entry function."""
         from custom_components.thz.binary_sensor import async_setup_entry
+
         assert callable(async_setup_entry)
 
     def test_binary_sensor_has_entity_class(self):
         """Test that binary_sensor module has THZBinarySensor class."""
         from custom_components.thz.binary_sensor import THZBinarySensor
+
         assert THZBinarySensor is not None
 
     def test_is_bit_decode_type(self):
         """Test the _is_bit_decode_type helper."""
         from custom_components.thz.binary_sensor import _is_bit_decode_type
+
         assert _is_bit_decode_type("bit0") is True
         assert _is_bit_decode_type("bit3") is True
         assert _is_bit_decode_type("nbit0") is True
@@ -486,6 +519,7 @@ class TestBinarySensorModule:
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
         from custom_components.thz.binary_sensor import _get_device_class
+
         assert _get_device_class("compressor") == BinarySensorDeviceClass.RUNNING
 
     def test_get_device_class_pump(self):
@@ -493,6 +527,7 @@ class TestBinarySensorModule:
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
         from custom_components.thz.binary_sensor import _get_device_class
+
         assert _get_device_class("dhwPump") == BinarySensorDeviceClass.RUNNING
         pump_class = _get_device_class("heatingCircuitPump")
         assert pump_class == BinarySensorDeviceClass.RUNNING
@@ -502,6 +537,7 @@ class TestBinarySensorModule:
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
         from custom_components.thz.binary_sensor import _get_device_class
+
         assert _get_device_class("filterBoth") == BinarySensorDeviceClass.PROBLEM
         assert _get_device_class("filterUp") == BinarySensorDeviceClass.PROBLEM
         assert _get_device_class("filterDown") == BinarySensorDeviceClass.PROBLEM
@@ -511,6 +547,7 @@ class TestBinarySensorModule:
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
         from custom_components.thz.binary_sensor import _get_device_class
+
         assert _get_device_class("windowOpen") == BinarySensorDeviceClass.WINDOW
 
     def test_get_device_class_valve(self):
@@ -518,12 +555,14 @@ class TestBinarySensorModule:
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
         from custom_components.thz.binary_sensor import _get_device_class
+
         assert _get_device_class("diverterValve") == BinarySensorDeviceClass.OPENING
         assert _get_device_class("mixerOpen") == BinarySensorDeviceClass.OPENING
 
     def test_get_device_class_unknown(self):
         """Test that unknown entities return None device class."""
         from custom_components.thz.binary_sensor import _get_device_class
+
         assert _get_device_class("somethingUnknown") is None
 
     def test_binary_sensor_is_on_property(self):
@@ -674,21 +713,25 @@ class TestButtonModule:
     def test_import_button_module(self):
         """Test that button module can be imported."""
         from custom_components.thz import button
+
         assert button is not None
 
     def test_button_has_async_setup_entry(self):
         """Test that button module has async_setup_entry function."""
         from custom_components.thz.button import async_setup_entry
+
         assert callable(async_setup_entry)
 
     def test_button_has_entity_class(self):
         """Test that button module has THZButton class."""
         from custom_components.thz.button import THZButton
+
         assert THZButton is not None
 
     def test_zResetLast10errors_is_button_type(self):
         """Test that zResetLast10errors write map entry is now type 'button'."""
         from custom_components.thz.register_maps.write_map_X39tech import WRITE_MAP
+
         entry = WRITE_MAP.get("zResetLast10errors")
         assert entry is not None, "zResetLast10errors entry not found in WRITE_MAP"
         assert entry["type"] == "button", (

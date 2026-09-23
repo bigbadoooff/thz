@@ -1,4 +1,5 @@
 """Pytest configuration and fixtures."""
+
 import sys
 from unittest.mock import MagicMock
 
@@ -39,6 +40,7 @@ class MockEntity:
         """Allow tests to override the resolved name directly."""
         self._name_override = value
 
+
 class MockCoordinatorEntity(MockEntity):
     """Mock coordinator entity."""
 
@@ -50,21 +52,30 @@ class MockCoordinatorEntity(MockEntity):
         """No-op stand-in for CoordinatorEntity's listener subscription."""
         return None
 
+
 class MockSensorEntity(MockEntity):
     """Mock sensor entity."""
+
     pass
+
 
 class MockSwitchEntity(MockEntity):
     """Mock switch entity."""
+
     pass
+
 
 class MockNumberEntity(MockEntity):
     """Mock number entity."""
+
     pass
+
 
 class MockSelectEntity(MockEntity):
     """Mock select entity."""
+
     pass
+
 
 class MockTimeEntity(MockEntity):
     """Mock time entity.
@@ -91,24 +102,29 @@ class MockTimeEntity(MockEntity):
         """Real TimeEntity's unimplemented base -- must be overridden."""
         raise NotImplementedError
 
+
 class MockBinarySensorEntity(MockEntity):
     """Mock binary sensor entity."""
+
     pass
+
 
 class MockButtonEntity(MockEntity):
     """Mock button entity."""
+
     pass
 
+
 # Mock Home Assistant modules
-sys.modules['homeassistant'] = MagicMock()
-sys.modules['homeassistant.util'] = MagicMock()
-sys.modules['homeassistant.util.dt'] = MagicMock()
-sys.modules['homeassistant.config_entries'] = MagicMock()
+sys.modules["homeassistant"] = MagicMock()
+sys.modules["homeassistant.util"] = MagicMock()
+sys.modules["homeassistant.util.dt"] = MagicMock()
+sys.modules["homeassistant.config_entries"] = MagicMock()
 core_mock = MagicMock()
 # Like Home Assistant's own decorator: marks the function, returns it as-is.
 # A MagicMock here would replace every @callback function with a mock.
 core_mock.callback = lambda func: func
-sys.modules['homeassistant.core'] = core_mock
+sys.modules["homeassistant.core"] = core_mock
 
 
 class HomeAssistantError(Exception):
@@ -127,30 +143,30 @@ exceptions_mock = MagicMock()
 exceptions_mock.HomeAssistantError = HomeAssistantError
 exceptions_mock.ConfigEntryNotReady = ConfigEntryNotReady
 exceptions_mock.ServiceValidationError = ServiceValidationError
-sys.modules['homeassistant.exceptions'] = exceptions_mock
-sys.modules['homeassistant.helpers'] = MagicMock()
-sys.modules['homeassistant.helpers.config_validation'] = MagicMock()
+sys.modules["homeassistant.exceptions"] = exceptions_mock
+sys.modules["homeassistant.helpers"] = MagicMock()
+sys.modules["homeassistant.helpers.config_validation"] = MagicMock()
 
 # Mock entity module
 entity_mock = MagicMock()
 entity_mock.Entity = MockEntity
-sys.modules['homeassistant.helpers.entity'] = entity_mock
+sys.modules["homeassistant.helpers.entity"] = entity_mock
 
 # Mock update coordinator module with mock classes
 update_coordinator_mock = MagicMock()
 update_coordinator_mock.CoordinatorEntity = MockCoordinatorEntity
 update_coordinator_mock.DataUpdateCoordinator = MagicMock
 update_coordinator_mock.UpdateFailed = Exception
-sys.modules['homeassistant.helpers.update_coordinator'] = update_coordinator_mock
+sys.modules["homeassistant.helpers.update_coordinator"] = update_coordinator_mock
 
-sys.modules['homeassistant.helpers.entity_platform'] = MagicMock()
-sys.modules['homeassistant.helpers.event'] = MagicMock()
-sys.modules['homeassistant.helpers.typing'] = MagicMock()
-sys.modules['homeassistant.helpers.device_registry'] = MagicMock()
-sys.modules['homeassistant.helpers.area_registry'] = MagicMock()
-sys.modules['homeassistant.helpers.entity_registry'] = MagicMock()
-sys.modules['homeassistant.helpers.selector'] = MagicMock()
-sys.modules['homeassistant.helpers.storage'] = MagicMock()
+sys.modules["homeassistant.helpers.entity_platform"] = MagicMock()
+sys.modules["homeassistant.helpers.event"] = MagicMock()
+sys.modules["homeassistant.helpers.typing"] = MagicMock()
+sys.modules["homeassistant.helpers.device_registry"] = MagicMock()
+sys.modules["homeassistant.helpers.area_registry"] = MagicMock()
+sys.modules["homeassistant.helpers.entity_registry"] = MagicMock()
+sys.modules["homeassistant.helpers.selector"] = MagicMock()
+sys.modules["homeassistant.helpers.storage"] = MagicMock()
 
 # Mock homeassistant.util (and its "dt" submodule, e.g. dt_util.now()/.utcnow()
 # used by __init__.py). Without an explicit sys.modules entry for the
@@ -163,12 +179,12 @@ sys.modules['homeassistant.helpers.storage'] = MagicMock()
 util_mock = MagicMock()
 dt_util_mock = MagicMock()
 util_mock.dt = dt_util_mock
-sys.modules['homeassistant.util'] = util_mock
-sys.modules['homeassistant.util.dt'] = dt_util_mock
+sys.modules["homeassistant.util"] = util_mock
+sys.modules["homeassistant.util.dt"] = dt_util_mock
 
 # Mock components
 components_mock = MagicMock()
-sys.modules['homeassistant.components'] = components_mock
+sys.modules["homeassistant.components"] = components_mock
 
 # Mock diagnostics component
 diagnostics_mock = MagicMock()
@@ -192,34 +208,34 @@ def _async_redact_data(data, to_redact):
 
 
 diagnostics_mock.async_redact_data = _async_redact_data
-sys.modules['homeassistant.components.diagnostics'] = diagnostics_mock
+sys.modules["homeassistant.components.diagnostics"] = diagnostics_mock
 
 # Mock sensor component
 sensor_mock = MagicMock()
 sensor_mock.SensorEntity = MockSensorEntity
 sensor_mock.SensorDeviceClass = MagicMock()
 sensor_mock.SensorStateClass = MagicMock()
-sys.modules['homeassistant.components.sensor'] = sensor_mock
+sys.modules["homeassistant.components.sensor"] = sensor_mock
 
 # Mock switch component
 switch_mock = MagicMock()
 switch_mock.SwitchEntity = MockSwitchEntity
-sys.modules['homeassistant.components.switch'] = switch_mock
+sys.modules["homeassistant.components.switch"] = switch_mock
 
 # Mock number component
 number_mock = MagicMock()
 number_mock.NumberEntity = MockNumberEntity
-sys.modules['homeassistant.components.number'] = number_mock
+sys.modules["homeassistant.components.number"] = number_mock
 
 # Mock select component
 select_mock = MagicMock()
 select_mock.SelectEntity = MockSelectEntity
-sys.modules['homeassistant.components.select'] = select_mock
+sys.modules["homeassistant.components.select"] = select_mock
 
 # Mock time component
 time_mock = MagicMock()
 time_mock.TimeEntity = MockTimeEntity
-sys.modules['homeassistant.components.time'] = time_mock
+sys.modules["homeassistant.components.time"] = time_mock
 
 # Mock climate component
 # Use a minimal string enum so that HVACMode comparisons work in tests.
@@ -228,14 +244,17 @@ from enum import StrEnum  # noqa: E402
 
 class MockHVACMode(StrEnum):
     """Minimal HVACMode stand-in for tests."""
+
     HEAT = "heat"
     COOL = "cool"
     OFF = "off"
     AUTO = "auto"
     HEAT_COOL = "heat_cool"
 
+
 class MockClimateEntityFeature:
     """Minimal ClimateEntityFeature stand-in that supports the | operator."""
+
     TARGET_TEMPERATURE = 1
     TARGET_TEMPERATURE_RANGE = 2
     FAN_MODE = 8
@@ -263,6 +282,7 @@ class MockClimateEntityFeature:
         """Return whether any feature flag is set."""
         return bool(self.value)
 
+
 class MockClimateEntity(MockEntity):
     """Mock ClimateEntity base class."""
 
@@ -276,32 +296,33 @@ class MockClimateEntity(MockEntity):
         """Return _attr_unique_id via HA's _attr_ pattern."""
         return getattr(self, "_attr_unique_id", None)
 
+
 climate_mock = MagicMock()
 climate_mock.ClimateEntity = MockClimateEntity
 climate_mock.ClimateEntityFeature = MockClimateEntityFeature
 climate_mock.HVACMode = MockHVACMode
-sys.modules['homeassistant.components.climate'] = climate_mock
+sys.modules["homeassistant.components.climate"] = climate_mock
 # Mock binary_sensor component
 binary_sensor_mock = MagicMock()
 binary_sensor_mock.BinarySensorEntity = MockBinarySensorEntity
 binary_sensor_mock.BinarySensorDeviceClass = MagicMock()
-sys.modules['homeassistant.components.binary_sensor'] = binary_sensor_mock
+sys.modules["homeassistant.components.binary_sensor"] = binary_sensor_mock
 
 # Mock button component
 button_mock = MagicMock()
 button_mock.ButtonEntity = MockButtonEntity
-sys.modules['homeassistant.components.button'] = button_mock
+sys.modules["homeassistant.components.button"] = button_mock
 
-sys.modules['homeassistant.const'] = MagicMock()
-sys.modules['serial'] = MagicMock()
-sys.modules['serial.tools'] = MagicMock()
-sys.modules['serial.tools.list_ports'] = MagicMock()
+sys.modules["homeassistant.const"] = MagicMock()
+sys.modules["serial"] = MagicMock()
+sys.modules["serial.tools"] = MagicMock()
+sys.modules["serial.tools.list_ports"] = MagicMock()
 
 # Mock voluptuous
 voluptuous_mock = MagicMock()
 voluptuous_mock.Schema = MagicMock(return_value=MagicMock())
 voluptuous_mock.Required = MagicMock(return_value="command")
-sys.modules['voluptuous'] = voluptuous_mock
+sys.modules["voluptuous"] = voluptuous_mock
 
-sys.modules['tzlocal'] = MagicMock()
-sys.modules['zoneinfo'] = MagicMock()
+sys.modules["tzlocal"] = MagicMock()
+sys.modules["zoneinfo"] = MagicMock()

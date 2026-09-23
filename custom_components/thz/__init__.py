@@ -37,8 +37,14 @@ _LOGGER = logging.getLogger(__name__)
 
 # Entity platforms forwarded to/unloaded from this config entry
 PLATFORMS = [
-    "sensor", "binary_sensor", "number", "switch", "select", "time",
-    "button", "climate",
+    "sensor",
+    "binary_sensor",
+    "number",
+    "switch",
+    "select",
+    "time",
+    "button",
+    "climate",
 ]
 
 
@@ -51,9 +57,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     if log_level_str:
         _LOGGER.setLevel(getattr(logging, log_level_str.upper(), logging.INFO))
         _LOGGER.info("Log level set to: %s", log_level_str)
-    _LOGGER.debug(
-        "THZ async_setup_entry called with entry: %s", config_entry.as_dict()
-    )
+    _LOGGER.debug("THZ async_setup_entry called with entry: %s", config_entry.as_dict())
 
     # Clean up any orphaned THZ entities from previous installations
     # This ensures a fresh start without ghost entities with broken names
@@ -95,9 +99,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         ) from err
 
     # 2. Query firmware version
-    _LOGGER.info(
-        "THZ device fully initialized (FW %s)", device.firmware_version
-    )
+    _LOGGER.info("THZ device fully initialized (FW %s)", device.firmware_version)
 
     # --- create / update device in Home Assistant device registry ---
 
@@ -130,9 +132,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # 5. Collect paired register blocks for energy sensors (cmd2 + cmd3)
     paired_blocks = register_manager.get_paired_blocks() if register_manager else {}
     if paired_blocks:
-        _LOGGER.debug(
-            "Paired register blocks for dual-read: %s", paired_blocks
-        )
+        _LOGGER.debug("Paired register blocks for dual-read: %s", paired_blocks)
 
     # 6. Prepare dict for storing all coordinators
     coordinators = {}
@@ -148,11 +148,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 "No refresh_intervals found in config, using default "
                 "interval of %s seconds for %d blocks",
                 DEFAULT_UPDATE_INTERVAL,
-                len(available_blocks)
+                len(available_blocks),
             )
             refresh_intervals = {
-                block: DEFAULT_UPDATE_INTERVAL
-                for block in available_blocks
+                block: DEFAULT_UPDATE_INTERVAL for block in available_blocks
             }
         else:
             _LOGGER.error(
@@ -180,7 +179,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     for block, interval in refresh_intervals.items():
         _LOGGER.debug(
             "Creating coordinator for block %s with interval %s seconds",
-            block, interval
+            block,
+            interval,
         )
         # Add per-coordinator jitter (up to 10 % of the interval, min 5 s) so
         # that all coordinators do not fire at the same wall-clock second after
@@ -205,7 +205,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             _LOGGER.warning(
                 "Block %s could not be read at startup (%s); its entities "
                 "stay unavailable until the next successful poll.",
-                block, exc,
+                block,
+                exc,
             )
             continue
         if coordinator.data is None:
@@ -216,9 +217,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
                 block,
             )
         else:
-            _LOGGER.info(
-                "Initial data fetch completed for block %s", block
-            )
+            _LOGGER.info("Initial data fetch completed for block %s", block)
 
     if coordinators and len(failed_blocks) == len(coordinators):
         # Not a single block answered: the device is not really reachable,
@@ -231,17 +230,20 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     # Store per-entry runtime state on the config entry itself (not hass.data),
     # per HA's recommended runtime-data pattern.
-    set_runtime_data(config_entry, {
-        "device": device,
-        "device_id": unique_id,
-        "write_manager": write_manager,
-        "register_manager": register_manager,
-        "coordinators": coordinators,
-        "unsupported_blocks": unsupported_blocks,
-        "entity_id_style": entity_id_style,
-        "entity_visibility": entity_visibility,
-        "entity_id_prefix": entity_id_prefix,
-    })
+    set_runtime_data(
+        config_entry,
+        {
+            "device": device,
+            "device_id": unique_id,
+            "write_manager": write_manager,
+            "register_manager": register_manager,
+            "coordinators": coordinators,
+            "unsupported_blocks": unsupported_blocks,
+            "entity_id_style": entity_id_style,
+            "entity_visibility": entity_visibility,
+            "entity_id_prefix": entity_id_prefix,
+        },
+    )
 
     # Periodic clock-drift check (independent of per-entity polling of the
     # individual pClock* registers — see clock_sync.py). Always runs so
@@ -348,7 +350,8 @@ async def _async_apply_entity_visibility_tier(
         # is correctly detected and reconciled, instead of being skipped as
         # a false no-op.
         last_applied_hc2 = last_applied in (
-            ENTITY_VISIBILITY_EXTENDED, ENTITY_VISIBILITY_ALL,
+            ENTITY_VISIBILITY_EXTENDED,
+            ENTITY_VISIBILITY_ALL,
         )
 
     if last_applied == visibility and last_applied_hc2 == enable_hc2:
@@ -374,7 +377,9 @@ async def _async_apply_entity_visibility_tier(
             disabled_count += 1
             _LOGGER.debug(
                 "Entity visibility: disabled %s (uid=%s) for tier '%s'",
-                entity_entry.entity_id, entity_entry.unique_id, visibility,
+                entity_entry.entity_id,
+                entity_entry.unique_id,
+                visibility,
             )
         elif (
             not should_hide
@@ -384,14 +389,18 @@ async def _async_apply_entity_visibility_tier(
             enabled_count += 1
             _LOGGER.debug(
                 "Entity visibility: re-enabled %s (uid=%s) for tier '%s'",
-                entity_entry.entity_id, entity_entry.unique_id, visibility,
+                entity_entry.entity_id,
+                entity_entry.unique_id,
+                visibility,
             )
 
     if disabled_count or enabled_count:
         _LOGGER.info(
             "Entity visibility tier '%s' applied: disabled %d entities, "
             "re-enabled %d entities",
-            visibility, disabled_count, enabled_count,
+            visibility,
+            disabled_count,
+            enabled_count,
         )
 
     # Store the applied tier/HC2 state so this only re-runs when either changes
@@ -481,17 +490,17 @@ async def _async_update_block(
 
             # Extract low (cmd2) and high (cmd3) values
             # Both are signed 16-bit integers at byte offset 4
-            low_val = int.from_bytes(
-                result[4:6], byteorder="big", signed=True
-            )
-            high_val = int.from_bytes(
-                cmd3_result[4:6], byteorder="big", signed=True
-            )
+            low_val = int.from_bytes(result[4:6], byteorder="big", signed=True)
+            high_val = int.from_bytes(cmd3_result[4:6], byteorder="big", signed=True)
             combined = high_val * 1000 + low_val
 
             _LOGGER.debug(
                 "Paired read %s: low=%s, high=%s (%s), combined=%s",
-                block_name, low_val, high_val, cmd3_name, combined,
+                block_name,
+                low_val,
+                high_val,
+                cmd3_name,
+                combined,
             )
 
             # Build payload with 4-byte combined value at offset 4
@@ -529,7 +538,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         # Remove services if this is the last config entry
         remaining_entries = [
-            e for e in hass.config_entries.async_entries(DOMAIN)
+            e
+            for e in hass.config_entries.async_entries(DOMAIN)
             if e.entry_id != entry.entry_id
         ]
         if not remaining_entries:

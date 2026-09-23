@@ -182,13 +182,13 @@ class THZDevice:
         # These settings ensure the connection stays alive even during long idle periods
         try:
             # Start sending keepalive probes after 60 seconds of inactivity
-            if hasattr(socket, 'TCP_KEEPIDLE'):
+            if hasattr(socket, "TCP_KEEPIDLE"):
                 self.ser.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60)
             # Send keepalive probes every 10 seconds
-            if hasattr(socket, 'TCP_KEEPINTVL'):
+            if hasattr(socket, "TCP_KEEPINTVL"):
                 self.ser.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
             # Close connection after 6 failed probes (60 seconds total)
-            if hasattr(socket, 'TCP_KEEPCNT'):
+            if hasattr(socket, "TCP_KEEPCNT"):
                 self.ser.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 6)
             _LOGGER.debug("TCP keepalive enabled with idle=60s, interval=10s, count=6")
         except (OSError, AttributeError) as e:
@@ -258,9 +258,7 @@ class THZDevice:
         Once async_execute has timed out it may hand the device to the next
         caller, so the old thread must neither reconnect nor send anything.
         """
-        abandoned: threading.Event | None = getattr(
-            self._call_state, "abandoned", None
-        )
+        abandoned: threading.Event | None = getattr(self._call_state, "abandoned", None)
         if abandoned is not None and abandoned.is_set():
             raise ConnectionError("Device call abandoned after its timeout")
 
@@ -432,7 +430,8 @@ class THZDevice:
         if self._initialized and not self._is_connection_alive():
             _LOGGER.warning(
                 "Connection not alive, attempting reconnect (attempt %d/%d)",
-                attempt + 1, max_retries + 1,
+                attempt + 1,
+                max_retries + 1,
             )
             self._reconnect()
 
@@ -475,7 +474,9 @@ class THZDevice:
                 # Final failures are raised and reported once by the caller.
                 _LOGGER.debug(
                     "Connection error in send_request (attempt %d/%d): %s",
-                    attempt + 1, max_retries + 1, e,
+                    attempt + 1,
+                    max_retries + 1,
+                    e,
                 )
                 if attempt < max_retries and self._may_retry(get_or_set):
                     try:
@@ -493,7 +494,9 @@ class THZDevice:
             except RuntimeError as e:
                 _LOGGER.debug(
                     "Protocol error in send_request (attempt %d/%d): %s",
-                    attempt + 1, max_retries + 1, e,
+                    attempt + 1,
+                    max_retries + 1,
+                    e,
                 )
                 if attempt < max_retries and self._may_retry(get_or_set):
                     try:
@@ -622,9 +625,7 @@ class THZDevice:
         except (ValueError, AttributeError) as e:
             # pyserial's select.select() raises ValueError when the port fd
             # is None (set by close()); AttributeError if self.ser is None.
-            raise ConnectionError(
-                f"Connection closed during serial read: {e}"
-            ) from e
+            raise ConnectionError(f"Connection closed during serial read: {e}") from e
 
     def _reset_input_buffer(self):
         """Delete any existing input buffer.
@@ -697,7 +698,8 @@ class THZDevice:
                 if not future.done():
                     _LOGGER.warning(
                         "Device worker did not finish within %.1fs after "
-                        "being abandoned", self._abandon_grace,
+                        "being abandoned",
+                        self._abandon_grace,
                     )
                 else:
                     # Consume the thread's (expected) error so it is not
@@ -879,9 +881,7 @@ class THZDevice:
         try:
             value_raw = self.read_value(b"\xfd", "get", 2, 2)
             if value_raw is None:
-                _LOGGER.error(
-                    "Could not read firmware version: no response"
-                )
+                _LOGGER.error("Could not read firmware version: no response")
                 return ""
             firmware_version = int.from_bytes(value_raw, byteorder="big", signed=False)
             _LOGGER.debug("Firmware version read: %s", firmware_version)
@@ -1018,7 +1018,10 @@ class THZDevice:
         self.read_write_register(block_addr, "set", bytes(payload))
         _LOGGER.debug(
             "Block value written: block=%s offset=%d length=%d value=%s",
-            block_addr.hex(), offset, length, value.hex(),
+            block_addr.hex(),
+            offset,
+            length,
+            value.hex(),
         )
 
     def read_block(self, addr_bytes: bytes, get_or_set: str) -> bytes:

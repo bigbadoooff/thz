@@ -13,6 +13,7 @@ verbatim from FHEM's "D1last" parsing table (as opposed to "D1last206"):
     "hex2time"/"hexdate" decoders, requiring the "turnhex2time"/"turnhexdate"
     decode types (see value_codec.py).
 """
+
 import pytest
 
 from custom_components.thz.register_maps import readings_map_439

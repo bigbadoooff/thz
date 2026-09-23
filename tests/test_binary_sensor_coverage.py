@@ -5,6 +5,7 @@ non-bit skipping, duplicate-name skipping, nibble-offset adjustment) as
 well as additional THZBinarySensor property paths not already covered by
 tests/test_entity_platforms.py.
 """
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -354,17 +355,20 @@ class TestTHZBinarySensorAdditional:
             device_id="dev1",
         )
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
         assert entity._attr_device_class == BinarySensorDeviceClass.PROBLEM
 
     def test_device_class_for_heating(self):
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
         from custom_components.thz.binary_sensor import _get_device_class
+
         assert _get_device_class("heatingActive") == BinarySensorDeviceClass.HEAT
 
     def test_device_class_for_cooling_defrost(self):
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 
         from custom_components.thz.binary_sensor import _get_device_class
+
         assert _get_device_class("coolingMode") == BinarySensorDeviceClass.COLD
         assert _get_device_class("defrostActive") == BinarySensorDeviceClass.COLD

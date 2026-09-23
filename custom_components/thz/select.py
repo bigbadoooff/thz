@@ -1,4 +1,5 @@
 """Select entity for THZ integration."""
+
 from __future__ import annotations
 
 import logging
@@ -35,8 +36,6 @@ async def async_setup_entry(
     await async_setup_write_platform(
         hass, config_entry, async_add_entities, THZSelect, "select"
     )
-
-
 
 
 def _options_within_bounds(
@@ -117,7 +116,8 @@ class THZSelect(THZBaseEntity, SelectEntity):
             self._attr_options = []
             _LOGGER.warning(
                 "No options found for select %s with decode_type %s",
-                name, self._decode_type
+                name,
+                self._decode_type,
             )
 
         self._attr_current_option = None
@@ -135,28 +135,18 @@ class THZSelect(THZBaseEntity, SelectEntity):
         if value_bytes is None:
             return
 
-        _LOGGER.debug(
-            "Received bytes for %s: %s",
-            self.name,
-            value_bytes.hex()
-        )
+        _LOGGER.debug("Received bytes for %s: %s", self.name, value_bytes.hex())
 
         try:
             # Use centralized codec for decoding
             option = THZValueCodec.decode_select(value_bytes, self._decode_type)
             if option:
                 self._attr_current_option = option
-                _LOGGER.debug(
-                    "Decoded option for %s: %s", self.name, option
-                )
+                _LOGGER.debug("Decoded option for %s: %s", self.name, option)
             else:
-                _LOGGER.warning(
-                    "Could not map value to option for %s", self.name
-                )
+                _LOGGER.warning("Could not map value to option for %s", self.name)
         except (ValueError, IndexError, TypeError) as err:
-            _LOGGER.error(
-                "Error decoding select %s: %s", self.name, err, exc_info=True
-            )
+            _LOGGER.error("Error decoding select %s: %s", self.name, err, exc_info=True)
             # Keep previous value on error
 
     async def async_select_option(self, option: str) -> None:
@@ -180,5 +170,8 @@ class THZSelect(THZBaseEntity, SelectEntity):
         except Exception as err:
             _LOGGER.error(
                 "Error setting select %s to option %s: %s",
-                self.name, option, err, exc_info=True
+                self.name,
+                option,
+                err,
+                exc_info=True,
             )

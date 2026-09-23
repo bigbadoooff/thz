@@ -50,12 +50,16 @@ class TestSensors:
         coordinator = _coordinator(payload)
         tracker = _tracker()
         args = (coordinator, tracker, "dev")
-        return coordinator, tracker, [
-            THZFaultStatusSensor(*args),
-            THZFaultMemorySensor(*args),
-            THZLatestFaultSensor(*args),
-            THZNewFaultsSensor(*args),
-        ]
+        return (
+            coordinator,
+            tracker,
+            [
+                THZFaultStatusSensor(*args),
+                THZFaultMemorySensor(*args),
+                THZLatestFaultSensor(*args),
+                THZNewFaultsSensor(*args),
+            ],
+        )
 
     def test_ids_and_translation_keys(self):
         _, _, sensors = self._sensors(_payload())
@@ -66,7 +70,10 @@ class TestSensors:
             "thz_dev_fault_new",
         ]
         assert [s._attr_translation_key for s in sensors] == [
-            "fault_status", "fault_memory", "fault_latest", "fault_new",
+            "fault_status",
+            "fault_memory",
+            "fault_latest",
+            "fault_new",
         ]
 
     def test_device_info_links_to_the_device(self):
@@ -323,7 +330,10 @@ class TestClearService:
             result = await handler(_call(confirmation="CLEAR D1"))
         clear.assert_awaited_once()
         assert result == {
-            "success": True, "cleared": True, "before_count": 2, "after_count": 0,
+            "success": True,
+            "cleared": True,
+            "before_count": 2,
+            "after_count": 0,
         }
         source.async_request_refresh.assert_awaited_once()
 
@@ -331,10 +341,13 @@ class TestClearService:
     async def test_clear_failure_becomes_homeassistant_error(self):
         hass = _hass_with({"device": _device()})
         handler = await _handler(hass, "clear_fault_memory")
-        with patch(
-            "custom_components.thz.services.clear_fault_memory",
-            AsyncMock(side_effect=RuntimeError("D1 still reports 1 fault(s)")),
-        ), pytest.raises(HomeAssistantError, match="still reports"):
+        with (
+            patch(
+                "custom_components.thz.services.clear_fault_memory",
+                AsyncMock(side_effect=RuntimeError("D1 still reports 1 fault(s)")),
+            ),
+            pytest.raises(HomeAssistantError, match="still reports"),
+        ):
             await handler(_call(confirmation="CLEAR D1"))
 
 

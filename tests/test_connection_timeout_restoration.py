@@ -83,7 +83,7 @@ class TestConnectionTimeoutRestoration:
         # Create a mock socket
         mock_socket = Mock()
         mock_socket.gettimeout.return_value = 1.0  # Original timeout
-        mock_socket.recv.return_value = b'\x10\x02'  # Some data
+        mock_socket.recv.return_value = b"\x10\x02"  # Some data
         mock_socket.fileno.return_value = 5  # Valid file descriptor
 
         device.ser = mock_socket
@@ -92,7 +92,7 @@ class TestConnectionTimeoutRestoration:
         result = device._read_available()
 
         # Verify data was returned
-        assert result == b'\x10\x02'
+        assert result == b"\x10\x02"
 
         # Verify timeout was saved and restored
         mock_socket.gettimeout.assert_called()
@@ -158,11 +158,11 @@ class TestConnectionTimeoutRestoration:
         # Create a mock serial object with only serial-like attributes
         # Using spec to limit available attributes
         mock_serial = Mock(
-            spec=['is_open', 'in_waiting', 'read', 'write', 'flush', 'close']
+            spec=["is_open", "in_waiting", "read", "write", "flush", "close"]
         )
         mock_serial.is_open = True
         mock_serial.in_waiting = 5
-        mock_serial.read.return_value = b'\xaa\xbb\xcc\xdd\xee'
+        mock_serial.read.return_value = b"\xaa\xbb\xcc\xdd\xee"
 
         device.ser = mock_serial
 
@@ -171,7 +171,7 @@ class TestConnectionTimeoutRestoration:
 
         # _read_available should work
         result = device._read_available()
-        assert result == b'\xaa\xbb\xcc\xdd\xee'
+        assert result == b"\xaa\xbb\xcc\xdd\xee"
         mock_serial.read.assert_called_with(5)
 
 

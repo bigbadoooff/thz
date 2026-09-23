@@ -77,10 +77,12 @@ class TestHvacModesExcludeOff:
         mode_values = [m.value if hasattr(m, "value") else m for m in entity.hvac_modes]
         assert "off" not in mode_values
         from homeassistant.components.climate import HVACMode
+
         assert entity.hvac_modes == [HVACMode.HEAT]
 
     def test_heat_and_cool_when_cooling_supported(self):
         from homeassistant.components.climate import HVACMode
+
         entity = _make_entity(
             cool_switch_entry=_COOL_SWITCH_ENTRY,
             cool_setpoint_entry=_COOL_SETPOINT_ENTRY,

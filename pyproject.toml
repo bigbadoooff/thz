@@ -2,6 +2,15 @@
 line-length = 88
 target-version = "py311"
 
+[tool.ruff.format]
+# The register/readings/write maps are hand-aligned tables; the formatter
+# would break them up line by line.
+exclude = [
+    "custom_components/thz/register_maps/readings_map_*.py",
+    "custom_components/thz/register_maps/register_map_[0-9a]*.py",
+    "custom_components/thz/register_maps/write_map_*.py",
+]
+
 [tool.ruff.lint]
 select = [
     "E",     # pycodestyle errors

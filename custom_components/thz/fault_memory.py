@@ -199,9 +199,7 @@ async def _read_back(
     return None, errors
 
 
-async def clear_fault_memory(
-    hass: HomeAssistant, device: THZDevice
-) -> dict[str, Any]:
+async def clear_fault_memory(hass: HomeAssistant, device: THZDevice) -> dict[str, Any]:
     """Clear the physical D1 fault memory and verify it by readback.
 
     Safety properties: D1 is read and validated first; nothing is written when
@@ -224,9 +222,7 @@ async def clear_fault_memory(
     if before_count == 0:
         return {"cleared": False, "before_count": 0, "after_count": 0}
 
-    _LOGGER.warning(
-        "Clearing THZ D1 fault memory (%d record(s) stored)", before_count
-    )
+    _LOGGER.warning("Clearing THZ D1 fault memory (%d record(s) stored)", before_count)
     try:
         await device.async_execute(
             hass, device.write_value, FAULT_MEMORY_COMMAND, FAULT_CLEAR_PAYLOAD

@@ -5,6 +5,7 @@ few hand-picked examples: encoding round-trips, escaping, frame parsing
 across arbitrary read-chunk boundaries, time quantisation, and that a 2xx
 block write only ever changes the bytes (or bits) of its own parameter.
 """
+
 import asyncio
 from datetime import time as dt_time
 from unittest.mock import patch
@@ -32,6 +33,7 @@ _DEVICE = THZDevice(connection="usb", port="/dev/null")
 # Value codec
 # ---------------------------------------------------------------------------
 
+
 @given(
     steps=st.integers(min_value=-32768, max_value=32767),
     step=st.sampled_from([0.01, 0.1, 0.5, 1.0]),
@@ -40,9 +42,7 @@ def test_signed_number_round_trips(steps, step):
     value = round(steps * step, 2)
     encoded = THZValueCodec.encode_number(value, step, "hex2int", 2)
     assert len(encoded) == 2
-    assert THZValueCodec.decode_number(encoded, step, "hex2int") == pytest.approx(
-        value
-    )
+    assert THZValueCodec.decode_number(encoded, step, "hex2int") == pytest.approx(value)
 
 
 @given(steps=st.integers(min_value=0, max_value=255), step=st.sampled_from([0.1, 1.0]))
@@ -112,8 +112,9 @@ def test_frame_is_read_completely_across_any_chunking(payload, cuts):
     ]
     feed = iter(chunks)
     device = THZDevice(connection="usb", port="/dev/null")
-    with patch.object(device, "_write_bytes"), patch.object(
-        device, "_read_available", side_effect=lambda: next(feed, b"")
+    with (
+        patch.object(device, "_write_bytes"),
+        patch.object(device, "_read_available", side_effect=lambda: next(feed, b"")),
     ):
         received = device._receive_data_telegram(1.0)
 
@@ -125,6 +126,7 @@ def test_frame_is_read_completely_across_any_chunking(payload, cuts):
 # ---------------------------------------------------------------------------
 # Schedule times
 # ---------------------------------------------------------------------------
+
 
 @given(quarters=st.integers(min_value=0, max_value=95))
 def test_quarters_round_trip(quarters):

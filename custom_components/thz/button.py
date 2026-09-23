@@ -115,9 +115,7 @@ class THZButton(THZBaseEntity, ButtonEntity):
             )
             _LOGGER.info("Button %s pressed successfully", self.name)
         except (ValueError, TypeError, OSError, RuntimeError, ConnectionError) as err:
-            _LOGGER.error(
-                "Error pressing button %s: %s", self.name, err, exc_info=True
-            )
+            _LOGGER.error("Error pressing button %s: %s", self.name, err, exc_info=True)
             raise HomeAssistantError(
                 f"Unable to execute THZ button '{self.name}'"
             ) from err

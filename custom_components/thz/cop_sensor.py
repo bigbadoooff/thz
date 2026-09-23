@@ -55,14 +55,14 @@ _POWER_BLOCK = "pxxFB"
 # All energy blocks are PAIRED (cmd2 + cmd3 combined as high*1000 + low), so the
 # coordinator stores a 4-byte signed integer at bytes 4:8 — hence byte_length=4.
 _ENERGY_SENSOR_BLOCKS: dict[str, tuple[str, int, int, str, float]] = {
-    "sHeatDHWDay":     ("pxx0A092A", 4, 4, "hex2int", 1.0),
-    "sHeatDHWTotal":   ("pxx0A092C", 4, 4, "hex2int", 1.0),
-    "sHeatHCDay":      ("pxx0A092E", 4, 4, "hex2int", 1.0),
-    "sHeatHCTotal":    ("pxx0A0930", 4, 4, "hex2int", 1.0),
-    "sElectrDHWDay":   ("pxx0A091A", 4, 4, "hex2int", 1.0),
+    "sHeatDHWDay": ("pxx0A092A", 4, 4, "hex2int", 1.0),
+    "sHeatDHWTotal": ("pxx0A092C", 4, 4, "hex2int", 1.0),
+    "sHeatHCDay": ("pxx0A092E", 4, 4, "hex2int", 1.0),
+    "sHeatHCTotal": ("pxx0A0930", 4, 4, "hex2int", 1.0),
+    "sElectrDHWDay": ("pxx0A091A", 4, 4, "hex2int", 1.0),
     "sElectrDHWTotal": ("pxx0A091C", 4, 4, "hex2int", 1.0),
-    "sElectrHCDay":    ("pxx0A091E", 4, 4, "hex2int", 1.0),
-    "sElectrHCTotal":  ("pxx0A0920", 4, 4, "hex2int", 1.0),
+    "sElectrHCDay": ("pxx0A091E", 4, 4, "hex2int", 1.0),
+    "sElectrHCTotal": ("pxx0A0920", 4, 4, "hex2int", 1.0),
 }
 
 
@@ -266,7 +266,8 @@ class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
         if len(payload) < min_length:
             _LOGGER.debug(
                 "Payload too short for power sensors: %d bytes, need %d",
-                len(payload), min_length,
+                len(payload),
+                min_length,
             )
             return None
 
@@ -303,9 +304,7 @@ class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
     name/unique_id/translation_key and ``native_value`` logic.
     """
 
-    def __init__(
-        self, coordinators: dict[str, Any], device_id: str
-    ) -> None:
+    def __init__(self, coordinators: dict[str, Any], device_id: str) -> None:
         """Initialize common COP sensor state.
 
         Args:
@@ -527,4 +526,3 @@ class THZLifetimeCOPSensor(THZBaseCOPSensor):
                 return round(cop, 2)
 
         return None
-

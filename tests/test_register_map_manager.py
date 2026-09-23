@@ -1,6 +1,5 @@
 """Tests for register map manager."""
 
-
 from custom_components.thz.register_maps.register_map_manager import (
     FIRMWARE_MAPS,
     RegisterMapManager,
@@ -260,9 +259,7 @@ class TestBaseRegisterMapManager:
         """Test merging maps with list entries."""
         manager = RegisterMapManager("206")
 
-        base = {
-            "block1": [("sensor1", 0, 2, "hex"), ("sensor2", 2, 2, "hex")]
-        }
+        base = {"block1": [("sensor1", 0, 2, "hex"), ("sensor2", 2, 2, "hex")]}
         override = {
             "block1": [("sensor2", 2, 2, "hex2int", 10)]  # Override sensor2
         }
@@ -324,8 +321,8 @@ class TestRegisterMapManagerWrite2xxEnrichment:
 
         entry = registers.get("p01RoomTempDay")
         assert entry is not None
-        assert entry.get("offset") == 2   # nibble 4 → byte 2
-        assert entry.get("length") == 2   # nibble 4 → byte 2
+        assert entry.get("offset") == 2  # nibble 4 → byte 2
+        assert entry.get("length") == 2  # nibble 4 → byte 2
 
     def test_2xx_entries_get_step_from_factor(self):
         """Test that step is computed as 1/factor from the register map."""
@@ -378,9 +375,9 @@ class TestRegisterMapManagerWrite2xxEnrichment:
         registers = manager.get_all_registers()
 
         expected = [
-            ("p13GradientHC1", "05"),   # pHeat1
-            ("p21Hyst1", "06"),          # pHeat2
-            ("p32HystDHW", "07"),        # pDHW
+            ("p13GradientHC1", "05"),  # pHeat1
+            ("p21Hyst1", "06"),  # pHeat2
+            ("p32HystDHW", "07"),  # pDHW
             ("p37Fanstage1AirflowInlet", "01"),  # pFan
             ("p54MinPumpCycles", "0A"),  # pCircPump
         ]

@@ -4,6 +4,7 @@ Exercises async_setup_entry's entity-creation loop (block skipping, bit-type
 skipping, duplicate-name skipping, metadata pass-through) as well as the
 THZGenericSensor entity properties under varied coordinator-data states.
 """
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -26,8 +27,13 @@ class FakeRegisterManager:
         return self._registers
 
 
-def _make_hass_and_entry(registers, coordinators, unsupported_blocks=None,
-                          device_id="dev1", firmware_version="2.06"):
+def _make_hass_and_entry(
+    registers,
+    coordinators,
+    unsupported_blocks=None,
+    device_id="dev1",
+    firmware_version="2.06",
+):
     """Build a (hass, config_entry) pair with entry_data for both platforms.
 
     Populates entry_data for sensor.async_setup_entry and the cop_sensor
@@ -355,9 +361,7 @@ class TestTHZGenericSensor:
         coord.data = None
         entry = self._make_entry(name="Outside Temp")
         block = bytes.fromhex("FB")
-        sensor = THZGenericSensor(
-            coord, entry=entry, block=block, device_id="dev1"
-        )
+        sensor = THZGenericSensor(coord, entry=entry, block=block, device_id="dev1")
         assert sensor.unique_id == f"thz_{block}_0_outside_temp"
         assert sensor.unique_id.endswith("_0_outside_temp")
 
@@ -378,7 +382,9 @@ class TestTHZGenericSensor:
         coord = MagicMock()
         coord.data = None
         sensor = THZGenericSensor(
-            coord, entry=self._make_entry(), block=bytes.fromhex("FB"),
+            coord,
+            entry=self._make_entry(),
+            block=bytes.fromhex("FB"),
             device_id="my_device",
         )
         info = sensor.device_info
@@ -396,8 +402,7 @@ class TestAbsentAndNibbleFields:
 
         manager = RegisterMapManager("206")
         coordinators = {
-            block: MagicMock(data=bytes(80))
-            for block in manager.get_all_registers()
+            block: MagicMock(data=bytes(80)) for block in manager.get_all_registers()
         }
         hass, config_entry = _make_hass_and_entry(
             manager.get_all_registers(), coordinators
@@ -416,8 +421,8 @@ class TestAbsentAndNibbleFields:
     @pytest.mark.parametrize(
         ("nibble_offset", "byte_value", "expected"),
         [
-            (7, 0x93, "Thursday"),   # low nibble 3, high nibble set
-            (6, 0x35, "Thursday"),   # high nibble 3
+            (7, 0x93, "Thursday"),  # low nibble 3, high nibble set
+            (6, 0x35, "Thursday"),  # high nibble 3
         ],
     )
     async def test_single_nibble_value_ignores_the_other_nibble(

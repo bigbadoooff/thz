@@ -1,10 +1,11 @@
-﻿"""Coverage tests for the service handlers registered by async_setup_services.
+"""Coverage tests for the service handlers registered by async_setup_services.
 
 read_raw_register is already covered by test_service_read_raw_register.py.
 This file covers scan_raw_registers, watch_raw_registers_changes,
 refresh_block, and set_diverter_valve. backup_parameters, restore_parameters,
 and list_parameter_backups are covered by test_backup_restore_services.py.
 """
+
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -421,7 +422,6 @@ class TestSetDiverterValveService:
         ):
             await handler(call)
 
-
     @pytest.mark.asyncio
     async def test_cancel_while_motor_runs_still_stops_both_motors(self):
         from custom_components.thz import services as services_module
@@ -440,10 +440,14 @@ class TestSetDiverterValveService:
 
         call = MagicMock()
         call.data = {"position": "heating"}
-        with patch.object(
-            services_module.asyncio, "sleep",
-            AsyncMock(side_effect=asyncio.CancelledError),
-        ), pytest.raises(asyncio.CancelledError):
+        with (
+            patch.object(
+                services_module.asyncio,
+                "sleep",
+                AsyncMock(side_effect=asyncio.CancelledError),
+            ),
+            pytest.raises(asyncio.CancelledError),
+        ):
             await handler(call)
 
         writes = [c.args[2:] for c in device.async_execute.await_args_list]

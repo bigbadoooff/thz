@@ -5,6 +5,7 @@ encode_switch/decode_switch, plus the module-level _dec_* helper functions
 reached via decode_raw_value that are not exercised by
 test_decode_value.py / test_decode_extended.py.
 """
+
 import pytest
 
 from custom_components.thz.value_codec import THZValueCodec, decode_raw_value
@@ -45,9 +46,7 @@ class TestEncodeNumber:
         # value / 0.1 lands just below the integer for these (e.g.
         # 0.3 / 0.1 == 2.9999999999999996); truncating wrote one step too low.
         result = THZValueCodec.encode_number(value, 0.1, "hex2int")
-        assert int.from_bytes(result, byteorder="big", signed=True) == round(
-            value * 10
-        )
+        assert int.from_bytes(result, byteorder="big", signed=True) == round(value * 10)
 
     @pytest.mark.parametrize("step", [0.1, 0.5, 1.0])
     def test_round_trips_every_step_value(self, step):

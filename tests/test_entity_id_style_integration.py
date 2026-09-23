@@ -13,6 +13,7 @@ pipeline. Setting ``self.entity_id`` directly (what the production code now
 does) is the mechanism entity_platform.py actually honors -- see
 base_entity.py's THZBaseEntity.__init__.
 """
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -151,7 +152,7 @@ class TestWriteEntityIdStyle:
             device_id="test_device",
             entity_id_style="fhem",
         )
-        expected = fhem_style_object_id('zResetLast10errors')
+        expected = fhem_style_object_id("zResetLast10errors")
         assert entity.entity_id == f"button.{expected}"
 
     def test_button_default_style_leaves_suggested_object_id_unset(self):

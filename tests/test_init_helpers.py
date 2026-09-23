@@ -1,4 +1,5 @@
 """Coverage tests for the pure/near-pure helper functions in services.py."""
+
 from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError

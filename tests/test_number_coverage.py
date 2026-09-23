@@ -1,4 +1,5 @@
 """Coverage tests for number.py (THZNumber entity and async_setup_entry)."""
+
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 

@@ -4,6 +4,7 @@ Exercises the COP calculation helpers, entity setup logic, and the
 native_value properties of THZCurrentCOPSensor, THZDailyCOPSensor, and
 THZLifetimeCOPSensor under a variety of coordinator-data states.
 """
+
 import struct
 from unittest.mock import MagicMock
 
@@ -240,9 +241,7 @@ class TestTHZCurrentCOPSensor:
     def test_factor_is_applied_to_both_values(self):
         coord = MagicMock()
         coord.data = _make_power_payload(qc=0.004, pel=0.001)
-        sensor = THZCurrentCOPSensor(
-            coord, "dev1", (47, 4, 0.001), (51, 4, 0.001)
-        )
+        sensor = THZCurrentCOPSensor(coord, "dev1", (47, 4, 0.001), (51, 4, 0.001))
         assert sensor.native_value == 4.0
 
     def test_native_value_none_when_no_data(self):
@@ -436,9 +435,7 @@ class TestTHZLifetimeCOPSensor:
 
     def test_init_dhw(self):
         coordinators = _make_energy_coordinators({"sHeatDHWDay": 0})
-        sensor = THZLifetimeCOPSensor(
-            coordinators, "dev1", "lifetime_cop_dhw", "DHW"
-        )
+        sensor = THZLifetimeCOPSensor(coordinators, "dev1", "lifetime_cop_dhw", "DHW")
         assert sensor._attr_unique_id == "thz_dev1_lifetime_cop_dhw"
         assert sensor._heat_sensor == "sHeatDHWTotal"
         assert sensor._elec_sensor == "sElectrDHWTotal"
