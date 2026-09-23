@@ -155,8 +155,9 @@ class TestClearValueServiceRegistration:
 
     @pytest.mark.asyncio
     async def test_async_setup_entry_registers_clear_value_service(self):
-        from custom_components.thz.time import async_setup_entry
         from homeassistant.helpers import entity_platform as ep_mock
+
+        from custom_components.thz.time import async_setup_entry
 
         platform_mock = MagicMock()
         ep_mock.async_get_current_platform = MagicMock(return_value=platform_mock)

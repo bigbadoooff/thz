@@ -11,8 +11,6 @@ Covers _list_serial_ports():
 import sys
 from unittest.mock import MagicMock, patch
 
-
-
 # ---------------------------------------------------------------------------
 # Ensure config_entries.ConfigFlow is a real class so THZConfigFlow can be
 # imported and subclassed.
@@ -20,7 +18,7 @@ from unittest.mock import MagicMock, patch
 # conftest.py does `sys.modules['homeassistant'] = MagicMock()`. When
 # config_flow.py does `from homeassistant import config_entries`, Python's
 # import machinery calls `getattr(ha_mock, 'config_entries')`, which returns
-# a *child* mock – NOT sys.modules['homeassistant.config_entries'].  So we
+# a *child* mock - NOT sys.modules['homeassistant.config_entries'].  So we
 # must patch the attribute on sys.modules['homeassistant'] directly.
 #
 # Also, conftest creates separate MagicMocks for 'serial', 'serial.tools', and
@@ -66,7 +64,6 @@ for _key in list(sys.modules):
 
 
 from custom_components.thz.config_flow import THZConfigFlow  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -345,7 +342,9 @@ class TestEntityIdStyleOption:
         schema_dict.
         """
         import asyncio
+
         import voluptuous as vol
+
         from custom_components.thz.const import CONF_ENTITY_ID_STYLE
 
         vol.Optional.reset_mock()
@@ -360,6 +359,7 @@ class TestEntityIdStyleOption:
 
     def test_async_step_user_captures_entity_id_style_and_routes_to_usb(self):
         import asyncio
+
         from custom_components.thz.const import CONNECTION_USB
 
         flow = THZConfigFlow()
@@ -380,6 +380,7 @@ class TestEntityIdStyleOption:
     def test_async_step_user_defaults_entity_id_style_when_omitted(self):
         """If the form is somehow submitted without the field, fall back safely."""
         import asyncio
+
         from custom_components.thz.const import CONNECTION_USB, ENTITY_ID_STYLE_DEFAULT
 
         flow = THZConfigFlow()
@@ -400,7 +401,9 @@ class TestEntityIdStyleOption:
         rather than the (also mocked) resulting vol.Schema object.
         """
         import asyncio
+
         import voluptuous as vol
+
         from custom_components.thz.const import (
             CONF_CONNECTION_TYPE,
             CONF_ENTITY_ID_STYLE,
@@ -428,7 +431,9 @@ class TestEntityIdStyleOption:
     def test_reconfigure_schema_preserves_existing_entity_id_style_default(self):
         """A stored 'fhem' choice is prefilled as the form's default, not reset."""
         import asyncio
+
         import voluptuous as vol
+
         from custom_components.thz.const import (
             CONF_CONNECTION_TYPE,
             CONF_ENTITY_ID_STYLE,
@@ -478,7 +483,9 @@ class TestEntityVisibilityOption:
         the (also mocked) resulting vol.Schema object.
         """
         import asyncio
+
         import voluptuous as vol
+
         from custom_components.thz.const import CONF_ENTITY_VISIBILITY
 
         vol.Optional.reset_mock()
@@ -493,6 +500,7 @@ class TestEntityVisibilityOption:
 
     def test_async_step_user_captures_entity_visibility_and_routes_to_usb(self):
         import asyncio
+
         from custom_components.thz.const import CONNECTION_USB
 
         flow = THZConfigFlow()
@@ -513,6 +521,7 @@ class TestEntityVisibilityOption:
     def test_async_step_user_defaults_entity_visibility_when_omitted(self):
         """If the form is somehow submitted without the field, fall back safely."""
         import asyncio
+
         from custom_components.thz.const import (
             CONNECTION_USB,
             ENTITY_VISIBILITY_DEFAULT,
@@ -536,7 +545,9 @@ class TestEntityVisibilityOption:
         _async_apply_entity_visibility_tier in __init__.py).
         """
         import asyncio
+
         import voluptuous as vol
+
         from custom_components.thz.const import (
             CONF_CONNECTION_TYPE,
             CONF_ENTITY_VISIBILITY,
@@ -564,7 +575,9 @@ class TestEntityVisibilityOption:
     def test_reconfigure_schema_preserves_existing_entity_visibility_default(self):
         """A stored 'all' choice is prefilled as the form's default, not reset."""
         import asyncio
+
         import voluptuous as vol
+
         from custom_components.thz.const import (
             CONF_CONNECTION_TYPE,
             CONF_ENTITY_VISIBILITY,
@@ -599,6 +612,7 @@ class TestEntityVisibilityOption:
     def test_refresh_blocks_final_data_includes_entity_visibility(self):
         """The final config-entry data dict carries the chosen visibility tier."""
         import asyncio
+
         from custom_components.thz.const import (
             CONF_ENTITY_VISIBILITY,
             DEFAULT_UPDATE_INTERVAL,
@@ -642,6 +656,7 @@ class TestAliasOption:
     def test_async_step_user_schema_includes_alias(self):
         """The very first setup step's schema offers the alias field."""
         import asyncio
+
         import voluptuous as vol
 
         vol.Optional.reset_mock()
@@ -656,6 +671,7 @@ class TestAliasOption:
 
     def test_async_step_user_captures_alias_and_strips_whitespace(self):
         import asyncio
+
         from custom_components.thz.const import CONNECTION_USB
 
         flow = THZConfigFlow()
@@ -675,6 +691,7 @@ class TestAliasOption:
 
     def test_async_step_user_defaults_alias_to_empty_when_omitted(self):
         import asyncio
+
         from custom_components.thz.const import CONNECTION_USB
 
         flow = THZConfigFlow()
@@ -690,6 +707,7 @@ class TestAliasOption:
     def test_refresh_blocks_final_data_includes_alias(self):
         """The final config-entry data dict carries the chosen alias."""
         import asyncio
+
         from custom_components.thz.const import DEFAULT_UPDATE_INTERVAL
 
         flow = THZConfigFlow()

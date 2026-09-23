@@ -138,7 +138,11 @@ class TestNoFirmwareLosesBaseMeta:
             for e in base_entries:
                 name = _norm(e[0])
                 # "n.a." entries are deliberately blanked by 2.xx firmware maps.
-                if len(e) > 5 and name in merged and merged[name][3] != "n.a.":
-                    if len(merged[name]) <= 5:
-                        lost.append(f"{block}.{name}")
+                if (
+                    len(e) > 5
+                    and name in merged
+                    and merged[name][3] != "n.a."
+                    and len(merged[name]) <= 5
+                ):
+                    lost.append(f"{block}.{name}")
         assert lost == []

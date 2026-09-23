@@ -423,8 +423,8 @@ class TestEntityRegistryEnabledDefault:
         THZScheduleTime entities for every schedule entry whose name
         contains 'program', and assert entity_registry_enabled_default is False.
         """
-        from custom_components.thz.time import THZScheduleTime
         from custom_components.thz.register_maps.write_map_439_539 import WRITE_MAP
+        from custom_components.thz.time import THZScheduleTime
 
         device = self._make_mock_device()
 
@@ -483,36 +483,41 @@ class TestBinarySensorModule:
 
     def test_get_device_class_compressor(self):
         """Test device class mapping for compressor-like entities."""
-        from custom_components.thz.binary_sensor import _get_device_class
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
+        from custom_components.thz.binary_sensor import _get_device_class
         assert _get_device_class("compressor") == BinarySensorDeviceClass.RUNNING
 
     def test_get_device_class_pump(self):
         """Test device class mapping for pump entities."""
-        from custom_components.thz.binary_sensor import _get_device_class
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
+        from custom_components.thz.binary_sensor import _get_device_class
         assert _get_device_class("dhwPump") == BinarySensorDeviceClass.RUNNING
         pump_class = _get_device_class("heatingCircuitPump")
         assert pump_class == BinarySensorDeviceClass.RUNNING
 
     def test_get_device_class_filter(self):
         """Test device class mapping for filter entities."""
-        from custom_components.thz.binary_sensor import _get_device_class
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
+        from custom_components.thz.binary_sensor import _get_device_class
         assert _get_device_class("filterBoth") == BinarySensorDeviceClass.PROBLEM
         assert _get_device_class("filterUp") == BinarySensorDeviceClass.PROBLEM
         assert _get_device_class("filterDown") == BinarySensorDeviceClass.PROBLEM
 
     def test_get_device_class_window(self):
         """Test device class mapping for window sensor."""
-        from custom_components.thz.binary_sensor import _get_device_class
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
+        from custom_components.thz.binary_sensor import _get_device_class
         assert _get_device_class("windowOpen") == BinarySensorDeviceClass.WINDOW
 
     def test_get_device_class_valve(self):
         """Test device class mapping for valve entities."""
-        from custom_components.thz.binary_sensor import _get_device_class
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
+        from custom_components.thz.binary_sensor import _get_device_class
         assert _get_device_class("diverterValve") == BinarySensorDeviceClass.OPENING
         assert _get_device_class("mixerOpen") == BinarySensorDeviceClass.OPENING
 
@@ -523,8 +528,9 @@ class TestBinarySensorModule:
 
     def test_binary_sensor_is_on_property(self):
         """Test THZBinarySensor.is_on returns correct boolean."""
-        from custom_components.thz.binary_sensor import THZBinarySensor
         from unittest.mock import MagicMock
+
+        from custom_components.thz.binary_sensor import THZBinarySensor
 
         coordinator = MagicMock()
         # payload byte 0x08 = 0b00001000; bit3 = 1
@@ -546,8 +552,9 @@ class TestBinarySensorModule:
 
     def test_binary_sensor_is_on_false(self):
         """Test THZBinarySensor.is_on returns False when bit is 0."""
-        from custom_components.thz.binary_sensor import THZBinarySensor
         from unittest.mock import MagicMock
+
+        from custom_components.thz.binary_sensor import THZBinarySensor
 
         coordinator = MagicMock()
         coordinator.data = bytes([0x00])
@@ -568,8 +575,9 @@ class TestBinarySensorModule:
 
     def test_binary_sensor_is_on_none_when_no_data(self):
         """Test THZBinarySensor.is_on returns None when coordinator has no data."""
-        from custom_components.thz.binary_sensor import THZBinarySensor
         from unittest.mock import MagicMock
+
+        from custom_components.thz.binary_sensor import THZBinarySensor
 
         coordinator = MagicMock()
         coordinator.data = None
@@ -590,8 +598,9 @@ class TestBinarySensorModule:
 
     def test_binary_sensor_nbit_inverts(self):
         """Test that nbit decode type inverts the bit."""
-        from custom_components.thz.binary_sensor import THZBinarySensor
         from unittest.mock import MagicMock
+
+        from custom_components.thz.binary_sensor import THZBinarySensor
 
         coordinator = MagicMock()
         # byte 0x01 = bit0 is 1; nbit0 should invert → False
@@ -613,8 +622,9 @@ class TestBinarySensorModule:
 
     def test_binary_sensor_unique_id(self):
         """Test that unique_id is generated correctly."""
-        from custom_components.thz.binary_sensor import THZBinarySensor
         from unittest.mock import MagicMock
+
+        from custom_components.thz.binary_sensor import THZBinarySensor
 
         coordinator = MagicMock()
         coordinator.data = None
@@ -635,8 +645,9 @@ class TestBinarySensorModule:
 
     def test_binary_sensor_device_info(self):
         """Test that device_info links entity to correct device."""
-        from custom_components.thz.binary_sensor import THZBinarySensor
         from unittest.mock import MagicMock
+
+        from custom_components.thz.binary_sensor import THZBinarySensor
 
         coordinator = MagicMock()
         coordinator.data = None

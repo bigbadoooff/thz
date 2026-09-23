@@ -34,7 +34,7 @@ class TestFaultLogBlockDefinition:
     def test_number_of_faults_entry(self):
         """Test the number_of_faults entry matches FHEM's D1last offset/type."""
         entries = readings_map_439.REGISTER_MAP["pxxD1"]
-        name, offset, length, decode, factor = entries[0][:5]
+        name, offset, length, decode, _factor = entries[0][:5]
         assert name.strip().rstrip(":") == "number_of_faults"
         assert (offset, length, decode) == (4, 2, "hex")
 
@@ -93,7 +93,7 @@ class TestFaultLogEndToEndDecode:
         entries = readings_map_439.REGISTER_MAP["pxxD1"]
         results = {}
         for entry in entries:
-            name, offset, length, decode, factor = entry[:5]
+            name, offset, length, decode, _factor = entry[:5]
             results[name.strip().rstrip(":")] = self._extract(
                 message_hex, offset, length, decode
             )

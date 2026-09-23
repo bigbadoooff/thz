@@ -331,7 +331,7 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
         merged.update(deepcopy(override) or {})
         return merged
 
-    def _enrich_2xx_write_entries(self) -> None:
+    def _enrich_2xx_write_entries(self) -> None:  # noqa: C901
         """Enrich 2xx firmware write entries with block address, offset, length and step.
 
         For 2xx firmware, each writable parameter lives inside a larger register block.

@@ -1,6 +1,7 @@
 """Coverage tests for the pure/near-pure helper functions in services.py."""
 from unittest.mock import AsyncMock, MagicMock
 
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.thz.services import (
@@ -12,7 +13,6 @@ from custom_components.thz.services import (
     _require_target_entry_data,
     async_refresh_block,
 )
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 
 def _make_hass_with_entries(entries: dict) -> MagicMock:

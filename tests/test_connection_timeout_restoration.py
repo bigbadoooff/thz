@@ -5,7 +5,6 @@ _is_connection_alive() and _read_available() methods, preventing
 the connection loss issue after ~20 hours.
 """
 
-import socket
 from unittest.mock import Mock
 
 import pytest
@@ -136,7 +135,7 @@ class TestConnectionTimeoutRestoration:
         # Create a mock socket
         mock_socket = Mock()
         mock_socket.gettimeout.return_value = 1.0  # Original timeout
-        mock_socket.recv.side_effect = socket.error("Connection reset")
+        mock_socket.recv.side_effect = OSError("Connection reset")
         mock_socket.fileno.return_value = 5  # Valid file descriptor
 
         device.ser = mock_socket

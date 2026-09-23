@@ -62,7 +62,7 @@ CLOCK_READ_ATTEMPTS = 3
 
 
 async def _read_clock_parts(
-    hass: HomeAssistant, device: "THZDevice", write_manager
+    hass: HomeAssistant, device: THZDevice, write_manager
 ) -> dict[str, int] | None:
     """Read the five pClock* components, retrying each read a few times.
 
@@ -116,7 +116,7 @@ def _parts_to_datetime(parts: dict[str, int]) -> datetime | None:
 
 
 async def async_read_device_clock(
-    hass: HomeAssistant, device: "THZDevice", write_manager
+    hass: HomeAssistant, device: THZDevice, write_manager
 ) -> datetime | None:
     """Read the device's current date/time from its 5 pClock* registers.
 
@@ -129,7 +129,7 @@ async def async_read_device_clock(
 
 
 async def async_write_device_clock(
-    hass: HomeAssistant, device: "THZDevice", write_manager, when: datetime
+    hass: HomeAssistant, device: THZDevice, write_manager, when: datetime
 ) -> bool:
     """Write ``when`` (a local wall-clock time) onto the 5 pClock* registers.
 
@@ -175,8 +175,8 @@ async def async_write_device_clock(
 
 async def async_check_and_maybe_sync_clock(
     hass: HomeAssistant,
-    config_entry: "ConfigEntry",
-    device: "THZDevice",
+    config_entry: ConfigEntry,
+    device: THZDevice,
     write_manager,
 ) -> None:
     """Periodic check: log clock drift, and auto-correct it if opted in.
@@ -229,7 +229,7 @@ async def async_check_and_maybe_sync_clock(
 
 
 def async_setup_clock_check(
-    hass: HomeAssistant, config_entry: "ConfigEntry", device: "THZDevice", write_manager
+    hass: HomeAssistant, config_entry: ConfigEntry, device: THZDevice, write_manager
 ):
     """Register the periodic clock-drift check for a config entry.
 

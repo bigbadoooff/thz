@@ -20,7 +20,6 @@ import pytest
 
 from custom_components.thz.climate import THZClimate
 
-
 _DAY_ENTRY = {"command": "0A0080", "min": "10", "max": "30", "step": "0.1"}
 _NIGHT_ENTRY = {"command": "0A0081", "min": "10", "max": "30", "step": "0.1"}
 

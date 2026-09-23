@@ -2,6 +2,7 @@
 import sys
 from unittest.mock import MagicMock
 
+
 # Create mock base classes to avoid metaclass conflicts
 class MockEntity:
     """Mock entity base class.
@@ -222,9 +223,10 @@ sys.modules['homeassistant.components.time'] = time_mock
 
 # Mock climate component
 # Use a minimal string enum so that HVACMode comparisons work in tests.
-from enum import Enum  # noqa: E402
+from enum import StrEnum  # noqa: E402
 
-class MockHVACMode(str, Enum):
+
+class MockHVACMode(StrEnum):
     """Minimal HVACMode stand-in for tests."""
     HEAT = "heat"
     COOL = "cool"

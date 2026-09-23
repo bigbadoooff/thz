@@ -5,8 +5,10 @@ on this firmware variant and must be excluded to prevent startup failures.
 See GitHub issues #113 and #115.
 """
 
-from .readings_map_539 import REGISTER_MAP as _base_539
-from .readings_map_539 import PAIRED_BLOCKS  # noqa: F401  # re-export unchanged
+from .readings_map_539 import (
+    PAIRED_BLOCKS as PAIRED_BLOCKS,  # re-exported unchanged
+    REGISTER_MAP as _base_539,
+)
 
 _UNSUPPORTED_509: frozenset[str] = frozenset(
     {

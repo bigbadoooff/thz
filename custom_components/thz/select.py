@@ -9,11 +9,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZBaseEntity
-from .entity_translations import get_translation_key
 from .const import (
-    WRITE_REGISTER_OFFSET,
     WRITE_REGISTER_LENGTH,
+    WRITE_REGISTER_OFFSET,
 )
+from .entity_translations import get_translation_key
 from .platform_setup import async_setup_write_platform
 from .thz_device import THZDevice
 from .value_codec import THZValueCodec
@@ -177,7 +177,7 @@ class THZSelect(THZBaseEntity, SelectEntity):
 
             self._attr_current_option = option
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:
             _LOGGER.error(
                 "Error setting select %s to option %s: %s",
                 self.name, option, err, exc_info=True

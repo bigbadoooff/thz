@@ -6,15 +6,15 @@ communication with Stiebel Eltron LWZ / Tecalor THZ heat pumps.
 
 import asyncio
 from collections.abc import Callable
+import contextlib
 import logging
 import socket
 import threading
 import time
 from typing import Any
 
-import serial
-
 from homeassistant.core import HomeAssistant
+import serial
 
 from . import const
 from .register_maps.register_map_manager import (
@@ -47,7 +47,7 @@ class THZDevice:
         read_timeout: float = const.TIMEOUT,
         firmware_override: str | None = None,
     ) -> None:
-        """Initialize basic configuration – no communication yet."""
+        """Initialize basic configuration - no communication yet."""
         self.connection = connection
         self.port = port
         self.host = host
@@ -233,19 +233,17 @@ class THZDevice:
                 except BlockingIOError:
                     # No data available but connection is alive
                     pass
-                except (OSError, socket.error):
+                except OSError:
                     # Connection is broken
                     return False
                 finally:
-                    # Always restore the original timeout
-                    try:
+                    # Always restore the original timeout; the socket may be
+                    # in a bad state.
+                    with contextlib.suppress(OSError):
                         self.ser.settimeout(original_timeout)  # type: ignore[union-attr]
-                    except (OSError, socket.error):
-                        # Socket may be in bad state, ignore
-                        pass
 
                 return True
-            except (OSError, socket.error, AttributeError):
+            except (OSError, AttributeError):
                 return False
 
         # Serial connection
@@ -282,10 +280,8 @@ class THZDevice:
         _LOGGER.warning("Attempting to reconnect...")
         try:
             if self.ser is not None:
-                try:
+                with contextlib.suppress(OSError):
                     self.ser.close()
-                except OSError:
-                    pass
 
             if self.connection == "usb":
                 self._connect_serial()
@@ -507,7 +503,7 @@ class THZDevice:
                         _LOGGER.warning("Reconnect failed: %s", reconnect_error)
                 raise
 
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 _LOGGER.exception("Unexpected error in send_request: %s", e)
                 raise RuntimeError(f"Device communication failed: {e}") from e
 
@@ -548,7 +544,7 @@ class THZDevice:
             else:
                 self.ser.write(data)  # type: ignore[union-attr]
                 self.ser.flush()  # type: ignore[union-attr]
-        except (OSError, socket.error, BrokenPipeError) as e:
+        except (OSError, BrokenPipeError) as e:
             # Connection reset, broken pipe, or other socket/serial errors
             _LOGGER.debug("Connection error during write: %s", e)
             raise ConnectionError(f"Failed to write to connection: {e}") from e
@@ -593,7 +589,7 @@ class THZDevice:
                 data = self.ser.recv(1024)  # type: ignore[union-attr]
             except BlockingIOError:
                 return b""
-            except (OSError, socket.error) as e:
+            except OSError as e:
                 # Connection reset, broken pipe, or other socket errors
                 _LOGGER.debug("TCP socket error during read: %s", e)
                 raise ConnectionError(f"TCP connection error: {e}") from e
@@ -605,12 +601,10 @@ class THZDevice:
             finally:
                 # Always restore the original timeout. UnboundLocalError covers
                 # the case where gettimeout() itself raised above, so
-                # original_timeout was never assigned.
-                try:
+                # original_timeout was never assigned. The socket may be in a
+                # bad state or already None.
+                with contextlib.suppress(OSError, AttributeError, UnboundLocalError):
                     self.ser.settimeout(original_timeout)  # type: ignore[union-attr]
-                except (OSError, socket.error, AttributeError, UnboundLocalError):
-                    # Socket may be in bad state or already None, ignore
-                    pass
             if not data:
                 # A non-blocking recv() only returns b"" at end of stream:
                 # the peer (e.g. a restarted ser2net) closed the connection.
@@ -639,17 +633,15 @@ class THZDevice:
         relevant for serial connections.
         """
         if self.ser is not None and hasattr(self.ser, "reset_input_buffer"):
-            try:
+            with contextlib.suppress(AttributeError):
                 self.ser.reset_input_buffer()
-            except AttributeError:
-                pass
 
     async def async_execute(
         self,
         hass: HomeAssistant,
         fn: Callable[..., Any],
         *args: Any,
-        timeout: float = 8.0,
+        timeout: float = 8.0,  # noqa: ASYNC109 - enforced on the executor job
     ) -> Any:
         """Execute a blocking device function with the lock held and a hard timeout.
 
@@ -673,7 +665,7 @@ class THZDevice:
         _LOCK_WAIT_TIMEOUT = 20.0
         try:
             await asyncio.wait_for(self.lock.acquire(), timeout=_LOCK_WAIT_TIMEOUT)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise ConnectionError(
                 f"Device busy: could not acquire lock within {_LOCK_WAIT_TIMEOUT:.0f}s"
             ) from None
@@ -684,7 +676,7 @@ class THZDevice:
         )
         try:
             return await asyncio.wait_for(asyncio.shield(future), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             _LOGGER.warning(
                 "Device call timed out after %.1fs; closing connection", timeout
             )
@@ -725,10 +717,8 @@ class THZDevice:
     def _force_close(self) -> None:
         """Close without raising; sets ser=None so the next call reconnects."""
         if self.ser is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self.ser.close()
-            except Exception:  # noqa: BLE001
-                pass
             self.ser = None
 
     def thz_checksum(self, data: bytes) -> bytes:
@@ -821,7 +811,7 @@ class THZDevice:
             return None
         except THZRegisterNotSupportedError:
             raise  # propagate — not a decode error, not a connection failure
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             _LOGGER.exception("Error decoding response: %s", e)
             return None
 
@@ -917,7 +907,7 @@ class THZDevice:
             # Bytes 4-5 hold the register value; all zeros = no cooling hardware.
             if len(result) >= 6 and result[4:6] == b"\x00\x00":
                 _LOGGER.debug(
-                    "Cooling probe: register 0A0648 returned zero payload – no cooling"
+                    "Cooling probe: register 0A0648 returned zero payload - no cooling"
                 )
                 return False
             return True

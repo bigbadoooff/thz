@@ -10,15 +10,15 @@ device clock via the dedicated pClock* helper rather than pulling it out of
 the "restorable parameters" dict (which filters out "pclean"-typed
 registers and would silently never see the clock at all).
 """
-import json
 from datetime import datetime, time as dt_time
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.thz.const import DOMAIN
 from custom_components.thz.services import async_setup_services
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 
 def _mock_hass():
@@ -640,8 +640,8 @@ class TestListParameterBackupsService:
         }
 
         def fake_open(path, mode="r", encoding=None):
-            import os as os_module
             from io import StringIO
+            import os as os_module
 
             fname = os_module.path.basename(path)
             return StringIO(json.dumps(docs[fname]))

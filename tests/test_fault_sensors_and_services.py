@@ -2,9 +2,11 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.thz import fault_sensor
+from custom_components.thz.const import DOMAIN
 from custom_components.thz.fault_sensor import (
     NO_FAULT,
     THZFaultMemorySensor,
@@ -19,10 +21,7 @@ from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManager,
 )
 from custom_components.thz.services import async_setup_services
-from custom_components.thz.const import DOMAIN
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-
-from tests.test_fault_memory import FakeStore, R3, R5, R11, _payload
+from tests.test_fault_memory import R3, R5, R11, FakeStore, _payload
 
 
 def _tracker():
@@ -335,9 +334,8 @@ class TestClearService:
         with patch(
             "custom_components.thz.services.clear_fault_memory",
             AsyncMock(side_effect=RuntimeError("D1 still reports 1 fault(s)")),
-        ):
-            with pytest.raises(HomeAssistantError, match="still reports"):
-                await handler(_call(confirmation="CLEAR D1"))
+        ), pytest.raises(HomeAssistantError, match="still reports"):
+            await handler(_call(confirmation="CLEAR D1"))
 
 
 class TestTranslationsAndIcons:

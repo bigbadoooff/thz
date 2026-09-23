@@ -20,7 +20,6 @@ import pytest
 
 from custom_components.thz.const import DOMAIN
 
-
 # ---------------------------------------------------------------------------
 # Module-level setup, mirroring tests/test_config_flow_ports.py's approach:
 # provide a real base class (with the async_show_form/async_abort/

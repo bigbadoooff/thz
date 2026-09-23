@@ -11,11 +11,11 @@ import pytest
 
 from custom_components.thz.const import DOMAIN
 from custom_components.thz.cop_sensor import (
+    _ENERGY_SENSOR_BLOCKS,
     THZBaseCOPSensor,
     THZCurrentCOPSensor,
     THZDailyCOPSensor,
     THZLifetimeCOPSensor,
-    _ENERGY_SENSOR_BLOCKS,
     _has_energy_sensors,
     _has_energy_values,
     _power_field_layout,
@@ -56,7 +56,7 @@ def _make_energy_coordinators(values: dict[str, int]) -> dict[str, MagicMock]:
     """
     coordinators = {}
     for sensor_name, raw_value in values.items():
-        block_name, offset, length, decode_type, factor = _ENERGY_SENSOR_BLOCKS[
+        block_name, offset, length, _decode_type, _factor = _ENERGY_SENSOR_BLOCKS[
             sensor_name
         ]
         payload = bytearray(offset + length)

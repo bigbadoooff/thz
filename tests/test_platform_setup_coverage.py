@@ -12,8 +12,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.thz.platform_setup import async_setup_write_platform
 from custom_components.thz.const import DEFAULT_WRITE_INTERVAL
+from custom_components.thz.platform_setup import async_setup_write_platform
 
 
 class FakeEntity:

@@ -6,9 +6,10 @@ across entity platforms (number, switch, select, time).
 
 from __future__ import annotations
 
-import logging
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Mapping
 from datetime import datetime, timedelta
+import logging
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import EntityCategory
@@ -42,7 +43,7 @@ class THZBaseEntity(Entity):
     _attr_should_poll = False
     # Block coordinators by key ("pxx17"), set by the platform setup; lets
     # 2xx block parameters read from data that is already being polled.
-    _coordinators: dict[str, Any] = {}
+    _coordinators: Mapping[str, Any] = MappingProxyType({})
 
     def __init__(
         self,
@@ -160,7 +161,7 @@ class THZBaseEntity(Entity):
 
         # Set default visibility based on entity naming conventions and the
         # configured entity_visibility tier.
-        # Uses HA's standard _attr_ pattern – do NOT add an explicit @property
+        # Uses HA's standard _attr_ pattern - do NOT add an explicit @property
         # override; it conflicts with HA's __init_subclass__ CachedProperty
         # mechanism and can silently default to True on derived entity classes.
         self._attr_entity_registry_enabled_default = not should_hide_entity(

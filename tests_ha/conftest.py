@@ -10,6 +10,7 @@ THZDevice whose send_request answers from in-memory registers.
 from __future__ import annotations
 
 from collections.abc import Generator
+from typing import ClassVar
 from unittest.mock import patch
 
 import pytest
@@ -25,7 +26,7 @@ BLOCK_SIZE = 120
 class FakeTHZDevice(THZDevice):
     """THZDevice speaking the real telegram format to in-memory registers."""
 
-    instances: list[FakeTHZDevice] = []
+    instances: ClassVar[list[FakeTHZDevice]] = []
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)

@@ -6,11 +6,9 @@ connections via USB serial or network (ser2net).
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
-
-import serial.tools.list_ports
-import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_DEVICE, CONF_HOST, CONF_PORT
@@ -20,6 +18,8 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectSelectorMode,
 )
+import serial.tools.list_ports
+import voluptuous as vol
 
 from .const import (
     CONF_CONNECTION_TYPE,
@@ -159,9 +159,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             port = user_input.get(CONF_PORT)
 
             # Basic IP validation
-            if not host:
-                errors[CONF_HOST] = "invalid_host"
-            elif not self._is_valid_ip_or_hostname(host):
+            if not host or not self._is_valid_ip_or_hostname(host):
                 errors[CONF_HOST] = "invalid_host"
 
             # Port validation
@@ -196,8 +194,8 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         Returns:
             True if valid, False otherwise.
         """
-        import re
         import ipaddress
+        import re
 
         # Try to parse as IP address
         try:
@@ -209,10 +207,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Check if it's a valid hostname
         # Hostname can contain letters, numbers, dots, and hyphens
         hostname_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-\.]{0,253}[a-zA-Z0-9])?$'
-        if re.match(hostname_pattern, host):
-            return True
-
-        return False
+        return bool(re.match(hostname_pattern, host))
 
     async def async_step_setup_usb(
         self, user_input: dict[str, Any] | None = None
@@ -235,7 +230,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="setup_usb", data_schema=schema)
 
-    async def async_step_reconfigure(
+    async def async_step_reconfigure(  # noqa: C901
         self, user_input: dict | None = None
     ) -> ConfigFlowResult:
         """Handle reconfiguration initiated from the device UI."""
@@ -488,10 +483,8 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if os.path.isdir(by_id_dir):
                 for name in os.listdir(by_id_dir):
                     symlink = os.path.join(by_id_dir, name)
-                    try:
+                    with contextlib.suppress(OSError):
                         by_id_map[os.path.realpath(symlink)] = symlink
-                    except OSError:
-                        pass
         except OSError:
             pass
         return by_id_map
@@ -520,10 +513,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             by_id_path = by_id_map.get(real_device)
 
             desc = p.description
-            if desc and desc != p.device:
-                label = f"{desc} ({p.device})"
-            else:
-                label = p.device
+            label = f"{desc} ({p.device})" if desc and desc != p.device else p.device
 
             if by_id_path:
                 label = f"{label} [{os.path.basename(by_id_path)}]"

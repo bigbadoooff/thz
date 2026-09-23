@@ -363,8 +363,8 @@ class TestPlatformSetupPassesEntityIdStyle:
         this test suite, since no prior test exercised button through this
         code path).
         """
-        from custom_components.thz.platform_setup import async_setup_write_platform
         from custom_components.thz.button import THZButton
+        from custom_components.thz.platform_setup import async_setup_write_platform
 
         hass = MagicMock()
         entry_id = "test_entry"

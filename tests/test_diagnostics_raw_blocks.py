@@ -1,6 +1,7 @@
 """Tests for diagnostics module with raw blocks extension."""
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 class TestDiagnosticsRawBlocks:

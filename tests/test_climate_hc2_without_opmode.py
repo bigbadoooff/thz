@@ -8,6 +8,7 @@ entity) is disabled by default unless enable_hc2 is set.
 
 from unittest.mock import MagicMock
 
+from homeassistant.components.climate import HVACMode
 import pytest
 
 from custom_components.thz.__init__ import _entity_should_be_hidden
@@ -16,7 +17,6 @@ from custom_components.thz.const import (
     ENTITY_VISIBILITY_ALL,
     ENTITY_VISIBILITY_DEFAULT,
 )
-from homeassistant.components.climate import HVACMode
 
 _F5_REAL = [
     ("hc2SetpointTemp:", 16, 4, "hex2int", 10, {}),
@@ -72,7 +72,7 @@ class TestHc2CreatedWithoutOpMode:
 
     @pytest.mark.asyncio
     async def test_op_mode_field_still_used_when_a_map_provides_one(self):
-        entries = _F5_REAL + [("hcOpMode:", 48, 2, "opmodehc", 1, {})]
+        entries = [*_F5_REAL, ("hcOpMode:", 48, 2, "opmodehc", 1, {})]
         config_entry, add, added = _setup(enable_hc2=True, f5_entries=entries)
         await async_setup_entry(MagicMock(), config_entry, add)
         assert added[0]._op_mode_offset == 24

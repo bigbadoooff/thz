@@ -22,8 +22,8 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-    from .thz_device import THZDevice
     from .register_maps.register_map_manager import RegisterMapManagerWrite
+    from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
 

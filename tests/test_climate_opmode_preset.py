@@ -24,7 +24,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.thz.climate import THZClimate, _OPMODE_DECODE_TYPE
+from custom_components.thz.climate import _OPMODE_DECODE_TYPE, THZClimate
 from custom_components.thz.value_maps import SELECT_MAP
 
 

@@ -9,8 +9,8 @@ import random
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -30,8 +30,7 @@ from .const import (
     FIRMWARE_OVERRIDE_AUTO,
     should_hide_entity,
 )
-from .services import async_refresh_block as async_refresh_block
-from .services import async_setup_services
+from .services import async_refresh_block as async_refresh_block, async_setup_services
 from .thz_device import THZDevice, THZRegisterNotSupportedError
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,7 +42,7 @@ PLATFORMS = [
 ]
 
 
-async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:  # noqa: C901
     """Set up THZ from config entry."""
     # Only entries created by old versions carry a "log_level" option; for
     # all others leave the level to Home Assistant's `logger:` configuration
@@ -297,12 +296,10 @@ def _entity_should_be_hidden(
         name, visibility, enable_hc2
     ):
         return True
-    if "program" in uid and visibility != ENTITY_VISIBILITY_ALL:
-        # Schedules are hidden in both "default" and "extended" tiers; this
-        # catches entities whose unique_id contains "program" but whose
-        # name-based classification missed it for some reason.
-        return True
-    return False
+    # Schedules are hidden in both "default" and "extended" tiers; this
+    # catches entities whose unique_id contains "program" but whose
+    # name-based classification missed it for some reason.
+    return "program" in uid and visibility != ENTITY_VISIBILITY_ALL
 
 
 async def _async_apply_entity_visibility_tier(
@@ -512,7 +509,7 @@ async def _async_update_block(
             "Block %s is not supported by this device firmware; skipping.", block_name
         )
         return None
-    except Exception as err:  # noqa: BLE001
+    except Exception as err:
         raise UpdateFailed(f"Error reading {block_name}: {err}") from err
 
 

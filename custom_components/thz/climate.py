@@ -160,7 +160,7 @@ _OP_MODE_TO_HVAC: dict[str, HVACMode] = cast(
 _DEFAULT_MIN_TEMP = 10.0
 _DEFAULT_MAX_TEMP = 60.0
 
-# Fan stage ↔ HA fan mode names  (stage 0 = off/bypass, 1–3 = low/medium/high)
+# Fan stage ↔ HA fan mode names  (stage 0 = off/bypass, 1-3 = low/medium/high)
 _FAN_MODES: list[str] = ["off", "low", "medium", "high"]
 _FAN_MODE_TO_STAGE: dict[str, int] = {m: i for i, m in enumerate(_FAN_MODES)}
 _FAN_STAGE_TO_MODE: dict[int, str] = {i: m for i, m in enumerate(_FAN_MODES)}
@@ -237,7 +237,7 @@ def _find_entry(write_registers: dict, names: list[str]) -> dict | None:
     return None
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: C901
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
@@ -535,7 +535,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             register (``pOpMode``), or ``None`` when not available.
         _fan_stage_entry: Write-register entry for the day fan-stage register
             (``p07FanStageDay``), or ``None`` when not available.
-        _fan_stage_cache: Last known fan stage (0–3), populated on startup.
+        _fan_stage_cache: Last known fan stage (0-3), populated on startup.
     """
 
     _attr_temperature_unit = UnitOfTemperature.CELSIUS

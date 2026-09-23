@@ -1,10 +1,8 @@
 """Tests for the THZ climate platform."""
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from homeassistant.components.climate import HVACAction, HVACMode
-
+import pytest
 
 # Real register-map byte offsets (derived the same way _field_layout does:
 # nibble_offset // 2) used across several tests below.
@@ -530,7 +528,7 @@ class TestTHZClimateEntity:
 
     def test_min_max_temp_default_when_no_entry(self):
         """min/max temp fall back to defaults when no heat entry provided."""
-        from custom_components.thz.climate import _DEFAULT_MIN_TEMP, _DEFAULT_MAX_TEMP
+        from custom_components.thz.climate import _DEFAULT_MAX_TEMP, _DEFAULT_MIN_TEMP
         entity = self._make_hc1_entity()
         assert entity.min_temp == pytest.approx(_DEFAULT_MIN_TEMP)
         assert entity.max_temp == pytest.approx(_DEFAULT_MAX_TEMP)
@@ -1019,7 +1017,7 @@ class TestClimateAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_creates_hc1_with_cooling_when_entries_present(self):
-        from custom_components.thz.climate import async_setup_entry, HVACMode
+        from custom_components.thz.climate import HVACMode, async_setup_entry
 
         register_manager = self._register_manager(
             {"pxxF4": self._F4_ENTRIES, "pxx0A0176": self._A176_ENTRIES}

@@ -15,7 +15,6 @@ import pytest
 
 from custom_components.thz.thz_device import THZDevice, THZRegisterNotSupportedError
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -98,9 +97,8 @@ class TestConnectSerial:
         with patch(
             "custom_components.thz.thz_device.serial.Serial",
             side_effect=OSError("no such device"),
-        ):
-            with pytest.raises(OSError):
-                device._connect_serial()
+        ), pytest.raises(OSError):
+            device._connect_serial()
 
 
 class TestConnectTcp:
@@ -240,9 +238,8 @@ class TestReconnect:
         device = _make_device(connection="usb")
         with patch.object(
             device, "_connect_serial", side_effect=OSError("no device")
-        ):
-            with pytest.raises(OSError):
-                device._reconnect()
+        ), pytest.raises(OSError):
+            device._reconnect()
 
 
 # ---------------------------------------------------------------------------
@@ -264,17 +261,15 @@ class TestHandshake1:
         device = _make_device()
         with patch.object(device, "_write_bytes"), patch.object(
             device, "_read_exact", return_value=b"\x05"
-        ):
-            with pytest.raises(RuntimeError, match="Handshake 1 failed"):
-                device._do_handshake_1(1.0)
+        ), pytest.raises(RuntimeError, match="Handshake 1 failed"):
+            device._do_handshake_1(1.0)
 
     def test_handshake1_no_data_raises(self):
         device = _make_device()
         with patch.object(device, "_write_bytes"), patch.object(
             device, "_read_exact", return_value=b""
-        ):
-            with pytest.raises(RuntimeError, match="no data"):
-                device._do_handshake_1(1.0)
+        ), pytest.raises(RuntimeError, match="no data"):
+            device._do_handshake_1(1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -309,9 +304,8 @@ class TestHandshake2:
         device = _make_device()
         with patch.object(
             device, "_read_exact", side_effect=[b"\x10", b"\x99"]
-        ):
-            with pytest.raises(RuntimeError, match="Handshake 2 failed"):
-                device._do_handshake_2(1.0)
+        ), pytest.raises(RuntimeError, match="Handshake 2 failed"):
+            device._do_handshake_2(1.0)
 
     def test_handshake2_split_dle_then_no_data_raises(self):
         device = _make_device()
@@ -360,9 +354,8 @@ class TestReceiveDataTelegram:
         device = _make_device()
         with patch.object(device, "_write_bytes"), patch.object(
             device, "_read_available", return_value=b""
-        ):
-            with pytest.raises(RuntimeError, match="No valid response"):
-                device._receive_data_telegram(0.03)
+        ), pytest.raises(RuntimeError, match="No valid response"):
+            device._receive_data_telegram(0.03)
 
     def test_receive_data_telegram_incomplete_data_raises(self):
         device = _make_device()
@@ -370,9 +363,8 @@ class TestReceiveDataTelegram:
         chunks = itertools.chain([b"\x01\x02"], itertools.repeat(b""))
         with patch.object(device, "_write_bytes"), patch.object(
             device, "_read_available", side_effect=chunks
-        ):
-            with pytest.raises(RuntimeError, match="No valid response"):
-                device._receive_data_telegram(0.03)
+        ), pytest.raises(RuntimeError, match="No valid response"):
+            device._receive_data_telegram(0.03)
 
 
 # ---------------------------------------------------------------------------
@@ -504,9 +496,8 @@ class TestSendRequest:
         device = _make_device()
         with patch.object(
             device, "_exchange_once", side_effect=[ValueError("oops")]
-        ):
-            with pytest.raises(RuntimeError, match="Device communication failed"):
-                device.send_request(b"telegram", "get")
+        ), pytest.raises(RuntimeError, match="Device communication failed"):
+            device.send_request(b"telegram", "get")
 
 
 # ---------------------------------------------------------------------------
@@ -1092,9 +1083,8 @@ class TestSetIsNotRepeatedOnceSent:
             device, "_do_handshake_2", side_effect=RuntimeError("no ack")
         ), patch.object(device, "_write_bytes") as write, patch.object(
             device, "_reconnect"
-        ) as reconnect:
-            with pytest.raises(RuntimeError, match="no ack"):
-                device.send_request(b"TELEGRAM", "set")
+        ) as reconnect, pytest.raises(RuntimeError, match="no ack"):
+            device.send_request(b"TELEGRAM", "set")
 
         telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
         assert len(telegram_writes) == 1

@@ -205,10 +205,7 @@ def _has_energy_sensors(coordinators: dict[str, Any]) -> bool:
         bool: True if energy sensors are likely available, False otherwise.
     """
     # Energy sensor blocks typically have names like pxx0A091A, pxx0A091C, etc.
-    for block_name in coordinators.keys():
-        if "0A09" in block_name:
-            return True
-    return False
+    return any("0A09" in block_name for block_name in coordinators)
 
 
 class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):

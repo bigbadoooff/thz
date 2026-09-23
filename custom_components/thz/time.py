@@ -1,8 +1,8 @@
 """Time entity for THZ devices."""
 from __future__ import annotations
 
-import logging
 from datetime import time
+import logging
 
 from homeassistant.components.time import TimeEntity
 from homeassistant.config_entries import ConfigEntry
@@ -14,8 +14,8 @@ from ._typing_compat import get_runtime_data
 from .base_entity import THZBaseEntity
 from .const import (
     TIME_VALUE_UNSET,
-    WRITE_REGISTER_OFFSET,
     WRITE_REGISTER_LENGTH,
+    WRITE_REGISTER_OFFSET,
 )
 from .entity_translations import get_translation_key
 from .register_maps.register_map_manager import RegisterMapManagerWrite
@@ -78,7 +78,7 @@ def quarters_to_time(num: int) -> time | None:
     ----------
     num : int
         Number of 15-minute intervals (quarters) since midnight. The expected range is
-        0–95 (0 => 00:00, 95 => 23:45). The special value 96 represents 24:00
+        0-95 (0 => 00:00, 95 => 23:45). The special value 96 represents 24:00
         (end-of-day) and is returned as time(0, 0). A special sentinel value 0x80
         indicates "no time" and causes the function to return None.
 
@@ -90,7 +90,7 @@ def quarters_to_time(num: int) -> time | None:
 
     Notes:
     -----
-    - The function validates the 0–95 range (plus 96 for end-of-day) and logs a
+    - The function validates the 0-95 range (plus 96 for end-of-day) and logs a
       warning for other out-of-range values.
     - Invalid values outside 0-96 are clamped to the valid range (0-95) to prevent
       crashes.
@@ -513,10 +513,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             )
             return
 
-        if self._time_type == "start":
-            num = value_bytes[0]
-        else:  # "end"
-            num = value_bytes[1]
+        num = value_bytes[0] if self._time_type == "start" else value_bytes[1]
 
         self._attr_native_value = quarters_to_time(num)
         _LOGGER.debug(

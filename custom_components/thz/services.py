@@ -10,14 +10,13 @@ once during ``async_setup_entry``.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import time as dt_time
 import itertools
 import json
 import logging
 import os
 from typing import Any, cast
-
-import voluptuous as vol
 
 from homeassistant.core import (
     HomeAssistant,
@@ -28,6 +27,7 @@ from homeassistant.core import (
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import homeassistant.helpers.config_validation as cv
 from homeassistant.util import dt as dt_util
+import voluptuous as vol
 
 from ._typing_compat import get_runtime_data
 from .clock_sync import (
@@ -226,7 +226,7 @@ def _format_hex_dump(data: bytes) -> str:
     return "\n".join(formatted_lines)
 
 
-def _guess_decode_candidates(data: bytes) -> dict[str, int | float | bool | str]:
+def _guess_decode_candidates(data: bytes) -> dict[str, int | float | bool | str]:  # noqa: C901
     """Best-effort decode candidates for raw payload bytes."""
     candidates: dict[str, int | float | bool | str] = {
         "raw_hex": data.hex(),
@@ -266,12 +266,10 @@ def _guess_decode_candidates(data: bytes) -> dict[str, int | float | bool | str]
             pass
 
     # Generic boolean hint used by many THZ switch-like values
-    try:
+    with contextlib.suppress(Exception):
         candidates["bool_nonzero"] = bool(
             int.from_bytes(data[: min(2, len(data))], byteorder="big", signed=False)
         )
-    except Exception:  # noqa: BLE001
-        pass
 
     # Try known select maps against common value widths
     map_hits: dict[str, str] = {}
@@ -409,7 +407,7 @@ async def async_refresh_block(
     return found
 
 
-async def async_setup_services(hass: HomeAssistant) -> None:
+async def async_setup_services(hass: HomeAssistant) -> None:  # noqa: C901
     """Set up services for the THZ integration.
 
     Registers the read_raw_register service that allows users to read
@@ -508,7 +506,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "formatted": formatted,
             }
 
-        except Exception as err:  # noqa: BLE001
+        except Exception as err:
             error_msg = f"Error reading register {command_str}: {err}"
             _LOGGER.error(error_msg, exc_info=True)
             async_notify(
@@ -735,7 +733,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         _LOGGER.warning(error_msg)
         raise ServiceValidationError(error_msg)
 
-    async def _async_handle_set_diverter_valve(call: ServiceCall) -> ServiceResponse:
+    async def _async_handle_set_diverter_valve(call: ServiceCall) -> ServiceResponse:  # noqa: C901
         """Handle the set_diverter_valve service call.
 
         Moves the 3-way diverter valve motor toward the requested position.
@@ -873,7 +871,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         )
         return {"success": True, "position": position, "confirmed_off": confirmed}
 
-    async def _async_handle_backup_parameters(call: ServiceCall) -> ServiceResponse:
+    async def _async_handle_backup_parameters(call: ServiceCall) -> ServiceResponse:  # noqa: C901
         """Handle the backup_parameters service call.
 
         Reads the live value of every writable parameter — number, switch,
@@ -1023,7 +1021,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "clock_corrected": clock_corrected,
         }
 
-    async def _async_handle_restore_parameters(call: ServiceCall) -> ServiceResponse:
+    async def _async_handle_restore_parameters(call: ServiceCall) -> ServiceResponse:  # noqa: C901
         """Handle the restore_parameters service call.
 
         Reads a JSON snapshot previously written by backup_parameters and
@@ -1073,7 +1071,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             raise HomeAssistantError(error_msg)
 
         def _read_backup() -> dict:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return cast("dict", json.load(f))
 
         try:
@@ -1115,15 +1113,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     num_value = float(value)
                     min_raw, max_raw = entry.get("min"), entry.get("max")
                     if min_raw not in (None, ""):
-                        try:
+                        with contextlib.suppress(TypeError, ValueError):
                             num_value = max(num_value, float(min_raw))
-                        except (TypeError, ValueError):
-                            pass
                     if max_raw not in (None, ""):
-                        try:
+                        with contextlib.suppress(TypeError, ValueError):
                             num_value = min(num_value, float(max_raw))
-                        except (TypeError, ValueError):
-                            pass
                     value_bytes = THZValueCodec.encode_number(
                         num_value, step, entry["decode_type"],
                         parameter_length(entry),
@@ -1252,7 +1246,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                     "size_bytes": os.path.getsize(fpath),
                 }
                 try:
-                    with open(fpath, "r", encoding="utf-8") as f:
+                    with open(fpath, encoding="utf-8") as f:
                         doc = json.load(f)
                     info["created"] = doc.get("created")
                     info["parameter_count"] = doc.get("parameter_count")

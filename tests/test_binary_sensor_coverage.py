@@ -357,12 +357,14 @@ class TestTHZBinarySensorAdditional:
         assert entity._attr_device_class == BinarySensorDeviceClass.PROBLEM
 
     def test_device_class_for_heating(self):
-        from custom_components.thz.binary_sensor import _get_device_class
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
+        from custom_components.thz.binary_sensor import _get_device_class
         assert _get_device_class("heatingActive") == BinarySensorDeviceClass.HEAT
 
     def test_device_class_for_cooling_defrost(self):
-        from custom_components.thz.binary_sensor import _get_device_class
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
+
+        from custom_components.thz.binary_sensor import _get_device_class
         assert _get_device_class("coolingMode") == BinarySensorDeviceClass.COLD
         assert _get_device_class("defrostActive") == BinarySensorDeviceClass.COLD

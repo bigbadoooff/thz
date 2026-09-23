@@ -4,6 +4,8 @@ Ported from the Darian6969 FW 4.19 fork, rebuilt on upstream conventions
 (shared fault table, device.async_execute, no extra polling).
 """
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
 from custom_components.thz.fault_memory import (
@@ -23,7 +25,6 @@ from custom_components.thz.fault_state import (
     STATUS_OK,
     THZFaultTracker,
 )
-from unittest.mock import AsyncMock, MagicMock
 
 
 def _record(number, hhmm, ddmm):

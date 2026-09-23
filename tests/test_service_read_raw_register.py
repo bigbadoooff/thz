@@ -2,10 +2,10 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.thz.const import DOMAIN
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 
 class TestReadRawRegisterService:

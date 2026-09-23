@@ -125,7 +125,7 @@ async def async_setup_entry(
         block_bytes = bytes.fromhex(block_hex)
 
         for entry_tuple in entries:
-            name, offset, length, decode_type, factor = entry_tuple[:5]
+            name, offset, length, decode_type, _factor = entry_tuple[:5]
             tuple_meta = entry_tuple[5] if len(entry_tuple) > 5 else {}
 
             # Only handle bit-decoded entries

@@ -40,8 +40,8 @@ from .const import (
     should_hide_entity_by_default,
 )
 from .cop_sensor import async_setup_cop_sensors
-from .fault_sensor import async_setup_fault_sensors
 from .entity_id_style import resolve_suggested_object_id
+from .fault_sensor import async_setup_fault_sensors
 from .register_maps.register_map_manager import RegisterMapManager
 from .value_codec import decode_raw_value
 
@@ -367,7 +367,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             self._icon = e.get("icon")
 
         # Set default visibility based on entity naming conventions
-        # Uses HA's standard _attr_ pattern – no explicit @property override.
+        # Uses HA's standard _attr_ pattern - no explicit @property override.
         # See base_entity.py for rationale on avoiding @property overrides
         # for entity_registry_enabled_default.
         self._attr_entity_registry_enabled_default = (

@@ -8,11 +8,11 @@ and list_parameter_backups are covered by test_backup_restore_services.py.
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
-from custom_components.thz.services import async_setup_services
 from custom_components.thz.const import DOMAIN
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from custom_components.thz.services import async_setup_services
 
 
 def _mock_hass():
@@ -443,9 +443,8 @@ class TestSetDiverterValveService:
         with patch.object(
             services_module.asyncio, "sleep",
             AsyncMock(side_effect=asyncio.CancelledError),
-        ):
-            with pytest.raises(asyncio.CancelledError):
-                await handler(call)
+        ), pytest.raises(asyncio.CancelledError):
+            await handler(call)
 
         writes = [c.args[2:] for c in device.async_execute.await_args_list]
         assert writes[0] == (bytes.fromhex("0A0653"), bytes.fromhex("0001"))

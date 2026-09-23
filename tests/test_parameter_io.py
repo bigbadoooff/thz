@@ -52,7 +52,7 @@ class Simulated2xxDevice(THZDevice):
         crc = self.thz_checksum(b"\x01\x00\x00" + data)
         return self.escape(b"\x01\x00" + crc + data) + b"\x10\x03"
 
-    async def async_execute(self, hass, fn, *args, timeout: float = 8.0):
+    async def async_execute(self, hass, fn, *args, timeout: float = 8.0):  # noqa: ASYNC109
         return fn(*args)
 
 

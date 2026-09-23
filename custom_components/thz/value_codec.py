@@ -6,9 +6,9 @@ and decoding values received from the device.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
 import struct
-from collections.abc import Callable
 
 from .value_maps import SELECT_MAP
 
@@ -378,10 +378,7 @@ class THZValueCodec:
             value = int.from_bytes(value_bytes, byteorder="big", signed=False)
 
         # Special case for SomWinMode: zero-pad to 2 digits
-        if decode_type == "SomWinMode":
-            value_str = str(value).zfill(2)
-        else:
-            value_str = str(value)
+        value_str = str(value).zfill(2) if decode_type == "SomWinMode" else str(value)
 
         # Map to option string
         if value_str in SELECT_MAP[decode_type]:
