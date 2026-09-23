@@ -947,10 +947,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         # clock_sync.py) is for.
         #
         # Read via async_read_device_clock rather than pulling from
-        # `parameters` above: the five pClock* registers are type "pclean"
-        # (no platform claims that type as an entity), so they're never
-        # added to `parameters` by the loop's _RESTORABLE_REGISTER_TYPES
-        # filter — reading them back out of it here would always miss.
+        # `parameters` above, so the five pClock* components are read as
+        # one consistent snapshot instead of minutes apart.
         clock_drift_seconds: float | None = None
         clock_corrected = False
         device_dt = await async_read_device_clock(hass, device, write_manager)

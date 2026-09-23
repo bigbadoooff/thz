@@ -302,6 +302,22 @@ class TestAsyncSetupEntry:
         assert thz_module._LOGGER.level == logging.DEBUG
         thz_module._LOGGER.setLevel(logging.NOTSET)  # reset for other tests
 
+    @pytest.mark.asyncio
+    async def test_log_level_left_to_home_assistant_without_option(self):
+        import logging
+
+        hass = _mock_hass()
+        entry = _mock_config_entry()  # no "log_level" (current config flow)
+        device = _fake_device(blocks=[])
+        thz_module._LOGGER.setLevel(logging.DEBUG)  # e.g. from `logger:` config
+        try:
+            with _patched_setup(device=device):
+                await thz_module.async_setup_entry(hass, entry)
+
+            assert thz_module._LOGGER.level == logging.DEBUG
+        finally:
+            thz_module._LOGGER.setLevel(logging.NOTSET)
+
 
 class TestAsyncUnloadEntry:
     @pytest.mark.asyncio

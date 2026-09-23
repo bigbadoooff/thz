@@ -203,8 +203,8 @@ async def async_setup_entry(
     entity_visibility = entry_data.get("entity_visibility", "default")
     entity_id_prefix = entry_data.get("entity_id_prefix")
 
-    from .const import DEFAULT_UPDATE_INTERVAL
-    write_interval = config_entry.data.get("write_interval", DEFAULT_UPDATE_INTERVAL)
+    from .const import DEFAULT_WRITE_INTERVAL
+    write_interval = config_entry.data.get("write_interval", DEFAULT_WRITE_INTERVAL)
 
     write_registers = write_manager.get_all_registers()
     _LOGGER.debug("Loading time platform with %d registers", len(write_registers))

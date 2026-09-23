@@ -46,9 +46,13 @@ PLATFORMS = [
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up THZ from config entry."""
-    log_level_str = config_entry.data.get("log_level", "info")
-    _LOGGER.setLevel(getattr(logging, log_level_str.upper(), logging.INFO))
-    _LOGGER.info("Log level set to: %s", log_level_str)
+    # Only entries created by old versions carry a "log_level" option; for
+    # all others leave the level to Home Assistant's `logger:` configuration
+    # instead of overriding it (e.g. forcing INFO over a configured DEBUG).
+    log_level_str = config_entry.data.get("log_level")
+    if log_level_str:
+        _LOGGER.setLevel(getattr(logging, log_level_str.upper(), logging.INFO))
+        _LOGGER.info("Log level set to: %s", log_level_str)
     _LOGGER.debug(
         "THZ async_setup_entry called with entry: %s", config_entry.as_dict()
     )

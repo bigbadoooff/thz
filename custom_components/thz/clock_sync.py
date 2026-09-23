@@ -1,10 +1,9 @@
 """Real-time clock drift detection and correction for THZ devices.
 
-The device's real-time clock is exposed as five plain "pclean" registers
-(day/month/year/hour/minute) that no platform claims as an entity, NOT as a
-"time"-typed register. They are read/written here as one consistent
-snapshot rather than through the per-entity polling used for ordinary
-parameters.
+The device's real-time clock is exposed as five separate number registers
+(day/month/year/hour/minute), not as a "time"-typed register. They are
+read/written here as one consistent snapshot rather than through the
+per-entity polling of the individual pClock* number entities.
 
 Two independent callers rely on this module:
 
@@ -45,8 +44,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 # The five pClock* registers that together make up the device's real-time
-# clock. "pclean" typed, so they are deliberately excluded from the
-# "restorable parameters" set in services.py — restoring an old backed-up
+# clock. restore_parameters skips them by name: restoring an old backed-up
 # clock value would set the heat pump's clock back to whenever the backup
 # was taken, and pClockYear's declared min/max ("12".."20") is a stale
 # bound that would otherwise get a real year like 26 clamped down to 20.

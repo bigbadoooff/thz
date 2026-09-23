@@ -1075,3 +1075,52 @@ class TestFullRoundtripIntegration:
         with patch.object(device, "_reconnect"):
             with pytest.raises(RuntimeError, match="Handshake 1 failed"):
                 device.send_request(b"telegram", "get")
+
+
+class TestSetIsNotRepeatedOnceSent:
+    """A SET that already went out is never sent a second time (#180)."""
+
+    def _device(self):
+        device = _make_device()
+        device.ser = MagicMock()
+        device._initialized = False  # skip liveness check
+        return device
+
+    def test_set_failing_after_telegram_is_not_repeated(self):
+        device = self._device()
+        with patch.object(device, "_do_handshake_1"), patch.object(
+            device, "_do_handshake_2", side_effect=RuntimeError("no ack")
+        ), patch.object(device, "_write_bytes") as write, patch.object(
+            device, "_reconnect"
+        ) as reconnect:
+            with pytest.raises(RuntimeError, match="no ack"):
+                device.send_request(b"TELEGRAM", "set")
+
+        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
+        assert len(telegram_writes) == 1
+        reconnect.assert_not_called()
+
+    def test_set_failing_before_telegram_is_retried(self):
+        device = self._device()
+        handshake = MagicMock(side_effect=[ConnectionError("down"), None])
+        with patch.object(device, "_do_handshake_1", handshake), patch.object(
+            device, "_do_handshake_2"
+        ), patch.object(device, "_write_bytes") as write, patch.object(
+            device, "_reconnect"
+        ):
+            assert device.send_request(b"TELEGRAM", "set") == b""
+
+        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
+        assert len(telegram_writes) == 1
+
+    def test_get_is_still_retried_after_telegram(self):
+        device = self._device()
+        with patch.object(device, "_do_handshake_1"), patch.object(
+            device, "_do_handshake_2", side_effect=[RuntimeError("no ack"), None]
+        ), patch.object(device, "_write_bytes") as write, patch.object(
+            device, "_reconnect"
+        ), patch.object(device, "_receive_data_telegram", return_value=b"data"):
+            assert device.send_request(b"TELEGRAM", "get") == b"data"
+
+        telegram_writes = [c for c in write.call_args_list if c.args[0] == b"TELEGRAM"]
+        assert len(telegram_writes) == 2

@@ -70,6 +70,8 @@ class THZDevice:
         self._min_interval = 0.1  # minimum time between reads in seconds
         # Per-thread abandon signal of the async_execute call being served.
         self._call_state = threading.local()
+        # Whether the current exchange already sent its telegram.
+        self._request_sent = False
 
         # ---------------------------------------------------------------------
 
@@ -449,6 +451,7 @@ class THZDevice:
 
         self._reset_input_buffer()
         self._write_bytes(telegram)
+        self._request_sent = True
 
         self._do_handshake_2(timeout)
 
@@ -471,6 +474,7 @@ class THZDevice:
         last_error: Exception | None = None
 
         for attempt in range(max_retries + 1):
+            self._request_sent = False
             try:
                 return self._exchange_once(telegram, get_or_set, attempt, max_retries)
 
@@ -480,7 +484,7 @@ class THZDevice:
                     "Connection error in send_request (attempt %d/%d): %s",
                     attempt + 1, max_retries + 1, e,
                 )
-                if attempt < max_retries:
+                if attempt < max_retries and self._may_retry(get_or_set):
                     try:
                         self._reconnect()
                         continue
@@ -496,7 +500,7 @@ class THZDevice:
             except RuntimeError as e:
                 last_error = e
                 _LOGGER.exception("Protocol error in send_request: %s", e)
-                if attempt < max_retries:
+                if attempt < max_retries and self._may_retry(get_or_set):
                     try:
                         self._reconnect()
                         continue
@@ -513,6 +517,22 @@ class THZDevice:
         if last_error:
             raise last_error
         raise RuntimeError("send_request failed without specific error")
+
+    def _may_retry(self, get_or_set: str) -> bool:
+        """Return True if a failed exchange may be repeated.
+
+        A GET is always safe to repeat. A SET is only repeated if it failed
+        before the telegram went out; once sent, the device may already have
+        applied it, and callers such as the D1 fault-memory clear rely on a
+        write being sent at most once.
+        """
+        if get_or_set == "get" or not self._request_sent:
+            return True
+        _LOGGER.warning(
+            "Not repeating a SET that was already sent; the device may or "
+            "may not have applied it"
+        )
+        return False
 
     # Helper methods
     def _write_bytes(self, data: bytes):

@@ -3,7 +3,7 @@
 Exercises async_setup_write_platform():
 - Filtering write registers by platform_type.
 - Entity construction path (entity_type(...)).
-- write_interval sourced from config_entry.data, with DEFAULT_UPDATE_INTERVAL
+- write_interval sourced from config_entry.data, with DEFAULT_WRITE_INTERVAL
   fallback when absent.
 - Empty register map -> async_add_entities called with an empty list.
 """
@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from custom_components.thz.platform_setup import async_setup_write_platform
-from custom_components.thz.const import DEFAULT_UPDATE_INTERVAL
+from custom_components.thz.const import DEFAULT_WRITE_INTERVAL
 
 
 class FakeEntity:
@@ -125,7 +125,7 @@ class TestAsyncSetupWritePlatformDefaultFactory:
 
         entities, _ = async_add_entities.call_args.args
         assert len(entities) == 1
-        assert entities[0].scan_interval == DEFAULT_UPDATE_INTERVAL
+        assert entities[0].scan_interval == DEFAULT_WRITE_INTERVAL
 
     @pytest.mark.asyncio
     async def test_write_interval_taken_from_config_entry(self):
