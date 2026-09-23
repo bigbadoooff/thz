@@ -79,3 +79,12 @@ def test_manager_finds_fields_by_block_and_name():
     assert manager.find_field("pxxNONE", "compressor") is None
     assert manager.block_fields("pxxNONE") == []
     assert set(manager.fields()) == set(manager.get_all_registers())
+
+
+def test_fields_are_hashable_and_read_only():
+    read_field = _field(8, 4, meta={"unit": "°C"})
+    same = _field(8, 4, meta={"unit": "°C"})
+    assert read_field == same
+    assert {read_field, same} == {read_field}
+    with pytest.raises(TypeError):
+        read_field.meta["unit"] = "K"  # type: ignore[index]

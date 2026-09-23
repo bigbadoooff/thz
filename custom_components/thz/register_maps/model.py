@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any
 
 # Decode types of single-bit flags: "bit0".."bit3" and the negated "nbit0"...
@@ -44,7 +45,9 @@ class ReadField:
     # Kept as given in the map (int or float): decoding divides by it, and
     # an int keeps whole-number values integral.
     factor: int | float
-    meta: Mapping[str, Any] = field(default_factory=dict)
+    # Read-only (see from_tuple) and left out of the hash, so a field can be
+    # used as a dict key or in a set.
+    meta: Mapping[str, Any] = field(default_factory=dict, hash=False)
 
     @classmethod
     def from_tuple(cls, block: str, entry: tuple[Any, ...]) -> ReadField:
@@ -58,7 +61,7 @@ class ReadField:
             nibble_length=int(length),
             decode_type=str(decode_type),
             factor=factor,
-            meta=dict(meta),
+            meta=MappingProxyType(dict(meta)),
         )
 
     @property
