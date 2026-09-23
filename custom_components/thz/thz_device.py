@@ -5,9 +5,12 @@ communication with Stiebel Eltron LWZ / Tecalor THZ heat pumps.
 """
 
 import asyncio
+from collections.abc import Callable
 import logging
 import socket
+import threading
 import time
+from typing import Any
 
 import serial
 
@@ -61,10 +64,12 @@ class THZDevice:
         self.register_map_manager: RegisterMapManager | None = None
         self.write_register_map_manager: RegisterMapManagerWrite | None = None
 
-        # Thread lock for parallel access
+        # Serialises device access across coroutines (see async_execute).
         self.lock = asyncio.Lock()
         self._last_access = 0
         self._min_interval = 0.1  # minimum time between reads in seconds
+        # Per-thread abandon signal of the async_execute call being served.
+        self._call_state = threading.local()
 
         # ---------------------------------------------------------------------
 
@@ -247,8 +252,31 @@ class THZDevice:
         except AttributeError:
             return False
 
+    def _raise_if_abandoned(self) -> None:
+        """Stop a worker thread whose async_execute call already gave up.
+
+        Once async_execute has timed out it may hand the device to the next
+        caller, so the old thread must neither reconnect nor send anything.
+        """
+        abandoned: threading.Event | None = getattr(
+            self._call_state, "abandoned", None
+        )
+        if abandoned is not None and abandoned.is_set():
+            raise ConnectionError("Device call abandoned after its timeout")
+
+    def _run_abandonable(
+        self, abandoned: threading.Event, fn: Callable[..., Any], *args: Any
+    ) -> Any:
+        """Run ``fn`` in this worker thread with its abandon signal attached."""
+        self._call_state.abandoned = abandoned
+        try:
+            return fn(*args)
+        finally:
+            self._call_state.abandoned = None
+
     def _reconnect(self):
         """Attempt to reconnect if connection was lost."""
+        self._raise_if_abandoned()
         _LOGGER.warning("Attempting to reconnect...")
         try:
             if self.ser is not None:
@@ -389,6 +417,7 @@ class THZDevice:
             RuntimeError: If a protocol/handshake error occurs.
         """
         timeout = self.read_timeout
+        self._raise_if_abandoned()
 
         if self._initialized and not self._is_connection_alive():
             _LOGGER.warning(
@@ -587,10 +616,10 @@ class THZDevice:
     async def async_execute(
         self,
         hass: HomeAssistant,
-        fn,
-        *args,
+        fn: Callable[..., Any],
+        *args: Any,
         timeout: float = 8.0,
-    ):
+    ) -> Any:
         """Execute a blocking device function with the lock held and a hard timeout.
 
         Acquires the device lock (with a 20-second cap so coordinators cannot
@@ -598,20 +627,15 @@ class THZDevice:
         ``fn(*args)`` in a thread-pool executor with a ``timeout``-second
         deadline.
 
-        Two complementary timeout mechanisms are used:
-
-        1. ``asyncio.wait_for`` — cancels a *pending* (not-yet-started) executor
-           future immediately, raising ``asyncio.TimeoutError``.
-        2. ``call_later`` deadline — closes the serial port from the event loop
-           at exactly ``timeout`` seconds.  This interrupts a *running* thread's
-           blocking I/O.  In Python ≥ 3.12 ``asyncio.wait_for`` does not raise
-           ``TimeoutError`` when the future is already running; without this
-           second mechanism the thread could reconnect and succeed silently past
-           the deadline.
+        A running thread cannot be cancelled, so on timeout the call is marked
+        abandoned (the thread then refuses to reconnect or send anything, see
+        _raise_if_abandoned) and the connection is closed to interrupt its
+        blocking I/O. The lock is only released once the thread has actually
+        finished (or after a short grace period), so it never talks to the
+        device concurrently with the next caller.
 
         On *any* failure ``_force_close`` is called so ``self.ser`` is
-        guaranteed to be ``None`` on exit, triggering a fresh ``_reconnect()``
-        on the next call.
+        ``None`` on exit, triggering a fresh ``_reconnect()`` on the next call.
         """
         # Prevent unbounded queuing: if the lock cannot be acquired within
         # 20 seconds the coordinator gives up and retries at its next interval.
@@ -623,52 +647,45 @@ class THZDevice:
                 f"Device busy: could not acquire lock within {_LOCK_WAIT_TIMEOUT:.0f}s"
             ) from None
 
-        # Hard deadline: close the connection at timeout seconds so a running
-        # thread cannot silently hold the port past the deadline.
-        loop = asyncio.get_running_loop()
-        _timed_out = False
-
-        def _deadline_close() -> None:
-            nonlocal _timed_out
-            _timed_out = True
-            self._force_close()
-
-        deadline = loop.call_later(timeout, _deadline_close)
+        abandoned = threading.Event()
+        future = hass.async_add_executor_job(
+            self._run_abandonable, abandoned, fn, *args
+        )
         try:
-            result = await asyncio.wait_for(
-                hass.async_add_executor_job(fn, *args),
-                timeout=timeout,
-            )
+            return await asyncio.wait_for(asyncio.shield(future), timeout=timeout)
         except asyncio.TimeoutError:
-            # Future was pending (never ran); our call_later may also have fired.
-            _LOGGER.exception(
+            _LOGGER.warning(
                 "Device call timed out after %.1fs; closing connection", timeout
             )
-            self._force_close()
             raise ConnectionError(
                 f"Device communication timed out after {timeout}s"
             ) from None
         except THZRegisterNotSupportedError:
-            raise  # device said "not supported" — connection is fine, don't close it
+            raise  # device said "not supported" — connection is fine, keep it
         except BaseException:
             self._force_close()
             raise
-        else:
-            if _timed_out:
-                # call_later fired and force-closed the connection, but the
-                # thread had already reconnected and succeeded.  The data is
-                # valid; close the now-stale reconnected connection so the next
-                # call starts fresh.
-                _LOGGER.warning(
-                    "Device call exceeded %.1fs deadline but thread reconnected "
-                    "and succeeded; connection reset for next call",
-                    timeout,
-                )
-                self._force_close()
-            return result
         finally:
-            deadline.cancel()
+            if not future.done():
+                # Timed out or cancelled while the thread still runs.
+                abandoned.set()
+                self._force_close()
+                await asyncio.wait({future}, timeout=self._abandon_grace)
+                if not future.done():
+                    _LOGGER.warning(
+                        "Device worker did not finish within %.1fs after "
+                        "being abandoned", self._abandon_grace,
+                    )
+                else:
+                    # Consume the thread's (expected) error so it is not
+                    # reported as "exception was never retrieved".
+                    future.exception()
             self.lock.release()
+
+    @property
+    def _abandon_grace(self) -> float:
+        """Upper bound for an abandoned worker to notice the closed port."""
+        return 2 * self.read_timeout + 1.0
 
     def close(self) -> None:
         """Close the connection; safe to call repeatedly and never raises."""
