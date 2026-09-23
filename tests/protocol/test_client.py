@@ -517,3 +517,31 @@ class TestClose:
         device.close()
         device.close()
         assert transport.closes == 2
+
+    @pytest.mark.asyncio
+    async def test_running_call_does_not_reconnect_after_close(self):
+        """A refresh in flight during unload must not reopen the connection."""
+        device, transport = _device()
+        device._initialized = True
+        started = asyncio.Event()
+
+        async def exchange(*args):
+            started.set()
+            await asyncio.sleep(0.01)
+            raise THZConnectionError("closed under us")
+
+        with patch.object(device, "_exchange_once", side_effect=exchange):
+            task = asyncio.create_task(device.send_request(b"telegram", "get"))
+            await started.wait()
+            device.close()
+            with pytest.raises(THZConnectionError):
+                await task
+        assert transport.connects == 0
+
+    @pytest.mark.asyncio
+    async def test_initialize_after_close_connects_again(self):
+        device, transport = _device()
+        device.close()
+        with patch.object(device, "read_firmware_version", return_value="439"):
+            await device.async_initialize(None)
+        assert transport.connects == 1

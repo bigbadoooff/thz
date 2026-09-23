@@ -74,6 +74,8 @@ class THZDevice:
         self.lock = asyncio.Lock()
         # Whether the current exchange already sent its telegram.
         self._request_sent = False
+        # Set by close(): a call still running must not open a new connection.
+        self._closed = False
 
     # --- Protocol (protocol.py), kept as attributes for callers and tests
     # that use them through the device.
@@ -100,6 +102,7 @@ class THZDevice:
         if self.connection not in ("usb", "ip"):
             raise ValueError(f"Unknown connection type: {self.connection}")
 
+        self._closed = False
         try:
             await self._connect()
             self._firmware_version = await self.read_firmware_version()
@@ -167,7 +170,9 @@ class THZDevice:
         return self._firmware_version
 
     async def _reconnect(self) -> None:
-        """Close the connection and open it again."""
+        """Close the connection and open it again (not after close())."""
+        if self._closed:
+            raise THZConnectionError("Device closed")
         _LOGGER.warning("Attempting to reconnect...")
         self._force_close()
         try:
@@ -435,7 +440,13 @@ class THZDevice:
             self.lock.release()
 
     def close(self) -> None:
-        """Close the connection; safe to call repeatedly and never raises."""
+        """Close the connection for good; safe to call repeatedly, never raises.
+
+        A call still running (e.g. a coordinator refresh during unload) then
+        fails instead of reconnecting, so the closed device cannot hold the
+        port or the ser2net connection a reloaded entry needs.
+        """
+        self._closed = True
         self._force_close()
 
     async def read_write_register(
