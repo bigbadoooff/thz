@@ -72,23 +72,28 @@ class THZDevice:
         """Open connection and initialize firmware-dependent data structures."""
         _LOGGER.debug("Initializing THZ device (%s)", self.connection)
 
-        # Open connection
         if self.connection == "usb":
-            self._connect_serial()
+            connect = self._connect_serial
         elif self.connection == "ip":
-            self._connect_tcp()
+            connect = self._connect_tcp
         else:
             raise ValueError(f"Unknown connection type: {self.connection}")
 
-        # Read firmware (runs synchronously in executor)
-        self._firmware_version = await hass.async_add_executor_job(
-            self.read_firmware_version
-        )
+        try:
+            # Opening the port / TCP connect blocks, so keep it off the loop.
+            await hass.async_add_executor_job(connect)
+            self._firmware_version = await hass.async_add_executor_job(
+                self.read_firmware_version
+            )
+            if not self._firmware_version:
+                # Never guess a profile: an unanswered FD request would
+                # otherwise fall through to the 4.39 default maps, including
+                # their write commands.
+                raise ConnectionError("Firmware version could not be read")
+        except BaseException:
+            self._force_close()
+            raise
         _LOGGER.info("Firmware version detected: %s", self._firmware_version)
-
-        # Load firmware-specific register maps
-        if self._firmware_version is None:
-            raise RuntimeError("Firmware version could not be determined")
 
         effective_firmware = self._resolve_effective_firmware()
         if effective_firmware != self._firmware_version:

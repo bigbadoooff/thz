@@ -909,13 +909,45 @@ class TestAsyncInitialize:
         assert device.has_cooling is True
 
     @pytest.mark.asyncio
-    async def test_async_initialize_none_firmware_raises(self):
+    @pytest.mark.parametrize("firmware", [None, ""])
+    async def test_async_initialize_unread_firmware_raises_and_closes(
+        self, firmware
+    ):
+        # read_firmware_version() returns "" on failure; that must not fall
+        # through to the 4.39 default profile.
         device = _make_device(connection="usb")
-        with patch.object(device, "_connect_serial"), patch.object(
-            device, "read_firmware_version", return_value=None
-        ):
-            with pytest.raises(RuntimeError, match="could not be determined"):
+        port = MagicMock()
+
+        def _connect():
+            device.ser = port
+
+        with patch.object(device, "_connect_serial", side_effect=_connect), \
+                patch.object(device, "read_firmware_version", return_value=firmware):
+            with pytest.raises(ConnectionError, match="could not be read"):
                 await device.async_initialize(FakeHass())
+
+        port.close.assert_called_once()
+        assert device.ser is None
+        assert device.register_map_manager is None
+
+    @pytest.mark.asyncio
+    async def test_async_initialize_connects_in_executor(self):
+        device = _make_device(connection="ip", host="h", tcp_port=1)
+        hass = FakeHass()
+        calls = []
+        original = hass.async_add_executor_job
+
+        async def _record(func, *args):
+            calls.append(func)
+            return await original(func, *args)
+
+        hass.async_add_executor_job = _record
+        with patch.object(device, "_connect_tcp") as mock_connect, patch.object(
+            device, "read_firmware_version", return_value="439"
+        ):
+            await device.async_initialize(hass)
+
+        assert calls[0] is mock_connect
 
 
 # ---------------------------------------------------------------------------
