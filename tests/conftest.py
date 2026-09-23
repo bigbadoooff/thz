@@ -167,7 +167,26 @@ sys.modules['homeassistant.components'] = components_mock
 
 # Mock diagnostics component
 diagnostics_mock = MagicMock()
-diagnostics_mock.async_redact_data = lambda data, redact_keys: data
+diagnostics_mock.REDACTED = "**REDACTED**"
+
+
+def _async_redact_data(data, to_redact):
+    """Mirror homeassistant.components.diagnostics.async_redact_data."""
+    if isinstance(data, list):
+        return [_async_redact_data(item, to_redact) for item in data]
+    if not isinstance(data, dict):
+        return data
+    return {
+        key: (
+            diagnostics_mock.REDACTED
+            if key in to_redact
+            else _async_redact_data(value, to_redact)
+        )
+        for key, value in data.items()
+    }
+
+
+diagnostics_mock.async_redact_data = _async_redact_data
 sys.modules['homeassistant.components.diagnostics'] = diagnostics_mock
 
 # Mock sensor component

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.diagnostics import async_redact_data
+from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
@@ -15,6 +15,8 @@ TO_REDACT = {
     "device",
     "unique_id",
     "serial",
+    "alias",
+    "area",
 }
 
 
@@ -32,11 +34,12 @@ async def async_get_config_entry_diagnostics(
     coordinators = entry_data.get("coordinators", {})
 
     # Collect basic device information
+    # _firmware_version rather than the firmware_version property, which
+    # raises while the version is unknown.
     device_info = {
-        "firmware_version": getattr(device, "firmware_version", "unknown"),
-        "connection_type": getattr(device, "connection_type", "unknown"),
+        "firmware_version": getattr(device, "_firmware_version", None) or "unknown",
+        "connection_type": getattr(device, "connection", None) or "unknown",
         "initialized": getattr(device, "_initialized", False),
-        "last_access": str(getattr(device, "last_access", "never")),
     }
 
     # Collect coordinator information (without sensitive data)
@@ -84,7 +87,9 @@ async def async_get_config_entry_diagnostics(
     # Build diagnostics data
     diagnostics_data = {
         "config_entry": {
-            "title": config_entry.title,
+            # The title embeds the host / serial device path, e.g.
+            # "THZ (ip: 192.168.1.5)", i.e. the very values redacted below.
+            "title": REDACTED,
             "version": config_entry.version,
             "data": async_redact_data(config_entry.data, TO_REDACT),
         },
