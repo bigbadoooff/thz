@@ -25,7 +25,7 @@ from custom_components.thz.cop_sensor import (
 from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManager,
 )
-from tests.helpers import make_runtime_data
+from tests.helpers import FakeRegisterManager, make_runtime_data
 
 # (byte_offset, byte_length, factor) of actualPower_Qc / _Pel on 5.39.
 _QC = (47, 4, 1.0)
@@ -108,9 +108,7 @@ class TestPowerFieldLayout:
         assert _power_field_layout(manager, "actualPower_Qc") is None
 
     def test_missing_field(self):
-        manager = MagicMock()
-        manager.get_registers_for_block.return_value = []
-        assert _power_field_layout(manager, "actualPower_Qc") is None
+        assert _power_field_layout(FakeRegisterManager({}), "actualPower_Qc") is None
 
 
 class TestHasEnergySensors:

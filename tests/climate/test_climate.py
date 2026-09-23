@@ -6,7 +6,7 @@ from homeassistant.components.climate import HVACAction, HVACMode
 import pytest
 
 from custom_components.thz.exceptions import THZProtocolError
-from tests.helpers import as_runtime_data
+from tests.helpers import FakeRegisterManager, as_runtime_data
 
 # Real register-map byte offsets (derived the same way _field_layout does:
 # nibble_offset // 2) used across several tests below.
@@ -51,8 +51,10 @@ class TestFieldLayout:
 
     @staticmethod
     def _register_manager(entries):
-        manager = MagicMock()
-        manager.get_registers_for_block = MagicMock(return_value=entries)
+        # The helpers only look up by block; every block has these entries.
+        manager = FakeRegisterManager({})
+        fake = FakeRegisterManager({"any": entries})
+        manager.find_field = lambda block, name: fake.find_field("any", name)
         return manager
 
     def test_field_layout_converts_nibbles_to_bytes(self):
@@ -87,6 +89,12 @@ class TestFieldLayout:
 
         manager = self._register_manager([("cooling:", 11, 1, "bit3", 1, {})])
         assert _bit_field_layout(manager, "pxx0A0176", "cooling") == (5, 3)
+
+    def test_bit_field_layout_high_nibble_is_four_bits_up(self):
+        from custom_components.thz.climate import _bit_field_layout
+
+        manager = self._register_manager([("cooling:", 10, 1, "bit3", 1, {})])
+        assert _bit_field_layout(manager, "pxx0A0176", "cooling") == (5, 7)
 
     def test_bit_field_layout_returns_none_for_non_bit_decode(self):
         from custom_components.thz.climate import _bit_field_layout
@@ -997,11 +1005,7 @@ class TestClimateAsyncSetupEntry:
 
     @staticmethod
     def _register_manager(blocks: dict):
-        manager = MagicMock()
-        manager.get_registers_for_block = MagicMock(
-            side_effect=lambda block: blocks.get(block, [])
-        )
-        return manager
+        return FakeRegisterManager(blocks)
 
     @staticmethod
     def _entry_data(register_manager, coordinators, write_registers):

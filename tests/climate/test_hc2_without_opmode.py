@@ -17,7 +17,7 @@ from custom_components.thz.const import (
     ENTITY_VISIBILITY_ALL,
     ENTITY_VISIBILITY_DEFAULT,
 )
-from tests.helpers import make_runtime_data
+from tests.helpers import FakeRegisterManager, make_runtime_data
 
 _F5_REAL = [
     ("hc2SetpointTemp:", 16, 4, "hex2int", 10, {}),
@@ -29,10 +29,7 @@ _HC2_WRITE = {
 
 
 def _setup(enable_hc2, f5_entries=_F5_REAL):
-    register_manager = MagicMock()
-    register_manager.get_registers_for_block = MagicMock(
-        side_effect=lambda block: f5_entries if block == "pxxF5" else []
-    )
+    register_manager = FakeRegisterManager({"pxxF5": f5_entries})
     config_entry = MagicMock()
     config_entry.data = {"enable_hc2": enable_hc2}
     config_entry.runtime_data = make_runtime_data(

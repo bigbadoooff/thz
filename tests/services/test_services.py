@@ -14,7 +14,7 @@ import pytest
 
 from custom_components.thz.const import DOMAIN
 from custom_components.thz.services import async_setup_services
-from tests.helpers import as_runtime_data
+from tests.helpers import FakeRegisterManager, as_runtime_data
 
 
 def _mock_hass():
@@ -489,15 +489,10 @@ class TestDiverterBitPosition:
     def test_even_nibble_is_the_high_nibble(self):
         from custom_components.thz.services.diverter import _diverter_bit_position
 
-        manager = MagicMock()
-        manager.get_registers_for_block.return_value = [
-            ("diverterValve:", 22, 1, "bit1", 1)
-        ]
+        manager = FakeRegisterManager({"pxxF2": [("diverterValve:", 22, 1, "bit1", 1)]})
         assert _diverter_bit_position(manager) == (11, 5)
 
     def test_missing_flag_is_reported(self):
         from custom_components.thz.services.diverter import _diverter_bit_position
 
-        manager = MagicMock()
-        manager.get_registers_for_block.return_value = []
-        assert _diverter_bit_position(manager) is None
+        assert _diverter_bit_position(FakeRegisterManager({})) is None

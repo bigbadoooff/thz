@@ -114,8 +114,7 @@ async def async_setup_entry(
     # Create sensors
     sensors = []
     seen_sensor_names = set()  # Track sensor names to avoid duplicates
-    all_registers = register_manager.get_all_registers()
-    for block, entries in all_registers.items():
+    for block, fields in register_manager.fields().items():
         # Get the coordinator for this block
         coordinator = coordinators.get(block)
         if coordinator is None:
@@ -133,21 +132,16 @@ async def async_setup_entry(
 
         block_hex = block.removeprefix("pxx")  # Remove "pxx" prefix
         block_bytes = bytes.fromhex(block_hex)
-        for entry_tuple in entries:
-            name, offset, length, decode_type, factor = entry_tuple[:5]
-            # 6th element (if present) is a metadata dict with HA entity attributes
-            tuple_meta = entry_tuple[5] if len(entry_tuple) > 5 else {}
-
+        for read_field in fields:
             # Skip fields that are disabled or absent on this firmware
-            if decode_type in _SKIPPED_DECODE_TYPES:
+            if read_field.decode_type in _SKIPPED_DECODE_TYPES:
                 continue
 
-            # Skip bit-decoded entries: they are handled by the binary_sensor platform
-            if decode_type.startswith("bit") or decode_type.startswith("nbit"):
+            # Bit flags are handled by the binary_sensor platform
+            if read_field.is_bit:
                 continue
 
-            # Strip whitespace and trailing colons from sensor name
-            sensor_name = name.strip().rstrip(":")
+            sensor_name = read_field.name
 
             # Skip duplicate sensor names - only create the first occurrence
             if sensor_name in seen_sensor_names:
@@ -160,43 +154,23 @@ async def async_setup_entry(
 
             seen_sensor_names.add(sensor_name)
 
-            meta = {**tuple_meta}
-
-            # FHEM nibble-offset convention: each register offset is a nibble (4-bit)
-            # position in the raw hex string.  Two consecutive nibble offsets share the
-            # same byte: the EVEN offset is the HIGH nibble (bits 4-7 of the byte) and
-            # the ODD offset is the LOW nibble (bits 0-3).  Python converts these to
-            # byte offsets with `offset // 2`, which maps both nibbles to the same byte.
-            # For single-nibble bit-typed registers at an EVEN offset we must shift the
-            # bit number up by 4 so that bit operations access the correct half of the
-            # byte.
-            effective_decode = decode_type
-            if length == 1 and offset % 2 == 0:
-                if decode_type.startswith("bit") and not decode_type.startswith("nbit"):
-                    bitnum = int(decode_type[3:])
-                    effective_decode = f"bit{bitnum + 4}"
-                elif decode_type.startswith("nbit"):
-                    bitnum = int(decode_type[4:])
-                    effective_decode = f"nbit{bitnum + 4}"
-
+            meta = read_field.meta
             entry = {
                 "name": sensor_name,
-                "offset": offset // 2,  # Register offset in bytes
-                "length": (length + 1)
-                // 2,  # Register length in bytes; +1 to always have >=1 byte
-                "decode": effective_decode,
-                "factor": factor,
+                "offset": read_field.byte_offset,
+                "length": read_field.byte_length,
+                "decode": read_field.decode_type,
+                "factor": read_field.factor,
                 "unit": meta.get("unit"),
                 "device_class": meta.get("device_class"),
                 "state_class": meta.get("state_class"),
                 "icon": meta.get("icon"),
-                "translation_key": meta.get("translation_key"),
+                "translation_key": read_field.translation_key,
             }
-            if length == 1:
-                # Single-nibble value (e.g. Weekday): the byte it lives in is
-                # shared with the neighbouring nibble. Even nibble offsets are
-                # the high nibble, odd ones the low nibble.
-                entry["nibble"] = "high" if offset % 2 == 0 else "low"
+            if read_field.nibble is not None:
+                # Single-nibble value (e.g. Weekday) sharing its byte with the
+                # neighbouring nibble.
+                entry["nibble"] = read_field.nibble
             sensors.append(
                 THZGenericSensor(
                     coordinator,

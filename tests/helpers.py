@@ -104,6 +104,41 @@ def device_with_transport(transport, **kwargs) -> THZDevice:
     return device
 
 
+class FakeRegisterManager:
+    """Read-map manager over hand-written block tuples, as the real one sees them.
+
+    ``blocks`` maps a block ("pxxFB") to its map tuples
+    ``(name, offset, length, decode, factor[, meta])``.
+    """
+
+    def __init__(self, blocks) -> None:
+        from custom_components.thz.register_maps.model import ReadField
+
+        self._blocks = {block: list(entries) for block, entries in blocks.items()}
+        self._fields = {
+            block: [ReadField.from_tuple(block, e) for e in entries]
+            for block, entries in self._blocks.items()
+        }
+
+    def get_all_registers(self):
+        return self._blocks
+
+    def get_registers_for_block(self, block):
+        return self._blocks.get(block, [])
+
+    def fields(self):
+        return self._fields
+
+    def block_fields(self, block):
+        return self._fields.get(block, [])
+
+    def find_field(self, block, name):
+        from custom_components.thz.register_maps.model import normalize_field_name
+
+        wanted = normalize_field_name(name)
+        return next((f for f in self.block_fields(block) if f.name == wanted), None)
+
+
 def make_runtime_data(**fields):
     """Build THZRuntimeData for tests; unspecified fields get neutral values."""
     from unittest.mock import MagicMock

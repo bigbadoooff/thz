@@ -45,10 +45,8 @@ PARALLEL_UPDATES = 0
 
 
 # Maps sensor names to (block_name, byte_offset, byte_length, decode_type, factor).
-# Offsets/lengths match the sensor.py conversion from readings_map_439.py nibble
-# notation:
-#   byte_offset = raw_offset // 2  (nibble 8 → byte 4)
-#   byte_length = (raw_length + 1) // 2  (nibble-length 8 → 4 bytes)
+# Byte positions as ReadField computes them from readings_map_439.py's nibble
+# notation (nibble offset 8, length 8 → byte 4, 4 bytes).
 _POWER_BLOCK = "pxxFB"
 
 # All energy blocks are PAIRED (cmd2 + cmd3 combined as high*1000 + low), so the
@@ -179,13 +177,10 @@ def _power_field_layout(
     Only "esp_mant" (float) entries qualify; firmwares that list the field
     as a placeholder (e.g. "n.a." on 2.06) return None.
     """
-    for entry in register_manager.get_registers_for_block(_POWER_BLOCK):
-        if entry[0].strip().rstrip(":").strip() != field_name:
-            continue
-        if entry[3] != "esp_mant":
-            return None
-        return entry[1] // 2, (entry[2] + 1) // 2, float(entry[4] or 1)
-    return None
+    read_field = register_manager.find_field(_POWER_BLOCK, field_name)
+    if read_field is None or read_field.decode_type != "esp_mant":
+        return None
+    return read_field.byte_offset, read_field.byte_length, read_field.scale
 
 
 def _has_energy_sensors(coordinators: dict[str, Any]) -> bool:

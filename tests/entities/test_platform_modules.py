@@ -502,18 +502,6 @@ class TestBinarySensorModule:
 
         assert THZBinarySensor is not None
 
-    def test_is_bit_decode_type(self):
-        """Test the _is_bit_decode_type helper."""
-        from custom_components.thz.binary_sensor import _is_bit_decode_type
-
-        assert _is_bit_decode_type("bit0") is True
-        assert _is_bit_decode_type("bit3") is True
-        assert _is_bit_decode_type("nbit0") is True
-        assert _is_bit_decode_type("nbit2") is True
-        assert _is_bit_decode_type("hex2int") is False
-        assert _is_bit_decode_type("hex") is False
-        assert _is_bit_decode_type("esp_mant") is False
-
     def test_get_device_class_compressor(self):
         """Test device class mapping for compressor-like entities."""
         from homeassistant.components.binary_sensor import BinarySensorDeviceClass
