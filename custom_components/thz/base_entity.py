@@ -40,6 +40,9 @@ class THZBaseEntity(Entity):
     """
 
     _attr_should_poll = False
+    # Block coordinators by key ("pxx17"), set by the platform setup; lets
+    # 2xx block parameters read from data that is already being polled.
+    _coordinators: dict[str, Any] = {}
 
     def __init__(
         self,

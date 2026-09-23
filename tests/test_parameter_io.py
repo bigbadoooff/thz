@@ -4,6 +4,7 @@ Uses the real firmware 206 write map and a simulated 2xx device that keeps
 its register blocks in memory and speaks the real telegram format, so the
 tests cover the whole path from write-map entry to bytes on the wire.
 """
+import asyncio
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
@@ -229,3 +230,74 @@ class TestClimateOn2xx:
         assert block[0:2] == bytes.fromhex("00D2")  # day unchanged
         assert block[2:4] == bytes.fromhex("00B9")  # night 18.5
         assert block[4:] == _block_17()[4:]
+
+
+class TestNumberReadsFromBlockCoordinator:
+    """2xx numbers take their value from the block coordinator's data."""
+
+    @staticmethod
+    def _number(entry, device, coordinator):
+        from custom_components.thz.number import THZNumber
+
+        number = THZNumber("p02RoomTempNight", entry, device, "dev")
+        number.hass = MagicMock()
+        number.async_write_ha_state = MagicMock()
+        number._coordinators = {"pxx17": coordinator} if coordinator else {}
+        return number
+
+    @staticmethod
+    def _coordinator(data, success=True):
+        coordinator = MagicMock()
+        coordinator.data = data
+        coordinator.last_update_success = success
+        coordinator.async_request_refresh = AsyncMock()
+        return coordinator
+
+    @pytest.mark.asyncio
+    async def test_value_comes_from_coordinator_without_device_read(
+        self, write_map_206
+    ):
+        device = Simulated2xxDevice({b"\x17": _block_17()})
+        coordinator = self._coordinator(device.read_write_register(b"\x17", "get"))
+        device.sent.clear()
+        number = self._number(write_map_206["p02RoomTempNight"], device, coordinator)
+
+        await number.async_update()
+
+        assert number.native_value == pytest.approx(18.0)
+        assert device.sent == []
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_device_when_coordinator_failed(self, write_map_206):
+        device = Simulated2xxDevice({b"\x17": _block_17()})
+        coordinator = self._coordinator(b"stale", success=False)
+        number = self._number(write_map_206["p02RoomTempNight"], device, coordinator)
+
+        await number.async_update()
+
+        assert number.native_value == pytest.approx(18.0)
+        assert device.sent
+
+    @pytest.mark.asyncio
+    async def test_write_refreshes_the_block_coordinator(self, write_map_206):
+        device = Simulated2xxDevice({b"\x17": _block_17()})
+        coordinator = self._coordinator(device.read_write_register(b"\x17", "get"))
+        number = self._number(write_map_206["p02RoomTempNight"], device, coordinator)
+
+        await number.async_set_native_value(18.5)
+
+        coordinator.async_request_refresh.assert_awaited_once()
+        assert device.blocks[b"\x17"][2:4] == bytes.fromhex("00B9")
+
+    @pytest.mark.parametrize("name", ["p02RoomTempNight", "progHC1Tuesday"])
+    def test_block_slice_equals_device_read(self, write_map_206, name):
+        from custom_components.thz.parameter_io import parameter_from_block
+
+        entry = write_map_206[name]
+        addr = bytes.fromhex(entry["command"])
+        device = Simulated2xxDevice({addr: bytes(range(7, 55))})
+        response = device.read_write_register(addr, "get")
+
+        from_block = parameter_from_block(entry, response)
+        from_device = asyncio.run(async_read_parameter(None, device, entry))
+        assert from_block == from_device

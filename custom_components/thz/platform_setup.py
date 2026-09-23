@@ -92,6 +92,7 @@ async def async_setup_write_platform(
                 entity_visibility=entity_visibility,
                 entity_id_prefix=entity_id_prefix,
             )
+            entity._coordinators = entry_data.get("coordinators", {})
             entities.append(entity)
 
     _LOGGER.info("Created %d %s entities", len(entities), platform_type)

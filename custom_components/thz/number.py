@@ -13,6 +13,8 @@ from .entity_translations import get_translation_key
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
+    block_coordinator_key,
+    parameter_from_block,
     parameter_length,
 )
 from .platform_setup import async_setup_write_platform
@@ -103,11 +105,27 @@ class THZNumber(THZBaseEntity, NumberEntity):
         """Return the native value of the number."""
         return self._attr_native_value
 
+    def _block_coordinator(self):
+        """Return the coordinator polling this 2xx parameter's block, if any."""
+        key = block_coordinator_key(self._entry)
+        return self._coordinators.get(key) if key else None
+
     async def async_update(self) -> None:
-        """Fetch new state data for the number."""
-        value_bytes = await self._async_guarded_read(
-            async_read_parameter(self.hass, self._device, self._entry)
-        )
+        """Fetch new state data for the number.
+
+        2xx block parameters are taken from the block's coordinator when it
+        has fresh data, instead of reading the whole block from the device
+        once per parameter; otherwise the device is read directly.
+        """
+        value_bytes = None
+        coordinator = self._block_coordinator()
+        if coordinator is not None and coordinator.last_update_success:
+            if coordinator.data:
+                value_bytes = parameter_from_block(self._entry, coordinator.data)
+        if value_bytes is None:
+            value_bytes = await self._async_guarded_read(
+                async_read_parameter(self.hass, self._device, self._entry)
+            )
         if value_bytes is None:
             return
 
@@ -149,6 +167,11 @@ class THZNumber(THZBaseEntity, NumberEntity):
 
             self._attr_native_value = value
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+            coordinator = self._block_coordinator()
+            if coordinator is not None:
+                # Keep the block data this entity reads from in step with
+                # the write, so the next update does not show the old value.
+                await coordinator.async_request_refresh()
         except (ValueError, TypeError, ConnectionError, RuntimeError, OSError) as err:
             _LOGGER.error(
                 "Error encoding number %s value %s: %s",

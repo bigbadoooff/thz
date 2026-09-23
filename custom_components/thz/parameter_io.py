@@ -43,6 +43,37 @@ def parameter_length(entry: Mapping[str, Any]) -> int:
     return WRITE_REGISTER_LENGTH
 
 
+def block_coordinator_key(entry: Mapping[str, Any]) -> str | None:
+    """Return the coordinator key ("pxx17") of a block parameter's block."""
+    if not is_block_parameter(entry):
+        return None
+    return f"pxx{str(entry['command']).upper()}"
+
+
+def parameter_from_block(
+    entry: Mapping[str, Any], block_data: bytes
+) -> bytes | None:
+    """Cut a block parameter's value out of an already-read block response.
+
+    ``block_data`` has the layout the block coordinators store (the decoded
+    response: CRC, address echo, data), i.e. the same bytes a device read of
+    the block returns. Returns None if the block is too short.
+    """
+    offset, length = int(entry["offset"]), int(entry["length"])
+    raw = block_data[offset : offset + length]
+    if len(raw) < length:
+        return None
+    return _apply_bit(entry, raw)
+
+
+def _apply_bit(entry: Mapping[str, Any], raw: bytes) -> bytes:
+    """Reduce a single-bit flag's byte to 0/1; other values pass through."""
+    bit = entry.get("bit")
+    if bit is not None and raw:
+        return bytes([(raw[0] >> int(bit)) & 0x01])
+    return raw
+
+
 async def async_read_parameter(
     hass: HomeAssistant, device: THZDevice, entry: Mapping[str, Any]
 ) -> bytes:
@@ -59,10 +90,7 @@ async def async_read_parameter(
         offset,
         length,
     )
-    bit = entry.get("bit")
-    if bit is not None and result:
-        return bytes([(result[0] >> int(bit)) & 0x01])
-    return result
+    return _apply_bit(entry, result)
 
 
 async def async_write_parameter(
