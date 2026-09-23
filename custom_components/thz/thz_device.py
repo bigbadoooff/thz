@@ -21,6 +21,7 @@ from .exceptions import (
     THZNotInitializedError,
     THZNotSupportedError,
     THZProtocolError,
+    THZWriteRejectedError,
 )
 from .register_maps.register_map_manager import (
     RegisterMapManager,
