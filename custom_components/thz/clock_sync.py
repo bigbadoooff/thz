@@ -28,13 +28,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from ._typing_compat import get_runtime_data
 from .notify import async_notify
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
     parameter_length,
 )
+from .runtime_data import loaded_runtime_data
 from .value_codec import THZValueCodec
 
 if TYPE_CHECKING:
@@ -216,12 +216,12 @@ async def async_check_and_maybe_sync_clock(
     # Surface it to the user — but at most once per calendar day, since this
     # check runs every 15 minutes and a persistently-drifted clock would
     # otherwise spam a fresh notification ~96 times a day.
-    entry_data = get_runtime_data(config_entry)
+    entry_data = loaded_runtime_data(config_entry)
     today = dt_util.now().date()
-    if isinstance(entry_data, dict):
-        if entry_data.get("_clock_notify_date") == today:
+    if entry_data is not None:
+        if entry_data.clock_notify_date == today:
             return
-        entry_data["_clock_notify_date"] = today
+        entry_data.clock_notify_date = today
     async_notify(
         hass,
         title="THZ Device Clock Drifted",

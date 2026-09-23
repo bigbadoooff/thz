@@ -19,7 +19,6 @@ from homeassistant.helpers import (
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from ._typing_compat import get_runtime_data, set_runtime_data
 from .clock_sync import async_setup_clock_check
 from .const import (
     CONF_ENABLE_HC2,
@@ -41,6 +40,7 @@ from .devices import (
     async_remove_empty_subdevices,
     main_device_name,
 )
+from .runtime_data import THZRuntimeData, loaded_runtime_data
 from .services import async_refresh_block as async_refresh_block, async_setup_services
 from .thz_device import THZDevice, THZRegisterNotSupportedError
 
@@ -106,8 +106,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     write_manager = device.write_register_map_manager
     register_manager = device.register_map_manager
+    if write_manager is None or register_manager is None:
+        await hass.async_add_executor_job(device.close)
+        raise ConfigEntryNotReady("THZ register maps could not be loaded")
     # Paired register blocks for energy sensors (cmd2 + cmd3)
-    paired_blocks = register_manager.get_paired_blocks() if register_manager else {}
+    paired_blocks = register_manager.get_paired_blocks()
     if paired_blocks:
         _LOGGER.debug("Paired register blocks for dual-read: %s", paired_blocks)
 
@@ -125,27 +128,24 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     # Store per-entry runtime state on the config entry itself (not hass.data),
     # per HA's recommended runtime-data pattern.
-    set_runtime_data(
-        config_entry,
-        {
-            "device": device,
-            "device_id": unique_id,
-            "write_manager": write_manager,
-            "register_manager": register_manager,
-            "coordinators": coordinators,
-            "unsupported_blocks": unsupported_blocks,
-            "entity_id_style": entity_id_style,
-            "entity_visibility": entity_visibility,
-            "entity_id_prefix": entity_id_prefix,
-        },
+    entry_data = THZRuntimeData(
+        device=device,
+        device_id=unique_id,
+        write_manager=write_manager,
+        register_manager=register_manager,
+        coordinators=coordinators,
+        unsupported_blocks=unsupported_blocks,
+        entity_id_style=entity_id_style,
+        entity_visibility=entity_visibility,
+        entity_id_prefix=entity_id_prefix,
     )
+    config_entry.runtime_data = entry_data
 
     # Periodic clock-drift check (independent of per-entity polling of the
     # individual pClock* registers — see clock_sync.py). Always runs so
     # drift is logged; only writes a correction back to the device when the
     # "auto_sync_clock" option is enabled.
-    entry_data = get_runtime_data(config_entry)
-    entry_data["unsub_clock_check"] = async_setup_clock_check(
+    entry_data.unsub_clock_check = async_setup_clock_check(
         hass, config_entry, device, write_manager
     )
 
@@ -571,14 +571,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         # Clean up device connection
-        entry_data = get_runtime_data(entry)
-        if entry_data:
-            unsub_clock_check = entry_data.get("unsub_clock_check")
-            if unsub_clock_check:
-                unsub_clock_check()
-            device = entry_data.get("device")
-            if device:
-                await hass.async_add_executor_job(device.close)
+        entry_data = loaded_runtime_data(entry)
+        if entry_data is not None:
+            if entry_data.unsub_clock_check:
+                entry_data.unsub_clock_check()
+            await hass.async_add_executor_job(entry_data.device.close)
 
     return unload_ok
 

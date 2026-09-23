@@ -18,7 +18,7 @@ async def async_handle_probe_fault_memory(
     """Read and decode the D1 fault memory. Read-only."""
     _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
     try:
-        result = await read_fault_memory(hass, entry_data["device"])
+        result = await read_fault_memory(hass, entry_data.device)
     except THZRegisterNotSupportedError as err:
         raise HomeAssistantError(
             f"D1 fault memory is not supported by this device: {err}"
@@ -33,8 +33,8 @@ async def async_handle_acknowledge_faults(
 ) -> ServiceResponse:
     """Mark all current D1 fault records as seen in Home Assistant only."""
     _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
-    tracker = entry_data.get("fault_tracker")
-    source = entry_data.get("fault_source")
+    tracker = entry_data.fault_tracker
+    source = entry_data.fault_source
     if tracker is None or source is None:
         raise ServiceValidationError(
             "Fault tracking is not available: it needs the Fault Log (pxxD1) "
@@ -59,12 +59,12 @@ async def async_handle_clear_fault_memory(
             f"Confirmation phrase incorrect. Expected exactly: {CLEAR_CONFIRMATION}"
         )
     _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
-    device = entry_data["device"]
+    device = entry_data.device
     try:
         result = await clear_fault_memory(hass, device)
     except RuntimeError as err:
         raise HomeAssistantError(str(err)) from err
-    source = entry_data.get("fault_source")
+    source = entry_data.fault_source
     if source is not None:
         await source.async_request_refresh()
     return cast("ServiceResponse", {"success": True, **result})

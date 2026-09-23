@@ -8,7 +8,7 @@ from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from ._typing_compat import get_runtime_data
+from .runtime_data import loaded_runtime_data
 
 # Keys to redact from diagnostics to protect user privacy
 TO_REDACT = {
@@ -30,9 +30,9 @@ async def async_get_config_entry_diagnostics(
     THZ integration without exposing sensitive data like IP addresses or
     serial numbers.
     """
-    entry_data = get_runtime_data(config_entry) or {}
-    device = entry_data.get("device")
-    coordinators = entry_data.get("coordinators", {})
+    entry_data = loaded_runtime_data(config_entry)
+    device = entry_data.device if entry_data else None
+    coordinators = entry_data.coordinators if entry_data else {}
 
     # Collect basic device information
     # _firmware_version rather than the firmware_version property, which
@@ -66,8 +66,8 @@ async def async_get_config_entry_diagnostics(
         }
 
     # Collect register information (counts only, no data)
-    register_manager = entry_data.get("register_manager")
-    write_manager = entry_data.get("write_manager")
+    register_manager = entry_data.register_manager if entry_data else None
+    write_manager = entry_data.write_manager if entry_data else None
 
     register_counts: dict[str, Any] = {}
     if register_manager:

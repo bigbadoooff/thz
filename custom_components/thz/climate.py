@@ -79,7 +79,6 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PRECISION_TENTHS, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -88,7 +87,6 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
-from ._typing_compat import get_runtime_data
 from .const import (
     CONF_ENABLE_HC2,
     ENTITY_ID_STYLE_DEFAULT,
@@ -105,6 +103,7 @@ from .value_maps import SELECT_MAP
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
+    from .runtime_data import THZConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -400,7 +399,7 @@ def _dhw_entity(
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: THZConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up THZ climate entities from a config entry.
@@ -414,21 +413,21 @@ async def async_setup_entry(
         config_entry: The configuration entry for this integration.
         async_add_entities: Callback to register new entities.
     """
-    entry_data = get_runtime_data(config_entry)
-    coordinators: dict[str, DataUpdateCoordinator] = entry_data["coordinators"]
-    register_manager = entry_data["register_manager"]
-    write_registers: dict[str, Any] = entry_data["write_manager"].get_all_registers()
+    entry_data = config_entry.runtime_data
+    coordinators: dict[str, DataUpdateCoordinator] = entry_data.coordinators
+    register_manager = entry_data.register_manager
+    write_registers: dict[str, Any] = entry_data.write_manager.get_all_registers()
 
     # Bit-field layouts for pxx0A0176 — None when not present in map
     cooling = _bit_field_layout(register_manager, "pxx0A0176", "cooling")
     compressor = _bit_field_layout(register_manager, "pxx0A0176", "compressor")
     setup = _ClimateSetup(
-        device=entry_data["device"],
-        device_id=entry_data["device_id"],
+        device=entry_data.device,
+        device_id=entry_data.device_id,
         write_registers=write_registers,
         register_manager=register_manager,
-        entity_id_style=entry_data.get("entity_id_style", ENTITY_ID_STYLE_DEFAULT),
-        entity_id_prefix=entry_data.get("entity_id_prefix"),
+        entity_id_style=entry_data.entity_id_style,
+        entity_id_prefix=entry_data.entity_id_prefix,
         cooling_coordinator=coordinators.get("pxx0A0176"),
         opmode_entry=_command_entry(write_registers, _OPMODE_NAME),
         cooling_byte=cooling[0] if cooling else None,

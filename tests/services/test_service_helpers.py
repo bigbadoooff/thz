@@ -16,6 +16,7 @@ from custom_components.thz.services.raw import (
     _format_hex_dump,
     _guess_decode_candidates,
 )
+from tests.helpers import as_runtime_data
 
 
 def _make_hass_with_entries(entries: dict) -> MagicMock:
@@ -28,7 +29,7 @@ def _make_hass_with_entries(entries: dict) -> MagicMock:
     for entry_id, runtime_data in entries.items():
         entry = MagicMock()
         entry.entry_id = entry_id
-        entry.runtime_data = runtime_data
+        entry.runtime_data = as_runtime_data(runtime_data)
         fake_entries.append(entry)
     hass.config_entries.async_entries = MagicMock(return_value=fake_entries)
     return hass
@@ -43,11 +44,11 @@ class TestRequireTargetEntryData:
             _require_target_entry_data(hass, None)
 
     def test_single_entry_no_entry_id_returns_it(self):
-        entry_data = {"device": MagicMock()}
-        hass = _make_hass_with_entries({"entry1": entry_data})
+        device = MagicMock()
+        hass = _make_hass_with_entries({"entry1": {"device": device}})
         entry_id, result = _require_target_entry_data(hass, None)
         assert entry_id == "entry1"
-        assert result is entry_data
+        assert result.device is device
 
     def test_multiple_entries_no_entry_id_raises_validation_error(self):
         hass = _make_hass_with_entries(
@@ -60,25 +61,21 @@ class TestRequireTargetEntryData:
             _require_target_entry_data(hass, None)
 
     def test_multiple_entries_with_valid_entry_id(self):
-        entry_data1 = {"device": MagicMock()}
-        entry_data2 = {"device": MagicMock()}
+        device2 = MagicMock()
         hass = _make_hass_with_entries(
-            {
-                "entry1": entry_data1,
-                "entry2": entry_data2,
-            }
+            {"entry1": {"device": MagicMock()}, "entry2": {"device": device2}}
         )
         entry_id, result = _require_target_entry_data(hass, "entry2")
         assert entry_id == "entry2"
-        assert result is entry_data2
+        assert result.device is device2
 
     def test_entry_id_not_found_raises_validation_error(self):
         hass = _make_hass_with_entries({"entry1": {"device": MagicMock()}})
         with pytest.raises(ServiceValidationError, match="No THZ entry found"):
             _require_target_entry_data(hass, "nonexistent")
 
-    def test_ignores_entries_without_device_key(self):
-        hass = _make_hass_with_entries({"entry1": {"not_a_device_entry": True}})
+    def test_ignores_entries_that_are_not_loaded(self):
+        hass = _make_hass_with_entries({"entry1": None})
         with pytest.raises(HomeAssistantError, match="No THZ device is loaded"):
             _require_target_entry_data(hass, None)
 

@@ -7,6 +7,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.thz.const import DOMAIN
+from tests.helpers import as_runtime_data, make_runtime_data
 
 
 class TestReadRawRegisterService:
@@ -36,7 +37,7 @@ class TestReadRawRegisterService:
             for entry_id, runtime_data in hass.data.get(domain, {}).items():
                 entry = MagicMock()
                 entry.entry_id = entry_id
-                entry.runtime_data = runtime_data
+                entry.runtime_data = as_runtime_data(runtime_data)
                 entries.append(entry)
             return entries
 
@@ -283,7 +284,9 @@ class TestReadRawRegisterService:
 
         entry = MagicMock()
         entry.entry_id = "test_entry"
-        entry.runtime_data = {"device": MagicMock(close=MagicMock())}
+        entry.runtime_data = make_runtime_data(
+            **{"device": MagicMock(close=MagicMock())}
+        )
         mock_hass.config_entries = MagicMock()
         mock_hass.config_entries.async_entries = MagicMock(return_value=[])
         mock_hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
@@ -298,7 +301,9 @@ class TestReadRawRegisterService:
 
         entry = MagicMock()
         entry.entry_id = "test_entry"
-        entry.runtime_data = {"device": MagicMock(close=MagicMock())}
+        entry.runtime_data = make_runtime_data(
+            **{"device": MagicMock(close=MagicMock())}
+        )
 
         # Mock config_entries.async_entries to return remaining entry
         other_entry = MagicMock()

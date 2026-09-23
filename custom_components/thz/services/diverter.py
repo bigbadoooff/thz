@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import HomeAssistantError
 
 from ..const import WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
+from ..runtime_data import THZRuntimeData
 from ..thz_device import THZDevice
 from .common import _require_target_entry_data
 
@@ -57,18 +58,18 @@ def _diverter_bit_position(register_manager: Any) -> tuple[int, int] | None:
     return None
 
 
-def _diverter_points_to_dhw(entry_data: dict[str, Any]) -> bool:
+def _diverter_points_to_dhw(entry_data: THZRuntimeData) -> bool:
     """Return the diverterValve flag from the polled pxxF2 block.
 
     Raises HomeAssistantError if the flag cannot be determined.
     """
-    coordinator = entry_data.get("coordinators", {}).get(_DIVERTER_BLOCK)
+    coordinator = entry_data.coordinators.get(_DIVERTER_BLOCK)
     if coordinator is None or coordinator.data is None:
         raise HomeAssistantError(
             f"Cannot verify valve state: {_DIVERTER_BLOCK} coordinator "
             "data not available"
         )
-    flag = _diverter_bit_position(entry_data.get("register_manager"))
+    flag = _diverter_bit_position(entry_data.register_manager)
     if flag is None:
         raise HomeAssistantError(
             f"Cannot verify valve state: no {_DIVERTER_FIELD} flag in "
@@ -81,7 +82,7 @@ def _diverter_points_to_dhw(entry_data: dict[str, Any]) -> bool:
     return bool((data[diverter_byte] >> diverter_bit) & 0x01)
 
 
-def _check_valve_direction(entry_data: dict[str, Any], position: str) -> None:
+def _check_valve_direction(entry_data: THZRuntimeData, position: str) -> None:
     """Refuse moving the valve against the active flow direction.
 
     diverterValve bit = 1 → flow is to DHW; bit = 0 → flow is to the heating
@@ -167,7 +168,7 @@ async def async_handle_set_diverter_valve(
     if motor_may_run:
         _check_valve_direction(entry_data, position)
 
-    device: THZDevice = entry_data["device"]
+    device: THZDevice = entry_data.device
     try:
         if motor_may_run:
             motor = _VALVE_MOTOR_HEATING if position == "heating" else _VALVE_MOTOR_DHW

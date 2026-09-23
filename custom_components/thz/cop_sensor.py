@@ -25,14 +25,13 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._typing_compat import get_runtime_data
 from .devices import assign_subdevices, thz_device_info
+from .runtime_data import THZConfigEntry
 from .value_codec import decode_raw_value
 
 if TYPE_CHECKING:
@@ -68,7 +67,7 @@ _ENERGY_SENSOR_BLOCKS: dict[str, tuple[str, int, int, str, float]] = {
 
 async def async_setup_cop_sensors(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: THZConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up COP sensor entities from a config entry.
@@ -85,10 +84,10 @@ async def async_setup_cop_sensors(
     Returns:
         None
     """
-    entry_data = get_runtime_data(config_entry)
-    coordinators = entry_data["coordinators"]
-    device_id = entry_data["device_id"]
-    device = entry_data["device"]
+    entry_data = config_entry.runtime_data
+    coordinators = entry_data.coordinators
+    device_id = entry_data.device_id
+    device = entry_data.device
     firmware_version = device.firmware_version
 
     # COP sensors are only available for firmware versions with energy values
@@ -105,7 +104,7 @@ async def async_setup_cop_sensors(
     # Current COP from the instantaneous power readings in pxxFB, located via
     # the active firmware's register map rather than guessed.
     power_coordinator = coordinators.get(_POWER_BLOCK)
-    register_manager = entry_data.get("register_manager")
+    register_manager = entry_data.register_manager
     if power_coordinator is not None and register_manager is not None:
         qc = _power_field_layout(register_manager, "actualPower_Qc")
         pel = _power_field_layout(register_manager, "actualPower_Pel")

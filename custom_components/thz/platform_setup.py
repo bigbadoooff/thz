@@ -9,17 +9,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from ._typing_compat import get_runtime_data
 from .const import (
     DEFAULT_WRITE_INTERVAL,
-    ENTITY_ID_STYLE_DEFAULT,
-    ENTITY_VISIBILITY_DEFAULT,
     get_write_group_for_key,
 )
 from .devices import assign_subdevices
+from .runtime_data import THZConfigEntry
 
 if TYPE_CHECKING:
-    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -31,7 +28,7 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_write_platform(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: THZConfigEntry,
     async_add_entities: AddEntitiesCallback,
     entity_type: type,
     platform_type: str,
@@ -49,13 +46,13 @@ async def async_setup_write_platform(
         entity_type: The entity class to instantiate (e.g., THZNumber, THZSwitch).
         platform_type: The type filter for register entries (e.g., "number", "switch").
     """
-    entry_data = get_runtime_data(config_entry)
-    write_manager: RegisterMapManagerWrite = entry_data["write_manager"]
-    device: THZDevice = entry_data["device"]
-    device_id = entry_data["device_id"]
-    entity_id_style = entry_data.get("entity_id_style", ENTITY_ID_STYLE_DEFAULT)
-    entity_visibility = entry_data.get("entity_visibility", ENTITY_VISIBILITY_DEFAULT)
-    entity_id_prefix = entry_data.get("entity_id_prefix")
+    entry_data = config_entry.runtime_data
+    write_manager: RegisterMapManagerWrite = entry_data.write_manager
+    device: THZDevice = entry_data.device
+    device_id = entry_data.device_id
+    entity_id_style = entry_data.entity_id_style
+    entity_visibility = entry_data.entity_visibility
+    entity_id_prefix = entry_data.entity_id_prefix
 
     # Same default the config flow stores for new entries.
     write_interval = config_entry.data.get("write_interval", DEFAULT_WRITE_INTERVAL)
@@ -93,7 +90,7 @@ async def async_setup_write_platform(
                 entity_visibility=entity_visibility,
                 entity_id_prefix=entity_id_prefix,
             )
-            entity._coordinators = entry_data.get("coordinators", {})
+            entity._coordinators = entry_data.coordinators
             entities.append(entity)
 
     _LOGGER.info("Created %d %s entities", len(entities), platform_type)

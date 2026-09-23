@@ -15,6 +15,7 @@ from custom_components.thz.sensor import (
     async_setup_entry,
     decode_value,
 )
+from tests.helpers import make_runtime_data
 
 
 class FakeRegisterManager:
@@ -45,13 +46,15 @@ def _make_hass_and_entry(
     hass = MagicMock()
     config_entry = MagicMock()
     config_entry.entry_id = "entry1"
-    config_entry.runtime_data = {
-        "register_manager": FakeRegisterManager(registers),
-        "coordinators": coordinators,
-        "device_id": device_id,
-        "device": device,
-        "unsupported_blocks": unsupported_blocks or set(),
-    }
+    config_entry.runtime_data = make_runtime_data(
+        **{
+            "register_manager": FakeRegisterManager(registers),
+            "coordinators": coordinators,
+            "device_id": device_id,
+            "device": device,
+            "unsupported_blocks": unsupported_blocks or set(),
+        }
+    )
     return hass, config_entry
 
 
@@ -407,7 +410,7 @@ class TestAbsentAndNibbleFields:
         hass, config_entry = _make_hass_and_entry(
             manager.get_all_registers(), coordinators
         )
-        config_entry.runtime_data["register_manager"] = manager
+        config_entry.runtime_data.register_manager = manager
         async_add_entities = MagicMock()
 
         await async_setup_entry(hass, config_entry, async_add_entities)

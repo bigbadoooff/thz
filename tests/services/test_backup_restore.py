@@ -20,6 +20,7 @@ import pytest
 
 from custom_components.thz.const import DOMAIN
 from custom_components.thz.services import async_setup_services
+from tests.helpers import as_runtime_data, make_runtime_data
 
 
 def _mock_hass():
@@ -48,7 +49,7 @@ def _mock_hass():
         for entry_id, runtime_data in hass.data.get(domain, {}).items():
             entry = MagicMock()
             entry.entry_id = entry_id
-            entry.runtime_data = runtime_data
+            entry.runtime_data = as_runtime_data(runtime_data)
             entry.data = {}
             entries.append(entry)
         return entries
@@ -171,7 +172,7 @@ class TestRequireTargetEntryData:
         hass = MagicMock()
         entry = MagicMock()
         entry.entry_id = "entry_a"
-        entry.runtime_data = {"device": MagicMock()}
+        entry.runtime_data = make_runtime_data(device=MagicMock())
         hass.config_entries.async_entries = MagicMock(return_value=[entry])
 
         entry_id, resolved = _require_target_entry_data(hass, None)
@@ -192,8 +193,14 @@ class TestRequireTargetEntryData:
         from custom_components.thz.services.common import _require_target_entry_data
 
         hass = MagicMock()
-        entry_a = MagicMock(entry_id="entry_a", runtime_data={"device": MagicMock()})
-        entry_b = MagicMock(entry_id="entry_b", runtime_data={"device": MagicMock()})
+        entry_a = MagicMock(
+            entry_id="entry_a",
+            runtime_data=make_runtime_data(device=MagicMock()),
+        )
+        entry_b = MagicMock(
+            entry_id="entry_b",
+            runtime_data=make_runtime_data(device=MagicMock()),
+        )
         hass.config_entries.async_entries = MagicMock(return_value=[entry_a, entry_b])
 
         with pytest.raises(ServiceValidationError, match="Multiple"):
@@ -203,8 +210,14 @@ class TestRequireTargetEntryData:
         from custom_components.thz.services.common import _require_target_entry_data
 
         hass = MagicMock()
-        entry_a = MagicMock(entry_id="entry_a", runtime_data={"device": MagicMock()})
-        entry_b = MagicMock(entry_id="entry_b", runtime_data={"device": MagicMock()})
+        entry_a = MagicMock(
+            entry_id="entry_a",
+            runtime_data=make_runtime_data(device=MagicMock()),
+        )
+        entry_b = MagicMock(
+            entry_id="entry_b",
+            runtime_data=make_runtime_data(device=MagicMock()),
+        )
         hass.config_entries.async_entries = MagicMock(return_value=[entry_a, entry_b])
 
         entry_id, resolved = _require_target_entry_data(hass, "entry_b")
@@ -216,7 +229,10 @@ class TestRequireTargetEntryData:
         from custom_components.thz.services.common import _require_target_entry_data
 
         hass = MagicMock()
-        entry = MagicMock(entry_id="entry_a", runtime_data={"device": MagicMock()})
+        entry = MagicMock(
+            entry_id="entry_a",
+            runtime_data=make_runtime_data(device=MagicMock()),
+        )
         hass.config_entries.async_entries = MagicMock(return_value=[entry])
 
         with pytest.raises(ServiceValidationError, match="nonexistent"):

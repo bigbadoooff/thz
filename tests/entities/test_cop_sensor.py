@@ -25,6 +25,7 @@ from custom_components.thz.cop_sensor import (
 from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManager,
 )
+from tests.helpers import make_runtime_data
 
 # (byte_offset, byte_length, factor) of actualPower_Qc / _Pel on 5.39.
 _QC = (47, 4, 1.0)
@@ -135,12 +136,14 @@ class TestAsyncSetupCopSensors:
         hass = MagicMock()
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
-        config_entry.runtime_data = {
-            "coordinators": coordinators,
-            "device_id": device_id,
-            "device": device,
-            "register_manager": RegisterMapManager("539"),
-        }
+        config_entry.runtime_data = make_runtime_data(
+            **{
+                "coordinators": coordinators,
+                "device_id": device_id,
+                "device": device,
+                "register_manager": RegisterMapManager("539"),
+            }
+        )
         return hass, config_entry
 
     @pytest.mark.asyncio

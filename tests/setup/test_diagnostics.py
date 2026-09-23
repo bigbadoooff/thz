@@ -13,6 +13,7 @@ from custom_components.thz.diagnostics import (
     TO_REDACT,
     async_get_config_entry_diagnostics,
 )
+from tests.helpers import make_runtime_data
 
 
 def _make_config_entry(entry_id="test_entry", data=None, runtime_data=None):
@@ -38,11 +39,9 @@ class TestDiagnosticsRegisterCounts:
 
         hass = MagicMock()
         config_entry = _make_config_entry(
-            runtime_data={
-                "device": MagicMock(),
-                "coordinators": {},
-                "register_manager": register_manager,
-            }
+            runtime_data=make_runtime_data(
+                device=MagicMock(), coordinators={}, register_manager=register_manager
+            )
         )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
@@ -63,11 +62,9 @@ class TestDiagnosticsRegisterCounts:
 
         hass = MagicMock()
         config_entry = _make_config_entry(
-            runtime_data={
-                "device": MagicMock(),
-                "coordinators": {},
-                "write_manager": write_manager,
-            }
+            runtime_data=make_runtime_data(
+                device=MagicMock(), coordinators={}, write_manager=write_manager
+            )
         )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
@@ -83,10 +80,7 @@ class TestDiagnosticsRegisterCounts:
     async def test_no_register_manager_or_write_manager(self):
         hass = MagicMock()
         config_entry = _make_config_entry(
-            runtime_data={
-                "device": MagicMock(),
-                "coordinators": {},
-            }
+            runtime_data=make_runtime_data(device=MagicMock(), coordinators={})
         )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
@@ -109,10 +103,9 @@ class TestDiagnosticsCoordinatorInfo:
 
         hass = MagicMock()
         config_entry = _make_config_entry(
-            runtime_data={
-                "device": MagicMock(),
-                "coordinators": {"pxxFB": coordinator},
-            }
+            runtime_data=make_runtime_data(
+                device=MagicMock(), coordinators={"pxxFB": coordinator}
+            )
         )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
@@ -132,10 +125,9 @@ class TestDiagnosticsCoordinatorInfo:
 
         hass = MagicMock()
         config_entry = _make_config_entry(
-            runtime_data={
-                "device": MagicMock(),
-                "coordinators": {"pxxFB": coordinator},
-            }
+            runtime_data=make_runtime_data(
+                device=MagicMock(), coordinators={"pxxFB": coordinator}
+            )
         )
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
@@ -203,7 +195,7 @@ class TestDiagnosticsMissingEntryData:
 
         device = THZDevice(connection="ip", host="h", tcp_port=1)
         hass = MagicMock()
-        config_entry = _make_config_entry(runtime_data={"device": device})
+        config_entry = _make_config_entry(runtime_data=make_runtime_data(device=device))
 
         # Firmware still unknown: must not raise from the firmware_version
         # property.

@@ -16,13 +16,12 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from ._typing_compat import get_runtime_data
 from .const import DOMAIN
 from .devices import thz_device_info
 from .fault_state import STATUS_FAULT, STATUS_OK, STORAGE_VERSION, THZFaultTracker
+from .runtime_data import THZConfigEntry
 
 if TYPE_CHECKING:
-    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
     from ._typing_compat import AddConfigEntryEntitiesCallback
@@ -49,15 +48,15 @@ def supports_fault_memory(register_manager: Any) -> bool:
 
 async def async_setup_fault_sensors(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: THZConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Create the fault-memory sensors and store the tracker for services."""
-    entry_data = get_runtime_data(config_entry)
-    coordinator = entry_data["coordinators"].get(D1_BLOCK)
+    entry_data = config_entry.runtime_data
+    coordinator = entry_data.coordinators.get(D1_BLOCK)
     if coordinator is None:
         return
-    if not supports_fault_memory(entry_data["register_manager"]):
+    if not supports_fault_memory(entry_data.register_manager):
         _LOGGER.debug("Fault memory sensors skipped: unsupported pxxD1 layout")
         return
 
@@ -67,8 +66,8 @@ async def async_setup_fault_sensors(
     await tracker.async_load()
     tracker.process(coordinator.data)
     await tracker.async_save()
-    entry_data["fault_tracker"] = tracker
-    entry_data["fault_source"] = coordinator
+    entry_data.fault_tracker = tracker
+    entry_data.fault_source = coordinator
 
     def _on_update() -> None:
         tracker.process(coordinator.data)
@@ -78,7 +77,7 @@ async def async_setup_fault_sensors(
     # Registered before the entities so the tracker is current when they read it.
     config_entry.async_on_unload(coordinator.async_add_listener(_on_update))
 
-    device_id = entry_data["device_id"]
+    device_id = entry_data.device_id
     async_add_entities(
         [
             THZFaultStatusSensor(coordinator, tracker, device_id),
