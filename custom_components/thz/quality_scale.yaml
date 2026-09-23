@@ -9,8 +9,9 @@ rules:
   config-flow-test-coverage:
     status: todo
     comment: >
-      Covered with stubbed Home Assistant in tests/; tests_ha/ covers only the
-      IP flow so far.
+      tests_ha/ covers the IP, USB, error, duplicate and reconfigure paths
+      against a real Home Assistant; the rest is covered only with stubs in
+      tests/.
   config-flow: done
   dependency-transparency: done
   docs-actions: done
