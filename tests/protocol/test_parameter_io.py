@@ -25,12 +25,12 @@ from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManagerWrite,
 )
 from custom_components.thz.value_codec import THZValueCodec
-from tests.helpers import Simulated2xxDevice
+from tests.helpers import Simulated2xxDevice, make_climate, write_param
 
 
 @pytest.fixture
 def write_map_206():
-    return RegisterMapManagerWrite("206").get_all_registers()
+    return RegisterMapManagerWrite("206").params()
 
 
 def _block_17() -> bytes:
@@ -40,20 +40,30 @@ def _block_17() -> bytes:
 
 class TestHelpers:
     def test_direct_entry_defaults(self):
-        entry = {"command": "0A0005", "type": "number"}
+        entry = write_param({"command": "0A0005", "type": "number"})
         assert not is_block_parameter(entry)
         assert parameter_length(entry) == 2
+
+    def test_parameter_from_block_needs_a_block_parameter(self, write_map_206):
+        from custom_components.thz.parameter_io import parameter_from_block
+
+        direct = write_param({"command": "0A0005"})
+        assert parameter_from_block(direct, bytes(40)) is None
+        # A block response too short to hold the parameter.
+        assert parameter_from_block(write_map_206["p02RoomTempNight"], b"\x00") is None
 
     def test_block_entry_uses_map_length(self, write_map_206):
         entry = write_map_206["p07FanStageDay"]
         assert is_block_parameter(entry)
-        assert parameter_length(entry) == entry["length"] == 1
+        assert parameter_length(entry) == entry.block.length == 1
 
     @pytest.mark.asyncio
     async def test_direct_write_uses_plain_set(self):
         device = MagicMock()
         device.async_execute = AsyncMock()
-        await async_write_parameter(None, device, {"command": "0A0005"}, b"\x00\x01")
+        await async_write_parameter(
+            None, device, write_param({"command": "0A0005"}), b"\x00\x01"
+        )
         device.async_execute.assert_awaited_once_with(
             None, device.write_value, bytes.fromhex("0A0005"), b"\x00\x01"
         )
@@ -68,8 +78,8 @@ class TestHelpers:
             None,
             device.write_block_value,
             b"\x17",
-            entry["offset"],
-            entry["length"],
+            entry.block.offset,
+            entry.block.length,
             b"\x00\xaa",
         )
 
@@ -91,7 +101,7 @@ class TestSimulated2xxDevice:
         device = Simulated2xxDevice({b"\x17": before})
         entry = write_map_206["p02RoomTempNight"]
         value = THZValueCodec.encode_number(
-            18.5, float(entry["step"]), entry["decode_type"], parameter_length(entry)
+            18.5, float(entry.step), entry.decode_type, parameter_length(entry)
         )
 
         await async_write_parameter(None, device, entry, value)
@@ -107,10 +117,10 @@ class TestSimulated2xxDevice:
         numbers = {
             name: e
             for name, e in write_map_206.items()
-            if e["type"] == "number" and is_block_parameter(e)
+            if e.type == "number" and is_block_parameter(e)
         }
         assert numbers
-        blocks = {bytes.fromhex(e["command"]): bytes(64) for e in numbers.values()}
+        blocks = {bytes.fromhex(e.command): bytes(64) for e in numbers.values()}
         device = Simulated2xxDevice(blocks)
         for entry in numbers.values():
             raw = bytes([0x01] * parameter_length(entry))
@@ -136,26 +146,26 @@ class TestBitFlagsOn2xx:
         tuesday = write_map_206["progHC1Tuesday"]
         monday = write_map_206["progHC1Monday"]
         # Both live in the low nibble of the same byte (nibble 13).
-        assert tuesday["offset"] == monday["offset"]
-        assert (tuesday["bit"], monday["bit"]) == (1, 0)
+        assert tuesday.block.offset == monday.block.offset
+        assert (tuesday.block.bit, monday.block.bit) == (1, 0)
 
         data = bytearray(16)
-        data[tuesday["offset"] - 2] = 0b1111_0001  # Monday on, high nibble set
+        data[tuesday.block.offset - 2] = 0b1111_0001  # Monday on, high nibble set
         device = Simulated2xxDevice({b"\x0b": bytes(data)})
 
         await async_write_parameter(None, device, tuesday, b"\x01")
 
-        byte = device.blocks[b"\x0b"][tuesday["offset"] - 2]
+        byte = device.blocks[b"\x0b"][tuesday.block.offset - 2]
         assert byte == 0b1111_0011
         assert await async_read_parameter(None, device, tuesday) == b"\x01"
         assert await async_read_parameter(None, device, monday) == b"\x01"
 
         await async_write_parameter(None, device, monday, b"\x00")
-        assert device.blocks[b"\x0b"][tuesday["offset"] - 2] == 0b1111_0010
+        assert device.blocks[b"\x0b"][tuesday.block.offset - 2] == 0b1111_0010
 
     def test_high_nibble_flags_are_shifted(self, write_map_206):
         # Friday sits at the even nibble 12, i.e. the byte's high nibble.
-        assert write_map_206["progHC1Friday"]["bit"] == 4
+        assert write_map_206["progHC1Friday"].block.bit == 4
 
 
 class TestClimateOn2xx:
@@ -165,7 +175,7 @@ class TestClimateOn2xx:
         coordinator = MagicMock()
         coordinator.data = None
         coordinator.async_request_refresh = AsyncMock()
-        entity = THZClimate(
+        entity = make_climate(
             coordinator=coordinator,
             cooling_coordinator=None,
             device=device,
@@ -266,7 +276,7 @@ class TestNumberReadsFromBlockCoordinator:
         from custom_components.thz.parameter_io import parameter_from_block
 
         entry = write_map_206[name]
-        addr = bytes.fromhex(entry["command"])
+        addr = bytes.fromhex(entry.command)
         device = Simulated2xxDevice({addr: bytes(range(7, 55))})
         response = await device.read_write_register(addr, "get")
 

@@ -26,7 +26,7 @@ from . import (
     write_map_539,  # noqa: F401
     write_map_X39tech,  # noqa: F401
 )
-from .model import ReadField, normalize_field_name
+from .model import ReadField, WriteParam, normalize_field_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -386,6 +386,20 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
         # derived from the read register maps so that block read-modify-write works.
         if firmware_version and firmware_version.startswith("2"):
             self._enrich_2xx_write_entries()
+        self._params: dict[str, WriteParam] = {}
+        for name, entry in self._merged_map.items():
+            if not isinstance(entry, dict) or "command" not in entry:
+                # A 2.x entry whose parent block is unknown has no register.
+                continue
+            self._params[name] = WriteParam.from_entry(name, entry)
+
+    def params(self) -> dict[str, WriteParam]:
+        """Return every writable parameter by name, typed."""
+        return self._params
+
+    def param(self, name: str) -> WriteParam | None:
+        """Return the parameter called ``name``, or None."""
+        return self._params.get(name)
 
     def _merge_maps(
         self, base: dict[str, Any], override: dict[str, Any]

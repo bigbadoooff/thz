@@ -696,9 +696,8 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "write_register_map_manager missing after async_initialize"
                 )
                 return self.async_abort(reason="cannot_detect_blocks")
-            write_registers = write_manager.get_all_registers()
             groups_found: set[str] = set()
-            for key in write_registers:
+            for key in write_manager.params():
                 groups_found.add(get_write_group_for_key(key))
             self.write_groups_available = sorted(groups_found)
 

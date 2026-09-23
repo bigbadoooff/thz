@@ -2,9 +2,15 @@
 
 import pytest
 
-from custom_components.thz.register_maps.model import ReadField, normalize_field_name
+from custom_components.thz.register_maps.model import (
+    BlockLayout,
+    ReadField,
+    WriteParam,
+    normalize_field_name,
+)
 from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManager,
+    RegisterMapManagerWrite,
 )
 
 
@@ -88,3 +94,83 @@ def test_fields_are_hashable_and_read_only():
     assert {read_field, same} == {read_field}
     with pytest.raises(TypeError):
         read_field.meta["unit"] = "K"  # type: ignore[index]
+
+
+# ---------------------------------------------------------------------------
+# WriteParam
+# ---------------------------------------------------------------------------
+
+
+def _write_entry(**fields):
+    entry = {"command": "0B0005", "type": "number", "decode_type": "5temp"}
+    entry.update(fields)
+    return entry
+
+
+def test_direct_param():
+    param = WriteParam.from_entry(
+        "p01RoomTempDayHC1",
+        _write_entry(min="12", max="32", step=0.1, unit=" °C", icon="mdi:x"),
+    )
+    assert param.name == "p01RoomTempDayHC1"
+    assert (param.command, param.type, param.decode_type) == (
+        "0B0005",
+        "number",
+        "5temp",
+    )
+    assert (param.min, param.max) == ("12", "32")
+    assert (param.min_value, param.max_value) == (12.0, 32.0)
+    assert param.step == 0.1
+    assert param.unit == " °C"
+    assert param.block is None
+    assert param.signed is True
+
+
+@pytest.mark.parametrize(
+    ("step", "expected"), [("0.5", 0.5), (1, 1.0), ("", None), ("x", None)]
+)
+def test_step_parsing(step, expected):
+    assert WriteParam.from_entry("p", _write_entry(step=step)).step == expected
+    assert WriteParam.from_entry("p", _write_entry()).step is None
+
+
+def test_time_bounds_stay_text():
+    param = WriteParam.from_entry(
+        "pHolidayBeginTime", _write_entry(type="time", min="00:00", max="23:59")
+    )
+    assert (param.min, param.max) == ("00:00", "23:59")
+    assert param.min_value is None
+
+
+def test_missing_or_none_text_fields_are_empty():
+    param = WriteParam.from_entry("p", _write_entry(icon=None))
+    assert (param.icon, param.unit, param.min, param.device_class) == ("", "", "", "")
+
+
+def test_block_param():
+    param = WriteParam.from_entry(
+        "progHC1Friday",
+        _write_entry(
+            command="0B",
+            parent="pHeatProg",
+            write_mode="block",
+            offset=8,
+            length=1,
+            bit=4,
+            signed=False,
+        ),
+    )
+    assert param.parent == "pHeatProg"
+    assert param.block == BlockLayout(offset=8, length=1, bit=4, signed=False)
+    assert param.signed is False
+
+
+def test_manager_types_every_write_entry():
+    manager = RegisterMapManagerWrite("206")
+    params = manager.params()
+    assert set(params) == set(manager.get_all_registers())
+    day = manager.param("p01RoomTempDay")
+    assert day is not None
+    assert day.block is not None
+    assert (day.command, day.block.offset, day.block.length) == ("17", 2, 2)
+    assert manager.param("nonexistent") is None

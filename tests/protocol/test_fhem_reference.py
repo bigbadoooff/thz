@@ -71,7 +71,7 @@ def _number_arg(value: float) -> str:
 
 
 def _number_values(entry: dict) -> list[float]:
-    low, high = float(entry["min"]), float(entry["max"])
+    low, high = float(entry.min), float(entry.max)
     return sorted({low, float(round((low + high) / 2)), high})
 
 
@@ -84,11 +84,11 @@ _BLOCK_FIRMWARES = {"206": "2.06", "214": "2.14", "214j": "2.14j"}
 
 def _block_entries(firmware: str) -> dict:
     """All 2xx block parameters exposed as number entities."""
-    registers = RegisterMapManagerWrite(firmware).get_all_registers()
+    registers = RegisterMapManagerWrite(firmware).params()
     return {
         name: entry
         for name, entry in registers.items()
-        if entry.get("type") == "number" and is_block_parameter(entry)
+        if entry.type == "number" and is_block_parameter(entry)
     }
 
 
@@ -100,16 +100,16 @@ def _block_data(addr: str) -> str:
     return data.hex().upper()
 
 
-def _fhem_rule(name: str, entry: dict) -> list:
+def _fhem_rule(name: str, entry) -> list:
     """Our register-map entry as an FHEM parsing rule (nibble positions)."""
-    offset = int(entry["offset"])
-    if "bit" in entry:
-        bit = int(entry["bit"])
+    offset = entry.block.offset
+    if entry.block.bit is not None:
+        bit = entry.block.bit
         nibble = offset * 2 + (0 if bit >= 4 else 1)
         return [f" {name}: ", nibble, 1, f"bit{bit % 4}", 1]
-    factor = round(1 / float(entry["step"]), 9)
-    decode = "hex2int" if entry.get("signed", True) else "hex"
-    return [f" {name}: ", offset * 2, int(entry["length"]) * 2, decode, factor]
+    factor = round(1 / float(entry.step), 9)
+    decode = "hex2int" if entry.signed else "hex"
+    return [f" {name}: ", offset * 2, entry.block.length * 2, decode, factor]
 
 
 def _block_definitions(entries: dict) -> dict:
@@ -124,16 +124,16 @@ def _block_definitions(entries: dict) -> dict:
         rule = _fhem_rule(name, entry)
         parsing[f"test_{name}"] = [rule]
         gets[f"test_parent_{name}"] = {
-            "cmd2": entry["command"].upper(),
+            "cmd2": entry.command.upper(),
             "type": f"test_{name}",
         }
         sets[name] = {
             "parent": f"test_parent_{name}",
-            "argMin": entry["min"],
-            "argMax": entry["max"],
+            "argMin": entry.min,
+            "argMax": entry.max,
             "type": "pclean",
         }
-        per_block.setdefault(entry["command"].upper(), []).append(rule)
+        per_block.setdefault(entry.command.upper(), []).append(rule)
     for addr, rules in per_block.items():
         parsing[f"test_block_{addr}"] = rules
     return {"sets": sets, "gets": gets, "parsing": parsing}
@@ -142,7 +142,7 @@ def _block_definitions(entries: dict) -> dict:
 def _block_cases(entries: dict) -> list[tuple[str, str]]:
     cases = []
     for name, entry in entries.items():
-        values = [0.0, 1.0] if "bit" in entry else _number_values(entry)
+        values = [0.0, 1.0] if entry.block.bit is not None else _number_values(entry)
         cases.extend((name, _number_arg(value)) for value in values)
     return cases
 
@@ -153,8 +153,8 @@ async def _our_block_telegram(entry: dict, value: str, blocks: dict) -> str:
     )
     value_bytes = THZValueCodec.encode_number(
         float(value),
-        float(entry["step"]),
-        entry["decode_type"],
+        float(entry.step),
+        entry.decode_type,
         parameter_length(entry),
     )
     await async_write_parameter(None, device, entry, value_bytes)
@@ -168,7 +168,7 @@ async def _our_block_telegram(entry: dict, value: str, blocks: dict) -> str:
 async def test_block_writes_match_fhem(firmware):
     entries = _block_entries(firmware)
     assert entries, f"no 2xx block parameters for {firmware}"
-    blocks = {e["command"]: _block_data(e["command"]) for e in entries.values()}
+    blocks = {e.command: _block_data(e.command) for e in entries.values()}
     cases = _block_cases(entries)
 
     reference = _fhem(
@@ -191,7 +191,7 @@ async def test_block_writes_match_fhem(firmware):
 @pytest.mark.parametrize("firmware", sorted(_BLOCK_FIRMWARES))
 async def test_block_reads_match_fhem(firmware):
     entries = _block_entries(firmware)
-    blocks = {e["command"]: _block_data(e["command"]) for e in entries.values()}
+    blocks = {e.command: _block_data(e.command) for e in entries.values()}
     parsed = _fhem(
         _BLOCK_FIRMWARES[firmware],
         blocks=blocks,
@@ -209,10 +209,10 @@ async def test_block_reads_match_fhem(firmware):
     )
     mismatches = []
     for name, entry in entries.items():
-        fhem = fhem_values[(entry["command"].upper(), name)]
+        fhem = fhem_values[(entry.command.upper(), name)]
         raw = await async_read_parameter(None, device, entry)
         ours = THZValueCodec.decode_number(
-            raw, float(entry["step"]), entry["decode_type"], entry.get("signed", True)
+            raw, float(entry.step), entry.decode_type, entry.signed
         )
         if ours != pytest.approx(float(fhem)):
             mismatches.append(f"{name}: fhem={fhem} ours={ours}")
@@ -266,10 +266,10 @@ def _direct_entries(firmware: str) -> dict:
     "8party" is left out: FHEM writes party start and end in one call,
     while the integration exposes only the start as a time entity.
     """
-    registers = RegisterMapManagerWrite(firmware).get_all_registers()
+    registers = RegisterMapManagerWrite(firmware).params()
     entries = {}
     for name, entry in registers.items():
-        kind, decode = entry.get("type"), entry.get("decode_type")
+        kind, decode = entry.type, entry.decode_type
         if kind in ("number", "switch", "select", "schedule") or (
             kind == "time" and decode == "9holy"
         ):
@@ -280,14 +280,14 @@ def _direct_entries(firmware: str) -> dict:
 def _direct_definitions(entries: dict) -> dict:
     sets = {}
     for name, entry in entries.items():
-        decode = entry.get("decode_type")
+        decode = entry.decode_type
         if decode not in _FHEM_VALUE_TYPES:
-            assert entry["type"] in ("select", "switch"), (name, decode)
+            assert entry.type in ("select", "switch"), (name, decode)
             decode = "1clean"
         sets[name] = {
-            "cmd2": entry["command"].upper(),
-            "argMin": entry.get("min") or "-32768",
-            "argMax": entry.get("max") or "32767",
+            "cmd2": entry.command.upper(),
+            "argMin": entry.min or "-32768",
+            "argMax": entry.max or "32767",
             "type": decode,
         }
     return {"sets": sets}
@@ -297,7 +297,7 @@ def _direct_cases(entries: dict) -> list[tuple[str, str, object]]:
     """(name, FHEM argument, our value) triples for every writable entry."""
     cases: list[tuple[str, str, object]] = []
     for name, entry in entries.items():
-        kind, decode = entry["type"], entry.get("decode_type")
+        kind, decode = entry.type, entry.decode_type
         if kind == "number":
             for value in _number_values(entry):
                 cases.append((name, _number_arg(value), value))
@@ -325,7 +325,7 @@ async def _our_direct_telegram(name: str, entry: dict, value) -> str:
         entity.async_write_ha_state = MagicMock()
         return entity
 
-    kind = entry["type"]
+    kind = entry.type
     if kind == "number":
         entity = _prepare(THZNumber(name, entry, device, "dev"))
         await entity.async_set_native_value(value)

@@ -74,10 +74,9 @@ async def _read_clock_parts(
     snapshot (and with it the drift check) fail. Returns None if a register is
     missing from the current register map or stays unreadable.
     """
-    write_registers = write_manager.get_all_registers()
     parts: dict[str, int] = {}
     for name in CLOCK_REGISTER_NAMES:
-        entry = write_registers.get(name)
+        entry = write_manager.param(name)
         if entry is None:
             return None
         value_bytes = None
@@ -100,7 +99,7 @@ async def _read_clock_parts(
         try:
             parts[name] = int(
                 THZValueCodec.decode_number(
-                    value_bytes, 1.0, entry["decode_type"], entry.get("signed", True)
+                    value_bytes, 1.0, entry.decode_type, entry.signed
                 )
             )
         except (ValueError, IndexError):
@@ -150,7 +149,6 @@ async def async_write_device_clock(
     matches ``when``; a mismatch is logged but not raised, since the write
     itself was accepted by the device.
     """
-    write_registers = write_manager.get_all_registers()
     values = {
         "pClockYear": when.year % 100,
         "pClockMonth": when.month,
@@ -160,11 +158,11 @@ async def async_write_device_clock(
     }
     current = await _read_clock_parts(hass, device, write_manager) or {}
     for name, value in values.items():
-        entry = write_registers.get(name)
+        entry = write_manager.param(name)
         if entry is None or current.get(name) == value:
             continue
         value_bytes = THZValueCodec.encode_number(
-            value, 1.0, entry["decode_type"], parameter_length(entry)
+            value, 1.0, entry.decode_type, parameter_length(entry)
         )
         await async_write_parameter(hass, device, entry, value_bytes)
     readback = await _read_clock_parts(hass, device, write_manager)

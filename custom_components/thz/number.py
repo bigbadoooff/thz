@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import logging
+from typing import cast
 
-from homeassistant.components.number import NumberEntity, NumberMode
+from homeassistant.components.number import (
+    NumberDeviceClass,
+    NumberEntity,
+    NumberMode,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -20,6 +25,7 @@ from .parameter_io import (
     parameter_length,
 )
 from .platform_setup import async_setup_write_platform
+from .register_maps.model import WriteParam
 from .thz_device import THZDevice
 from .value_codec import THZValueCodec
 
@@ -47,7 +53,7 @@ class THZNumber(THZBaseEntity, NumberEntity):
     def __init__(
         self,
         name: str,
-        entry: dict,
+        entry: WriteParam,
         device: THZDevice,
         device_id: str,
         scan_interval: int | None = None,
@@ -59,7 +65,7 @@ class THZNumber(THZBaseEntity, NumberEntity):
 
         Args:
             name: The name of the number entity.
-            entry: The register entry dict containing configuration.
+            entry: The write-map parameter.
             device: The device instance this entity belongs to.
             device_id: The device identifier for linking to device.
             scan_interval: The scan interval in seconds for polling updates.
@@ -71,10 +77,10 @@ class THZNumber(THZBaseEntity, NumberEntity):
         # Initialize base class with common properties
         super().__init__(
             name=name,
-            command=entry["command"],
+            command=entry.command,
             device=device,
             device_id=device_id,
-            icon=entry.get("icon"),
+            icon=entry.icon,
             scan_interval=scan_interval,
             translation_key=get_translation_key(name),
             entity_id_style=entity_id_style,
@@ -84,21 +90,20 @@ class THZNumber(THZBaseEntity, NumberEntity):
         )
 
         # Number-specific attributes
-        min_value = entry["min"]
-        max_value = entry["max"]
-        step = entry.get("step", 1)
-
-        self._attr_native_min_value = float(min_value) if min_value != "" else 0.0
-        self._attr_native_max_value = float(max_value) if max_value != "" else 100.0
-        self._attr_native_step = float(step) if step != "" else 1.0
-        self._attr_native_unit_of_measurement = entry.get("unit", "")
-        self._attr_device_class = entry.get("device_class")
+        min_value, max_value = entry.min_value, entry.max_value
+        self._attr_native_min_value = min_value if min_value is not None else 0.0
+        self._attr_native_max_value = max_value if max_value is not None else 100.0
+        self._attr_native_step = entry.step if entry.step is not None else 1.0
+        self._attr_native_unit_of_measurement = entry.unit
+        # The map's text ("temperature", or "" for none) as Home Assistant's
+        # device class string.
+        self._attr_device_class = cast("NumberDeviceClass | None", entry.device_class)
         self._attr_mode = NumberMode.BOX
-        self._decode_type = entry["decode_type"]
+        self._decode_type = entry.decode_type
         self._attr_native_value = None
 
         # Reads/writes go through parameter_io, which handles both direct
-        # registers and 2xx block parameters (see write_mode="block").
+        # registers and 2xx block parameters (entry.block).
         self._entry = entry
         self._read_length = parameter_length(entry)
 
@@ -142,7 +147,7 @@ class THZNumber(THZBaseEntity, NumberEntity):
                 value_bytes,
                 self._attr_native_step,
                 self._decode_type,
-                self._entry.get("signed", True),
+                self._entry.signed,
             )
             _LOGGER.debug("Decoded value for %s: %s", self.name, value)
             self._attr_native_value = value

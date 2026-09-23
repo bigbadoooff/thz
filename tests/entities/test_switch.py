@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.thz.switch import THZSwitch, async_setup_entry
-from tests.helpers import make_runtime_data
+from tests.helpers import FakeWriteManager, make_runtime_data, write_param
 
 
 def _make_device():
@@ -24,7 +24,7 @@ def _switch_entry(command="0A0700"):
 def _make_entity(name="pSwitchTest", entry=None, device=None):
     entity = THZSwitch(
         name=name,
-        entry=entry or _switch_entry(),
+        entry=write_param(entry or _switch_entry(), name=name),
         device=device or _make_device(),
         device_id="dev1",
     )
@@ -37,12 +37,12 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_creates_switch_entities(self):
-        write_manager = MagicMock()
-        write_manager.get_all_registers.return_value = {
-            "pSwitchOne": _switch_entry("0A0701"),
-            "pNumberOne": {"command": "0A0702", "type": "number"},
-        }
-
+        write_manager = FakeWriteManager(
+            {
+                "pSwitchOne": _switch_entry("0A0701"),
+                "pNumberOne": {"command": "0A0702", "type": "number"},
+            }
+        )
         hass = MagicMock()
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"

@@ -60,7 +60,7 @@ Tests are grouped by feature:
 |---|---|
 | `protocol/` | THZDevice: telegrams, transport, timeouts, `parameter_io`, FHEM reference, property tests |
 | `codec/` | value decoding and encoding |
-| `register_maps/` | map selection and merging, the typed `ReadField` model, schema checks over every firmware profile |
+| `register_maps/` | map selection and merging, the typed `ReadField` / `WriteParam` model, schema checks over every firmware profile |
 | `setup/` | config flow, setup/unload, platform setup, visibility tiers, diagnostics |
 | `entities/` | sensor, binary sensor, number, select, switch, button, COP, naming, translations |
 | `climate/` | climate entities |

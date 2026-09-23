@@ -10,7 +10,6 @@ it cannot rewrite device registers.
 
 from __future__ import annotations
 
-import contextlib
 from datetime import datetime, time as dt_time
 import json
 import logging
@@ -34,6 +33,7 @@ from ..parameter_io import (
     async_write_parameter,
     parameter_length,
 )
+from ..register_maps.model import WriteParam
 from ..thz_device import THZDevice
 from ..time import quarters_to_time, time_byte_index, time_to_quarters
 from ..value_codec import THZValueCodec
@@ -84,9 +84,8 @@ def _format_hhmm(value: dt_time | None) -> str | None:
     return value.strftime("%H:%M") if value else None
 
 
-def _number_step(entry: dict[str, Any]) -> float:
-    step_raw = entry.get("step", 1)
-    return float(step_raw) if step_raw != "" else 1.0
+def _number_step(entry: WriteParam) -> float:
+    return entry.step if entry.step is not None else 1.0
 
 
 async def _read_schedule(hass: HomeAssistant, device: THZDevice, command: str) -> bytes:
@@ -109,12 +108,12 @@ async def _read_schedule(hass: HomeAssistant, device: THZDevice, command: str) -
 
 
 async def _read_backup_value(
-    hass: HomeAssistant, device: THZDevice, entry: dict[str, Any]
+    hass: HomeAssistant, device: THZDevice, entry: WriteParam
 ) -> Any:
     """Read one write-map parameter and return its value as stored in a backup."""
-    reg_type = entry["type"]
+    reg_type = entry.type
     if reg_type == "schedule":
-        value_bytes = await _read_schedule(hass, device, entry["command"])
+        value_bytes = await _read_schedule(hass, device, entry.command)
         if not value_bytes or len(value_bytes) < 2:
             raise ValueError("no data received")
         return {
@@ -129,26 +128,26 @@ async def _read_backup_value(
         return THZValueCodec.decode_number(
             value_bytes,
             _number_step(entry),
-            entry["decode_type"],
-            entry.get("signed", True),
+            entry.decode_type,
+            entry.signed,
         )
     if reg_type == "switch":
         return THZValueCodec.decode_switch(value_bytes)
     if reg_type == "select":
-        return THZValueCodec.decode_select(value_bytes, entry.get("decode_type"))
+        return THZValueCodec.decode_select(value_bytes, entry.decode_type)
     # "time"
-    index = time_byte_index(entry.get("decode_type"))
+    index = time_byte_index(entry.decode_type)
     return _format_hhmm(quarters_to_time(value_bytes[index]))
 
 
 async def _read_all_parameters(
-    hass: HomeAssistant, device: THZDevice, write_registers: dict[str, Any]
+    hass: HomeAssistant, device: THZDevice, write_registers: dict[str, WriteParam]
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     """Read every restorable parameter; return (parameters, read errors)."""
     parameters: dict[str, dict[str, Any]] = {}
     read_errors: list[str] = []
     for name, entry in write_registers.items():
-        if entry.get("type") not in _RESTORABLE_REGISTER_TYPES:
+        if entry.type not in _RESTORABLE_REGISTER_TYPES:
             continue
         try:
             value = await _read_backup_value(hass, device, entry)
@@ -163,8 +162,8 @@ async def _read_all_parameters(
             _LOGGER.warning("backup_parameters: failed to read %s: %s", name, err)
             continue
         parameters[name] = {
-            "type": entry["type"],
-            "command": entry["command"],
+            "type": entry.type,
+            "command": entry.command,
             "value": value,
         }
     return parameters, read_errors
@@ -229,7 +228,7 @@ async def async_handle_backup_parameters(
     device: THZDevice = entry_data.device
 
     parameters, read_errors = await _read_all_parameters(
-        hass, device, write_manager.get_all_registers()
+        hass, device, write_manager.params()
     )
     clock_drift_seconds, clock_corrected = await _correct_gross_clock_drift(
         hass, device, write_manager
@@ -304,48 +303,45 @@ def _read_backup(path: str) -> dict[str, Any]:
         return cast("dict[str, Any]", json.load(f))
 
 
-def _clamp_to_entry_range(value: float, entry: dict[str, Any]) -> float:
+def _clamp_to_entry_range(value: float, entry: WriteParam) -> float:
     """Clamp a number to the entry's min/max, ignoring unset or invalid bounds."""
-    min_raw, max_raw = entry.get("min"), entry.get("max")
-    if min_raw not in (None, ""):
-        with contextlib.suppress(TypeError, ValueError):
-            value = max(value, float(min_raw))
-    if max_raw not in (None, ""):
-        with contextlib.suppress(TypeError, ValueError):
-            value = min(value, float(max_raw))
+    if entry.min_value is not None:
+        value = max(value, entry.min_value)
+    if entry.max_value is not None:
+        value = min(value, entry.max_value)
     return value
 
 
 async def _encode_restore_value(
-    hass: HomeAssistant, device: THZDevice, entry: dict[str, Any], value: Any
+    hass: HomeAssistant, device: THZDevice, entry: WriteParam, value: Any
 ) -> bytes:
     """Encode a backed-up value for writing to the entry's register.
 
     Raises ValueError, TypeError, KeyError or IndexError for a value that
     does not fit the entry.
     """
-    reg_type = entry["type"]
+    reg_type = entry.type
     if reg_type == "number":
         return THZValueCodec.encode_number(
             _clamp_to_entry_range(float(value), entry),
             _number_step(entry),
-            entry["decode_type"],
+            entry.decode_type,
             parameter_length(entry),
         )
     if reg_type == "switch":
         return THZValueCodec.encode_switch(bool(value))
     if reg_type == "select":
-        return THZValueCodec.encode_select(value, entry.get("decode_type"))
+        return THZValueCodec.encode_select(value, entry.decode_type)
     if reg_type == "time":
         payload = bytearray(2)
-        payload[time_byte_index(entry.get("decode_type"))] = time_to_quarters(
+        payload[time_byte_index(entry.decode_type)] = time_to_quarters(
             _parse_hhmm(value)
         )
         return bytes(payload)
     # "schedule": keep the register's other bytes, replace start and end.
     start_value = _parse_hhmm(value.get("start")) if value else None
     end_value = _parse_hhmm(value.get("end")) if value else None
-    schedule_bytes = bytearray(await _read_schedule(hass, device, entry["command"]))
+    schedule_bytes = bytearray(await _read_schedule(hass, device, entry.command))
     schedule_bytes[0] = time_to_quarters(start_value)
     schedule_bytes[1] = time_to_quarters(end_value, is_end_time=True)
     return bytes(schedule_bytes)
@@ -417,7 +413,6 @@ async def async_handle_restore_parameters(
         raise HomeAssistantError(error_msg) from err
 
     saved_parameters: dict[str, dict[str, Any]] = backup_doc.get("parameters", {})
-    write_registers = write_manager.get_all_registers()
     restored = 0
     skipped_missing: list[str] = []
     failed: list[str] = []
@@ -429,8 +424,8 @@ async def async_handle_restore_parameters(
             continue
         if only_set is not None and name not in only_set:
             continue
-        entry = write_registers.get(name)
-        if entry is None or entry.get("type") not in _RESTORABLE_REGISTER_TYPES:
+        entry = write_manager.param(name)
+        if entry is None or entry.type not in _RESTORABLE_REGISTER_TYPES:
             skipped_missing.append(name)
             continue
         try:

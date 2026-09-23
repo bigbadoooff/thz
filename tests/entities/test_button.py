@@ -7,7 +7,7 @@ import pytest
 
 from custom_components.thz.button import THZButton, async_setup_entry
 from custom_components.thz.exceptions import THZProtocolError
-from tests.helpers import make_runtime_data
+from tests.helpers import FakeWriteManager, make_runtime_data, write_param
 
 
 def _make_device():
@@ -29,7 +29,7 @@ def _button_entry(command="D1"):
 def _make_entity(name="zResetLast10errors", entry=None, device=None):
     entity = THZButton(
         name=name,
-        entry=entry if entry is not None else _button_entry(),
+        entry=write_param(entry if entry is not None else _button_entry(), name=name),
         device=device or _make_device(),
         device_id="dev1",
     )
@@ -42,12 +42,12 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_creates_button_entities(self):
-        write_manager = MagicMock()
-        write_manager.get_all_registers.return_value = {
-            "zResetLast10errors": _button_entry("D1"),
-            "pNumberOne": {"command": "0A0802", "type": "number"},
-        }
-
+        write_manager = FakeWriteManager(
+            {
+                "zResetLast10errors": _button_entry("D1"),
+                "pNumberOne": {"command": "0A0802", "type": "number"},
+            }
+        )
         hass = MagicMock()
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"

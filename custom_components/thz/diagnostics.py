@@ -77,14 +77,13 @@ async def async_get_config_entry_diagnostics(
         register_counts["read_sensors"] = total_sensors
 
     if write_manager:
-        write_registers = write_manager.get_all_registers()
-        register_counts["write_entities"] = len(write_registers)
+        params = write_manager.params()
+        register_counts["write_entities"] = len(params)
 
         # Count by type
         type_counts: dict[str, int] = {}
-        for entry in write_registers.values():
-            entity_type = entry.get("type", "unknown")
-            type_counts[entity_type] = type_counts.get(entity_type, 0) + 1
+        for param in params.values():
+            type_counts[param.type] = type_counts.get(param.type, 0) + 1
         register_counts["write_entity_types"] = type_counts
 
     # Build diagnostics data

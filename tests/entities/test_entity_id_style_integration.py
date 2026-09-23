@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from custom_components.thz.entity_id_style import fhem_style_object_id
-from tests.helpers import make_runtime_data
+from tests.helpers import FakeWriteManager, make_climate, make_runtime_data, write_param
 
 
 def _make_mock_device():
@@ -36,7 +36,7 @@ class TestWriteEntityIdStyle:
 
         entity = THZSwitch(
             name="zPumpHC",
-            entry={"command": "0A0052", "type": "switch", "icon": ""},
+            entry=write_param({"command": "0A0052", "type": "switch", "icon": ""}),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="default",
@@ -48,7 +48,7 @@ class TestWriteEntityIdStyle:
 
         entity = THZSwitch(
             name="zPumpHC",
-            entry={"command": "0A0052", "type": "switch", "icon": ""},
+            entry=write_param({"command": "0A0052", "type": "switch", "icon": ""}),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="fhem",
@@ -60,17 +60,19 @@ class TestWriteEntityIdStyle:
 
         entity = THZNumber(
             name="p01RoomTempDayHC1",
-            entry={
-                "command": "0A0800",
-                "type": "number",
-                "icon": "",
-                "min": 0,
-                "max": 100,
-                "step": 1,
-                "unit": "",
-                "device_class": "",
-                "decode_type": "0clean",
-            },
+            entry=write_param(
+                {
+                    "command": "0A0800",
+                    "type": "number",
+                    "icon": "",
+                    "min": 0,
+                    "max": 100,
+                    "step": 1,
+                    "unit": "",
+                    "device_class": "",
+                    "decode_type": "0clean",
+                }
+            ),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="fhem",
@@ -82,12 +84,14 @@ class TestWriteEntityIdStyle:
 
         entity = THZSelect(
             name="pOpMode",
-            entry={
-                "command": "0A0900",
-                "type": "select",
-                "icon": "",
-                "decode_type": "opmode",
-            },
+            entry=write_param(
+                {
+                    "command": "0A0900",
+                    "type": "select",
+                    "icon": "",
+                    "decode_type": "opmode",
+                }
+            ),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="fhem",
@@ -99,7 +103,9 @@ class TestWriteEntityIdStyle:
 
         entity = THZTime(
             name="pHolidayBeginTime",
-            entry={"command": "0A0600", "type": "time", "icon": "mdi:clock"},
+            entry=write_param(
+                {"command": "0A0600", "type": "time", "icon": "mdi:clock"}
+            ),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="fhem",
@@ -113,7 +119,7 @@ class TestWriteEntityIdStyle:
         start_entity = THZScheduleTime(
             name="programHC1_Mo_0 Start",
             base_name="programHC1_Mo_0",
-            entry=entry,
+            entry=write_param(entry),
             device=_make_mock_device(),
             device_id="test_device",
             time_type="start",
@@ -122,7 +128,7 @@ class TestWriteEntityIdStyle:
         end_entity = THZScheduleTime(
             name="programHC1_Mo_0 End",
             base_name="programHC1_Mo_0",
-            entry=entry,
+            entry=write_param(entry),
             device=_make_mock_device(),
             device_id="test_device",
             time_type="end",
@@ -137,7 +143,7 @@ class TestWriteEntityIdStyle:
 
         entity = THZSwitch(
             name="zPumpHC",
-            entry={"command": "0A0052", "type": "switch", "icon": ""},
+            entry=write_param({"command": "0A0052", "type": "switch", "icon": ""}),
             device=_make_mock_device(),
             device_id="test_device",
         )
@@ -148,7 +154,7 @@ class TestWriteEntityIdStyle:
 
         entity = THZButton(
             name="zResetLast10errors",
-            entry={"command": "0A0700", "type": "button", "icon": ""},
+            entry=write_param({"command": "0A0700", "type": "button", "icon": ""}),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="fhem",
@@ -161,7 +167,7 @@ class TestWriteEntityIdStyle:
 
         entity = THZButton(
             name="zResetLast10errors",
-            entry={"command": "0A0700", "type": "button", "icon": ""},
+            entry=write_param({"command": "0A0700", "type": "button", "icon": ""}),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="default",
@@ -184,13 +190,12 @@ class TestClimateEntityIdStyle:
 
     @staticmethod
     def _make_climate_entity(entity_id_style="default", entity_id_prefix=None):
-        from custom_components.thz.climate import THZClimate
 
         coordinator = MagicMock()
         coordinator.data = bytes(10)
         coordinator.async_add_listener = MagicMock(return_value=lambda: None)
         device = _make_mock_device()
-        return THZClimate(
+        return make_climate(
             coordinator=coordinator,
             cooling_coordinator=None,
             device=device,
@@ -326,16 +331,14 @@ class TestPlatformSetupPassesEntityIdStyle:
         config_entry.data = {}
         config_entry.runtime_data = make_runtime_data(
             **{
-                "write_manager": MagicMock(
-                    get_all_registers=MagicMock(
-                        return_value={
-                            "zPumpHC": {
-                                "command": "0A0052",
-                                "type": "switch",
-                                "icon": "",
-                            }
+                "write_manager": FakeWriteManager(
+                    {
+                        "zPumpHC": {
+                            "command": "0A0052",
+                            "type": "switch",
+                            "icon": "",
                         }
-                    )
+                    }
                 ),
                 "device": _make_mock_device(),
                 "device_id": "test_device",
@@ -377,16 +380,14 @@ class TestPlatformSetupPassesEntityIdStyle:
         config_entry.data = {}
         config_entry.runtime_data = make_runtime_data(
             **{
-                "write_manager": MagicMock(
-                    get_all_registers=MagicMock(
-                        return_value={
-                            "zResetLast10errors": {
-                                "command": "0A0700",
-                                "type": "button",
-                                "icon": "",
-                            }
+                "write_manager": FakeWriteManager(
+                    {
+                        "zResetLast10errors": {
+                            "command": "0A0700",
+                            "type": "button",
+                            "icon": "",
                         }
-                    )
+                    }
                 ),
                 "device": _make_mock_device(),
                 "device_id": "test_device",
@@ -417,7 +418,7 @@ class TestEntityIdPrefix:
 
         entity = THZSwitch(
             name="zPumpHC",
-            entry={"command": "0A0052", "type": "switch", "icon": ""},
+            entry=write_param({"command": "0A0052", "type": "switch", "icon": ""}),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="fhem",
@@ -430,17 +431,19 @@ class TestEntityIdPrefix:
 
         entity = THZNumber(
             name="p99startUnschedVent",
-            entry={
-                "command": "0A0800",
-                "type": "number",
-                "icon": "",
-                "min": 0,
-                "max": 100,
-                "step": 1,
-                "unit": "",
-                "device_class": "",
-                "decode_type": "0clean",
-            },
+            entry=write_param(
+                {
+                    "command": "0A0800",
+                    "type": "number",
+                    "icon": "",
+                    "min": 0,
+                    "max": 100,
+                    "step": 1,
+                    "unit": "",
+                    "device_class": "",
+                    "decode_type": "0clean",
+                }
+            ),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="fhem",
@@ -453,7 +456,7 @@ class TestEntityIdPrefix:
 
         entity = THZButton(
             name="zResetLast10errors",
-            entry={"command": "0A0700", "type": "button", "icon": ""},
+            entry=write_param({"command": "0A0700", "type": "button", "icon": ""}),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="fhem",
@@ -467,7 +470,7 @@ class TestEntityIdPrefix:
 
         entity = THZSwitch(
             name="zPumpHC",
-            entry={"command": "0A0052", "type": "switch", "icon": ""},
+            entry=write_param({"command": "0A0052", "type": "switch", "icon": ""}),
             device=_make_mock_device(),
             device_id="test_device",
             entity_id_style="default",
@@ -482,7 +485,7 @@ class TestEntityIdPrefix:
         start_entity = THZScheduleTime(
             name="programHC1_Mo_0 Start",
             base_name="programHC1_Mo_0",
-            entry=entry,
+            entry=write_param(entry),
             device=_make_mock_device(),
             device_id="test_device",
             time_type="start",
@@ -547,16 +550,14 @@ class TestEntityIdPrefix:
         config_entry.data = {}
         config_entry.runtime_data = make_runtime_data(
             **{
-                "write_manager": MagicMock(
-                    get_all_registers=MagicMock(
-                        return_value={
-                            "zPumpHC": {
-                                "command": "0A0052",
-                                "type": "switch",
-                                "icon": "",
-                            }
+                "write_manager": FakeWriteManager(
+                    {
+                        "zPumpHC": {
+                            "command": "0A0052",
+                            "type": "switch",
+                            "icon": "",
                         }
-                    )
+                    }
                 ),
                 "device": _make_mock_device(),
                 "device_id": "test_device",

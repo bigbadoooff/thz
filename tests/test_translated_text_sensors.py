@@ -23,6 +23,7 @@ from custom_components.thz.value_maps import (
     state_slug,
     to_state,
 )
+from tests.helpers import write_param
 
 COMPONENT = pathlib.Path(__file__).resolve().parent.parent / "custom_components" / "thz"
 SLUG = re.compile(r"^[a-z0-9_]+$")
@@ -40,7 +41,10 @@ def _sensor(decode, payload, key="weekday"):
         "translation_key": key,
     }
     return THZGenericSensor(
-        coordinator, entry=entry, block=bytes.fromhex("FB"), device_id="dev1"
+        coordinator,
+        entry=entry,
+        block=bytes.fromhex("FB"),
+        device_id="dev1",
     )
 
 
@@ -102,7 +106,10 @@ class TestSensorBehaviour:
             "factor": 1,
         }
         sensor = THZGenericSensor(
-            coordinator, entry=entry, block=bytes.fromhex("FB"), device_id="dev1"
+            coordinator,
+            entry=entry,
+            block=bytes.fromhex("FB"),
+            device_id="dev1",
         )
         assert sensor._translated_states is False
         assert "register_raw" not in sensor.extra_state_attributes
@@ -154,7 +161,9 @@ class TestSelectOptionsAreTranslationKeys:
         device.async_execute = AsyncMock()
         entity = THZSelect(
             name="pOpMode",
-            entry={"command": "0A0900", "type": "select", "decode_type": decode_type},
+            entry=write_param(
+                {"command": "0A0900", "type": "select", "decode_type": decode_type}
+            ),
             device=device,
             device_id="dev1",
         )

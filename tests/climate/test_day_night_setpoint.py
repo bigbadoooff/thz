@@ -18,10 +18,28 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-from custom_components.thz.climate import THZClimate
+from tests.helpers import make_climate, write_param
 
-_DAY_ENTRY = {"command": "0A0080", "min": "10", "max": "30", "step": "0.1"}
-_NIGHT_ENTRY = {"command": "0A0081", "min": "10", "max": "30", "step": "0.1"}
+_DAY_ENTRY = write_param(
+    {
+        "command": "0A0080",
+        "min": "10",
+        "max": "30",
+        "step": "0.1",
+        "decode_type": "5temp",
+    },
+    name="day_entry",
+)
+_NIGHT_ENTRY = write_param(
+    {
+        "command": "0A0081",
+        "min": "10",
+        "max": "30",
+        "step": "0.1",
+        "decode_type": "5temp",
+    },
+    name="night_entry",
+)
 
 
 def _make_entity(*, heat_setpoint_entry=_DAY_ENTRY, night_setpoint_entry=None):
@@ -31,7 +49,7 @@ def _make_entity(*, heat_setpoint_entry=_DAY_ENTRY, night_setpoint_entry=None):
     device = MagicMock()
     device.lock = asyncio.Lock()
 
-    entity = THZClimate(
+    entity = make_climate(
         coordinator=coordinator,
         cooling_coordinator=None,
         device=device,
@@ -70,7 +88,7 @@ class TestWriteHeatSetpointWithoutNightRegister:
         entity._device.async_execute.assert_called_once()
         write_call = entity._device.async_execute.call_args
         assert write_call[0][1] == entity._device.write_value
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_warns_and_noops_with_no_entries_at_all(self):
@@ -106,7 +124,7 @@ class TestWriteHeatSetpointWithNightRegister:
             await entity._async_write_heat_setpoint(17.0)
 
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_NIGHT_ENTRY["command"])
+        assert write_call[0][2] == bytes.fromhex(_NIGHT_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_writes_day_register_when_day_is_active(self):
@@ -128,7 +146,7 @@ class TestWriteHeatSetpointWithNightRegister:
             await entity._async_write_heat_setpoint(22.0)
 
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_neither_register_matches(self):
@@ -151,7 +169,7 @@ class TestWriteHeatSetpointWithNightRegister:
             await entity._async_write_heat_setpoint(20.0)
 
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_target_temperature_unknown(self):
@@ -170,7 +188,7 @@ class TestWriteHeatSetpointWithNightRegister:
 
         entity._async_read_setpoint.assert_not_called()
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
 
 
 class TestAsyncReadSetpoint:

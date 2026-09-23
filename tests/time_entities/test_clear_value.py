@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from tests.helpers import make_runtime_data
+from tests.helpers import make_runtime_data, write_param
 
 
 def _make_hass():
@@ -63,7 +63,7 @@ class TestThzTimeClearValue:
 
         entity = THZTime(
             name="Test Time",
-            entry={"command": "0B0005"},
+            entry=write_param({"command": "0B0005"}),
             device=device,
             device_id="test_device",
         )
@@ -108,7 +108,7 @@ class TestThzScheduleTimeClearValue:
         entity = THZScheduleTime(
             name=f"Test Schedule {time_type.title()}",
             base_name="programHC1_Mo_0",
-            entry={"command": "0B0100"},
+            entry=write_param({"command": "0B0100"}),
             device=device,
             device_id="test_device",
             time_type=time_type,

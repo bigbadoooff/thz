@@ -6,7 +6,13 @@ from homeassistant.components.climate import HVACAction, HVACMode
 import pytest
 
 from custom_components.thz.exceptions import THZProtocolError
-from tests.helpers import FakeRegisterManager, as_runtime_data
+from tests.helpers import (
+    FakeRegisterManager,
+    FakeWriteManager,
+    as_runtime_data,
+    make_climate,
+    write_param,
+)
 
 # Real register-map byte offsets (derived the same way _field_layout does:
 # nibble_offset // 2) used across several tests below.
@@ -20,8 +26,13 @@ A176_COOLING_BYTE = 5
 A176_COOLING_BIT = 3
 A176_COMPRESSOR_BIT = 1
 
-HEAT_ENTRY = {"command": "0B0005", "step": 0.1, "decode_type": "5temp"}
-COOL_SETPOINT_ENTRY = {"command": "0B0582", "step": 0.1, "decode_type": "5temp"}
+HEAT_ENTRY = write_param(
+    {"command": "0B0005", "step": 0.1, "decode_type": "5temp"}, name="heat_entry"
+)
+COOL_SETPOINT_ENTRY = write_param(
+    {"command": "0B0582", "step": 0.1, "decode_type": "5temp"},
+    name="cool_setpoint_entry",
+)
 
 
 class TestClimateModule:
@@ -113,52 +124,47 @@ class TestClimateHelpers:
     """Test module-level helper functions."""
 
     def test_get_step_from_step_key(self):
-        """_get_step returns float from 'step' key."""
+        """_get_step returns the parameter's step."""
         from custom_components.thz.climate import _get_step
 
-        assert _get_step({"step": 0.1}) == pytest.approx(0.1)
-
-    def test_get_step_from_factor_key(self):
-        """_get_step falls back to 'factor' key."""
-        from custom_components.thz.climate import _get_step
-
-        assert _get_step({"factor": "0.1"}) == pytest.approx(0.1)
+        assert _get_step(write_param(step=0.1)) == pytest.approx(0.1)
 
     def test_get_step_default(self):
-        """_get_step returns 1.0 when neither key is present."""
+        """_get_step returns 1.0 when the map leaves the step empty."""
         from custom_components.thz.climate import _get_step
 
-        assert _get_step({}) == pytest.approx(1.0)
+        assert _get_step(write_param(step="")) == pytest.approx(1.0)
+        assert _get_step(write_param()) == pytest.approx(1.0)
 
     def test_get_step_invalid_value_falls_back(self):
         """_get_step returns 1.0 when the value cannot be converted to float."""
         from custom_components.thz.climate import _get_step
 
-        assert _get_step({"step": "not-a-number"}) == pytest.approx(1.0)
+        assert _get_step(write_param(step="not-a-number")) == pytest.approx(1.0)
 
     def test_find_entry_returns_first_match(self):
-        """_find_entry returns first entry with a command field."""
+        """_find_entry returns the first candidate the map has."""
         from custom_components.thz.climate import _find_entry
 
         regs = {
-            "p01RoomTempDayHC1": {"command": "0B0005", "step": 0.1},
-            "p01RoomTempDay": {"command": "0B0006", "step": 1.0},
+            "p01RoomTempDayHC1": write_param(command="0B0005", step=0.1),
+            "p01RoomTempDay": write_param(command="0B0006", step=1.0),
         }
         result = _find_entry(regs, ["p01RoomTempDayHC1", "p01RoomTempDay"])
         assert result is not None
-        assert result["command"] == "0B0005"
+        assert result.command == "0B0005"
 
     def test_find_entry_skips_missing_command(self):
-        """_find_entry skips entries without a 'command' field."""
+        """_find_entry skips parameters without a command."""
         from custom_components.thz.climate import _find_entry
 
         regs = {
-            "p01RoomTempDay": {"step": 1.0},  # no command
-            "p01RoomTempDayHC1": {"command": "0B0005"},
+            "p01RoomTempDay": write_param(command="", step=1.0),
+            "p01RoomTempDayHC1": write_param(command="0B0005"),
         }
         result = _find_entry(regs, ["p01RoomTempDay", "p01RoomTempDayHC1"])
         assert result is not None
-        assert result["command"] == "0B0005"
+        assert result.command == "0B0005"
 
     def test_find_entry_returns_none_when_not_found(self):
         """_find_entry returns None when no candidate matches."""
@@ -282,11 +288,9 @@ class TestTHZClimateEntity:
         device=None,
     ):
         """Instantiate an HC1-style THZClimate entity with minimal config."""
-        from custom_components.thz.climate import THZClimate
-
         coordinator = TestTHZClimateEntity._make_coordinator(coord_data)
         device = device if device is not None else TestTHZClimateEntity._make_device()
-        return THZClimate(
+        return make_climate(
             coordinator=coordinator,
             cooling_coordinator=cooling_coordinator,
             device=device,
@@ -371,9 +375,7 @@ class TestTHZClimateEntity:
 
     def test_current_temperature_none_when_offset_none(self):
         """current_temperature is None when current_temp_offset is None (e.g. HC2)."""
-        from custom_components.thz.climate import THZClimate
-
-        entity = THZClimate(
+        entity = make_climate(
             coordinator=self._make_coordinator(bytes(40)),
             cooling_coordinator=None,
             device=self._make_device(),
@@ -634,9 +636,7 @@ class TestTHZClimateEntity:
 
     def test_dhw_entity_no_cooling_modes(self):
         """DHW climate entity never supports COOL mode."""
-        from custom_components.thz.climate import THZClimate
-
-        entity = THZClimate(
+        entity = make_climate(
             coordinator=self._make_coordinator(bytes(40)),
             cooling_coordinator=None,
             device=self._make_device(),
@@ -667,7 +667,6 @@ class TestTHZClimateAsyncAddedToHass:
 
     @pytest.mark.asyncio
     async def test_subscribes_to_cooling_coordinator(self):
-        from custom_components.thz.climate import THZClimate
 
         cooling_coordinator = MagicMock()
         cooling_coordinator.async_add_listener = MagicMock(return_value=lambda: None)
@@ -679,7 +678,7 @@ class TestTHZClimateAsyncAddedToHass:
 
         device = MagicMock()
 
-        entity = THZClimate(
+        entity = make_climate(
             coordinator=coordinator,
             cooling_coordinator=cooling_coordinator,
             device=device,
@@ -706,7 +705,6 @@ class TestTHZClimateAsyncAddedToHass:
 
     @pytest.mark.asyncio
     async def test_populates_cooling_setpoint_and_fan_stage_caches(self):
-        from custom_components.thz.climate import THZClimate
 
         coordinator = MagicMock()
         coordinator.data = None
@@ -723,7 +721,7 @@ class TestTHZClimateAsyncAddedToHass:
             ]
         )
 
-        entity = THZClimate(
+        entity = make_climate(
             coordinator=coordinator,
             cooling_coordinator=None,
             device=device,
@@ -1009,9 +1007,7 @@ class TestClimateAsyncSetupEntry:
 
     @staticmethod
     def _entry_data(register_manager, coordinators, write_registers):
-        write_manager = MagicMock(
-            get_all_registers=MagicMock(return_value=write_registers)
-        )
+        write_manager = FakeWriteManager(write_registers)
         return {
             "coordinators": coordinators,
             "device": MagicMock(),

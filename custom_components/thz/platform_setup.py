@@ -60,14 +60,12 @@ async def async_setup_write_platform(
     # Get selected write groups (if not set, all groups are enabled)
     selected_write_groups = config_entry.data.get("selected_write_groups")
 
-    write_registers = write_manager.get_all_registers()
-    _LOGGER.debug(
-        "Loading %s platform with %d registers", platform_type, len(write_registers)
-    )
+    params = write_manager.params()
+    _LOGGER.debug("Loading %s platform with %d registers", platform_type, len(params))
 
     entities = []
-    for name, entry in write_registers.items():
-        if entry["type"] == platform_type:
+    for name, entry in params.items():
+        if entry.type == platform_type:
             # Filter by selected write groups if configured
             if selected_write_groups is not None:
                 group = get_write_group_for_key(name)
@@ -77,7 +75,7 @@ async def async_setup_write_platform(
                 "Creating %s for %s with command %s",
                 entity_type.__name__,
                 name,
-                entry["command"],
+                entry.command,
             )
 
             entity = entity_type(

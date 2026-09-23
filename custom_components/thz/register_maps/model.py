@@ -116,3 +116,107 @@ class ReadField:
         """The entity translation key from the field's meta data."""
         value = self.meta.get("translation_key")
         return str(value) if value is not None else None
+
+
+def _text(entry: Mapping[str, Any], key: str) -> str:
+    """Return a text field of a write-map dict; missing or None is ""."""
+    value = entry.get(key)
+    return "" if value is None else str(value)
+
+
+def _optional_float(value: Any) -> float | None:
+    """Return a map number ("12", 0.5, "") as float; None if unset or text."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+@dataclass(frozen=True, slots=True)
+class BlockLayout:
+    """Where a 2.x parameter lives inside its register block.
+
+    The parameter is read out of the block and written by read-modify-write
+    of the whole block (THZDevice.write_block_value).
+    """
+
+    # Byte offset in the decoded block (CRC at 0, address echo at 1).
+    offset: int
+    length: int
+    # Bit of a single-bit flag sharing its byte with others, else None.
+    bit: int | None
+    # FHEM reads 2.x values unsigned unless the read map says "hex2int".
+    signed: bool
+
+
+@dataclass(frozen=True, slots=True)
+class WriteParam:
+    """One entry of the write map: a setting the integration can change.
+
+    Built from the merged (and for 2.x firmware enriched) write-map dict.
+    The bounds keep the map's text because times use "HH:MM"; numeric
+    bounds and the step are also available as floats.
+    """
+
+    name: str
+    # Register of the parameter, or the parent block for a 2.x parameter.
+    command: str
+    # Entity platform: "number", "select", "switch", "time", "schedule",
+    # "ptime" or "button".
+    type: str
+    decode_type: str
+    min: str = ""
+    max: str = ""
+    # Encoding step (e.g. 0.1 for tenths); None if the map leaves it empty.
+    step: float | None = None
+    unit: str = ""
+    device_class: str = ""
+    icon: str = ""
+    # 2.x parameter group ("p01-p12") whose block holds the value.
+    parent: str | None = None
+    block: BlockLayout | None = None
+
+    @classmethod
+    def from_entry(cls, name: str, entry: Mapping[str, Any]) -> WriteParam:
+        """Build a parameter from a write-map dict."""
+        block = None
+        if entry.get("write_mode") == "block":
+            bit = entry.get("bit")
+            block = BlockLayout(
+                offset=int(entry["offset"]),
+                length=int(entry["length"]),
+                bit=int(bit) if bit is not None else None,
+                signed=bool(entry.get("signed", True)),
+            )
+        parent = entry.get("parent")
+        return cls(
+            name=name,
+            command=str(entry["command"]),
+            type=str(entry["type"]),
+            decode_type=str(entry["decode_type"]),
+            min=_text(entry, "min"),
+            max=_text(entry, "max"),
+            step=_optional_float(entry.get("step")),
+            unit=_text(entry, "unit"),
+            device_class=_text(entry, "device_class"),
+            icon=_text(entry, "icon"),
+            parent=str(parent) if parent is not None else None,
+            block=block,
+        )
+
+    @property
+    def min_value(self) -> float | None:
+        """The lower bound as a number, or None if unset or not numeric."""
+        return _optional_float(self.min)
+
+    @property
+    def max_value(self) -> float | None:
+        """The upper bound as a number, or None if unset or not numeric."""
+        return _optional_float(self.max)
+
+    @property
+    def signed(self) -> bool:
+        """Whether the value is decoded as signed (4.x/5.x registers always are)."""
+        return self.block.signed if self.block is not None else True

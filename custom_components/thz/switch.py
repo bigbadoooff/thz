@@ -18,6 +18,7 @@ from .const import (
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
 from .platform_setup import async_setup_write_platform
+from .register_maps.model import WriteParam
 from .thz_device import THZDevice
 from .value_codec import THZValueCodec
 
@@ -45,7 +46,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
     def __init__(
         self,
         name: str,
-        entry: dict,
+        entry: WriteParam,
         device: THZDevice,
         device_id: str,
         scan_interval: int | None = None,
@@ -57,7 +58,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
 
         Args:
             name: The name of the switch.
-            entry: The register entry dict containing configuration.
+            entry: The write-map parameter.
             device: The device instance this switch is associated with.
             device_id: The device identifier for linking to device.
             scan_interval: The scan interval in seconds for polling updates.
@@ -69,10 +70,10 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
         # Initialize base class with common properties
         super().__init__(
             name=name,
-            command=entry["command"],
+            command=entry.command,
             device=device,
             device_id=device_id,
-            icon=entry.get("icon"),
+            icon=entry.icon,
             scan_interval=scan_interval,
             translation_key=get_translation_key(name),
             entity_id_style=entity_id_style,

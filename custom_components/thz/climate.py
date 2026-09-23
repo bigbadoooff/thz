@@ -69,6 +69,7 @@ read-only mode — ``target_temperature`` is still shown but
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any, cast
@@ -99,6 +100,7 @@ from .parameter_io import (
     async_write_parameter,
     parameter_length,
 )
+from .register_maps.model import WriteParam
 from .value_codec import THZValueCodec, decode_raw_value
 from .value_maps import SELECT_MAP
 
@@ -196,40 +198,23 @@ def _bit_field_layout(
     return read_field.byte_offset, read_field.bit
 
 
-def _get_step(entry: dict) -> float:
-    """Return the encoding step/factor from a write-register entry.
-
-    Some map entries use ``"step"``, others use ``"factor"``.  Both represent
-    the same scaling value used by :class:`THZValueCodec`.
-
-    Args:
-        entry: Write-register metadata dictionary.
-
-    Returns:
-        Floating-point step value, defaulting to 1.0.
-    """
-    raw = entry.get("step") or entry.get("factor")
-    if raw is None:
-        return 1.0
-    try:
-        return float(raw)
-    except (ValueError, TypeError):
-        return 1.0
+def _get_step(entry: WriteParam) -> float:
+    """Return the encoding step of a write parameter, defaulting to 1.0."""
+    return entry.step or 1.0
 
 
-def _find_entry(write_registers: dict, names: list[str]) -> dict | None:
-    """Return the first write-register entry that has a ``command`` field.
+def _find_entry(
+    write_registers: Mapping[str, WriteParam], names: list[str]
+) -> WriteParam | None:
+    """Return the first of ``names`` that the write map has, with a command.
 
     Args:
-        write_registers: Full dict of writable register entries.
+        write_registers: The firmware's write parameters by name.
         names: Candidate names to look up, in priority order.
-
-    Returns:
-        The matched entry dict, or ``None`` if none found.
     """
     for name in names:
-        entry = write_registers.get(name)
-        if isinstance(entry, dict) and entry.get("command"):
+        entry = _command_entry(write_registers, name)
+        if entry is not None:
             return entry
     return None
 
@@ -240,12 +225,12 @@ class _ClimateSetup:
 
     device: Any
     device_id: str
-    write_registers: dict[str, Any]
+    write_registers: Mapping[str, WriteParam]
     register_manager: Any
     entity_id_style: str
     entity_id_prefix: str | None
     cooling_coordinator: DataUpdateCoordinator | None
-    opmode_entry: dict[str, Any] | None
+    opmode_entry: WriteParam | None
     cooling_byte: int | None
     cooling_bit: int | None
     compressor_bit: int | None
@@ -262,15 +247,17 @@ class _ClimateSetup:
         }
 
 
-def _command_entry(write_registers: dict[str, Any], name: str) -> dict[str, Any] | None:
-    """Return a write-map entry if it exists and has a command."""
+def _command_entry(
+    write_registers: Mapping[str, WriteParam], name: str
+) -> WriteParam | None:
+    """Return a write parameter if it exists and has a command."""
     entry = write_registers.get(name)
-    return entry if isinstance(entry, dict) and entry.get("command") else None
+    return entry if entry is not None and entry.command else None
 
 
 def _cooling_entries(
-    write_registers: dict[str, Any], switch_name: str, setpoint_name: str
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    write_registers: Mapping[str, WriteParam], switch_name: str, setpoint_name: str
+) -> tuple[WriteParam | None, WriteParam | None]:
     """Return the cooling switch and setpoint entries, only if both exist."""
     switch = _command_entry(write_registers, switch_name)
     setpoint = _command_entry(write_registers, setpoint_name)
@@ -412,7 +399,7 @@ async def async_setup_entry(
     entry_data = config_entry.runtime_data
     coordinators: dict[str, DataUpdateCoordinator] = entry_data.coordinators
     register_manager = entry_data.register_manager
-    write_registers: dict[str, Any] = entry_data.write_manager.get_all_registers()
+    write_registers = entry_data.write_manager.params()
 
     # Bit-field layouts for pxx0A0176 — None when not present in map
     cooling = _bit_field_layout(register_manager, "pxx0A0176", "cooling")
@@ -568,16 +555,16 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         target_temp_length: int,
         op_mode_offset: int | None,
         op_mode_length: int | None,
-        heat_setpoint_entry: dict | None,
-        cool_switch_entry: dict | None,
-        cool_setpoint_entry: dict | None,
-        opmode_entry: dict | None = None,
-        fan_stage_entry: dict | None = None,
+        heat_setpoint_entry: WriteParam | None,
+        cool_switch_entry: WriteParam | None,
+        cool_setpoint_entry: WriteParam | None,
+        opmode_entry: WriteParam | None = None,
+        fan_stage_entry: WriteParam | None = None,
         cooling_byte: int | None = None,
         cooling_bit: int | None = None,
         compressor_bit: int | None = None,
-        night_setpoint_entry: dict | None = None,
-        manual_setpoint_entry: dict | None = None,
+        night_setpoint_entry: WriteParam | None = None,
+        manual_setpoint_entry: WriteParam | None = None,
         entity_id_style: str = ENTITY_ID_STYLE_DEFAULT,
         entity_id_prefix: str | None = None,
         enabled_default: bool = True,
@@ -727,12 +714,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         # Temperature bounds from heat setpoint entry
         if heat_setpoint_entry is not None:
-            self._attr_min_temp = float(
-                heat_setpoint_entry.get("min") or _DEFAULT_MIN_TEMP
-            )
-            self._attr_max_temp = float(
-                heat_setpoint_entry.get("max") or _DEFAULT_MAX_TEMP
-            )
+            self._attr_min_temp = float(heat_setpoint_entry.min or _DEFAULT_MIN_TEMP)
+            self._attr_max_temp = float(heat_setpoint_entry.max or _DEFAULT_MAX_TEMP)
         else:
             self._attr_min_temp = _DEFAULT_MIN_TEMP
             self._attr_max_temp = _DEFAULT_MAX_TEMP
@@ -774,14 +757,14 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
     def min_temp(self) -> float:
         """Return the minimum settable temperature for the current HVAC mode."""
         if self.hvac_mode == HVACMode.COOL and self._cool_setpoint_entry:
-            return float(self._cool_setpoint_entry.get("min") or _DEFAULT_MIN_TEMP)
+            return float(self._cool_setpoint_entry.min or _DEFAULT_MIN_TEMP)
         return self._attr_min_temp
 
     @property
     def max_temp(self) -> float:
         """Return the maximum settable temperature for the current HVAC mode."""
         if self.hvac_mode == HVACMode.COOL and self._cool_setpoint_entry:
-            return float(self._cool_setpoint_entry.get("max") or _DEFAULT_MAX_TEMP)
+            return float(self._cool_setpoint_entry.max or _DEFAULT_MAX_TEMP)
         return self._attr_max_temp
 
     # ── ClimateEntity properties ────────────────────────────────────────────
@@ -1044,7 +1027,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             return
         entry = self._fan_stage_entry
         step = _get_step(entry)
-        decode_type = entry.get("decode_type", "1clean")
+        decode_type = entry.decode_type
         try:
             value_bytes = THZValueCodec.encode_number(
                 float(stage), step, decode_type, parameter_length(entry)
@@ -1059,15 +1042,15 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
     # ── Private write helpers ───────────────────────────────────────────────
 
-    async def _async_read_setpoint(self, entry: dict) -> float | None:
+    async def _async_read_setpoint(self, entry: WriteParam) -> float | None:
         """Read a heat-setpoint register's current value directly from the device."""
         step = _get_step(entry)
-        decode_type = entry.get("decode_type", "5temp")
+        decode_type = entry.decode_type
         try:
             value_bytes = await async_read_parameter(self.hass, self._device, entry)
             if value_bytes:
                 return THZValueCodec.decode_number(
-                    value_bytes, step, decode_type, entry.get("signed", True)
+                    value_bytes, step, decode_type, entry.signed
                 )
         except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.warning(
@@ -1099,7 +1082,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         """
         active_temp = self.target_temperature
         day_entry = self._heat_setpoint_entry
-        candidates: list[tuple[str, dict]] = []
+        candidates: list[tuple[str, WriteParam]] = []
         if day_entry is not None:
             candidates.append(("day", day_entry))
         if self._night_setpoint_entry is not None:
@@ -1110,7 +1093,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         target_label, target_entry = "day", day_entry
 
         if len(candidates) > 1 and active_temp is not None:
-            matches: list[tuple[str, dict]] = []
+            matches: list[tuple[str, WriteParam]] = []
             for label, entry in candidates:
                 value = await self._async_read_setpoint(entry)
                 if value is not None and abs(value - active_temp) < 0.05:
@@ -1129,13 +1112,13 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             return
 
         step = _get_step(target_entry)
-        decode_type = target_entry.get("decode_type", "5temp")
+        decode_type = target_entry.decode_type
 
         _LOGGER.debug(
             "Writing heat setpoint %.1f °C to %s (cmd=%s, step=%s, register=%s)",
             temperature,
             self.name,
-            target_entry["command"],
+            target_entry.command,
             step,
             target_label,
         )
@@ -1167,13 +1150,13 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         entry = self._cool_setpoint_entry
         step = _get_step(entry)
-        decode_type = entry.get("decode_type", "5temp")
+        decode_type = entry.decode_type
 
         _LOGGER.debug(
             "Writing cool setpoint %.1f °C to %s (cmd=%s, step=%s)",
             temperature,
             self.name,
-            entry["command"],
+            entry.command,
             step,
         )
         try:
@@ -1200,7 +1183,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             "Setting cooling switch on %s to %s (cmd=%s)",
             self.name,
             enabled,
-            self._cool_switch_entry["command"],
+            self._cool_switch_entry.command,
         )
         try:
             await async_write_parameter(
@@ -1221,7 +1204,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         entry = self._cool_setpoint_entry
         step = _get_step(entry)
-        decode_type = entry.get("decode_type", "5temp")
+        decode_type = entry.decode_type
 
         try:
             value_bytes = await async_read_parameter(self.hass, self._device, entry)
@@ -1245,12 +1228,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             return
         entry = self._fan_stage_entry
         step = _get_step(entry)
-        decode_type = entry.get("decode_type", "1clean")
+        decode_type = entry.decode_type
         try:
             value_bytes = await async_read_parameter(self.hass, self._device, entry)
             if value_bytes:
                 raw = THZValueCodec.decode_number(
-                    value_bytes, step, decode_type, entry.get("signed", True)
+                    value_bytes, step, decode_type, entry.signed
                 )
                 self._fan_stage_cache = int(raw)
                 _LOGGER.debug(

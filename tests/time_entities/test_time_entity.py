@@ -19,7 +19,7 @@ from custom_components.thz.time import (
     _create_time_entities,
     async_setup_entry,
 )
-from tests.helpers import make_runtime_data
+from tests.helpers import FakeWriteManager, make_runtime_data, write_param
 
 
 def _make_device():
@@ -49,7 +49,9 @@ class TestCreateTimeEntitiesFactory:
     def test_schedule_type_creates_two_entities(self):
         device = _make_device()
         entry = _schedule_entry()
-        result = _create_time_entities("programHC1_Mo_0", entry, device, "dev1", 600)
+        result = _create_time_entities(
+            "programHC1_Mo_0", write_param(entry), device, "dev1", 600
+        )
         assert isinstance(result, list)
         assert len(result) == 2
         assert all(isinstance(e, THZScheduleTime) for e in result)
@@ -59,7 +61,9 @@ class TestCreateTimeEntitiesFactory:
     def test_plain_time_type_creates_single_entity(self):
         device = _make_device()
         entry = _time_entry()
-        result = _create_time_entities("pHolidayBeginTime", entry, device, "dev1", 600)
+        result = _create_time_entities(
+            "pHolidayBeginTime", write_param(entry), device, "dev1", 600
+        )
         assert isinstance(result, THZTime)
 
 
@@ -69,13 +73,13 @@ class TestAsyncSetupEntry:
     @pytest.mark.asyncio
     async def test_creates_time_and_schedule_entities(self):
         device = _make_device()
-        write_manager = MagicMock()
-        write_manager.get_all_registers.return_value = {
-            "pHolidayBeginTime": _time_entry("0A0601"),
-            "programHC1_Mo_0": _schedule_entry("0A0501"),
-            "p01RoomTempDayHC1": {"command": "0A0701", "type": "number"},
-        }
-
+        write_manager = FakeWriteManager(
+            {
+                "pHolidayBeginTime": _time_entry("0A0601"),
+                "programHC1_Mo_0": _schedule_entry("0A0501"),
+                "p01RoomTempDayHC1": {"command": "0A0701", "type": "number"},
+            }
+        )
         hass = MagicMock()
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
@@ -103,11 +107,11 @@ class TestAsyncSetupEntry:
     @pytest.mark.asyncio
     async def test_no_matching_entries_creates_nothing(self):
         device = _make_device()
-        write_manager = MagicMock()
-        write_manager.get_all_registers.return_value = {
-            "p01RoomTempDayHC1": {"command": "0A0701", "type": "number"},
-        }
-
+        write_manager = FakeWriteManager(
+            {
+                "p01RoomTempDayHC1": {"command": "0A0701", "type": "number"},
+            }
+        )
         hass = MagicMock()
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
@@ -134,7 +138,7 @@ class TestTHZTime:
         device = _make_device()
         entity = THZTime(
             name="pHolidayBeginTime",
-            entry={"command": "0A0601", "type": "time"},
+            entry=write_param({"command": "0A0601", "type": "time"}),
             device=device,
             device_id="dev1",
         )
@@ -148,7 +152,9 @@ class TestTHZTime:
         device = _make_device()
         entity = THZTime(
             name="pHolidayBeginTime",
-            entry={"command": "0A0601", "type": "time", "icon": "mdi:custom"},
+            entry=write_param(
+                {"command": "0A0601", "type": "time", "icon": "mdi:custom"}
+            ),
             device=device,
             device_id="dev1",
         )
@@ -158,7 +164,9 @@ class TestTHZTime:
         device = _make_device()
         entity = THZTime(
             name="customUntranslatedTime",
-            entry={"command": "0A0601", "type": "time", "icon": "mdi:custom"},
+            entry=write_param(
+                {"command": "0A0601", "type": "time", "icon": "mdi:custom"}
+            ),
             device=device,
             device_id="dev1",
         )
@@ -169,7 +177,7 @@ class TestTHZTime:
         device = _make_device()
         entity = THZTime(
             name="pHolidayBeginTime",
-            entry=_time_entry(),
+            entry=write_param(_time_entry()),
             device=device,
             device_id="dev1",
         )
@@ -186,7 +194,7 @@ class TestTHZTime:
         device = _make_device()
         entity = THZTime(
             name="pHolidayBeginTime",
-            entry=_time_entry(),
+            entry=write_param(_time_entry()),
             device=device,
             device_id="dev1",
         )
@@ -204,7 +212,7 @@ class TestTHZTime:
         device = _make_device()
         entity = THZTime(
             name="pHolidayBeginTime",
-            entry=_time_entry(),
+            entry=write_param(_time_entry()),
             device=device,
             device_id="dev1",
         )
@@ -222,7 +230,7 @@ class TestTHZTime:
         device = _make_device()
         entity = THZTime(
             name="pHolidayBeginTime",
-            entry=_time_entry(),
+            entry=write_param(_time_entry()),
             device=device,
             device_id="dev1",
         )
@@ -245,7 +253,7 @@ class TestTHZScheduleTime:
         entity = THZScheduleTime(
             name="programHC1_Mo_0 Start",
             base_name="programHC1_Mo_0",
-            entry=_schedule_entry(),
+            entry=write_param(_schedule_entry()),
             device=device,
             device_id="dev1",
             time_type="start",
@@ -262,7 +270,7 @@ class TestTHZScheduleTime:
         entity = THZScheduleTime(
             name="totallyUnknownSchedule_Mo_0 End",
             base_name="totallyUnknownSchedule_Mo_0",
-            entry=entry,
+            entry=write_param(entry),
             device=device,
             device_id="dev1",
             time_type="end",
@@ -276,7 +284,7 @@ class TestTHZScheduleTime:
         entity = THZScheduleTime(
             name="totallyUnknownSchedule_Mo_0 Start",
             base_name="totallyUnknownSchedule_Mo_0",
-            entry=_schedule_entry(),
+            entry=write_param(_schedule_entry()),
             device=device,
             device_id="dev1",
             time_type="start",
@@ -291,7 +299,7 @@ class TestTHZScheduleTime:
         entity = THZScheduleTime(
             name="programHC1_Mo_0 Start",
             base_name="programHC1_Mo_0",
-            entry=_schedule_entry(),
+            entry=write_param(_schedule_entry()),
             device=device,
             device_id="dev1",
             time_type="start",
@@ -311,7 +319,7 @@ class TestTHZScheduleTime:
         entity = THZScheduleTime(
             name="programHC1_Mo_0 End",
             base_name="programHC1_Mo_0",
-            entry=_schedule_entry(),
+            entry=write_param(_schedule_entry()),
             device=device,
             device_id="dev1",
             time_type="end",
@@ -330,7 +338,7 @@ class TestTHZScheduleTime:
         entity = THZScheduleTime(
             name="programHC1_Mo_0 Start",
             base_name="programHC1_Mo_0",
-            entry=_schedule_entry(),
+            entry=write_param(_schedule_entry()),
             device=device,
             device_id="dev1",
             time_type="start",
@@ -350,7 +358,7 @@ class TestTHZScheduleTime:
         entity = THZScheduleTime(
             name="programHC1_Mo_0 Start",
             base_name="programHC1_Mo_0",
-            entry=_schedule_entry(),
+            entry=write_param(_schedule_entry()),
             device=device,
             device_id="dev1",
             time_type="start",
@@ -370,7 +378,7 @@ class TestTHZScheduleTime:
         entity = THZScheduleTime(
             name="programHC1_Mo_0 Start",
             base_name="programHC1_Mo_0",
-            entry=_schedule_entry(),
+            entry=write_param(_schedule_entry()),
             device=device,
             device_id="dev1",
             time_type="start",
@@ -390,7 +398,7 @@ class TestTHZScheduleTime:
         entity = THZScheduleTime(
             name="programHC1_Mo_0 Start",
             base_name="programHC1_Mo_0",
-            entry=_schedule_entry(),
+            entry=write_param(_schedule_entry()),
             device=device,
             device_id="dev1",
             time_type="start",
@@ -419,7 +427,7 @@ class TestHolidayAndPartyTimeByte:
         device.async_execute = AsyncMock(return_value=read_bytes)
         entity = THZTime(
             name="pHolidayBeginTime",
-            entry={"command": "0A05D3", "decode_type": decode_type},
+            entry=write_param({"command": "0A05D3", "decode_type": decode_type}),
             device=device,
             device_id="dev",
         )

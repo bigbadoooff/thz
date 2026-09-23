@@ -11,7 +11,6 @@ Currently exposed buttons:
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
@@ -23,6 +22,7 @@ from .base_entity import THZBaseEntity
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
 from .platform_setup import async_setup_write_platform
+from .register_maps.model import WriteParam
 from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class THZButton(THZBaseEntity, ButtonEntity):
     def __init__(
         self,
         name: str,
-        entry: dict[str, Any],
+        entry: WriteParam,
         device: THZDevice,
         device_id: str,
         scan_interval: int | None = None,
@@ -65,7 +65,7 @@ class THZButton(THZBaseEntity, ButtonEntity):
 
         Args:
             name: The name of the button.
-            entry: The register entry dict from the write map.
+            entry: The write-map parameter.
             device: The device instance this button communicates with.
             device_id: The device identifier for registry linking.
             scan_interval: Not used for buttons; accepted for API compatibility.
@@ -76,10 +76,10 @@ class THZButton(THZBaseEntity, ButtonEntity):
         """
         super().__init__(
             name=name,
-            command=entry["command"],
+            command=entry.command,
             device=device,
             device_id=device_id,
-            icon=entry.get("icon") or "mdi:gesture-tap-button",
+            icon=entry.icon or "mdi:gesture-tap-button",
             scan_interval=scan_interval,
             translation_key=get_translation_key(name),
             entity_id_style=entity_id_style,

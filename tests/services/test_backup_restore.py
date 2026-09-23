@@ -20,7 +20,7 @@ import pytest
 
 from custom_components.thz.const import DOMAIN
 from custom_components.thz.services import async_setup_services
-from tests.helpers import as_runtime_data, make_runtime_data
+from tests.helpers import FakeWriteManager, as_runtime_data, make_runtime_data
 
 
 def _mock_hass():
@@ -267,10 +267,7 @@ class TestClockDriftCheck:
         }
 
     def _make_write_manager(self):
-        write_manager = MagicMock()
-        write_manager.get_all_registers = MagicMock(
-            return_value=self._write_registers()
-        )
+        write_manager = FakeWriteManager(self._write_registers())
         return write_manager
 
     def _make_device(self, read_values=None, write_values=None):
@@ -317,10 +314,9 @@ class TestClockDriftCheck:
         from custom_components.thz.clock_sync import async_read_device_clock
 
         hass = MagicMock()
-        write_manager = MagicMock()
         regs = self._write_registers()
         del regs["pClockMinutes"]
-        write_manager.get_all_registers = MagicMock(return_value=regs)
+        write_manager = FakeWriteManager(regs)
         device = self._make_device(read_values=iter([bytes([1])] * 10))
 
         result = await async_read_device_clock(hass, device, write_manager)
@@ -466,10 +462,9 @@ class TestClockDriftCheck:
         config_entry.data = {"auto_sync_clock": False}
         config_entry.runtime_data = {}
 
-        write_manager = MagicMock()
         regs = self._write_registers()
         del regs["pClockYear"]
-        write_manager.get_all_registers = MagicMock(return_value=regs)
+        write_manager = FakeWriteManager(regs)
         device = self._make_device(read_values=iter([bytes([1])] * 10))
 
         await async_check_and_maybe_sync_clock(
@@ -522,10 +517,7 @@ class TestBackupParametersService:
     def _entry_data(self):
         device = MagicMock()
         device.firmware_version = "1.0"
-        write_manager = MagicMock()
-        write_manager.get_all_registers = MagicMock(
-            return_value=_sample_write_registers()
-        )
+        write_manager = FakeWriteManager(_sample_write_registers())
         return {
             "device": device,
             "device_id": "thz-1234",
@@ -722,10 +714,7 @@ class TestRestoreParametersService:
 
     def _entry_data(self):
         device = MagicMock()
-        write_manager = MagicMock()
-        write_manager.get_all_registers = MagicMock(
-            return_value=_sample_write_registers()
-        )
+        write_manager = FakeWriteManager(_sample_write_registers())
         return {
             "device": device,
             "device_id": "thz-1234",
@@ -1012,9 +1001,8 @@ class _FakeClockDevice:
 
 
 def _clock_write_manager():
-    write_manager = MagicMock()
-    write_manager.get_all_registers = MagicMock(
-        return_value={
+    write_manager = FakeWriteManager(
+        {
             name: {"command": cmd, "decode_type": "0clean"}
             for cmd, name in _FakeClockDevice.COMMANDS.items()
         }

@@ -13,7 +13,7 @@ from custom_components.thz.diagnostics import (
     TO_REDACT,
     async_get_config_entry_diagnostics,
 )
-from tests.helpers import make_runtime_data
+from tests.helpers import FakeWriteManager, make_runtime_data
 
 
 def _make_config_entry(entry_id="test_entry", data=None, runtime_data=None):
@@ -51,15 +51,14 @@ class TestDiagnosticsRegisterCounts:
 
     @pytest.mark.asyncio
     async def test_includes_write_manager_counts_and_types(self):
-        write_manager = MagicMock()
-        write_manager.get_all_registers.return_value = {
-            "p01": {"type": "number"},
-            "p02": {"type": "number"},
-            "pSwitch": {"type": "switch"},
-            "pSelect": {"type": "select"},
-            "pUnknownTypeEntry": {},  # missing "type" -> "unknown"
-        }
-
+        write_manager = FakeWriteManager(
+            {
+                "p01": {"type": "number"},
+                "p02": {"type": "number"},
+                "pSwitch": {"type": "switch"},
+                "pSelect": {"type": "select"},
+            }
+        )
         hass = MagicMock()
         config_entry = _make_config_entry(
             runtime_data=make_runtime_data(
@@ -69,12 +68,11 @@ class TestDiagnosticsRegisterCounts:
 
         result = await async_get_config_entry_diagnostics(hass, config_entry)
 
-        assert result["registers"]["write_entities"] == 5
+        assert result["registers"]["write_entities"] == 4
         type_counts = result["registers"]["write_entity_types"]
         assert type_counts["number"] == 2
         assert type_counts["switch"] == 1
         assert type_counts["select"] == 1
-        assert type_counts["unknown"] == 1
 
     @pytest.mark.asyncio
     async def test_no_register_manager_or_write_manager(self):
