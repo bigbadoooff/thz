@@ -45,9 +45,13 @@ async def async_get_config_entry_diagnostics(
     # Collect coordinator information (without sensitive data)
     coordinator_info = {}
     for block_name, coordinator in coordinators.items():
+        # Only TimestampDataUpdateCoordinator records the time of the last
+        # successful update; the plain DataUpdateCoordinator used here does
+        # not have the attribute at all.
         last_update_time = None
-        if coordinator.last_update_success_time:
-            last_update_time = str(coordinator.last_update_success_time)
+        success_time = getattr(coordinator, "last_update_success_time", None)
+        if success_time:
+            last_update_time = str(success_time)
 
         update_interval = None
         if coordinator.update_interval:
