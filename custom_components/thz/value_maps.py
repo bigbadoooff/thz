@@ -93,3 +93,58 @@ SELECT_MAP = {
         "1": "air",
     },
 }
+
+
+# Read-only text sensors whose value comes from one of the tables above. They
+# are exposed as enum sensors so Home Assistant can translate the state (the
+# tables hold protocol names, not display text): the state is the slug of the
+# table value, the texts live under ``entity.sensor.<key>.state`` in
+# strings.json and the translations.
+STATE_TRANSLATED_DECODE_TYPES = {
+    "weekday": "weekday",
+    "somwinmode": "SomWinMode",
+    "opmodehc": "OpModeHC",
+    "faultmap": "faultmap",
+}
+STATE_UNKNOWN = "unknown"
+STATE_NONE = "none"
+
+
+def state_slug(name: str) -> str:
+    """Return the translation-safe state key for a SELECT_MAP value.
+
+    "n.a." (no fault) becomes "none"; everything else is lower-cased with
+    characters outside ``[a-z0-9_]`` replaced by ``_`` (hassfest only accepts
+    lowercase slugs as state keys), e.g. "F01_AnodeFault" -> "f01_anodefault".
+    """
+    if name == "n.a.":
+        return STATE_NONE
+    return "".join(
+        c if (c.isalnum() and c.isascii()) or c == "_" else "_" for c in name.lower()
+    )
+
+
+def state_options(decode_type: str) -> list[str]:
+    """Return every state an enum sensor of this decode type can report."""
+    slugs = dict.fromkeys(
+        state_slug(name)
+        for name in SELECT_MAP[STATE_TRANSLATED_DECODE_TYPES[decode_type]].values()
+    )
+    slugs[STATE_UNKNOWN] = None
+    return list(slugs)
+
+
+def to_state(decode_type: str, value: object) -> str:
+    """Map a decoded table value to its state key ("unknown" if not in the table)."""
+    slug = state_slug(str(value))
+    return slug if slug in state_options(decode_type) else STATE_UNKNOWN
+
+
+def select_slugs(decode_type: str) -> dict[str, str]:
+    """Return {state key: SELECT_MAP value} for a select entity's table.
+
+    Select options must be translation-safe keys too, so entities expose the
+    slug ("daymode") while the codec keeps working with the table value
+    ("DAYmode"). Tables whose values are already slugs map to themselves.
+    """
+    return {state_slug(value): value for value in SELECT_MAP[decode_type].values()}

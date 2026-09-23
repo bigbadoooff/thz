@@ -239,8 +239,10 @@ class TestOptionsWithinMapBounds:
         from unittest.mock import MagicMock
 
         from custom_components.thz.select import THZSelect
-        from custom_components.thz.value_maps import SELECT_MAP
+        from custom_components.thz.value_maps import SELECT_MAP, state_slug
 
         entry = {"command": "0A0112", "min": "", "max": "", "decode_type": "2opmode"}
         select = THZSelect("pOpMode", entry, MagicMock(), "dev")
-        assert select._attr_options == list(SELECT_MAP["2opmode"].values())
+        assert select._attr_options == [
+            state_slug(value) for value in SELECT_MAP["2opmode"].values()
+        ]

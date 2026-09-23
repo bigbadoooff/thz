@@ -20,6 +20,7 @@ from .const import DOMAIN
 from .devices import thz_device_info
 from .fault_state import STATUS_FAULT, STATUS_OK, STORAGE_VERSION, THZFaultTracker
 from .runtime_data import THZConfigEntry
+from .value_maps import STATE_NONE, state_options, to_state
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -29,9 +30,8 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 D1_BLOCK = "pxxD1"
-# Latest-fault state when D1 is empty; same text the existing faultmap
-# decoder uses for "no fault".
-NO_FAULT = "n.a."
+# Latest-fault state when D1 is empty (the same state the faultmap sensors use).
+NO_FAULT = STATE_NONE
 
 
 def supports_fault_memory(register_manager: Any) -> bool:
@@ -175,15 +175,20 @@ class THZLatestFaultSensor(_THZFaultSensor):
     """The newest record in the device's fault memory."""
 
     KEY = "latest"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = state_options("faultmap")
 
     @property
     def native_value(self) -> str | None:
-        """Return the newest fault's name, or "n.a." when none is stored."""
+        """Return the newest fault's state key, or "none" when none is stored.
+
+        The states are translated (see ``entity.sensor.fault_latest.state``).
+        """
         state = self._state
         if state is None:
             return None
         latest = state["latest"]
-        return str(latest["description"]) if latest else NO_FAULT
+        return to_state("faultmap", latest["description"]) if latest else NO_FAULT
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

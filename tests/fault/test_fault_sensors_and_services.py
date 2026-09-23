@@ -94,7 +94,7 @@ class TestSensors:
         _, _, (status, memory, latest, new) = self._sensors(_payload(R3, R5))
         assert status.native_value == "ok"
         assert memory.native_value == 2
-        assert latest.native_value == "F05_OutletFanFault"
+        assert latest.native_value == "f05_outletfanfault"
         assert latest.extra_state_attributes["fault_code"] == "F05"
         assert latest.extra_state_attributes["time"] == "23:59"
         assert new.native_value == 0

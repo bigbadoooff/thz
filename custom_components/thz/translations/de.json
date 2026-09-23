@@ -561,10 +561,22 @@
         "name": "Innentemperatur Kontrolleinheit HK2"
       },
       "season_mode": {
-        "name": "Jahreszeitenmodus"
+        "name": "Jahreszeitenmodus",
+        "state": {
+          "winter": "Winter",
+          "summer": "Sommer",
+          "unknown": "Unbekannt"
+        }
       },
       "hc_op_mode": {
-        "name": "Heizkreis Betriebsart"
+        "name": "Heizkreis Betriebsart",
+        "state": {
+          "normal": "Normal",
+          "setback": "Absenkbetrieb",
+          "standby": "Bereitschaft",
+          "restart": "Neustart",
+          "unknown": "Unbekannt"
+        }
       },
       "integral_heat": {
         "name": "Integral Wärme"
@@ -777,7 +789,14 @@
         "name": "Warmwasserstunden"
       },
       "dhw_op_mode": {
-        "name": "Warmwasser Betriebsmodus"
+        "name": "Warmwasser Betriebsmodus",
+        "state": {
+          "normal": "Normal",
+          "setback": "Absenkbetrieb",
+          "standby": "Bereitschaft",
+          "restart": "Neustart",
+          "unknown": "Unbekannt"
+        }
       },
       "dhw_out_mode": {
         "name": "Warmwasser Ausgangsmodus"
@@ -876,7 +895,42 @@
         "name": "Lüfterstufe Standby"
       },
       "fault0_code": {
-        "name": "Fehler 0 Code"
+        "name": "Fehler 0 Code",
+        "state": {
+          "none": "Kein Fehler",
+          "f01_anodefault": "Anodenfehler",
+          "f02_safetytempdelimiterengaged": "Sicherheitstemperaturbegrenzer ausgelöst",
+          "f03_highpreasureguardfault": "Störung Hochdruckwächter",
+          "f04_lowpreasureguardfault": "Störung Niederdruckwächter",
+          "f05_outletfanfault": "Störung Fortluftventilator",
+          "f06_inletfanfault": "Störung Zuluftventilator",
+          "f07_mainoutputfanfault": "Störung Ventilator Hauptausgang",
+          "f11_lowpreasuresensorfault": "Störung Niederdrucksensor",
+          "f12_highpreasuresensorfault": "Störung Hochdrucksensor",
+          "f15_dhw_temperaturefault": "Störung Warmwassertemperatur",
+          "f17_defrostingdurationexceeded": "Abtaudauer überschritten",
+          "f20_solarsensorfault": "Störung Solarfühler",
+          "f21_outsidetemperaturesensorfault": "Störung Außentemperaturfühler",
+          "f22_hotgastemperaturefault": "Störung Heißgastemperatur",
+          "f23_condensertemperaturesensorfault": "Störung Verflüssigertemperaturfühler",
+          "f24_evaporatortemperaturesensorfault": "Störung Verdampfertemperaturfühler",
+          "f26_returntemperaturesensorfault": "Störung Rücklauftemperaturfühler",
+          "f28_flowtemperaturesensorfault": "Störung Vorlauftemperaturfühler",
+          "f29_dhw_temperaturesensorfault": "Störung Warmwassertemperaturfühler",
+          "f30_softwareversionfault": "Störung Softwareversion",
+          "f31_ramfault": "RAM-Fehler",
+          "f32_eepromfault": "EEPROM-Fehler",
+          "f33_extractairhumiditysensor": "Störung Fortluftfeuchtefühler",
+          "f34_flowsensor": "Störung Durchflusssensor",
+          "f35_minflowcooling": "Mindestdurchfluss im Kühlbetrieb",
+          "f36_minflowrate": "Mindestdurchfluss",
+          "f37_minwaterpressure": "Mindestwasserdruck",
+          "f40_floatswitch": "Schwimmerschalter",
+          "f50_sensorheatpumpreturn": "Fühler Wärmepumpe Rücklauf",
+          "f51_sensorheatpumpflow": "Fühler Wärmepumpe Vorlauf",
+          "f52_sensorcondenseroutlet": "Fühler Verflüssigeraustritt",
+          "unknown": "Unbekannter Fehler"
+        }
       },
       "fault0_date": {
         "name": "Fehler 0 Datum"
@@ -885,7 +939,42 @@
         "name": "Fehler 0 Zeit"
       },
       "fault1_code": {
-        "name": "Fehler 1 Code"
+        "name": "Fehler 1 Code",
+        "state": {
+          "none": "Kein Fehler",
+          "f01_anodefault": "Anodenfehler",
+          "f02_safetytempdelimiterengaged": "Sicherheitstemperaturbegrenzer ausgelöst",
+          "f03_highpreasureguardfault": "Störung Hochdruckwächter",
+          "f04_lowpreasureguardfault": "Störung Niederdruckwächter",
+          "f05_outletfanfault": "Störung Fortluftventilator",
+          "f06_inletfanfault": "Störung Zuluftventilator",
+          "f07_mainoutputfanfault": "Störung Ventilator Hauptausgang",
+          "f11_lowpreasuresensorfault": "Störung Niederdrucksensor",
+          "f12_highpreasuresensorfault": "Störung Hochdrucksensor",
+          "f15_dhw_temperaturefault": "Störung Warmwassertemperatur",
+          "f17_defrostingdurationexceeded": "Abtaudauer überschritten",
+          "f20_solarsensorfault": "Störung Solarfühler",
+          "f21_outsidetemperaturesensorfault": "Störung Außentemperaturfühler",
+          "f22_hotgastemperaturefault": "Störung Heißgastemperatur",
+          "f23_condensertemperaturesensorfault": "Störung Verflüssigertemperaturfühler",
+          "f24_evaporatortemperaturesensorfault": "Störung Verdampfertemperaturfühler",
+          "f26_returntemperaturesensorfault": "Störung Rücklauftemperaturfühler",
+          "f28_flowtemperaturesensorfault": "Störung Vorlauftemperaturfühler",
+          "f29_dhw_temperaturesensorfault": "Störung Warmwassertemperaturfühler",
+          "f30_softwareversionfault": "Störung Softwareversion",
+          "f31_ramfault": "RAM-Fehler",
+          "f32_eepromfault": "EEPROM-Fehler",
+          "f33_extractairhumiditysensor": "Störung Fortluftfeuchtefühler",
+          "f34_flowsensor": "Störung Durchflusssensor",
+          "f35_minflowcooling": "Mindestdurchfluss im Kühlbetrieb",
+          "f36_minflowrate": "Mindestdurchfluss",
+          "f37_minwaterpressure": "Mindestwasserdruck",
+          "f40_floatswitch": "Schwimmerschalter",
+          "f50_sensorheatpumpreturn": "Fühler Wärmepumpe Rücklauf",
+          "f51_sensorheatpumpflow": "Fühler Wärmepumpe Vorlauf",
+          "f52_sensorcondenseroutlet": "Fühler Verflüssigeraustritt",
+          "unknown": "Unbekannter Fehler"
+        }
       },
       "fault1_date": {
         "name": "Fehler 1 Datum"
@@ -894,7 +983,42 @@
         "name": "Fehler 1 Zeit"
       },
       "fault2_code": {
-        "name": "Fehler 2 Code"
+        "name": "Fehler 2 Code",
+        "state": {
+          "none": "Kein Fehler",
+          "f01_anodefault": "Anodenfehler",
+          "f02_safetytempdelimiterengaged": "Sicherheitstemperaturbegrenzer ausgelöst",
+          "f03_highpreasureguardfault": "Störung Hochdruckwächter",
+          "f04_lowpreasureguardfault": "Störung Niederdruckwächter",
+          "f05_outletfanfault": "Störung Fortluftventilator",
+          "f06_inletfanfault": "Störung Zuluftventilator",
+          "f07_mainoutputfanfault": "Störung Ventilator Hauptausgang",
+          "f11_lowpreasuresensorfault": "Störung Niederdrucksensor",
+          "f12_highpreasuresensorfault": "Störung Hochdrucksensor",
+          "f15_dhw_temperaturefault": "Störung Warmwassertemperatur",
+          "f17_defrostingdurationexceeded": "Abtaudauer überschritten",
+          "f20_solarsensorfault": "Störung Solarfühler",
+          "f21_outsidetemperaturesensorfault": "Störung Außentemperaturfühler",
+          "f22_hotgastemperaturefault": "Störung Heißgastemperatur",
+          "f23_condensertemperaturesensorfault": "Störung Verflüssigertemperaturfühler",
+          "f24_evaporatortemperaturesensorfault": "Störung Verdampfertemperaturfühler",
+          "f26_returntemperaturesensorfault": "Störung Rücklauftemperaturfühler",
+          "f28_flowtemperaturesensorfault": "Störung Vorlauftemperaturfühler",
+          "f29_dhw_temperaturesensorfault": "Störung Warmwassertemperaturfühler",
+          "f30_softwareversionfault": "Störung Softwareversion",
+          "f31_ramfault": "RAM-Fehler",
+          "f32_eepromfault": "EEPROM-Fehler",
+          "f33_extractairhumiditysensor": "Störung Fortluftfeuchtefühler",
+          "f34_flowsensor": "Störung Durchflusssensor",
+          "f35_minflowcooling": "Mindestdurchfluss im Kühlbetrieb",
+          "f36_minflowrate": "Mindestdurchfluss",
+          "f37_minwaterpressure": "Mindestwasserdruck",
+          "f40_floatswitch": "Schwimmerschalter",
+          "f50_sensorheatpumpreturn": "Fühler Wärmepumpe Rücklauf",
+          "f51_sensorheatpumpflow": "Fühler Wärmepumpe Vorlauf",
+          "f52_sensorcondenseroutlet": "Fühler Verflüssigeraustritt",
+          "unknown": "Unbekannter Fehler"
+        }
       },
       "fault2_date": {
         "name": "Fehler 2 Datum"
@@ -903,7 +1027,42 @@
         "name": "Fehler 2 Zeit"
       },
       "fault3_code": {
-        "name": "Fehler 3 Code"
+        "name": "Fehler 3 Code",
+        "state": {
+          "none": "Kein Fehler",
+          "f01_anodefault": "Anodenfehler",
+          "f02_safetytempdelimiterengaged": "Sicherheitstemperaturbegrenzer ausgelöst",
+          "f03_highpreasureguardfault": "Störung Hochdruckwächter",
+          "f04_lowpreasureguardfault": "Störung Niederdruckwächter",
+          "f05_outletfanfault": "Störung Fortluftventilator",
+          "f06_inletfanfault": "Störung Zuluftventilator",
+          "f07_mainoutputfanfault": "Störung Ventilator Hauptausgang",
+          "f11_lowpreasuresensorfault": "Störung Niederdrucksensor",
+          "f12_highpreasuresensorfault": "Störung Hochdrucksensor",
+          "f15_dhw_temperaturefault": "Störung Warmwassertemperatur",
+          "f17_defrostingdurationexceeded": "Abtaudauer überschritten",
+          "f20_solarsensorfault": "Störung Solarfühler",
+          "f21_outsidetemperaturesensorfault": "Störung Außentemperaturfühler",
+          "f22_hotgastemperaturefault": "Störung Heißgastemperatur",
+          "f23_condensertemperaturesensorfault": "Störung Verflüssigertemperaturfühler",
+          "f24_evaporatortemperaturesensorfault": "Störung Verdampfertemperaturfühler",
+          "f26_returntemperaturesensorfault": "Störung Rücklauftemperaturfühler",
+          "f28_flowtemperaturesensorfault": "Störung Vorlauftemperaturfühler",
+          "f29_dhw_temperaturesensorfault": "Störung Warmwassertemperaturfühler",
+          "f30_softwareversionfault": "Störung Softwareversion",
+          "f31_ramfault": "RAM-Fehler",
+          "f32_eepromfault": "EEPROM-Fehler",
+          "f33_extractairhumiditysensor": "Störung Fortluftfeuchtefühler",
+          "f34_flowsensor": "Störung Durchflusssensor",
+          "f35_minflowcooling": "Mindestdurchfluss im Kühlbetrieb",
+          "f36_minflowrate": "Mindestdurchfluss",
+          "f37_minwaterpressure": "Mindestwasserdruck",
+          "f40_floatswitch": "Schwimmerschalter",
+          "f50_sensorheatpumpreturn": "Fühler Wärmepumpe Rücklauf",
+          "f51_sensorheatpumpflow": "Fühler Wärmepumpe Vorlauf",
+          "f52_sensorcondenseroutlet": "Fühler Verflüssigeraustritt",
+          "unknown": "Unbekannter Fehler"
+        }
       },
       "fault3_date": {
         "name": "Fehler 3 Datum"
@@ -1233,13 +1392,34 @@
         "name": "Programm HC2 Mittwoch"
       },
       "prog_state_dhw": {
-        "name": "Programmstatus WW"
+        "name": "Programmstatus WW",
+        "state": {
+          "normal": "Normal",
+          "setback": "Absenkbetrieb",
+          "standby": "Bereitschaft",
+          "restart": "Neustart",
+          "unknown": "Unbekannt"
+        }
       },
       "prog_state_fan": {
-        "name": "Programmstatus Lüfter"
+        "name": "Programmstatus Lüfter",
+        "state": {
+          "normal": "Normal",
+          "setback": "Absenkbetrieb",
+          "standby": "Bereitschaft",
+          "restart": "Neustart",
+          "unknown": "Unbekannt"
+        }
       },
       "prog_state_hc": {
-        "name": "Programmstatus HC"
+        "name": "Programmstatus HC",
+        "state": {
+          "normal": "Normal",
+          "setback": "Absenkbetrieb",
+          "standby": "Bereitschaft",
+          "restart": "Neustart",
+          "unknown": "Unbekannt"
+        }
       },
       "restart_before_setback_end": {
         "name": "Neustart vor Absenkende"
@@ -1341,7 +1521,17 @@
         "name": "Volumenstrom Filterwechsel"
       },
       "weekday": {
-        "name": "Wochentag"
+        "name": "Wochentag",
+        "state": {
+          "monday": "Montag",
+          "tuesday": "Dienstag",
+          "wednesday": "Mittwoch",
+          "thursday": "Donnerstag",
+          "friday": "Freitag",
+          "saturday": "Samstag",
+          "sunday": "Sonntag",
+          "unknown": "Unbekannt"
+        }
       },
       "x08": {
         "name": "Register X08"
@@ -1390,7 +1580,42 @@
         "name": "Fehlerspeicher"
       },
       "fault_latest": {
-        "name": "Letzter Fehler"
+        "name": "Letzter Fehler",
+        "state": {
+          "none": "Kein Fehler",
+          "f01_anodefault": "Anodenfehler",
+          "f02_safetytempdelimiterengaged": "Sicherheitstemperaturbegrenzer ausgelöst",
+          "f03_highpreasureguardfault": "Störung Hochdruckwächter",
+          "f04_lowpreasureguardfault": "Störung Niederdruckwächter",
+          "f05_outletfanfault": "Störung Fortluftventilator",
+          "f06_inletfanfault": "Störung Zuluftventilator",
+          "f07_mainoutputfanfault": "Störung Ventilator Hauptausgang",
+          "f11_lowpreasuresensorfault": "Störung Niederdrucksensor",
+          "f12_highpreasuresensorfault": "Störung Hochdrucksensor",
+          "f15_dhw_temperaturefault": "Störung Warmwassertemperatur",
+          "f17_defrostingdurationexceeded": "Abtaudauer überschritten",
+          "f20_solarsensorfault": "Störung Solarfühler",
+          "f21_outsidetemperaturesensorfault": "Störung Außentemperaturfühler",
+          "f22_hotgastemperaturefault": "Störung Heißgastemperatur",
+          "f23_condensertemperaturesensorfault": "Störung Verflüssigertemperaturfühler",
+          "f24_evaporatortemperaturesensorfault": "Störung Verdampfertemperaturfühler",
+          "f26_returntemperaturesensorfault": "Störung Rücklauftemperaturfühler",
+          "f28_flowtemperaturesensorfault": "Störung Vorlauftemperaturfühler",
+          "f29_dhw_temperaturesensorfault": "Störung Warmwassertemperaturfühler",
+          "f30_softwareversionfault": "Störung Softwareversion",
+          "f31_ramfault": "RAM-Fehler",
+          "f32_eepromfault": "EEPROM-Fehler",
+          "f33_extractairhumiditysensor": "Störung Fortluftfeuchtefühler",
+          "f34_flowsensor": "Störung Durchflusssensor",
+          "f35_minflowcooling": "Mindestdurchfluss im Kühlbetrieb",
+          "f36_minflowrate": "Mindestdurchfluss",
+          "f37_minwaterpressure": "Mindestwasserdruck",
+          "f40_floatswitch": "Schwimmerschalter",
+          "f50_sensorheatpumpreturn": "Fühler Wärmepumpe Rücklauf",
+          "f51_sensorheatpumpflow": "Fühler Wärmepumpe Vorlauf",
+          "f52_sensorcondenseroutlet": "Fühler Verflüssigeraustritt",
+          "unknown": "Unbekannter Fehler"
+        }
       },
       "fault_new": {
         "name": "Neue Fehler"
@@ -1889,7 +2114,16 @@
     },
     "select": {
       "op_mode": {
-        "name": "Betriebsart"
+        "name": "Betriebsart",
+        "state": {
+          "standby": "Bereitschaft",
+          "automatic": "Automatik",
+          "daymode": "Tagbetrieb",
+          "setback": "Absenkbetrieb",
+          "dhwmode": "Warmwasserbetrieb",
+          "manual": "Handbetrieb",
+          "emergency": "Notbetrieb"
+        }
       },
       "passive_cooling": {
         "name": "Passive Kühlung",
@@ -1909,7 +2143,11 @@
         }
       },
       "z_control_valve_dhw": {
-        "name": "Steuerventil Warmwasser"
+        "name": "Steuerventil Warmwasser",
+        "state": {
+          "off": "Aus",
+          "on": "Ein"
+        }
       },
       "z_pump_dhw": {
         "name": "Pumpe Warmwasser"
