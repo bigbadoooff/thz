@@ -8,40 +8,27 @@ import asyncio
 from collections.abc import Callable
 import contextlib
 import logging
-import socket
 import threading
 import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant
-import serial
 
-from . import const
+from . import const, protocol
 from .exceptions import (
     DEVICE_ERRORS,
     THZConnectionError,
     THZNotInitializedError,
     THZNotSupportedError,
     THZProtocolError,
-    THZWriteRejectedError,
 )
 from .register_maps.register_map_manager import (
     RegisterMapManager,
     RegisterMapManagerWrite,
 )
+from .transport import SerialTransport, TcpTransport, THZTransport
 
 _LOGGER = logging.getLogger(__name__)
-
-
-# Shortest answer to a SET: header (01 xx) and the 10 03 terminator.
-_SET_ANSWER_MIN = 4
-# Error headers of the answer to a SET, as named in FHEM's THZ_decode.
-_SET_ERRORS = {
-    b"\x01\x01": "timing issue",
-    b"\x01\x02": "CRC error in request",
-    b"\x01\x03": "command not known",
-    b"\x01\x04": "unknown register",
-}
 
 
 class THZDevice:
@@ -67,8 +54,12 @@ class THZDevice:
         self._firmware_override = firmware_override
         self._initialized = False
 
+        self._transport: THZTransport = (
+            TcpTransport(host, tcp_port)
+            if connection == "ip"
+            else SerialTransport(port, baudrate)
+        )
         # Placeholders
-        self.ser: serial.Serial | socket.socket | None = None
         self._firmware_version: str | None = None
         self.has_cooling: bool = True
         self.register_map_manager: RegisterMapManager | None = None
@@ -82,6 +73,53 @@ class THZDevice:
         self._request_sent = False
 
         # ---------------------------------------------------------------------
+
+    # --- Transport (transport.py); thin wrappers so the exchange code and
+    # its tests address one object.
+
+    @property
+    def ser(self) -> Any:
+        """The open serial port or socket of the transport; None if closed."""
+        return self._transport.ser
+
+    @ser.setter
+    def ser(self, value: Any) -> None:
+        self._transport.ser = value
+
+    def _connect_serial(self) -> None:
+        """Open the serial port."""
+        self._transport.connect(self.read_timeout)
+
+    def _connect_tcp(self) -> None:
+        """Open the ser2net TCP connection."""
+        self._transport.connect(self.read_timeout)
+
+    def _is_connection_alive(self) -> bool:
+        return self._transport.is_alive()
+
+    def _write_bytes(self, data: bytes) -> None:
+        self._transport.write(data)
+
+    def _read_available(self) -> bytes:
+        return self._transport.read_available()
+
+    def _reset_input_buffer(self) -> None:
+        self._transport.reset_input_buffer()
+
+    def _force_close(self) -> None:
+        """Close without raising; the next call reconnects."""
+        self._transport.close()
+
+    # --- Protocol (protocol.py), kept as attributes for callers and tests
+    # that use them through the device.
+
+    thz_checksum = staticmethod(protocol.checksum)
+    escape = staticmethod(protocol.escape)
+    unescape = staticmethod(protocol.unescape)
+    construct_telegram = staticmethod(protocol.construct_telegram)
+    decode_response = staticmethod(protocol.decode_response)
+    _frame_complete = staticmethod(protocol.frame_complete)
+    _check_set_answer = staticmethod(protocol.check_set_answer)
 
     async def async_initialize(self, hass: HomeAssistant) -> None:
         """Open connection and initialize firmware-dependent data structures."""
@@ -164,105 +202,6 @@ class THZDevice:
                 "Device not initialized or firmware version unknown"
             )
         return self._firmware_version
-
-    def _connect_serial(self):
-        """Open the USB/Serial connection."""
-        _LOGGER.debug(
-            "Opening serial connection: %s @ %s baud", self.port, self.baudrate
-        )
-        self.ser = serial.Serial(
-            self.port,
-            baudrate=self.baudrate,
-            timeout=self.read_timeout,
-        )
-
-    def _connect_tcp(self):
-        """Connect to ser2net (TCP/IP) with keepalive enabled.
-
-        Enables TCP keepalive to prevent connection timeouts when using ser2net.
-        This is critical for long-running connections that may be idle between polls.
-        """
-        _LOGGER.debug("Opening TCP connection: %s:%s", self.host, self.tcp_port)
-        self.ser = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.ser.settimeout(self.read_timeout)
-
-        # Enable TCP keepalive to prevent connection timeout
-        # This is essential for ser2net connections that may timeout after inactivity
-        self.ser.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-
-        # Configure keepalive parameters (Linux-specific but safe on other platforms)
-        # These settings ensure the connection stays alive even during long idle periods
-        try:
-            # Start sending keepalive probes after 60 seconds of inactivity
-            if hasattr(socket, "TCP_KEEPIDLE"):
-                self.ser.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 60)
-            # Send keepalive probes every 10 seconds
-            if hasattr(socket, "TCP_KEEPINTVL"):
-                self.ser.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 10)
-            # Close connection after 6 failed probes (60 seconds total)
-            if hasattr(socket, "TCP_KEEPCNT"):
-                self.ser.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 6)
-            _LOGGER.debug("TCP keepalive enabled with idle=60s, interval=10s, count=6")
-        except (OSError, AttributeError) as e:
-            # Keepalive parameters may not be available on all platforms
-            _LOGGER.warning("Could not set TCP keepalive parameters: %s", e)
-
-        self.ser.connect((self.host, self.tcp_port))
-        _LOGGER.info("TCP connection established with keepalive enabled")
-
-    def _is_connection_alive(self) -> bool:
-        """Check if the connection is still alive.
-
-        Uses multiple methods to verify connection health:
-        1. Check if socket/serial file descriptor is valid
-        2. For TCP: Try MSG_PEEK to detect closed connections
-        3. For serial: Check is_open status
-
-        Returns:
-            bool: True if connection is alive, False otherwise
-        """
-        if self.ser is None:
-            return False
-
-        if self.connection == "ip":
-            try:
-                # Check if socket is still valid
-                if self.ser.fileno() == -1:
-                    return False
-
-                # Save original timeout to restore after the check.
-                original_timeout = self.ser.gettimeout()  # type: ignore[union-attr]
-
-                # Try a quick peek without blocking to detect closed connections
-                # This is a best-effort check; MSG_PEEK may not work on all platforms
-                self.ser.setblocking(False)  # type: ignore[union-attr]
-                try:
-                    # recv with MSG_PEEK doesn't remove data from buffer. A
-                    # non-blocking socket without data raises BlockingIOError;
-                    # an empty result means the peer closed the connection.
-                    if self.ser.recv(1, socket.MSG_PEEK) == b"":  # type: ignore[union-attr]
-                        return False
-                except BlockingIOError:
-                    # No data available but connection is alive
-                    pass
-                except OSError:
-                    # Connection is broken
-                    return False
-                finally:
-                    # Always restore the original timeout; the socket may be
-                    # in a bad state.
-                    with contextlib.suppress(OSError):
-                        self.ser.settimeout(original_timeout)  # type: ignore[union-attr]
-
-                return True
-            except (OSError, AttributeError):
-                return False
-
-        # Serial connection
-        try:
-            return self.ser.is_open  # type: ignore[union-attr]
-        except AttributeError:
-            return False
 
     def _raise_if_abandoned(self) -> None:
         """Stop a worker thread whose async_execute call already gave up.
@@ -361,7 +300,9 @@ class THZDevice:
             _LOGGER.debug(error_msg)
             raise THZProtocolError(error_msg)
 
-    def _receive_data_telegram(self, timeout: float, min_length: int = 8) -> bytes:
+    def _receive_data_telegram(
+        self, timeout: float, min_length: int = protocol.DATA_TELEGRAM_MIN
+    ) -> bytes:
         """Send confirmation and read data telegram until 0x10 0x03 terminator.
 
         Args:
@@ -398,28 +339,6 @@ class THZDevice:
             raise THZProtocolError(error_msg)
 
         return bytes(data)
-
-    @staticmethod
-    def _frame_complete(data: bytes | bytearray, min_length: int = 8) -> bool:
-        """Return True if ``data`` ends with an unescaped 0x10 0x03 terminator.
-
-        ``min_length`` is the shortest frame accepted: a data telegram has at
-        least 8 bytes, the answer to a SET only a header and the terminator
-        (FHEM's THZ_ReadAnswer reads until a message starting 01 ends in 10 03).
-
-        A data byte 0x10 is sent escaped as 0x10 0x10, so ``... 10 10 03``
-        is an escaped 0x10 followed by a data byte 0x03, not the end of the
-        frame. The terminator's 0x10 is real only if the run of 0x10 bytes
-        before the final 0x03 has odd length.
-        """
-        if len(data) < min_length or data[-1] != const.ENDOFTEXT[0]:
-            return False
-        run = 0
-        for byte in reversed(data[:-1]):
-            if byte != const.DATALINKESCAPE[0]:
-                break
-            run += 1
-        return run % 2 == 1
 
     def _exchange_once(
         self, telegram: bytes, get_or_set: str, attempt: int, max_retries: int
@@ -473,34 +392,14 @@ class THZDevice:
         else:
             # Like FHEM's THZ_Get_Comunication, read the device's answer to a
             # SET too and require its acknowledgement (see _check_set_answer).
-            answer = self._receive_data_telegram(timeout, min_length=_SET_ANSWER_MIN)
+            answer = self._receive_data_telegram(
+                timeout, min_length=protocol.SET_ANSWER_MIN
+            )
             self._check_set_answer(answer)
             data = b""
 
         self._write_bytes(const.STARTOFTEXT)
         return data
-
-    def _check_set_answer(self, raw: bytes) -> None:
-        """Raise THZWriteRejectedError unless the answer acknowledges a SET.
-
-        Mirrors FHEM's THZ_decode: ``01 80`` is accepted as is, ``01 00``
-        if its checksum is correct; NAK (``15``), the ``01 01``..``01 04``
-        headers and anything else are errors.
-        """
-        answer = self.unescape(raw)
-        if answer == const.NAK:
-            raise THZWriteRejectedError("Device rejected the write (NAK)")
-        header = answer[:2]
-        if header == b"\x01\x80":
-            return
-        if header == b"\x01\x00":
-            if self.decode_response(raw) is not None:
-                return
-            raise THZWriteRejectedError(
-                "Device rejected the write: CRC error in answer"
-            )
-        reason = _SET_ERRORS.get(header, f"unknown answer {answer.hex()}")
-        raise THZWriteRejectedError(f"Device rejected the write: {reason}")
 
     def send_request(self, telegram: bytes, get_or_set: str) -> bytes:
         """Send request via USB or TCP, receive response.
@@ -579,34 +478,6 @@ class THZDevice:
         return False
 
     # Helper methods
-    def _write_bytes(self, data: bytes):
-        """Send bytes depending on connection type.
-
-        Raises:
-            THZConnectionError: If the connection is closed or broken
-        """
-        try:
-            # self.connection is the authoritative discriminator (set once in
-            # __init__ and never mutated); mypy can't narrow self.ser's union
-            # type from it, so these accesses need an explicit ignore.
-            # self.ser turning None mid-call is a real, accepted race handled
-            # by the AttributeError clause below.
-            if self.connection == "ip":
-                self.ser.sendall(data)  # type: ignore[union-attr]
-            else:
-                self.ser.write(data)  # type: ignore[union-attr]
-                self.ser.flush()  # type: ignore[union-attr]
-        except (OSError, BrokenPipeError) as e:
-            # Connection reset, broken pipe, or other socket/serial errors
-            _LOGGER.debug("Connection error during write: %s", e)
-            raise THZConnectionError(f"Failed to write to connection: {e}") from e
-        except (ValueError, AttributeError) as e:
-            # Raised by select.select() when the fd is closed mid-write (pyserial sets
-            # fd=None on close, so fileno() returns None, which is not an int).
-            # Also catches AttributeError if self.ser is set to None by _force_close()
-            # between the check above and the actual send/write call.
-            raise THZConnectionError(f"Connection closed during write: {e}") from e
-
     def _read_exact(self, size: int, timeout: float) -> bytes:
         """Read exactly n bytes, regardless of USB or TCP."""
         end_time = time.time() + timeout
@@ -618,75 +489,6 @@ class THZDevice:
             else:
                 time.sleep(0.005)
         return bytes(buf)
-
-    def _read_available(self) -> bytes:
-        """Read available bytes.
-
-        Raises:
-            THZConnectionError: If the connection is closed or broken
-        """
-        # self.connection is the authoritative discriminator (set once in
-        # __init__ and never mutated); mypy can't narrow self.ser's union
-        # type from it, so these accesses need an explicit ignore.
-        # self.ser turning None mid-call is a real, accepted race handled by
-        # the AttributeError clauses below.
-        if self.ser is None:
-            return b""
-
-        if self.connection == "ip":
-            try:
-                # Save original timeout to restore after reading
-                original_timeout = self.ser.gettimeout()  # type: ignore[union-attr]
-                self.ser.setblocking(False)  # type: ignore[union-attr]
-                data = self.ser.recv(1024)  # type: ignore[union-attr]
-            except BlockingIOError:
-                return b""
-            except OSError as e:
-                # Connection reset, broken pipe, or other socket errors
-                _LOGGER.debug("TCP socket error during read: %s", e)
-                raise THZConnectionError(f"TCP connection error: {e}") from e
-            except (ValueError, AttributeError) as e:
-                # select.select() raises ValueError when the socket fd is closed
-                # (fileno() returns None after close); AttributeError if self.ser
-                # becomes None between the check above and the recv call.
-                raise THZConnectionError(f"Connection closed during read: {e}") from e
-            finally:
-                # Always restore the original timeout. UnboundLocalError covers
-                # the case where gettimeout() itself raised above, so
-                # original_timeout was never assigned. The socket may be in a
-                # bad state or already None.
-                with contextlib.suppress(OSError, AttributeError, UnboundLocalError):
-                    self.ser.settimeout(original_timeout)  # type: ignore[union-attr]
-            if not data:
-                # A non-blocking recv() only returns b"" at end of stream:
-                # the peer (e.g. a restarted ser2net) closed the connection.
-                raise THZConnectionError("TCP socket connection closed by peer")
-            return bytes(data)
-
-        # Serial connection
-        try:
-            waiting = getattr(self.ser, "in_waiting", 0)
-            if waiting > 0:
-                return self.ser.read(waiting)  # type: ignore[union-attr]
-            return b""
-        except (OSError, serial.SerialException) as e:
-            raise THZConnectionError(f"Serial read error: {e}") from e
-        except (ValueError, AttributeError) as e:
-            # pyserial's select.select() raises ValueError when the port fd
-            # is None (set by close()); AttributeError if self.ser is None.
-            raise THZConnectionError(
-                f"Connection closed during serial read: {e}"
-            ) from e
-
-    def _reset_input_buffer(self):
-        """Delete any existing input buffer.
-
-        TCP sockets do not have an input buffer to reset, so this is only
-        relevant for serial connections.
-        """
-        if self.ser is not None and hasattr(self.ser, "reset_input_buffer"):
-            with contextlib.suppress(AttributeError):
-                self.ser.reset_input_buffer()
 
     async def async_execute(
         self,
@@ -767,105 +569,6 @@ class THZDevice:
         """Close the connection; safe to call repeatedly and never raises."""
         self._force_close()
 
-    def _force_close(self) -> None:
-        """Close without raising; sets ser=None so the next call reconnects."""
-        if self.ser is not None:
-            with contextlib.suppress(Exception):
-                self.ser.close()
-            self.ser = None
-
-    def thz_checksum(self, data: bytes) -> bytes:
-        """Calculate THZ checksum for given data."""
-        checksum = sum(b for i, b in enumerate(data) if i != 2)
-        checksum = checksum % 256
-        return bytes([checksum])
-
-    def unescape(self, data: bytes) -> bytes:
-        """Remove escape sequences from data."""
-        # 0x10 0x10 -> 0x10
-        data = data.replace(
-            const.DATALINKESCAPE + const.DATALINKESCAPE, const.DATALINKESCAPE
-        )
-        # 0x2B 0x18 -> 0x2B
-        return data.replace(b"\x2b\x18", b"\x2b")
-
-    def escape(self, data: bytes) -> bytes:
-        """Add escape sequences to data before sending.
-
-        According to the protocol (from FHEM THZ module):
-        - Each 0x10 byte must be escaped as 0x10 0x10
-        - Each 0x2B byte must be escaped as 0x2B 0x18
-
-        The order of escaping (0x10 first, then 0x2B) matches the FHEM implementation
-        and is safe because these escape sequences don't interfere with each other.
-
-        Args:
-            data: Raw bytes to escape
-
-        Returns:
-            Escaped bytes ready to send
-        """
-        # 0x10 -> 0x10 0x10 (matches Perl line 1764)
-        escape = const.DATALINKESCAPE
-        data = data.replace(escape, escape + escape)
-        # 0x2B -> 0x2B 0x18 (matches Perl line 1768)
-        return data.replace(b"\x2b", b"\x2b\x18")
-
-    def decode_response(self, data: bytes) -> bytes | None:
-        """Decode the response from the THZ device.
-
-        Checks header, CRC, and performs unescaping.
-        """
-        try:
-            if len(data) < 6:
-                _LOGGER.error("Response too short: %s", data.hex())
-                return None
-
-            data = self.unescape(data)
-
-            # Header is the first 2 bytes
-            header = data[0:2]
-            if header in (b"\x01\x80", b"\x01\x00"):
-                # Normal response b'\x01\x80' for "set" commands, b'\x01\x00' for "get"
-                # CRC is byte 2 (index 2)
-                crc = data[2]
-                # Payload = between byte 3 and last 2 bytes (ETX)
-                payload = data[3:-2]
-                # Check CRC
-                # For CRC calculation: everything except CRC and ETX (last 2 bytes)
-                # Assemble hex string for checking
-                check_data = data[:2] + b"\x00" + payload
-                checksum_bytes = self.thz_checksum(check_data)
-                calc_crc = checksum_bytes[0]
-                if calc_crc != crc:
-                    _LOGGER.error(
-                        "CRC error in response. Expected %02X, calculated %02X",
-                        crc,
-                        calc_crc,
-                    )
-                    return None
-
-                return checksum_bytes + payload
-
-            if header == b"\x01\x01":
-                _LOGGER.error("Timing issue from device")
-                return None
-            if header == b"\x01\x02":
-                _LOGGER.error("CRC error in request")
-                return None
-            if header == b"\x01\x03":
-                _LOGGER.error("Unknown command")
-                return None
-            if header == b"\x01\x04":
-                raise THZNotSupportedError("Register not supported by device firmware")
-            _LOGGER.error("Unknown response: %s", data.hex())
-            return None
-        except THZNotSupportedError:
-            raise  # propagate — not a decode error, not a connection failure
-        except Exception as e:
-            _LOGGER.exception("Error decoding response: %s", e)
-            return None
-
     def read_write_register(
         self,
         addr_bytes: bytes,
@@ -880,15 +583,7 @@ class THZDevice:
             THZNotSupportedError: If the device reports the register is
                 not supported
         """
-        header = b"\x01\x00" if get_or_set == "get" else b"\x01\x80"
-        # Standard header for "get" and "set"
-        footer = const.DATALINKESCAPE + const.ENDOFTEXT  # Standard footer
-
-        checksum = self.thz_checksum(header + b"\x00" + addr_bytes + payload_to_deliver)
-        # b'\x00' = placeholder for the checksum byte
-        telegram = self.construct_telegram(
-            addr_bytes + payload_to_deliver, header, footer, checksum
-        )
+        telegram = protocol.build_telegram(get_or_set, addr_bytes + payload_to_deliver)
         raw_response = self.send_request(telegram, get_or_set)
         if get_or_set == "get":
             decoded = self.decode_response(raw_response)
@@ -897,27 +592,6 @@ class THZDevice:
             return decoded
 
         return b""
-
-    def construct_telegram(
-        self, addr_bytes: bytes, header: bytes, footer: bytes, checksum: bytes
-    ) -> bytes:
-        r"""Constructs a telegram for the THZ device based on the given address bytes.
-
-        Args:
-            addr_bytes: Address bytes including command and optional payload
-                (e.g. b'\xfb' or b'\x0a\x01\x1f')
-            header: Header bytes (e.g. b'\x01\x00' or b'\x01\x80')
-            footer: Footer bytes (e.g. b'\x10\x03')
-            checksum: Checksum bytes (e.g. b'\x5a')
-
-        Returns:
-            telegram ready to send.
-        """
-        # Escape the checksum + command (+ payload) bytes according to the protocol
-        # (0x10 -> 0x10 0x10, 0x2B -> 0x2B 0x18)
-        # This matches the FHEM THZ module's THZ_encodecommand() function behavior
-        escaped_data = self.escape(checksum + addr_bytes)
-        return header + escaped_data + footer
 
     def read_firmware_version(self) -> str:
         """Reads the firmware version from the THZ device.

@@ -84,6 +84,9 @@ module = [
     "thz.parameter_io",
     "thz.value_codec",
     "thz.register_maps.register_map_manager",
+    "thz.protocol",
+    "thz.transport",
+    "thz.exceptions",
 ]
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
