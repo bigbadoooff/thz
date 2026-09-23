@@ -46,6 +46,12 @@ pip install -r requirements_test_ha.txt
 python -m pytest tests_ha -o asyncio_mode=auto
 ```
 
+`tests_ha/test_firmware_matrix.py` sets the integration up once per firmware
+and compares the created entities (unique_id, translation key, category,
+device class, unit, enabled state) with `tests_ha/snapshots/`. After an
+intended register-map change, review the diff and accept it with
+`python -m pytest tests_ha -o asyncio_mode=auto --snapshot-update`.
+
 ## How the tests are built
 
 - `conftest.py` replaces the Home Assistant modules with lightweight stubs, so

@@ -28,11 +28,16 @@ class FakeTHZDevice(THZDevice):
     """THZDevice speaking the real telegram format to in-memory registers."""
 
     instances: ClassVar[list[FakeTHZDevice]] = []
+    # Firmware reported in register FD and extra register contents; tests
+    # change these on the class before the integration creates the device.
+    firmware: ClassVar[int] = FIRMWARE
+    initial_registers: ClassVar[dict[bytes, bytes]] = {}
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.registers: dict[bytes, bytes] = {
-            b"\xfd": FIRMWARE.to_bytes(2, "big") + bytes(4),
+            b"\xfd": self.firmware.to_bytes(2, "big") + bytes(4),
+            **self.initial_registers,
         }
         self.sent: list[bytes] = []
         self.closed = False
@@ -85,6 +90,8 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 def fake_device() -> Generator[type[FakeTHZDevice]]:
     """Replace the device class used by setup and the config flow."""
     FakeTHZDevice.instances = []
+    FakeTHZDevice.firmware = FIRMWARE
+    FakeTHZDevice.initial_registers = {}
     with (
         patch("custom_components.thz.THZDevice", FakeTHZDevice),
         patch("custom_components.thz.config_flow.THZDevice", FakeTHZDevice),
