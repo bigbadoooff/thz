@@ -353,7 +353,7 @@ Contributions are welcome!
 
 - **Bugs**: Open an issue with HA version, heat pump model, firmware version, and relevant log entries
 - **Compatibility reports**: Let us know which devices work (or don't)
-- **Code**: Fork → feature branch → PR with a clear description
+- **Code**: see [CONTRIBUTING.md](CONTRIBUTING.md) and [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ## Contributors
 
