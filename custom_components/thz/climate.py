@@ -90,9 +90,9 @@ from homeassistant.helpers.update_coordinator import (
 from ._typing_compat import get_runtime_data
 from .const import (
     CONF_ENABLE_HC2,
-    DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
 )
+from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
 from .parameter_io import (
     async_read_parameter,
@@ -431,6 +431,7 @@ async def async_setup_entry(  # noqa: C901
             )
 
     if entities:
+        assign_subdevices(entities, config_entry.data)
         async_add_entities(entities, True)
         _LOGGER.info("Created %d climate entities", len(entities))
 
@@ -1266,7 +1267,18 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
     # ── Device registry ─────────────────────────────────────────────────────
 
+    # Sub-device group, set by devices.assign_subdevices before the entity
+    # is added; None links the entity to the heat pump itself.
+    _subdevice: str | None = None
+    _subdevice_device_name: str | None = None
+    _subdevice_area: str | None = None
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
-        return {"identifiers": {(DOMAIN, self._device_id)}}
+        return thz_device_info(
+            self._device_id,
+            self._subdevice,
+            self._subdevice_device_name,
+            self._subdevice_area,
+        )

@@ -34,13 +34,13 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._typing_compat import get_runtime_data
 from .const import (
-    DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
     should_hide_entity,
     should_hide_entity_by_default,
 )
 from .cop_sensor import async_setup_cop_sensors
+from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
 from .fault_sensor import async_setup_fault_sensors
 from .register_maps.register_map_manager import RegisterMapManager
@@ -201,6 +201,7 @@ async def async_setup_entry(
                     entity_id_prefix=entity_id_prefix,
                 )
             )
+    assign_subdevices(sensors, config_entry.data)
     async_add_entities(sensors, True)
 
     # Set up COP sensors separately
@@ -528,9 +529,18 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             "register_factor": self._factor,
         }
 
+    # Sub-device group, set by devices.assign_subdevices before the entity
+    # is added; None links the entity to the heat pump itself.
+    _subdevice: str | None = None
+    _subdevice_device_name: str | None = None
+    _subdevice_area: str | None = None
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-        }
+        return thz_device_info(
+            self._device_id,
+            self._subdevice,
+            self._subdevice_device_name,
+            self._subdevice_area,
+        )

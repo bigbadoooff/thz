@@ -7,9 +7,13 @@
         "data": {
           "connection_type": "Connection Type",
           "enable_hc2": "Enable HC2 entities",
+          "split_devices": "Split into sub-devices",
           "alias": "Device Name",
           "entity_id_style": "Entity ID Style",
           "entity_visibility": "Entity Visibility"
+        },
+        "data_description": {
+          "split_devices": "Group the entities into sub-devices (heating circuits, hot water, ventilation, compressor, solar, cooling). Changes the displayed entity names; entity IDs stay the same."
         }
       },
       "reconfigure": {
@@ -146,10 +150,14 @@
           "refresh_pxx0C0264": "Poll interval: Dew Point HC2 (s)",
           "refresh_pxx0C0011": "Poll interval: Inside temperature HC2 (Room controller) (s)",
           "enable_hc2": "Enable HC2 entities",
+          "split_devices": "Split into sub-devices",
           "entity_id_style": "Entity ID Style",
           "entity_visibility": "Entity Visibility",
           "firmware_override": "Firmware Override",
           "auto_sync_clock": "Auto-Sync Clock"
+        },
+        "data_description": {
+          "split_devices": "Group the entities into sub-devices (heating circuits, hot water, ventilation, compressor, solar, cooling). Changes the displayed entity names; entity IDs stay the same."
         }
       },
       "setup_ip": {
@@ -320,6 +328,29 @@
     "error": {
       "invalid_host": "Invalid IP address or hostname. Please enter a valid IPv4, IPv6 address, or hostname.",
       "invalid_port": "Invalid port number. Port must be between 1 and 65535."
+    }
+  },
+  "device": {
+    "heating": {
+      "name": "{device_name} Heating circuit 1"
+    },
+    "heating_hc2": {
+      "name": "{device_name} Heating circuit 2"
+    },
+    "dhw": {
+      "name": "{device_name} Hot water"
+    },
+    "ventilation": {
+      "name": "{device_name} Ventilation"
+    },
+    "compressor": {
+      "name": "{device_name} Compressor"
+    },
+    "solar": {
+      "name": "{device_name} Solar"
+    },
+    "cooling": {
+      "name": "{device_name} Cooling"
     }
   },
   "entity": {

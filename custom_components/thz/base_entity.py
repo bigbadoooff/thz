@@ -19,12 +19,12 @@ from homeassistant.helpers.event import async_track_time_interval
 
 from .const import (
     DEFAULT_UPDATE_INTERVAL,
-    DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
     should_hide_entity,
     should_hide_entity_by_default,
 )
+from .devices import thz_device_info
 from .entity_id_style import resolve_suggested_object_id
 
 if TYPE_CHECKING:
@@ -286,9 +286,18 @@ class THZBaseEntity(Entity):
             "register_command": self._command,
         }
 
+    # Sub-device group, set by devices.assign_subdevices before the entity
+    # is added; None links the entity to the heat pump itself.
+    _subdevice: str | None = None
+    _subdevice_device_name: str | None = None
+    _subdevice_area: str | None = None
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information to link this entity with the device."""
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-        }
+        return thz_device_info(
+            self._device_id,
+            self._subdevice,
+            self._subdevice_device_name,
+            self._subdevice_area,
+        )

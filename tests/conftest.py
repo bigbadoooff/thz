@@ -163,6 +163,8 @@ sys.modules["homeassistant.helpers.entity_platform"] = MagicMock()
 sys.modules["homeassistant.helpers.event"] = MagicMock()
 sys.modules["homeassistant.helpers.typing"] = MagicMock()
 sys.modules["homeassistant.helpers.device_registry"] = MagicMock()
+# DeviceInfo is a TypedDict: calling it builds a plain dict.
+sys.modules["homeassistant.helpers.device_registry"].DeviceInfo = dict
 sys.modules["homeassistant.helpers.area_registry"] = MagicMock()
 sys.modules["homeassistant.helpers.entity_registry"] = MagicMock()
 sys.modules["homeassistant.helpers.selector"] = MagicMock()

@@ -16,6 +16,7 @@ from .const import (
     ENTITY_VISIBILITY_DEFAULT,
     get_write_group_for_key,
 )
+from .devices import assign_subdevices
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -96,4 +97,5 @@ async def async_setup_write_platform(
             entities.append(entity)
 
     _LOGGER.info("Created %d %s entities", len(entities), platform_type)
+    assign_subdevices(entities, config_entry.data)
     async_add_entities(entities, True)

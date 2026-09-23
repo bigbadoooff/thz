@@ -130,6 +130,24 @@ Two independent settings control this, both asked during setup and changeable la
 
 Entities can also always be re-enabled individually via **Settings → Devices & Services → THZ → device → Show disabled entities**.
 
+### Sub-devices
+
+The entities can be grouped into sub-devices linked to the heat pump:
+
+- Heating circuit 1
+- Heating circuit 2
+- Hot water
+- Ventilation
+- Compressor (compressor, refrigerant circuit, defrost, COP)
+- Solar
+- Cooling
+
+General entities, such as the clock, fault memory, versions, outside temperature and operating mode, stay on the heat pump device. Each sub-device has its own device page and can be put in its own area.
+
+The **Split into sub-devices** setting is asked during setup, on by default. It can be changed later via **Settings → Devices & Services → THZ → Configure**. Installations set up before this option existed keep the single device until you switch it on.
+
+Switching the split on or off keeps the entity IDs, but the displayed names change. With the split on, a name is made of the sub-device name and the entity name, for example "lwz Hot water DHW temperature". Automations that refer to entity IDs keep working. Automations that pick a *device* (device triggers, conditions or actions) must be pointed to the new device. When the split is switched off, the entities move back to the heat pump with their names, areas and enabled state intact, and the sub-devices are removed.
+
 ### COP (Coefficient of Performance) Sensors
 
 For firmware versions that support energy monitoring (e.g., 4.39), the integration automatically provides COP sensors:

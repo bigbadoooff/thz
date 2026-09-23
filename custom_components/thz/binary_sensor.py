@@ -26,12 +26,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from ._typing_compat import get_runtime_data
 from .const import (
-    DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
     should_hide_entity,
     should_hide_entity_by_default,
 )
+from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
 from .register_maps.register_map_manager import RegisterMapManager
 from .value_codec import decode_raw_value
@@ -177,6 +177,7 @@ async def async_setup_entry(
             )
 
     _LOGGER.info("Created %d binary sensor entities", len(entities))
+    assign_subdevices(entities, config_entry.data)
     async_add_entities(entities, True)
 
 
@@ -320,9 +321,18 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
             "register_decode_type": self._decode_type,
         }
 
+    # Sub-device group, set by devices.assign_subdevices before the entity
+    # is added; None links the entity to the heat pump itself.
+    _subdevice: str | None = None
+    _subdevice_device_name: str | None = None
+    _subdevice_area: str | None = None
+
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information to link this entity to the device."""
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-        }
+        return thz_device_info(
+            self._device_id,
+            self._subdevice,
+            self._subdevice_device_name,
+            self._subdevice_area,
+        )
