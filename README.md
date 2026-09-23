@@ -92,7 +92,7 @@ The heat pump keeps its last ten faults but has no "acknowledged" concept. When 
 |--------|---------|
 | Fault status | `No fault` / `Fault` — `Fault` while there are records you have not acknowledged |
 | Fault memory | Number of stored records; all records (newest first) are in the `entries` attribute |
-| Latest fault | Name of the newest stored fault (`n.a.` if none) with code, date and time as attributes |
+| Latest fault | The newest stored fault, translated (`none` if there is none) with code, date and time as attributes |
 | New faults | Number of records not yet acknowledged; the records are in the `entries` attribute |
 
 Faults already stored when the integration first sees the block are treated as acknowledged, so an existing history does not trigger an alarm. The heat pump stores day and month only, no year.

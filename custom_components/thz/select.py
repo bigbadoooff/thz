@@ -18,7 +18,7 @@ from .entity_translations import get_translation_key
 from .platform_setup import async_setup_write_platform
 from .thz_device import THZDevice
 from .value_codec import THZValueCodec
-from .value_maps import SELECT_MAP
+from .value_maps import SELECT_MAP, state_slug
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ async def async_setup_entry(
 
 def _options_within_bounds(
     options: dict[str, str], low: str | None, high: str | None
-) -> list[str]:
-    """Return the option names whose raw value lies within the map's bounds.
+) -> dict[str, str]:
+    """Return the raw {key: value} table entries whose key lies within bounds.
 
     The value tables are shared across firmwares, but a firmware may allow
     fewer values (e.g. p75passiveCooling is 0..2 on 4.39 and 0..4 on 5.39).
@@ -50,13 +50,13 @@ def _options_within_bounds(
         low_value = int(low) if low not in (None, "") else None
         high_value = int(high) if high not in (None, "") else None
     except ValueError:
-        return list(options.values())
-    return [
-        option
+        return dict(options)
+    return {
+        key: option
         for key, option in options.items()
         if (low_value is None or int(key) >= low_value)
         and (high_value is None or int(key) <= high_value)
-    ]
+    }
 
 
 class THZSelect(THZBaseEntity, SelectEntity):
@@ -104,11 +104,19 @@ class THZSelect(THZBaseEntity, SelectEntity):
         # Select-specific attributes
         self._decode_type = entry.get("decode_type")
 
-        # Set available options based on decode_type
+        # Set available options based on decode_type, bounded by the entry's
+        # min/max (a firmware may allow fewer values than the shared table).
+        # Options are translation keys (slugs); _table_values maps them back
+        # to the SELECT_MAP values the codec works with.
+        self._table_values: dict[str, str] = {}
         if self._decode_type and self._decode_type in SELECT_MAP:
-            self._attr_options = _options_within_bounds(
+            bounded = _options_within_bounds(
                 SELECT_MAP[self._decode_type], entry.get("min"), entry.get("max")
             )
+            self._table_values = {
+                state_slug(value): value for value in bounded.values()
+            }
+            self._attr_options = list(self._table_values)
             _LOGGER.debug(
                 "Options for %s (%s): %s", name, self._decode_type, self._attr_options
             )
@@ -141,6 +149,7 @@ class THZSelect(THZBaseEntity, SelectEntity):
             # Use centralized codec for decoding
             option = THZValueCodec.decode_select(value_bytes, self._decode_type)
             if option:
+                option = state_slug(option)
                 self._attr_current_option = option
                 _LOGGER.debug("Decoded option for %s: %s", self.name, option)
             else:
@@ -155,7 +164,9 @@ class THZSelect(THZBaseEntity, SelectEntity):
 
         try:
             # Use centralized codec for encoding
-            value_bytes = THZValueCodec.encode_select(option, self._decode_type)
+            value_bytes = THZValueCodec.encode_select(
+                self._table_values.get(option, option), self._decode_type
+            )
             _LOGGER.debug("Encoded value bytes: %s", value_bytes.hex())
 
             await self._device.async_execute(

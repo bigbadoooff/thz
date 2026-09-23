@@ -32,6 +32,22 @@ All notable changes to the THZ integration are documented here.
   switched on via Configure. Entity IDs stay the same, but displayed names
   change, and automations that pick a device must be updated.
 
+### Bug Fixes
+
+- **Sensors and selects showed English protocol names instead of translated
+  values** (e.g. *Wochentag* reading `Monday`): the weekday, season mode,
+  heating/DHW operating mode, program state and fault code sensors (plus the
+  new *Latest fault* sensor) are now enum sensors with translated states in
+  English and German, and the *Operating mode* and *Control valve DHW*
+  selects have translated options. The 2.xx *Last errors* list is translated
+  into the configured language when the value is built (restart or reload
+  after changing the language). State and option values change to lowercase
+  keys (`monday`, `setback`, `daymode`, `f05_outletfanfault`, `none` for "no
+  fault"); update automations or templates that compared against the old
+  text or call `select.select_option` with the old option names. A value that
+  is not in the table reads `unknown`, with the raw bytes in the
+  `register_raw` attribute.
+
 ## [0.6.0] – 2026-09-19
 
 ### Added

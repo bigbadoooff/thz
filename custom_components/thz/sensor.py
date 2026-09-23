@@ -28,10 +28,12 @@ from homeassistant.components.sensor import (
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
     should_hide_entity,
@@ -44,6 +46,12 @@ from .fault_sensor import async_setup_fault_sensors
 from .register_maps.register_map_manager import RegisterMapManager
 from .runtime_data import THZConfigEntry
 from .value_codec import decode_raw_value
+from .value_maps import (
+    STATE_TRANSLATED_DECODE_TYPES,
+    state_options,
+    state_slug,
+    to_state,
+)
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
@@ -349,6 +357,19 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         self._nibble = e.get("nibble")
         self._device_id = device_id
         self._implausible_logged = False
+        self._raw_hex: str | None = None
+        # hex2error is a list of fault names, which an enum state cannot be;
+        # the names are translated when the value is built instead.
+        self._fault_texts: dict[str, str] = {}
+
+        # Table-backed text values (weekday, season/operating mode, fault
+        # codes) are enum sensors so their states are translated.
+        self._translated_states = self._decode_type in STATE_TRANSLATED_DECODE_TYPES
+        if self._translated_states:
+            self._device_class = SensorDeviceClass.ENUM
+            self._unit = None
+            self._state_class = None
+            self._attr_options = state_options(self._decode_type)
 
         # Store the name for later use in unique_id and visibility checks
         self._entity_name = e["name"]
@@ -423,12 +444,40 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             elif self._nibble == "low":
                 raw_bytes = bytes([raw_bytes[0] & 0x0F])
             value = decode_value(raw_bytes, self._decode_type, self._factor)
+            if self._translated_states:
+                self._raw_hex = raw_bytes.hex()
+                return to_state(self._decode_type, value)
+            if self._decode_type == "hex2error" and isinstance(value, str):
+                return self._translate_fault_list(value)
             return self._discard_implausible(value, raw_bytes)
         except (ValueError, IndexError, TypeError) as err:
             _LOGGER.error(
                 "Error decoding sensor %s: %s", self._entity_name, err, exc_info=True
             )
             return None
+
+    async def async_added_to_hass(self) -> None:
+        """Load the fault names in the configured language for list sensors."""
+        await super().async_added_to_hass()
+        if self._decode_type != "hex2error":
+            return
+        prefix = f"component.{DOMAIN}.entity.sensor.fault_latest.state."
+        translations = await async_get_translations(
+            self.hass, self.hass.config.language, "entity", [DOMAIN]
+        )
+        self._fault_texts = {
+            key[len(prefix) :]: text
+            for key, text in translations.items()
+            if key.startswith(prefix)
+        }
+
+    def _translate_fault_list(self, value: str) -> str:
+        """Translate a ", "-joined list of fault names (unknown names stay)."""
+        if not self._fault_texts:
+            return value
+        return ", ".join(
+            self._fault_texts.get(state_slug(name), name) for name in value.split(", ")
+        )
 
     def _discard_implausible(
         self, value: int | float | bool | str, raw_bytes: bytes
@@ -520,13 +569,17 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             A dictionary containing register metadata for this sensor,
             visible as attributes in the Home Assistant UI.
         """
-        return {
+        attributes: dict[str, Any] = {
             "register_block": "pxx" + self._block.hex().upper(),
             "register_offset": self._offset,
             "register_length": self._length,
             "register_decode_type": self._decode_type,
             "register_factor": self._factor,
         }
+        if self._translated_states and self._raw_hex is not None:
+            # Lets a value missing from the table ("unknown") be identified.
+            attributes["register_raw"] = self._raw_hex
+        return attributes
 
     # Sub-device group, set by devices.assign_subdevices before the entity
     # is added; None links the entity to the heat pump itself.
