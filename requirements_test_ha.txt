@@ -1,0 +1,5 @@
+# Test dependencies for tests_ha/, which run the integration inside a real
+# Home Assistant instance. Pinned so a Home Assistant release cannot change
+# the test environment unnoticed; bump deliberately. Requires Python 3.13.
+pytest-homeassistant-custom-component==0.13.316
+pyserial>=3.5

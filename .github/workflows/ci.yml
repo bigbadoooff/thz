@@ -39,7 +39,7 @@ jobs:
       - name: Install lint dependencies
         run: pip install -r requirements_test.txt
       - name: Run ruff
-        run: ruff check custom_components/thz tests
+        run: ruff check custom_components/thz tests tests_ha
 
   typecheck:
     name: Type check (mypy)
@@ -79,3 +79,19 @@ jobs:
           python3 -m pytest tests/ -v
           --cov=custom_components/thz --cov-report=term-missing
           --cov-fail-under=85
+
+  test-home-assistant:
+    name: Test suite (real Home Assistant)
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - name: Set up Python
+        uses: "actions/setup-python@v5"
+        with:
+          # pytest-homeassistant-custom-component follows Home Assistant's
+          # own minimum Python version.
+          python-version: "3.13"
+      - name: Install test dependencies
+        run: pip install -r requirements_test_ha.txt
+      - name: Run tests against Home Assistant
+        run: python3 -m pytest tests_ha -v -o asyncio_mode=auto

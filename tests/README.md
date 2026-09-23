@@ -27,6 +27,20 @@ pip install --no-deps homeassistant-stubs
 mypy
 ```
 
+### Tests against a real Home Assistant
+
+`tests_ha/` sets the integration up inside a real Home Assistant instance
+(config entries, entity registry, translations, services, diagnostics) with
+only the serial/TCP line simulated. It needs Python 3.13 and its own
+dependencies, and must be run separately from `tests/`, whose `conftest.py`
+replaces Home Assistant with stubs:
+
+```bash
+python3.13 -m venv .venv-ha && . .venv-ha/bin/activate
+pip install -r requirements_test_ha.txt
+python -m pytest tests_ha -o asyncio_mode=auto
+```
+
 ## How the tests are built
 
 - `conftest.py` replaces the Home Assistant modules with lightweight stubs, so
@@ -50,6 +64,10 @@ mypy
   framing, checksum, escaping, 2.x read-modify-write and the encoding of each
   value type. Our code and FHEM must produce identical SET telegrams (and, for
   2.x blocks, identical decoded values). Skipped when `perl` is not installed.
+- `test_properties.py` uses hypothesis for invariants that must hold for every
+  input: codec round-trips, escaping, frame reading across arbitrary chunk
+  boundaries, time quantisation and 2.x block writes touching only their own
+  bytes.
 - `test_async_execute.py` runs `THZDevice.async_execute` against a real thread
   pool to cover timeouts, cancellation and lock hand-over.
 - Codec changes should keep the round-trip tests in
