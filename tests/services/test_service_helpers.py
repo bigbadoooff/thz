@@ -1,18 +1,20 @@
-"""Tests for the pure/near-pure helper functions in services.py."""
+"""Tests for the pure/near-pure helper functions in the services package."""
 
 from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
-from custom_components.thz.services import (
+from custom_components.thz.services.common import (
+    _normalize_block_name,
+    _require_target_entry_data,
+    async_refresh_block,
+)
+from custom_components.thz.services.raw import (
     _expand_scan_pattern,
     _expand_scan_range,
     _format_hex_dump,
     _guess_decode_candidates,
-    _normalize_block_name,
-    _require_target_entry_data,
-    async_refresh_block,
 )
 
 
@@ -37,7 +39,7 @@ class TestRequireTargetEntryData:
 
     def test_raises_home_assistant_error_when_no_entries(self):
         hass = _make_hass_with_entries({})
-        with pytest.raises(HomeAssistantError, match="not initialized"):
+        with pytest.raises(HomeAssistantError, match="No THZ device is loaded"):
             _require_target_entry_data(hass, None)
 
     def test_single_entry_no_entry_id_returns_it(self):
@@ -77,7 +79,7 @@ class TestRequireTargetEntryData:
 
     def test_ignores_entries_without_device_key(self):
         hass = _make_hass_with_entries({"entry1": {"not_a_device_entry": True}})
-        with pytest.raises(HomeAssistantError, match="not initialized"):
+        with pytest.raises(HomeAssistantError, match="No THZ device is loaded"):
             _require_target_entry_data(hass, None)
 
 

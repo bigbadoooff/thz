@@ -205,7 +205,7 @@ def _hass_with(entry_data):
 
 
 async def _handler(hass, name):
-    await async_setup_services(hass)
+    async_setup_services(hass)
     for call in hass.services.async_register.call_args_list:
         if call[0][1] == name:
             return call[0][2]
@@ -306,7 +306,7 @@ class TestClearService:
         hass = _hass_with({"device": _device(firmware=firmware)})
         handler = await _handler(hass, "clear_fault_memory")
         with patch(
-            "custom_components.thz.services.clear_fault_memory",
+            "custom_components.thz.services.faults.clear_fault_memory",
             AsyncMock(
                 return_value={"cleared": True, "before_count": 1, "after_count": 0}
             ),
@@ -322,7 +322,7 @@ class TestClearService:
         hass = _hass_with({"device": _device(), "fault_source": source})
         handler = await _handler(hass, "clear_fault_memory")
         with patch(
-            "custom_components.thz.services.clear_fault_memory",
+            "custom_components.thz.services.faults.clear_fault_memory",
             AsyncMock(
                 return_value={"cleared": True, "before_count": 2, "after_count": 0}
             ),
@@ -343,7 +343,7 @@ class TestClearService:
         handler = await _handler(hass, "clear_fault_memory")
         with (
             patch(
-                "custom_components.thz.services.clear_fault_memory",
+                "custom_components.thz.services.faults.clear_fault_memory",
                 AsyncMock(side_effect=RuntimeError("D1 still reports 1 fault(s)")),
             ),
             pytest.raises(HomeAssistantError, match="still reports"),

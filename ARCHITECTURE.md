@@ -109,7 +109,7 @@ contents.
 | Module | Role |
 |---|---|
 | `config_flow.py` | Setup (IP or USB, block and write-group selection) and reconfigure |
-| `services.py` | `thz.*` services: raw register access, block refresh, diverter valve, backup/restore, fault memory |
+| `services/` | `thz.*` services, registered once in `async_setup`: `raw` (register access, block refresh), `diverter`, `backup` (backup/restore), `faults` |
 | `fault_memory.py`, `fault_state.py`, `fault_sensor.py` | D1 fault memory: decoding, acknowledgement, sensors |
 | `clock_sync.py` | Periodic clock-drift check and optional correction |
 | `cop_sensor.py` | COP computed from energy and power registers |

@@ -1,8 +1,6 @@
 rules:
   # Bronze
-  action-setup:
-    status: todo
-    comment: Services are registered in async_setup_entry, not async_setup.
+  action-setup: done
   appropriate-polling: done
   brands: done
   common-modules: done

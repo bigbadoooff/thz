@@ -11,7 +11,7 @@ Two independent callers rely on this module:
   ``async_setup_entry`` to run a periodic (every 15 minutes) drift check —
   always logging/notifying on drift, and only writing a correction back to
   the device when the entry's ``auto_sync_clock`` option is enabled.
-- ``services.py``'s ``backup_parameters``/``restore_parameters`` handlers
+- ``services/backup.py``'s ``backup_parameters``/``restore_parameters`` handlers
   use :func:`async_read_device_clock`/:func:`async_write_device_clock`
   directly: backup always corrects a grossly wrong clock (see
   ``CLOCK_DRIFT_BACKUP_SECONDS``), and restore always syncs the clock to

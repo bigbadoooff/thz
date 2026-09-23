@@ -11,7 +11,12 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    config_validation as cv,
+    device_registry as dr,
+    entity_registry as er,
+)
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from ._typing_compat import get_runtime_data, set_runtime_data
@@ -52,6 +57,15 @@ PLATFORMS = [
     "button",
     "climate",
 ]
+
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register the THZ services once, independent of config entries."""
+    async_setup_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:  # noqa: C901
@@ -278,9 +292,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # entities) whenever the configured tier differs from the tier last
     # applied, e.g. after the user changes this option via Reconfigure.
     await _async_apply_entity_visibility_tier(hass, config_entry)
-
-    # Register services
-    await async_setup_services(hass)
 
     return True
 
@@ -546,26 +557,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             device = entry_data.get("device")
             if device:
                 await hass.async_add_executor_job(device.close)
-
-        # Remove services if this is the last config entry
-        remaining_entries = [
-            e
-            for e in hass.config_entries.async_entries(DOMAIN)
-            if e.entry_id != entry.entry_id
-        ]
-        if not remaining_entries:
-            _LOGGER.debug("Removing THZ services (last config entry)")
-            hass.services.async_remove(DOMAIN, "read_raw_register")
-            hass.services.async_remove(DOMAIN, "scan_raw_registers")
-            hass.services.async_remove(DOMAIN, "watch_raw_registers_changes")
-            hass.services.async_remove(DOMAIN, "refresh_block")
-            hass.services.async_remove(DOMAIN, "set_diverter_valve")
-            hass.services.async_remove(DOMAIN, "backup_parameters")
-            hass.services.async_remove(DOMAIN, "restore_parameters")
-            hass.services.async_remove(DOMAIN, "list_parameter_backups")
-            hass.services.async_remove(DOMAIN, "probe_fault_memory")
-            hass.services.async_remove(DOMAIN, "acknowledge_faults")
-            hass.services.async_remove(DOMAIN, "clear_fault_memory")
 
     return unload_ok
 

@@ -6,6 +6,13 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Services are registered when Home Assistant starts** instead of with
+  the first config entry, and they stay registered after the last entry is
+  removed. A call without a loaded THZ entry now fails with a validation
+  error ("No THZ device is loaded").
+
 ### Added
 
 - **Optional sub-devices** (#186): a new setting, *Split into sub-devices*,
