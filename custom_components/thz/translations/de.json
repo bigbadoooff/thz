@@ -188,6 +188,7 @@
           "refresh_pxxF2": "Abfrageintervall: Wärmeanforderung & Betriebsmodus (s)",
           "refresh_pxxF3": "Abfrageintervall: Warmwasser-Status (s)",
           "refresh_pxxF4": "Abfrageintervall: Heizkreis-Status (s)",
+          "refresh_pxxF5": "Abfrageintervall: Heizkreis2-Status (s)",
           "refresh_pxxFC": "Abfrageintervall: Datum & Uhrzeit (s)",
           "refresh_pxxFD": "Abfrageintervall: Firmware-Datum (s)",
           "refresh_pxxFE": "Abfrageintervall: Hardware-/Softwareversion (s)",
@@ -395,96 +396,6 @@
       "condenser_temp": {
         "name": "Verflüssigertemperatur"
       },
-      "mixer_open": {
-        "name": "Mischer offen"
-      },
-      "mixer_closed": {
-        "name": "Mischer geschlossen"
-      },
-      "heat_pipe_valve": {
-        "name": "Heizrohrventil"
-      },
-      "diverter_valve": {
-        "name": "Umschaltventil"
-      },
-      "dhw_pump": {
-        "name": "Zirkulation Warmwasser"
-      },
-      "heating_circuit_pump": {
-        "name": "Zirkulation Heizung"
-      },
-      "solar_pump": {
-        "name": "Solarpumpe"
-      },
-      "compressor": {
-        "name": "Kompressor"
-      },
-      "booster_stage_3": {
-        "name": "Zusatzheizung Stufe 3"
-      },
-      "booster_stage_2": {
-        "name": "Zusatzheizung Stufe 2"
-      },
-      "booster_stage_1": {
-        "name": "Zusatzheizung Stufe 1"
-      },
-      "switching_prog": {
-        "name": "Schaltprogramm"
-      },
-      "heating_hc": {
-        "name": "Heizung HK"
-      },
-      "heating_dhw": {
-        "name": "Heizung WW"
-      },
-      "booster_hc": {
-        "name": "Zusatzheizung HK"
-      },
-      "filter_both": {
-        "name": "Filter beide"
-      },
-      "vent_stage": {
-        "name": "Lüftungsstufe"
-      },
-      "pump_hc": {
-        "name": "Zirkulationspumpe"
-      },
-      "defrost": {
-        "name": "Abtauung"
-      },
-      "filter_up": {
-        "name": "Filter oben"
-      },
-      "filter_down": {
-        "name": "Filter unten"
-      },
-      "cooling": {
-        "name": "Kühlung"
-      },
-      "service": {
-        "name": "Service"
-      },
-      "high_pressure_sensor": {
-        "name": "Hochdrucksensor"
-      },
-      "low_pressure_sensor": {
-        "name": "Niederdrucksensor"
-      },
-      "evaporator_ice_monitor": {
-        "name": "Verdampfer Eisüberwachung"
-      },
-      "signal_anode": {
-        "name": "Signalanodenmeldung"
-      },
-      "evu_release": {
-        "name": "EVU-Freigabe"
-      },
-      "oven_fireplace": {
-        "name": "Ofen/Kamin"
-      },
-      "stb": {
-        "name": "Sicherheits-Temperaturbegrenzer"
-      },
       "output_ventilator_power": {
         "name": "Abluftventilator Leistung"
       },
@@ -530,14 +441,44 @@
       "collector_temp": {
         "name": "Kollektortemperatur"
       },
+      "solar_collector_temp": {
+        "name": "Solar Kollektortemperatur"
+      },
+      "solar_dhw_temp": {
+        "name": "Solar Warmwassertemperatur"
+      },
+      "solar_flow_temp": {
+        "name": "Solar Vorlauftemperatur"
+      },
+      "solar_pump_hours": {
+        "name": "Solarpumpe Betriebsstunden"
+      },
+      "solar_out": {
+        "name": "Solarertrag"
+      },
+      "solar_status": {
+        "name": "Solarstatus"
+      },
+      "input_fan_speed": {
+        "name": "Zuluftlüfter Drehzahl"
+      },
+      "output_fan_speed": {
+        "name": "Abluftlüfter Drehzahl"
+      },
+      "fan_stage_airflow_inlet": {
+        "name": "Lüfterstufe Zuluft"
+      },
+      "fan_stage_airflow_outlet": {
+        "name": "Lüfterstufe Abluft"
+      },
+      "input_fan_power": {
+        "name": "Zuluftlüfter Leistung"
+      },
+      "output_fan_power": {
+        "name": "Abluftlüfter Leistung"
+      },
       "inside_temp": {
         "name": "Innentemperatur"
-      },
-      "window_open": {
-        "name": "Fenster offen"
-      },
-      "quick_air_vent": {
-        "name": "Schnelllüftung"
       },
       "flow_rate": {
         "name": "Durchflussmenge"
@@ -1250,29 +1191,8 @@
       "prog_dhw_end_time": {
         "name": "Programm WW Endzeit"
       },
-      "prog_dhw_friday": {
-        "name": "Programm WW Freitag"
-      },
-      "prog_dhw_monday": {
-        "name": "Programm WW Montag"
-      },
-      "prog_dhw_saturday": {
-        "name": "Programm WW Samstag"
-      },
       "prog_dhw_start_time": {
         "name": "Programm WW Startzeit"
-      },
-      "prog_dhw_sunday": {
-        "name": "Programm WW Sonntag"
-      },
-      "prog_dhw_thursday": {
-        "name": "Programm WW Donnerstag"
-      },
-      "prog_dhw_tuesday": {
-        "name": "Programm WW Dienstag"
-      },
-      "prog_dhw_wednesday": {
-        "name": "Programm WW Mittwoch"
       },
       "prog_fan1_enable": {
         "name": "Programm Lüfter 1 aktiv"
@@ -1280,29 +1200,8 @@
       "prog_fan1_end_time": {
         "name": "Programm Lüfter 1 Endzeit"
       },
-      "prog_fan1_friday": {
-        "name": "Programm Lüfter 1 Freitag"
-      },
-      "prog_fan1_monday": {
-        "name": "Programm Lüfter 1 Montag"
-      },
-      "prog_fan1_saturday": {
-        "name": "Programm Lüfter 1 Samstag"
-      },
       "prog_fan1_start_time": {
         "name": "Programm Lüfter 1 Startzeit"
-      },
-      "prog_fan1_sunday": {
-        "name": "Programm Lüfter 1 Sonntag"
-      },
-      "prog_fan1_thursday": {
-        "name": "Programm Lüfter 1 Donnerstag"
-      },
-      "prog_fan1_tuesday": {
-        "name": "Programm Lüfter 1 Dienstag"
-      },
-      "prog_fan1_wednesday": {
-        "name": "Programm Lüfter 1 Mittwoch"
       },
       "prog_fan2_enable": {
         "name": "Programm Lüfter 2 aktiv"
@@ -1310,29 +1209,8 @@
       "prog_fan2_end_time": {
         "name": "Programm Lüfter 2 Endzeit"
       },
-      "prog_fan2_friday": {
-        "name": "Programm Lüfter 2 Freitag"
-      },
-      "prog_fan2_monday": {
-        "name": "Programm Lüfter 2 Montag"
-      },
-      "prog_fan2_saturday": {
-        "name": "Programm Lüfter 2 Samstag"
-      },
       "prog_fan2_start_time": {
         "name": "Programm Lüfter 2 Startzeit"
-      },
-      "prog_fan2_sunday": {
-        "name": "Programm Lüfter 2 Sonntag"
-      },
-      "prog_fan2_thursday": {
-        "name": "Programm Lüfter 2 Donnerstag"
-      },
-      "prog_fan2_tuesday": {
-        "name": "Programm Lüfter 2 Dienstag"
-      },
-      "prog_fan2_wednesday": {
-        "name": "Programm Lüfter 2 Mittwoch"
       },
       "prog_hc1_enable": {
         "name": "Programm HC1 aktiv"
@@ -1340,29 +1218,8 @@
       "prog_hc1_end_time": {
         "name": "Programm HC1 Endzeit"
       },
-      "prog_hc1_friday": {
-        "name": "Programm HC1 Freitag"
-      },
-      "prog_hc1_monday": {
-        "name": "Programm HC1 Montag"
-      },
-      "prog_hc1_saturday": {
-        "name": "Programm HC1 Samstag"
-      },
       "prog_hc1_start_time": {
         "name": "Programm HC1 Startzeit"
-      },
-      "prog_hc1_sunday": {
-        "name": "Programm HC1 Sonntag"
-      },
-      "prog_hc1_thursday": {
-        "name": "Programm HC1 Donnerstag"
-      },
-      "prog_hc1_tuesday": {
-        "name": "Programm HC1 Dienstag"
-      },
-      "prog_hc1_wednesday": {
-        "name": "Programm HC1 Mittwoch"
       },
       "prog_hc2_enable": {
         "name": "Programm HC2 aktiv"
@@ -1370,29 +1227,8 @@
       "prog_hc2_end_time": {
         "name": "Programm HC2 Endzeit"
       },
-      "prog_hc2_friday": {
-        "name": "Programm HC2 Freitag"
-      },
-      "prog_hc2_monday": {
-        "name": "Programm HC2 Montag"
-      },
-      "prog_hc2_saturday": {
-        "name": "Programm HC2 Samstag"
-      },
       "prog_hc2_start_time": {
         "name": "Programm HC2 Startzeit"
-      },
-      "prog_hc2_sunday": {
-        "name": "Programm HC2 Sonntag"
-      },
-      "prog_hc2_thursday": {
-        "name": "Programm HC2 Donnerstag"
-      },
-      "prog_hc2_tuesday": {
-        "name": "Programm HC2 Dienstag"
-      },
-      "prog_hc2_wednesday": {
-        "name": "Programm HC2 Mittwoch"
       },
       "prog_state_dhw": {
         "name": "Programmstatus WW",
@@ -1566,12 +1402,6 @@
       "x76": {
         "name": "Register X76"
       },
-      "power_nd": {
-        "name": "Leistung Nd"
-      },
-      "power_hd": {
-        "name": "Leistung Hd"
-      },
       "fault_status": {
         "name": "Störungsstatus",
         "state": {
@@ -1625,9 +1455,6 @@
       }
     },
     "number": {
-      "op_mode": {
-        "name": "Betriebsart"
-      },
       "room_temp_day": {
         "name": "Raumtemperatur Tag"
       },
@@ -1730,15 +1557,6 @@
       "summer_mode_hysteresis": {
         "name": "Sommermodus Hysterese"
       },
-      "hysteresis_6": {
-        "name": "Hysterese 6"
-      },
-      "hysteresis_7": {
-        "name": "Hysterese 7"
-      },
-      "hysteresis_8": {
-        "name": "Hysterese 8"
-      },
       "hysteresis_asymmetry": {
         "name": "Hysterese Asymmetrie"
       },
@@ -1826,17 +1644,8 @@
       "enable_solar": {
         "name": "Solar aktivieren"
       },
-      "diff_temp_solar_loading": {
-        "name": "Temperaturdifferenz Solarbeladung"
-      },
-      "delay_comp_start_solar": {
-        "name": "Verdichterstart-Verzögerung Solar"
-      },
       "dhw_temp_solar_mode": {
         "name": "Warmwassertemperatur Solarmodus"
-      },
-      "enable_dhw_buffer": {
-        "name": "Warmwasserspeicher aktivieren"
       },
       "solar_hysteresis": {
         "name": "Solar-Hysterese"
@@ -1880,12 +1689,6 @@
       "prog_dhw_enable": {
         "name": "Warmwasser Programm Aktivieren"
       },
-      "prog_dhw_start_time": {
-        "name": "Warmwasser Programm Startzeit"
-      },
-      "prog_dhw_end_time": {
-        "name": "Warmwasser Programm Endzeit"
-      },
       "prog_dhw_monday": {
         "name": "Warmwasser Programm Montag"
       },
@@ -1909,12 +1712,6 @@
       },
       "prog_fan1_enable": {
         "name": "Lüfter 1 Programm Aktivieren"
-      },
-      "prog_fan1_start_time": {
-        "name": "Lüfter 1 Programm Startzeit"
-      },
-      "prog_fan1_end_time": {
-        "name": "Lüfter 1 Programm Endzeit"
       },
       "prog_fan1_monday": {
         "name": "Lüfter 1 Programm Montag"
@@ -1940,12 +1737,6 @@
       "prog_fan2_enable": {
         "name": "Lüfter 2 Programm Aktivieren"
       },
-      "prog_fan2_start_time": {
-        "name": "Lüfter 2 Programm Startzeit"
-      },
-      "prog_fan2_end_time": {
-        "name": "Lüfter 2 Programm Endzeit"
-      },
       "prog_fan2_monday": {
         "name": "Lüfter 2 Programm Montag"
       },
@@ -1970,12 +1761,6 @@
       "prog_hc1_enable": {
         "name": "HC1 Programm Aktivieren"
       },
-      "prog_hc1_start_time": {
-        "name": "HC1 Programm Startzeit"
-      },
-      "prog_hc1_end_time": {
-        "name": "HC1 Programm Endzeit"
-      },
       "prog_hc1_monday": {
         "name": "HC1 Programm Montag"
       },
@@ -1999,12 +1784,6 @@
       },
       "prog_hc2_enable": {
         "name": "HC2 Programm Aktivieren"
-      },
-      "prog_hc2_start_time": {
-        "name": "HC2 Programm Startzeit"
-      },
-      "prog_hc2_end_time": {
-        "name": "HC2 Programm Endzeit"
       },
       "prog_hc2_monday": {
         "name": "HC2 Programm Montag"
@@ -2111,9 +1890,6 @@
       "pasteurisation_temp": {
         "name": "Pasteurisierungstemperatur"
       },
-      "party_time": {
-        "name": "Party-Zeit"
-      },
       "z_pump_hc": {
         "name": "Pumpe Heizkreis"
       },
@@ -2157,18 +1933,6 @@
           "off": "Aus",
           "on": "Ein"
         }
-      },
-      "z_pump_dhw": {
-        "name": "Pumpe Warmwasser"
-      },
-      "z_pump_hc": {
-        "name": "Pumpe Heizkreis"
-      },
-      "z_reset_last10errors": {
-        "name": "Letzte 10 Fehler zurücksetzen"
-      },
-      "reset_errors": {
-        "name": "Fehler zurücksetzen"
       }
     },
     "switch": {
@@ -2192,17 +1956,11 @@
       "party_time_end": {
         "name": "Party-Ende"
       },
-      "programhc1_mo_0": {
-        "name": "HK1 Programm Montag 1"
-      },
       "programhc1_mo_0_start": {
         "name": "HK1 Programm Montag 1 Start"
       },
       "programhc1_mo_0_end": {
         "name": "HK1 Programm Montag 1 Ende"
-      },
-      "programhc1_mo_1": {
-        "name": "HK1 Programm Montag 2"
       },
       "programhc1_mo_1_start": {
         "name": "HK1 Programm Montag 2 Start"
@@ -2210,17 +1968,11 @@
       "programhc1_mo_1_end": {
         "name": "HK1 Programm Montag 2 Ende"
       },
-      "programhc1_mo_2": {
-        "name": "HK1 Programm Montag 3"
-      },
       "programhc1_mo_2_start": {
         "name": "HK1 Programm Montag 3 Start"
       },
       "programhc1_mo_2_end": {
         "name": "HK1 Programm Montag 3 Ende"
-      },
-      "programhc1_tu_0": {
-        "name": "HK1 Programm Dienstag 1"
       },
       "programhc1_tu_0_start": {
         "name": "HK1 Programm Dienstag 1 Start"
@@ -2228,17 +1980,11 @@
       "programhc1_tu_0_end": {
         "name": "HK1 Programm Dienstag 1 Ende"
       },
-      "programhc1_tu_1": {
-        "name": "HK1 Programm Dienstag 2"
-      },
       "programhc1_tu_1_start": {
         "name": "HK1 Programm Dienstag 2 Start"
       },
       "programhc1_tu_1_end": {
         "name": "HK1 Programm Dienstag 2 Ende"
-      },
-      "programhc1_tu_2": {
-        "name": "HK1 Programm Dienstag 3"
       },
       "programhc1_tu_2_start": {
         "name": "HK1 Programm Dienstag 3 Start"
@@ -2246,17 +1992,11 @@
       "programhc1_tu_2_end": {
         "name": "HK1 Programm Dienstag 3 Ende"
       },
-      "programhc1_we_0": {
-        "name": "HK1 Programm Mittwoch 1"
-      },
       "programhc1_we_0_start": {
         "name": "HK1 Programm Mittwoch 1 Start"
       },
       "programhc1_we_0_end": {
         "name": "HK1 Programm Mittwoch 1 Ende"
-      },
-      "programhc1_we_1": {
-        "name": "HK1 Programm Mittwoch 2"
       },
       "programhc1_we_1_start": {
         "name": "HK1 Programm Mittwoch 2 Start"
@@ -2264,17 +2004,11 @@
       "programhc1_we_1_end": {
         "name": "HK1 Programm Mittwoch 2 Ende"
       },
-      "programhc1_we_2": {
-        "name": "HK1 Programm Mittwoch 3"
-      },
       "programhc1_we_2_start": {
         "name": "HK1 Programm Mittwoch 3 Start"
       },
       "programhc1_we_2_end": {
         "name": "HK1 Programm Mittwoch 3 Ende"
-      },
-      "programhc1_th_0": {
-        "name": "HK1 Programm Donnerstag 1"
       },
       "programhc1_th_0_start": {
         "name": "HK1 Programm Donnerstag 1 Start"
@@ -2282,17 +2016,11 @@
       "programhc1_th_0_end": {
         "name": "HK1 Programm Donnerstag 1 Ende"
       },
-      "programhc1_th_1": {
-        "name": "HK1 Programm Donnerstag 2"
-      },
       "programhc1_th_1_start": {
         "name": "HK1 Programm Donnerstag 2 Start"
       },
       "programhc1_th_1_end": {
         "name": "HK1 Programm Donnerstag 2 Ende"
-      },
-      "programhc1_th_2": {
-        "name": "HK1 Programm Donnerstag 3"
       },
       "programhc1_th_2_start": {
         "name": "HK1 Programm Donnerstag 3 Start"
@@ -2300,17 +2028,11 @@
       "programhc1_th_2_end": {
         "name": "HK1 Programm Donnerstag 3 Ende"
       },
-      "programhc1_fr_0": {
-        "name": "HK1 Programm Freitag 1"
-      },
       "programhc1_fr_0_start": {
         "name": "HK1 Programm Freitag 1 Start"
       },
       "programhc1_fr_0_end": {
         "name": "HK1 Programm Freitag 1 Ende"
-      },
-      "programhc1_fr_1": {
-        "name": "HK1 Programm Freitag 2"
       },
       "programhc1_fr_1_start": {
         "name": "HK1 Programm Freitag 2 Start"
@@ -2318,17 +2040,11 @@
       "programhc1_fr_1_end": {
         "name": "HK1 Programm Freitag 2 Ende"
       },
-      "programhc1_fr_2": {
-        "name": "HK1 Programm Freitag 3"
-      },
       "programhc1_fr_2_start": {
         "name": "HK1 Programm Freitag 3 Start"
       },
       "programhc1_fr_2_end": {
         "name": "HK1 Programm Freitag 3 Ende"
-      },
-      "programhc1_sa_0": {
-        "name": "HK1 Programm Samstag 1"
       },
       "programhc1_sa_0_start": {
         "name": "HK1 Programm Samstag 1 Start"
@@ -2336,17 +2052,11 @@
       "programhc1_sa_0_end": {
         "name": "HK1 Programm Samstag 1 Ende"
       },
-      "programhc1_sa_1": {
-        "name": "HK1 Programm Samstag 2"
-      },
       "programhc1_sa_1_start": {
         "name": "HK1 Programm Samstag 2 Start"
       },
       "programhc1_sa_1_end": {
         "name": "HK1 Programm Samstag 2 Ende"
-      },
-      "programhc1_sa_2": {
-        "name": "HK1 Programm Samstag 3"
       },
       "programhc1_sa_2_start": {
         "name": "HK1 Programm Samstag 3 Start"
@@ -2354,17 +2064,11 @@
       "programhc1_sa_2_end": {
         "name": "HK1 Programm Samstag 3 Ende"
       },
-      "programhc1_so_0": {
-        "name": "HK1 Programm Sonntag 1"
-      },
       "programhc1_so_0_start": {
         "name": "HK1 Programm Sonntag 1 Start"
       },
       "programhc1_so_0_end": {
         "name": "HK1 Programm Sonntag 1 Ende"
-      },
-      "programhc1_so_1": {
-        "name": "HK1 Programm Sonntag 2"
       },
       "programhc1_so_1_start": {
         "name": "HK1 Programm Sonntag 2 Start"
@@ -2372,17 +2076,11 @@
       "programhc1_so_1_end": {
         "name": "HK1 Programm Sonntag 2 Ende"
       },
-      "programhc1_so_2": {
-        "name": "HK1 Programm Sonntag 3"
-      },
       "programhc1_so_2_start": {
         "name": "HK1 Programm Sonntag 3 Start"
       },
       "programhc1_so_2_end": {
         "name": "HK1 Programm Sonntag 3 Ende"
-      },
-      "programhc1_mo_fr_0": {
-        "name": "HK1 Programm Mo-Fr 1"
       },
       "programhc1_mo_fr_0_start": {
         "name": "HK1 Programm Mo-Fr 1 Start"
@@ -2390,17 +2088,11 @@
       "programhc1_mo_fr_0_end": {
         "name": "HK1 Programm Mo-Fr 1 Ende"
       },
-      "programhc1_mo_fr_1": {
-        "name": "HK1 Programm Mo-Fr 2"
-      },
       "programhc1_mo_fr_1_start": {
         "name": "HK1 Programm Mo-Fr 2 Start"
       },
       "programhc1_mo_fr_1_end": {
         "name": "HK1 Programm Mo-Fr 2 Ende"
-      },
-      "programhc1_mo_fr_2": {
-        "name": "HK1 Programm Mo-Fr 3"
       },
       "programhc1_mo_fr_2_start": {
         "name": "HK1 Programm Mo-Fr 3 Start"
@@ -2408,17 +2100,11 @@
       "programhc1_mo_fr_2_end": {
         "name": "HK1 Programm Mo-Fr 3 Ende"
       },
-      "programhc1_sa_so_0": {
-        "name": "HK1 Programm Sa-So 1"
-      },
       "programhc1_sa_so_0_start": {
         "name": "HK1 Programm Sa-So 1 Start"
       },
       "programhc1_sa_so_0_end": {
         "name": "HK1 Programm Sa-So 1 Ende"
-      },
-      "programhc1_sa_so_1": {
-        "name": "HK1 Programm Sa-So 2"
       },
       "programhc1_sa_so_1_start": {
         "name": "HK1 Programm Sa-So 2 Start"
@@ -2426,17 +2112,11 @@
       "programhc1_sa_so_1_end": {
         "name": "HK1 Programm Sa-So 2 Ende"
       },
-      "programhc1_sa_so_2": {
-        "name": "HK1 Programm Sa-So 3"
-      },
       "programhc1_sa_so_2_start": {
         "name": "HK1 Programm Sa-So 3 Start"
       },
       "programhc1_sa_so_2_end": {
         "name": "HK1 Programm Sa-So 3 Ende"
-      },
-      "programhc1_mo_so_0": {
-        "name": "HK1 Programm Mo-So 1"
       },
       "programhc1_mo_so_0_start": {
         "name": "HK1 Programm Mo-So 1 Start"
@@ -2444,17 +2124,11 @@
       "programhc1_mo_so_0_end": {
         "name": "HK1 Programm Mo-So 1 Ende"
       },
-      "programhc1_mo_so_1": {
-        "name": "HK1 Programm Mo-So 2"
-      },
       "programhc1_mo_so_1_start": {
         "name": "HK1 Programm Mo-So 2 Start"
       },
       "programhc1_mo_so_1_end": {
         "name": "HK1 Programm Mo-So 2 Ende"
-      },
-      "programhc1_mo_so_2": {
-        "name": "HK1 Programm Mo-So 3"
       },
       "programhc1_mo_so_2_start": {
         "name": "HK1 Programm Mo-So 3 Start"
@@ -2462,17 +2136,11 @@
       "programhc1_mo_so_2_end": {
         "name": "HK1 Programm Mo-So 3 Ende"
       },
-      "programhc2_mo_0": {
-        "name": "HK2 Programm Montag 1"
-      },
       "programhc2_mo_0_start": {
         "name": "HK2 Programm Montag 1 Start"
       },
       "programhc2_mo_0_end": {
         "name": "HK2 Programm Montag 1 Ende"
-      },
-      "programhc2_mo_1": {
-        "name": "HK2 Programm Montag 2"
       },
       "programhc2_mo_1_start": {
         "name": "HK2 Programm Montag 2 Start"
@@ -2480,17 +2148,11 @@
       "programhc2_mo_1_end": {
         "name": "HK2 Programm Montag 2 Ende"
       },
-      "programhc2_mo_2": {
-        "name": "HK2 Programm Montag 3"
-      },
       "programhc2_mo_2_start": {
         "name": "HK2 Programm Montag 3 Start"
       },
       "programhc2_mo_2_end": {
         "name": "HK2 Programm Montag 3 Ende"
-      },
-      "programhc2_tu_0": {
-        "name": "HK2 Programm Dienstag 1"
       },
       "programhc2_tu_0_start": {
         "name": "HK2 Programm Dienstag 1 Start"
@@ -2498,17 +2160,11 @@
       "programhc2_tu_0_end": {
         "name": "HK2 Programm Dienstag 1 Ende"
       },
-      "programhc2_tu_1": {
-        "name": "HK2 Programm Dienstag 2"
-      },
       "programhc2_tu_1_start": {
         "name": "HK2 Programm Dienstag 2 Start"
       },
       "programhc2_tu_1_end": {
         "name": "HK2 Programm Dienstag 2 Ende"
-      },
-      "programhc2_tu_2": {
-        "name": "HK2 Programm Dienstag 3"
       },
       "programhc2_tu_2_start": {
         "name": "HK2 Programm Dienstag 3 Start"
@@ -2516,17 +2172,11 @@
       "programhc2_tu_2_end": {
         "name": "HK2 Programm Dienstag 3 Ende"
       },
-      "programhc2_we_0": {
-        "name": "HK2 Programm Mittwoch 1"
-      },
       "programhc2_we_0_start": {
         "name": "HK2 Programm Mittwoch 1 Start"
       },
       "programhc2_we_0_end": {
         "name": "HK2 Programm Mittwoch 1 Ende"
-      },
-      "programhc2_we_1": {
-        "name": "HK2 Programm Mittwoch 2"
       },
       "programhc2_we_1_start": {
         "name": "HK2 Programm Mittwoch 2 Start"
@@ -2534,17 +2184,11 @@
       "programhc2_we_1_end": {
         "name": "HK2 Programm Mittwoch 2 Ende"
       },
-      "programhc2_we_2": {
-        "name": "HK2 Programm Mittwoch 3"
-      },
       "programhc2_we_2_start": {
         "name": "HK2 Programm Mittwoch 3 Start"
       },
       "programhc2_we_2_end": {
         "name": "HK2 Programm Mittwoch 3 Ende"
-      },
-      "programhc2_th_0": {
-        "name": "HK2 Programm Donnerstag 1"
       },
       "programhc2_th_0_start": {
         "name": "HK2 Programm Donnerstag 1 Start"
@@ -2552,17 +2196,11 @@
       "programhc2_th_0_end": {
         "name": "HK2 Programm Donnerstag 1 Ende"
       },
-      "programhc2_th_1": {
-        "name": "HK2 Programm Donnerstag 2"
-      },
       "programhc2_th_1_start": {
         "name": "HK2 Programm Donnerstag 2 Start"
       },
       "programhc2_th_1_end": {
         "name": "HK2 Programm Donnerstag 2 Ende"
-      },
-      "programhc2_th_2": {
-        "name": "HK2 Programm Donnerstag 3"
       },
       "programhc2_th_2_start": {
         "name": "HK2 Programm Donnerstag 3 Start"
@@ -2570,17 +2208,11 @@
       "programhc2_th_2_end": {
         "name": "HK2 Programm Donnerstag 3 Ende"
       },
-      "programhc2_fr_0": {
-        "name": "HK2 Programm Freitag 1"
-      },
       "programhc2_fr_0_start": {
         "name": "HK2 Programm Freitag 1 Start"
       },
       "programhc2_fr_0_end": {
         "name": "HK2 Programm Freitag 1 Ende"
-      },
-      "programhc2_fr_1": {
-        "name": "HK2 Programm Freitag 2"
       },
       "programhc2_fr_1_start": {
         "name": "HK2 Programm Freitag 2 Start"
@@ -2588,17 +2220,11 @@
       "programhc2_fr_1_end": {
         "name": "HK2 Programm Freitag 2 Ende"
       },
-      "programhc2_fr_2": {
-        "name": "HK2 Programm Freitag 3"
-      },
       "programhc2_fr_2_start": {
         "name": "HK2 Programm Freitag 3 Start"
       },
       "programhc2_fr_2_end": {
         "name": "HK2 Programm Freitag 3 Ende"
-      },
-      "programhc2_sa_0": {
-        "name": "HK2 Programm Samstag 1"
       },
       "programhc2_sa_0_start": {
         "name": "HK2 Programm Samstag 1 Start"
@@ -2606,17 +2232,11 @@
       "programhc2_sa_0_end": {
         "name": "HK2 Programm Samstag 1 Ende"
       },
-      "programhc2_sa_1": {
-        "name": "HK2 Programm Samstag 2"
-      },
       "programhc2_sa_1_start": {
         "name": "HK2 Programm Samstag 2 Start"
       },
       "programhc2_sa_1_end": {
         "name": "HK2 Programm Samstag 2 Ende"
-      },
-      "programhc2_sa_2": {
-        "name": "HK2 Programm Samstag 3"
       },
       "programhc2_sa_2_start": {
         "name": "HK2 Programm Samstag 3 Start"
@@ -2624,17 +2244,11 @@
       "programhc2_sa_2_end": {
         "name": "HK2 Programm Samstag 3 Ende"
       },
-      "programhc2_so_0": {
-        "name": "HK2 Programm Sonntag 1"
-      },
       "programhc2_so_0_start": {
         "name": "HK2 Programm Sonntag 1 Start"
       },
       "programhc2_so_0_end": {
         "name": "HK2 Programm Sonntag 1 Ende"
-      },
-      "programhc2_so_1": {
-        "name": "HK2 Programm Sonntag 2"
       },
       "programhc2_so_1_start": {
         "name": "HK2 Programm Sonntag 2 Start"
@@ -2642,17 +2256,11 @@
       "programhc2_so_1_end": {
         "name": "HK2 Programm Sonntag 2 Ende"
       },
-      "programhc2_so_2": {
-        "name": "HK2 Programm Sonntag 3"
-      },
       "programhc2_so_2_start": {
         "name": "HK2 Programm Sonntag 3 Start"
       },
       "programhc2_so_2_end": {
         "name": "HK2 Programm Sonntag 3 Ende"
-      },
-      "programhc2_mo_fr_0": {
-        "name": "HK2 Programm Mo-Fr 1"
       },
       "programhc2_mo_fr_0_start": {
         "name": "HK2 Programm Mo-Fr 1 Start"
@@ -2660,17 +2268,11 @@
       "programhc2_mo_fr_0_end": {
         "name": "HK2 Programm Mo-Fr 1 Ende"
       },
-      "programhc2_mo_fr_1": {
-        "name": "HK2 Programm Mo-Fr 2"
-      },
       "programhc2_mo_fr_1_start": {
         "name": "HK2 Programm Mo-Fr 2 Start"
       },
       "programhc2_mo_fr_1_end": {
         "name": "HK2 Programm Mo-Fr 2 Ende"
-      },
-      "programhc2_mo_fr_2": {
-        "name": "HK2 Programm Mo-Fr 3"
       },
       "programhc2_mo_fr_2_start": {
         "name": "HK2 Programm Mo-Fr 3 Start"
@@ -2678,17 +2280,11 @@
       "programhc2_mo_fr_2_end": {
         "name": "HK2 Programm Mo-Fr 3 Ende"
       },
-      "programhc2_sa_so_0": {
-        "name": "HK2 Programm Sa-So 1"
-      },
       "programhc2_sa_so_0_start": {
         "name": "HK2 Programm Sa-So 1 Start"
       },
       "programhc2_sa_so_0_end": {
         "name": "HK2 Programm Sa-So 1 Ende"
-      },
-      "programhc2_sa_so_1": {
-        "name": "HK2 Programm Sa-So 2"
       },
       "programhc2_sa_so_1_start": {
         "name": "HK2 Programm Sa-So 2 Start"
@@ -2696,17 +2292,11 @@
       "programhc2_sa_so_1_end": {
         "name": "HK2 Programm Sa-So 2 Ende"
       },
-      "programhc2_sa_so_2": {
-        "name": "HK2 Programm Sa-So 3"
-      },
       "programhc2_sa_so_2_start": {
         "name": "HK2 Programm Sa-So 3 Start"
       },
       "programhc2_sa_so_2_end": {
         "name": "HK2 Programm Sa-So 3 Ende"
-      },
-      "programhc2_mo_so_0": {
-        "name": "HK2 Programm Mo-So 1"
       },
       "programhc2_mo_so_0_start": {
         "name": "HK2 Programm Mo-So 1 Start"
@@ -2714,17 +2304,11 @@
       "programhc2_mo_so_0_end": {
         "name": "HK2 Programm Mo-So 1 Ende"
       },
-      "programhc2_mo_so_1": {
-        "name": "HK2 Programm Mo-So 2"
-      },
       "programhc2_mo_so_1_start": {
         "name": "HK2 Programm Mo-So 2 Start"
       },
       "programhc2_mo_so_1_end": {
         "name": "HK2 Programm Mo-So 2 Ende"
-      },
-      "programhc2_mo_so_2": {
-        "name": "HK2 Programm Mo-So 3"
       },
       "programhc2_mo_so_2_start": {
         "name": "HK2 Programm Mo-So 3 Start"
@@ -2732,17 +2316,11 @@
       "programhc2_mo_so_2_end": {
         "name": "HK2 Programm Mo-So 3 Ende"
       },
-      "programdhw_mo_0": {
-        "name": "Warmwasser Programm Montag 1"
-      },
       "programdhw_mo_0_start": {
         "name": "Warmwasser Programm Montag 1 Start"
       },
       "programdhw_mo_0_end": {
         "name": "Warmwasser Programm Montag 1 Ende"
-      },
-      "programdhw_mo_1": {
-        "name": "Warmwasser Programm Montag 2"
       },
       "programdhw_mo_1_start": {
         "name": "Warmwasser Programm Montag 2 Start"
@@ -2750,17 +2328,11 @@
       "programdhw_mo_1_end": {
         "name": "Warmwasser Programm Montag 2 Ende"
       },
-      "programdhw_mo_2": {
-        "name": "Warmwasser Programm Montag 3"
-      },
       "programdhw_mo_2_start": {
         "name": "Warmwasser Programm Montag 3 Start"
       },
       "programdhw_mo_2_end": {
         "name": "Warmwasser Programm Montag 3 Ende"
-      },
-      "programdhw_tu_0": {
-        "name": "Warmwasser Programm Dienstag 1"
       },
       "programdhw_tu_0_start": {
         "name": "Warmwasser Programm Dienstag 1 Start"
@@ -2768,17 +2340,11 @@
       "programdhw_tu_0_end": {
         "name": "Warmwasser Programm Dienstag 1 Ende"
       },
-      "programdhw_tu_1": {
-        "name": "Warmwasser Programm Dienstag 2"
-      },
       "programdhw_tu_1_start": {
         "name": "Warmwasser Programm Dienstag 2 Start"
       },
       "programdhw_tu_1_end": {
         "name": "Warmwasser Programm Dienstag 2 Ende"
-      },
-      "programdhw_tu_2": {
-        "name": "Warmwasser Programm Dienstag 3"
       },
       "programdhw_tu_2_start": {
         "name": "Warmwasser Programm Dienstag 3 Start"
@@ -2786,17 +2352,11 @@
       "programdhw_tu_2_end": {
         "name": "Warmwasser Programm Dienstag 3 Ende"
       },
-      "programdhw_we_0": {
-        "name": "Warmwasser Programm Mittwoch 1"
-      },
       "programdhw_we_0_start": {
         "name": "Warmwasser Programm Mittwoch 1 Start"
       },
       "programdhw_we_0_end": {
         "name": "Warmwasser Programm Mittwoch 1 Ende"
-      },
-      "programdhw_we_1": {
-        "name": "Warmwasser Programm Mittwoch 2"
       },
       "programdhw_we_1_start": {
         "name": "Warmwasser Programm Mittwoch 2 Start"
@@ -2804,17 +2364,11 @@
       "programdhw_we_1_end": {
         "name": "Warmwasser Programm Mittwoch 2 Ende"
       },
-      "programdhw_we_2": {
-        "name": "Warmwasser Programm Mittwoch 3"
-      },
       "programdhw_we_2_start": {
         "name": "Warmwasser Programm Mittwoch 3 Start"
       },
       "programdhw_we_2_end": {
         "name": "Warmwasser Programm Mittwoch 3 Ende"
-      },
-      "programdhw_th_0": {
-        "name": "Warmwasser Programm Donnerstag 1"
       },
       "programdhw_th_0_start": {
         "name": "Warmwasser Programm Donnerstag 1 Start"
@@ -2822,17 +2376,11 @@
       "programdhw_th_0_end": {
         "name": "Warmwasser Programm Donnerstag 1 Ende"
       },
-      "programdhw_th_1": {
-        "name": "Warmwasser Programm Donnerstag 2"
-      },
       "programdhw_th_1_start": {
         "name": "Warmwasser Programm Donnerstag 2 Start"
       },
       "programdhw_th_1_end": {
         "name": "Warmwasser Programm Donnerstag 2 Ende"
-      },
-      "programdhw_th_2": {
-        "name": "Warmwasser Programm Donnerstag 3"
       },
       "programdhw_th_2_start": {
         "name": "Warmwasser Programm Donnerstag 3 Start"
@@ -2840,17 +2388,11 @@
       "programdhw_th_2_end": {
         "name": "Warmwasser Programm Donnerstag 3 Ende"
       },
-      "programdhw_fr_0": {
-        "name": "Warmwasser Programm Freitag 1"
-      },
       "programdhw_fr_0_start": {
         "name": "Warmwasser Programm Freitag 1 Start"
       },
       "programdhw_fr_0_end": {
         "name": "Warmwasser Programm Freitag 1 Ende"
-      },
-      "programdhw_fr_1": {
-        "name": "Warmwasser Programm Freitag 2"
       },
       "programdhw_fr_1_start": {
         "name": "Warmwasser Programm Freitag 2 Start"
@@ -2858,17 +2400,11 @@
       "programdhw_fr_1_end": {
         "name": "Warmwasser Programm Freitag 2 Ende"
       },
-      "programdhw_fr_2": {
-        "name": "Warmwasser Programm Freitag 3"
-      },
       "programdhw_fr_2_start": {
         "name": "Warmwasser Programm Freitag 3 Start"
       },
       "programdhw_fr_2_end": {
         "name": "Warmwasser Programm Freitag 3 Ende"
-      },
-      "programdhw_sa_0": {
-        "name": "Warmwasser Programm Samstag 1"
       },
       "programdhw_sa_0_start": {
         "name": "Warmwasser Programm Samstag 1 Start"
@@ -2876,17 +2412,11 @@
       "programdhw_sa_0_end": {
         "name": "Warmwasser Programm Samstag 1 Ende"
       },
-      "programdhw_sa_1": {
-        "name": "Warmwasser Programm Samstag 2"
-      },
       "programdhw_sa_1_start": {
         "name": "Warmwasser Programm Samstag 2 Start"
       },
       "programdhw_sa_1_end": {
         "name": "Warmwasser Programm Samstag 2 Ende"
-      },
-      "programdhw_sa_2": {
-        "name": "Warmwasser Programm Samstag 3"
       },
       "programdhw_sa_2_start": {
         "name": "Warmwasser Programm Samstag 3 Start"
@@ -2894,17 +2424,11 @@
       "programdhw_sa_2_end": {
         "name": "Warmwasser Programm Samstag 3 Ende"
       },
-      "programdhw_so_0": {
-        "name": "Warmwasser Programm Sonntag 1"
-      },
       "programdhw_so_0_start": {
         "name": "Warmwasser Programm Sonntag 1 Start"
       },
       "programdhw_so_0_end": {
         "name": "Warmwasser Programm Sonntag 1 Ende"
-      },
-      "programdhw_so_1": {
-        "name": "Warmwasser Programm Sonntag 2"
       },
       "programdhw_so_1_start": {
         "name": "Warmwasser Programm Sonntag 2 Start"
@@ -2912,17 +2436,11 @@
       "programdhw_so_1_end": {
         "name": "Warmwasser Programm Sonntag 2 Ende"
       },
-      "programdhw_so_2": {
-        "name": "Warmwasser Programm Sonntag 3"
-      },
       "programdhw_so_2_start": {
         "name": "Warmwasser Programm Sonntag 3 Start"
       },
       "programdhw_so_2_end": {
         "name": "Warmwasser Programm Sonntag 3 Ende"
-      },
-      "programdhw_mo_fr_0": {
-        "name": "Warmwasser Programm Mo-Fr 1"
       },
       "programdhw_mo_fr_0_start": {
         "name": "Warmwasser Programm Mo-Fr 1 Start"
@@ -2930,17 +2448,11 @@
       "programdhw_mo_fr_0_end": {
         "name": "Warmwasser Programm Mo-Fr 1 Ende"
       },
-      "programdhw_mo_fr_1": {
-        "name": "Warmwasser Programm Mo-Fr 2"
-      },
       "programdhw_mo_fr_1_start": {
         "name": "Warmwasser Programm Mo-Fr 2 Start"
       },
       "programdhw_mo_fr_1_end": {
         "name": "Warmwasser Programm Mo-Fr 2 Ende"
-      },
-      "programdhw_mo_fr_2": {
-        "name": "Warmwasser Programm Mo-Fr 3"
       },
       "programdhw_mo_fr_2_start": {
         "name": "Warmwasser Programm Mo-Fr 3 Start"
@@ -2948,17 +2460,11 @@
       "programdhw_mo_fr_2_end": {
         "name": "Warmwasser Programm Mo-Fr 3 Ende"
       },
-      "programdhw_sa_so_0": {
-        "name": "Warmwasser Programm Sa-So 1"
-      },
       "programdhw_sa_so_0_start": {
         "name": "Warmwasser Programm Sa-So 1 Start"
       },
       "programdhw_sa_so_0_end": {
         "name": "Warmwasser Programm Sa-So 1 Ende"
-      },
-      "programdhw_sa_so_1": {
-        "name": "Warmwasser Programm Sa-So 2"
       },
       "programdhw_sa_so_1_start": {
         "name": "Warmwasser Programm Sa-So 2 Start"
@@ -2966,17 +2472,11 @@
       "programdhw_sa_so_1_end": {
         "name": "Warmwasser Programm Sa-So 2 Ende"
       },
-      "programdhw_sa_so_2": {
-        "name": "Warmwasser Programm Sa-So 3"
-      },
       "programdhw_sa_so_2_start": {
         "name": "Warmwasser Programm Sa-So 3 Start"
       },
       "programdhw_sa_so_2_end": {
         "name": "Warmwasser Programm Sa-So 3 Ende"
-      },
-      "programdhw_mo_so_0": {
-        "name": "Warmwasser Programm Mo-So 1"
       },
       "programdhw_mo_so_0_start": {
         "name": "Warmwasser Programm Mo-So 1 Start"
@@ -2984,17 +2484,11 @@
       "programdhw_mo_so_0_end": {
         "name": "Warmwasser Programm Mo-So 1 Ende"
       },
-      "programdhw_mo_so_1": {
-        "name": "Warmwasser Programm Mo-So 2"
-      },
       "programdhw_mo_so_1_start": {
         "name": "Warmwasser Programm Mo-So 2 Start"
       },
       "programdhw_mo_so_1_end": {
         "name": "Warmwasser Programm Mo-So 2 Ende"
-      },
-      "programdhw_mo_so_2": {
-        "name": "Warmwasser Programm Mo-So 3"
       },
       "programdhw_mo_so_2_start": {
         "name": "Warmwasser Programm Mo-So 3 Start"
@@ -3002,17 +2496,11 @@
       "programdhw_mo_so_2_end": {
         "name": "Warmwasser Programm Mo-So 3 Ende"
       },
-      "programfan_mo_0": {
-        "name": "Lüftung Programm Montag 1"
-      },
       "programfan_mo_0_start": {
         "name": "Lüftung Programm Montag 1 Start"
       },
       "programfan_mo_0_end": {
         "name": "Lüftung Programm Montag 1 Ende"
-      },
-      "programfan_mo_1": {
-        "name": "Lüftung Programm Montag 2"
       },
       "programfan_mo_1_start": {
         "name": "Lüftung Programm Montag 2 Start"
@@ -3020,17 +2508,11 @@
       "programfan_mo_1_end": {
         "name": "Lüftung Programm Montag 2 Ende"
       },
-      "programfan_mo_2": {
-        "name": "Lüftung Programm Montag 3"
-      },
       "programfan_mo_2_start": {
         "name": "Lüftung Programm Montag 3 Start"
       },
       "programfan_mo_2_end": {
         "name": "Lüftung Programm Montag 3 Ende"
-      },
-      "programfan_tu_0": {
-        "name": "Lüftung Programm Dienstag 1"
       },
       "programfan_tu_0_start": {
         "name": "Lüftung Programm Dienstag 1 Start"
@@ -3038,17 +2520,11 @@
       "programfan_tu_0_end": {
         "name": "Lüftung Programm Dienstag 1 Ende"
       },
-      "programfan_tu_1": {
-        "name": "Lüftung Programm Dienstag 2"
-      },
       "programfan_tu_1_start": {
         "name": "Lüftung Programm Dienstag 2 Start"
       },
       "programfan_tu_1_end": {
         "name": "Lüftung Programm Dienstag 2 Ende"
-      },
-      "programfan_tu_2": {
-        "name": "Lüftung Programm Dienstag 3"
       },
       "programfan_tu_2_start": {
         "name": "Lüftung Programm Dienstag 3 Start"
@@ -3056,17 +2532,11 @@
       "programfan_tu_2_end": {
         "name": "Lüftung Programm Dienstag 3 Ende"
       },
-      "programfan_we_0": {
-        "name": "Lüftung Programm Mittwoch 1"
-      },
       "programfan_we_0_start": {
         "name": "Lüftung Programm Mittwoch 1 Start"
       },
       "programfan_we_0_end": {
         "name": "Lüftung Programm Mittwoch 1 Ende"
-      },
-      "programfan_we_1": {
-        "name": "Lüftung Programm Mittwoch 2"
       },
       "programfan_we_1_start": {
         "name": "Lüftung Programm Mittwoch 2 Start"
@@ -3074,17 +2544,11 @@
       "programfan_we_1_end": {
         "name": "Lüftung Programm Mittwoch 2 Ende"
       },
-      "programfan_we_2": {
-        "name": "Lüftung Programm Mittwoch 3"
-      },
       "programfan_we_2_start": {
         "name": "Lüftung Programm Mittwoch 3 Start"
       },
       "programfan_we_2_end": {
         "name": "Lüftung Programm Mittwoch 3 Ende"
-      },
-      "programfan_th_0": {
-        "name": "Lüftung Programm Donnerstag 1"
       },
       "programfan_th_0_start": {
         "name": "Lüftung Programm Donnerstag 1 Start"
@@ -3092,17 +2556,11 @@
       "programfan_th_0_end": {
         "name": "Lüftung Programm Donnerstag 1 Ende"
       },
-      "programfan_th_1": {
-        "name": "Lüftung Programm Donnerstag 2"
-      },
       "programfan_th_1_start": {
         "name": "Lüftung Programm Donnerstag 2 Start"
       },
       "programfan_th_1_end": {
         "name": "Lüftung Programm Donnerstag 2 Ende"
-      },
-      "programfan_th_2": {
-        "name": "Lüftung Programm Donnerstag 3"
       },
       "programfan_th_2_start": {
         "name": "Lüftung Programm Donnerstag 3 Start"
@@ -3110,17 +2568,11 @@
       "programfan_th_2_end": {
         "name": "Lüftung Programm Donnerstag 3 Ende"
       },
-      "programfan_fr_0": {
-        "name": "Lüftung Programm Freitag 1"
-      },
       "programfan_fr_0_start": {
         "name": "Lüftung Programm Freitag 1 Start"
       },
       "programfan_fr_0_end": {
         "name": "Lüftung Programm Freitag 1 Ende"
-      },
-      "programfan_fr_1": {
-        "name": "Lüftung Programm Freitag 2"
       },
       "programfan_fr_1_start": {
         "name": "Lüftung Programm Freitag 2 Start"
@@ -3128,17 +2580,11 @@
       "programfan_fr_1_end": {
         "name": "Lüftung Programm Freitag 2 Ende"
       },
-      "programfan_fr_2": {
-        "name": "Lüftung Programm Freitag 3"
-      },
       "programfan_fr_2_start": {
         "name": "Lüftung Programm Freitag 3 Start"
       },
       "programfan_fr_2_end": {
         "name": "Lüftung Programm Freitag 3 Ende"
-      },
-      "programfan_sa_0": {
-        "name": "Lüftung Programm Samstag 1"
       },
       "programfan_sa_0_start": {
         "name": "Lüftung Programm Samstag 1 Start"
@@ -3146,17 +2592,11 @@
       "programfan_sa_0_end": {
         "name": "Lüftung Programm Samstag 1 Ende"
       },
-      "programfan_sa_1": {
-        "name": "Lüftung Programm Samstag 2"
-      },
       "programfan_sa_1_start": {
         "name": "Lüftung Programm Samstag 2 Start"
       },
       "programfan_sa_1_end": {
         "name": "Lüftung Programm Samstag 2 Ende"
-      },
-      "programfan_sa_2": {
-        "name": "Lüftung Programm Samstag 3"
       },
       "programfan_sa_2_start": {
         "name": "Lüftung Programm Samstag 3 Start"
@@ -3164,17 +2604,11 @@
       "programfan_sa_2_end": {
         "name": "Lüftung Programm Samstag 3 Ende"
       },
-      "programfan_so_0": {
-        "name": "Lüftung Programm Sonntag 1"
-      },
       "programfan_so_0_start": {
         "name": "Lüftung Programm Sonntag 1 Start"
       },
       "programfan_so_0_end": {
         "name": "Lüftung Programm Sonntag 1 Ende"
-      },
-      "programfan_so_1": {
-        "name": "Lüftung Programm Sonntag 2"
       },
       "programfan_so_1_start": {
         "name": "Lüftung Programm Sonntag 2 Start"
@@ -3182,17 +2616,11 @@
       "programfan_so_1_end": {
         "name": "Lüftung Programm Sonntag 2 Ende"
       },
-      "programfan_so_2": {
-        "name": "Lüftung Programm Sonntag 3"
-      },
       "programfan_so_2_start": {
         "name": "Lüftung Programm Sonntag 3 Start"
       },
       "programfan_so_2_end": {
         "name": "Lüftung Programm Sonntag 3 Ende"
-      },
-      "programfan_mo_fr_0": {
-        "name": "Lüftung Programm Mo-Fr 1"
       },
       "programfan_mo_fr_0_start": {
         "name": "Lüftung Programm Mo-Fr 1 Start"
@@ -3200,17 +2628,11 @@
       "programfan_mo_fr_0_end": {
         "name": "Lüftung Programm Mo-Fr 1 Ende"
       },
-      "programfan_mo_fr_1": {
-        "name": "Lüftung Programm Mo-Fr 2"
-      },
       "programfan_mo_fr_1_start": {
         "name": "Lüftung Programm Mo-Fr 2 Start"
       },
       "programfan_mo_fr_1_end": {
         "name": "Lüftung Programm Mo-Fr 2 Ende"
-      },
-      "programfan_mo_fr_2": {
-        "name": "Lüftung Programm Mo-Fr 3"
       },
       "programfan_mo_fr_2_start": {
         "name": "Lüftung Programm Mo-Fr 3 Start"
@@ -3218,17 +2640,11 @@
       "programfan_mo_fr_2_end": {
         "name": "Lüftung Programm Mo-Fr 3 Ende"
       },
-      "programfan_sa_so_0": {
-        "name": "Lüftung Programm Sa-So 1"
-      },
       "programfan_sa_so_0_start": {
         "name": "Lüftung Programm Sa-So 1 Start"
       },
       "programfan_sa_so_0_end": {
         "name": "Lüftung Programm Sa-So 1 Ende"
-      },
-      "programfan_sa_so_1": {
-        "name": "Lüftung Programm Sa-So 2"
       },
       "programfan_sa_so_1_start": {
         "name": "Lüftung Programm Sa-So 2 Start"
@@ -3236,17 +2652,11 @@
       "programfan_sa_so_1_end": {
         "name": "Lüftung Programm Sa-So 2 Ende"
       },
-      "programfan_sa_so_2": {
-        "name": "Lüftung Programm Sa-So 3"
-      },
       "programfan_sa_so_2_start": {
         "name": "Lüftung Programm Sa-So 3 Start"
       },
       "programfan_sa_so_2_end": {
         "name": "Lüftung Programm Sa-So 3 Ende"
-      },
-      "programfan_mo_so_0": {
-        "name": "Lüftung Programm Mo-So 1"
       },
       "programfan_mo_so_0_start": {
         "name": "Lüftung Programm Mo-So 1 Start"
@@ -3254,17 +2664,11 @@
       "programfan_mo_so_0_end": {
         "name": "Lüftung Programm Mo-So 1 Ende"
       },
-      "programfan_mo_so_1": {
-        "name": "Lüftung Programm Mo-So 2"
-      },
       "programfan_mo_so_1_start": {
         "name": "Lüftung Programm Mo-So 2 Start"
       },
       "programfan_mo_so_1_end": {
         "name": "Lüftung Programm Mo-So 2 Ende"
-      },
-      "programfan_mo_so_2": {
-        "name": "Lüftung Programm Mo-So 3"
       },
       "programfan_mo_so_2_start": {
         "name": "Lüftung Programm Mo-So 3 Start"
