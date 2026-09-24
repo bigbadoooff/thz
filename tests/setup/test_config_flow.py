@@ -378,7 +378,7 @@ class TestAsyncStepDetectBlocks:
         assert result["step_id"] == "select_groups"
 
     @pytest.mark.asyncio
-    async def test_sets_unique_id_from_device_serial(self, flow):
+    async def test_unique_id_is_the_connection(self, flow):
         flow.connection_data = {
             "connection_type": "usb",
             CONF_DEVICE: "/dev/ttyUSB0",
@@ -387,25 +387,6 @@ class TestAsyncStepDetectBlocks:
         mock_device.async_initialize = AsyncMock()
         mock_device.firmware_version = "319"
         mock_device.available_reading_blocks = ["p01"]
-        mock_device.unique_id = "thz-serial-123"
-
-        with patch.object(config_flow_module, "THZDevice", return_value=mock_device):
-            await flow.async_step_detect_blocks()
-
-        assert flow.unique_id == "thz-serial-123"
-
-    @pytest.mark.asyncio
-    async def test_unique_id_falls_back_to_connection_string(self, flow):
-        flow.connection_data = {
-            "connection_type": "usb",
-            CONF_DEVICE: "/dev/ttyUSB0",
-        }
-        mock_device = MagicMock()
-        mock_device.async_initialize = AsyncMock()
-        mock_device.firmware_version = "319"
-        mock_device.available_reading_blocks = ["p01"]
-        mock_device.unique_id = None
-        mock_device.serial = None
 
         with patch.object(config_flow_module, "THZDevice", return_value=mock_device):
             await flow.async_step_detect_blocks()
@@ -422,9 +403,7 @@ class TestAsyncStepDetectBlocks:
         mock_device.async_initialize = AsyncMock()
         mock_device.firmware_version = "319"
         mock_device.available_reading_blocks = ["p01"]
-        mock_device.unique_id = "thz-serial-123"
-
-        existing_entry = MagicMock(unique_id="thz-serial-123")
+        existing_entry = MagicMock(unique_id="usb-/dev/ttyUSB0")
         flow.hass.config_entries.async_entries = MagicMock(
             return_value=[existing_entry]
         )

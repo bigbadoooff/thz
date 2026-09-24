@@ -50,6 +50,9 @@ class THZBaseEntity(Entity):
     """
 
     _attr_should_poll = False
+    # Names are the entity's part only; Home Assistant prefixes the device
+    # name (https://developers.home-assistant.io/docs/core/entity/#entity-naming).
+    _attr_has_entity_name = True
     # Block coordinators by key ("pxx17"), set by the platform setup; lets
     # 2xx block parameters read from data that is already being polled.
     _coordinators: Mapping[str, Any] = MappingProxyType({})
@@ -105,12 +108,10 @@ class THZBaseEntity(Entity):
         self._device_id = device_id
         self._attr_available = True
 
-        # has_entity_name=True is mandatory for new integrations, see
-        # https://developers.home-assistant.io/docs/core/entity/#entity-naming
-        #
         # Home Assistant ignores translation_key when _attr_name is set, so
         # only one of the two is set: the translation key when there is one,
-        # otherwise the name as a fallback.
+        # otherwise the name as a fallback (tests_ha checks that every
+        # entity has a translation key).
         #
         # Icon: entities with a translation_key get their icon from
         # icons.json (icon translations) instead of a hardcoded _attr_icon,
@@ -118,12 +119,9 @@ class THZBaseEntity(Entity):
         # translation_key fall back to the icon passed in (or "mdi:eye").
         if translation_key is not None:
             self._attr_translation_key = translation_key
-            self._attr_has_entity_name = True
-            # Do NOT set _attr_name - it blocks translation lookup!
         else:
             self._attr_name = name
             self._attr_icon = icon or "mdi:eye"
-            # Entities without a translation keep has_entity_name unset.
 
         # Generate unique ID if not provided
         self._attr_unique_id = unique_id or self._generate_unique_id(command, name)
@@ -311,7 +309,7 @@ class THZBaseEntity(Entity):
     # Home Assistant uses ONLY the _attr_* attributes for translation:
     # - _attr_translation_key: triggers translation lookup in strings.json
     # - _attr_name: fallback name when no translation_key is set
-    # - _attr_has_entity_name: must be True for entities with translations
+    # - _attr_has_entity_name: True for every entity (class attribute)
     #
     # IMPORTANT: Setting _attr_name blocks translation_key from working!
     # Properties are NOT evaluated by HA's translation system.

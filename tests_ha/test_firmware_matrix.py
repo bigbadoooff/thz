@@ -6,9 +6,14 @@ compares the resulting entity registry with the stored snapshot. A
 register-map change that adds, drops or renames entities, or changes their
 sub-device, category, device class or unit, shows up as a snapshot diff
 that has to be reviewed and accepted with ``pytest tests_ha --snapshot-update``.
+Every entity must also have ``has_entity_name`` and a translation key that
+strings.json names.
 """
 
 from __future__ import annotations
+
+import json
+from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -25,6 +30,10 @@ from custom_components.thz.const import (
 from custom_components.thz.devices import SUBDEVICES
 
 HOST = "192.0.2.20"
+
+_STRINGS = json.loads(
+    (Path(__file__).parents[1] / "custom_components/thz/strings.json").read_text()
+)["entity"]
 
 # 5.x firmware probes 0A0648 for cooling hardware; all zeros means none.
 _COOLING = {bytes.fromhex("0a0648"): b"\x00\x01"}
@@ -97,6 +106,15 @@ async def test_entities_per_firmware(
         )
     }
     assert sorted(_describe(e, prefix, devices) for e in entities) == snapshot
+
+    # Every entity is named by a translation, under the device's name.
+    untranslated = [
+        e.entity_id
+        for e in entities
+        if e.translation_key not in _STRINGS.get(e.domain, {})
+    ]
+    assert untranslated == []
+    assert [e.entity_id for e in entities if not e.has_entity_name] == []
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()

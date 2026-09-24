@@ -1620,6 +1620,7 @@
     'time | schedule_time_0c15a2_programhc2_mo-so_2_end_end | heating_hc2 | programhc2_mo_so_2_end | config |  |  | disabled',
     'time | schedule_time_0c15a2_programhc2_mo-so_2_start_start | heating_hc2 | programhc2_mo_so_2_start | config |  |  | disabled',
     'time | set_0a05d1_party-time | heat_pump | party_time',
+    'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
   ])
@@ -2103,6 +2104,7 @@
     'time | schedule_time_0c15a2_programhc2_mo-so_2_end_end | heating_hc2 | programhc2_mo_so_2_end | config |  |  | disabled',
     'time | schedule_time_0c15a2_programhc2_mo-so_2_start_start | heating_hc2 | programhc2_mo_so_2_start | config |  |  | disabled',
     'time | set_0a05d1_party-time | heat_pump | party_time',
+    'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
   ])
@@ -2590,6 +2592,7 @@
     'time | schedule_time_0c15a2_programhc2_mo-so_2_end_end | heating_hc2 | programhc2_mo_so_2_end | config |  |  | disabled',
     'time | schedule_time_0c15a2_programhc2_mo-so_2_start_start | heating_hc2 | programhc2_mo_so_2_start | config |  |  | disabled',
     'time | set_0a05d1_party-time | heat_pump | party_time',
+    'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
   ])
@@ -3088,6 +3091,7 @@
     'time | schedule_time_0c15a2_programhc2_mo-so_2_end_end | heating_hc2 | programhc2_mo_so_2_end | config |  |  | disabled',
     'time | schedule_time_0c15a2_programhc2_mo-so_2_start_start | heating_hc2 | programhc2_mo_so_2_start | config |  |  | disabled',
     'time | set_0a05d1_party-time | heat_pump | party_time',
+    'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
   ])
@@ -3600,6 +3604,7 @@
     'time | schedule_time_0c15a2_programhc2_mo-so_2_end_end | heating_hc2 | programhc2_mo_so_2_end | config |  |  | disabled',
     'time | schedule_time_0c15a2_programhc2_mo-so_2_start_start | heating_hc2 | programhc2_mo_so_2_start | config |  |  | disabled',
     'time | set_0a05d1_party-time | heat_pump | party_time',
+    'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
   ])
@@ -4099,6 +4104,7 @@
     'time | schedule_time_0c15a2_programhc2_mo-so_2_end_end | heating_hc2 | programhc2_mo_so_2_end | config |  |  | disabled',
     'time | schedule_time_0c15a2_programhc2_mo-so_2_start_start | heating_hc2 | programhc2_mo_so_2_start | config |  |  | disabled',
     'time | set_0a05d1_party-time | heat_pump | party_time',
+    'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
   ])
@@ -4615,6 +4621,7 @@
     'time | schedule_time_0c15a2_programhc2_mo-so_2_end_end | heating_hc2 | programhc2_mo_so_2_end | config |  |  | disabled',
     'time | schedule_time_0c15a2_programhc2_mo-so_2_start_start | heating_hc2 | programhc2_mo_so_2_start | config |  |  | disabled',
     'time | set_0a05d1_party-time | heat_pump | party_time',
+    'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
   ])

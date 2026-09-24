@@ -260,6 +260,7 @@ class TestTHZGenericSensor:
             coord, entry=entry, block=bytes.fromhex("FB"), device_id="dev1"
         )
         assert sensor._attr_name == "outsideTemp"
+        assert sensor._attr_has_entity_name is True
 
     def test_advanced_sensor_gets_diagnostic_category(self):
         from homeassistant.const import EntityCategory

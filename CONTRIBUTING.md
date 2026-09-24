@@ -66,7 +66,9 @@ These keep the protocol code safe to change. Reviews check them.
   `register_map_manager` are checked with mypy's strict flags. Add a module
   to that list in `pyproject.toml` once it passes.
 - User-facing text goes through `strings.json` and `translations/`, never a
-  hard-coded English string.
+  hard-coded English string. Every entity has a translation key and
+  `has_entity_name`; a new map entry needs its name in `strings.json`
+  (`tests_ha/test_firmware_matrix.py` checks both).
 - Log with `%s` placeholders, not f-strings:
   - debug for protocol details,
   - info for connection and setup events,

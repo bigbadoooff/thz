@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .clock_sync import async_setup_clock_check
 from .const import (
+    CONF_DEVICE_IDENTIFIER,
     CONF_ENABLE_HC2,
     CONF_ENTITY_ID_STYLE,
     CONF_ENTITY_VISIBILITY,
@@ -39,6 +40,7 @@ from .const import (
 from .devices import (
     async_release_subdevices,
     async_remove_empty_subdevices,
+    entry_unique_id,
     main_device_name,
 )
 from .exceptions import DEVICE_ERRORS, THZNotSupportedError
@@ -68,6 +70,20 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the THZ services once, independent of config entries."""
     async_setup_services(hass)
+    return True
+
+
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Migrate an entry to the current version (see THZConfigFlow)."""
+    if config_entry.version > 1:
+        return False  # created by a newer version
+    if config_entry.minor_version < 2:
+        # The registry identifier was derived from the connection on every
+        # setup; keep the one the heat pump is registered under.
+        data = {**config_entry.data}
+        data.setdefault(CONF_DEVICE_IDENTIFIER, entry_unique_id(data))
+        hass.config_entries.async_update_entry(config_entry, data=data, minor_version=2)
+        _LOGGER.debug("Migrated entry to 1.2 (%s)", CONF_DEVICE_IDENTIFIER)
     return True
 
 
@@ -104,7 +120,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         ) from err
     _LOGGER.info("THZ device fully initialized (FW %s)", device.firmware_version)
 
-    unique_id = _device_unique_id(device, data)
+    unique_id = data[CONF_DEVICE_IDENTIFIER]
     device_entry = _register_heat_pump(hass, config_entry, device, unique_id)
 
     write_manager = device.write_register_map_manager
@@ -199,15 +215,6 @@ def _create_device(data: Mapping[str, Any]) -> THZDevice:
             firmware_override=firmware_override,
         )
     raise ValueError("Invalid connection type")
-
-
-def _device_unique_id(device: THZDevice, data: Mapping[str, Any]) -> str:
-    """Return the heat pump's device registry id; prefer one from the device."""
-    return str(
-        getattr(device, "unique_id", None)
-        or getattr(device, "serial", None)
-        or f"{data['connection_type']}-{data.get('host') or data.get('device')}"
-    )
 
 
 def _register_heat_pump(

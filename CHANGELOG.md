@@ -42,6 +42,12 @@ All notable changes to the THZ integration are documented here.
 
 ### Added
 
+- **Party end time** (4.x/5.x, #185): the party register holds the start
+  and the end of the party; besides the start (now named *Party Start*) a
+  new *Party End* time entity shows and sets the end. Setting 00:00 as the
+  end means 24:00, as for the schedules. Writes match FHEM's
+  `set party-time HH:MM--HH:MM` byte for byte.
+
 - **Optional sub-devices** (#186): a new setting, *Split into sub-devices*,
   groups the entities into sub-devices linked to the heat pump:
   - heating circuit 1,
@@ -57,6 +63,20 @@ All notable changes to the THZ integration are documented here.
   change, and automations that pick a device must be updated.
 
 ### Bug Fixes
+
+- **Changing the host or serial device kept the entities but not the
+  device** (#185): the heat pump's device registry identifier was derived
+  from the connection on every start, so after a Reconfigure to a new host
+  a second device appeared, and the climate, COP and fault entities (whose
+  unique ids contain it) were created anew without their history. The
+  identifier is now stored in the entry when it is created; existing
+  entries keep the one they are registered under (entry migration to 1.2).
+
+- **Three entities had no name of their own**: the pump settings of the
+  technician maps (`zPumpHC`, `zPumpDHW`, numbers) and the 2.14 error reset
+  (`ResetErrors`, a button) had their translations only under `select`, so
+  Home Assistant showed them as "Heating Circuit 1 Number", "Hot Water
+  Number" or just the device name. Existing entity IDs stay as they are.
 
 - **Sensors and selects showed English protocol names instead of translated
   values** (e.g. *Wochentag* reading `Monday`): the weekday, season mode,

@@ -149,6 +149,11 @@ def time_byte_index(decode_type: str | None) -> int:
     return 1 if decode_type in ("9holy", "8party") else 0
 
 
+# Registers holding two times: the party start (second data byte) and end
+# (first data byte), FHEM's "8party" parsing rule.
+TWO_TIME_DECODE_TYPES = ("8party",)
+
+
 def _create_time_entities(
     name,
     entry: WriteParam,
@@ -186,17 +191,22 @@ def _create_time_entities(
                 entity_id_prefix=entity_id_prefix,
             ),
         ]
-    else:
-        # Regular time entity
-        return THZTime(
-            name=name,
-            entry=entry,
-            device=device,
-            device_id=device_id,
-            entity_id_style=entity_id_style,
-            entity_visibility=entity_visibility,
-            entity_id_prefix=entity_id_prefix,
-        )
+    common = {
+        "entry": entry,
+        "device": device,
+        "device_id": device_id,
+        "entity_id_style": entity_id_style,
+        "entity_visibility": entity_visibility,
+        "entity_id_prefix": entity_id_prefix,
+    }
+    if entry.decode_type in TWO_TIME_DECODE_TYPES:
+        # The start keeps the parameter's own name (and unique id); the end
+        # is a second entity on the other byte of the register.
+        return [
+            THZTime(name=name, **common),
+            THZTime(name=f"{name} End", base_name=name, end=True, **common),
+        ]
+    return THZTime(name=name, **common)
 
 
 async def async_setup_entry(
@@ -272,6 +282,8 @@ class THZTime(THZParameterEntity, TimeEntity):
         entity_id_style: str = "default",
         entity_visibility: str = "default",
         entity_id_prefix: str | None = None,
+        base_name: str | None = None,
+        end: bool = False,
     ) -> None:
         """Initialize a THZ time entity.
 
@@ -284,7 +296,15 @@ class THZTime(THZParameterEntity, TimeEntity):
             entity_visibility: "default"/"extended"/"all" (see base_entity.py).
             entity_id_prefix: Optional device alias prefix for "fhem"-style
                 entity_ids (see base_entity.py).
+            base_name: The parameter's name when ``name`` is derived from it
+                (the end of a two-time register); used for the translation.
+            end: This entity is the end time of a two-time register
+                (TWO_TIME_DECODE_TYPES): first data byte, and 00:00 is
+                written as 24:00 like a schedule's end.
         """
+        translation_key = get_translation_key(base_name or name)
+        if end and translation_key:
+            translation_key = f"{translation_key}_end"
         # Initialize base class with common properties
         super().__init__(
             name=name,
@@ -292,19 +312,19 @@ class THZTime(THZParameterEntity, TimeEntity):
             device=device,
             device_id=device_id,
             icon=entry.icon,
-            translation_key=get_translation_key(name),
+            translation_key=translation_key,
             entity_id_style=entity_id_style,
             entity_visibility=entity_visibility,
             entity_id_prefix=entity_id_prefix,
             domain="time",
         )
 
-        # Explicitly enable has_entity_name for time entities
-        self._attr_has_entity_name = True
-
         self._attr_native_value = None
         self._entry = entry
-        self._byte_index = time_byte_index(entry.decode_type)
+        self._end = end
+        self._byte_index = 0 if end else time_byte_index(entry.decode_type)
+        # The other byte holds a time of its own; keep it when writing.
+        self._keep_other_byte = entry.decode_type in TWO_TIME_DECODE_TYPES
 
     @property
     def native_value(self):
@@ -343,7 +363,7 @@ class THZTime(THZParameterEntity, TimeEntity):
         """
         t_value = value
 
-        num = time_to_quarters(t_value)
+        num = time_to_quarters(t_value, is_end_time=self._end)
         _LOGGER.debug("Setting time %s to %s (%s quarters)", self.name, t_value, num)
 
         try:
@@ -365,11 +385,11 @@ class THZTime(THZParameterEntity, TimeEntity):
         """Write ``num`` into this entity's byte of the 2-byte register.
 
         Registers whose time lives in the second byte (see time_byte_index)
-        keep the other byte as read from the device, e.g. the party end
-        time next to the party start; the others are written as
-        ``[num, 0]`` as before.
+        and the two-time registers keep the other byte as read from the
+        device, e.g. the party end next to the party start; the others are
+        written as ``[num, 0]``.
         """
-        if self._byte_index == 0:
+        if self._byte_index == 0 and not self._keep_other_byte:
             payload = bytearray([num, 0])
         else:
             current = await async_read_parameter(self.hass, self._device, self._entry)
@@ -459,9 +479,6 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             entity_id_prefix=entity_id_prefix,
             domain="time",
         )
-
-        # Explicitly enable has_entity_name for time entities
-        self._attr_has_entity_name = True
 
         self._time_type = time_type
         self._attr_native_value = None

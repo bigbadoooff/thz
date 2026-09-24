@@ -213,7 +213,7 @@ class TestSelectOptionsAreTranslationKeys:
         "path", ["strings.json", "translations/en.json", "translations/de.json"]
     )
     def test_select_states_are_translated(self, path):
-        from custom_components.thz.value_maps import select_slugs
+        from custom_components.thz.value_maps import SELECT_MAP, select_slugs
 
         selects = json.loads((COMPONENT / path).read_text(encoding="utf-8"))["entity"][
             "select"
@@ -224,7 +224,9 @@ class TestSelectOptionsAreTranslationKeys:
             ("passive_cooling", "passive_cooling"),
             ("cooling_hc1_distribution", "cooling_distribution_hc1"),
         ):
-            assert set(selects[key]["state"]) == set(select_slugs(table)), key
+            assert set(selects[key]["state"]) == set(select_slugs(SELECT_MAP[table])), (
+                key
+            )
 
 
 class TestFaultListTranslation:

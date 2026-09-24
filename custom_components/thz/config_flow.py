@@ -24,6 +24,7 @@ import voluptuous as vol
 
 from .const import (
     CONF_CONNECTION_TYPE,
+    CONF_DEVICE_IDENTIFIER,
     CONF_ENABLE_HC2,
     CONF_ENTITY_ID_STYLE,
     CONF_ENTITY_VISIBILITY,
@@ -46,6 +47,7 @@ from .const import (
     WRITE_GROUP_LABELS,
     get_write_group_for_key,
 )
+from .devices import entry_unique_id
 from .exceptions import DEVICE_ERRORS
 from .thz_device import THZDevice
 
@@ -80,11 +82,6 @@ def _translated_select(labels: dict[str, str], translation_key: str) -> SelectSe
             mode=SelectSelectorMode.DROPDOWN,
         )
     )
-
-
-def entry_unique_id(data: Mapping[str, Any]) -> str:
-    """Return the unique id of the entry for a connection (``ip-<host>``...)."""
-    return f"{data['connection_type']}-{data.get(CONF_HOST) or data.get(CONF_DEVICE)}"
 
 
 def merge_reconfigure_input(
@@ -133,6 +130,8 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for Stiebel Eltron THZ (LAN or USB)."""
 
     VERSION = 1
+    # 1.2: CONF_DEVICE_IDENTIFIER in the entry data (async_migrate_entry).
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -675,12 +674,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             await device.async_initialize(self.hass)
 
-            unique_id = (
-                getattr(device, "unique_id", None)
-                or getattr(device, "serial", None)
-                or f"{conn_type}-{data.get(CONF_HOST) or data.get(CONF_DEVICE)}"
-            )
-            await self.async_set_unique_id(unique_id)
+            await self.async_set_unique_id(entry_unique_id(data))
             self._abort_if_unique_id_configured()
 
             firmware = device.firmware_version
@@ -778,6 +772,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
                 "alias": getattr(self, "alias", ""),
             }
+            data[CONF_DEVICE_IDENTIFIER] = entry_unique_id(data)
             conn_target = data.get("host") or data.get("device")
             title = f"THZ ({data['connection_type']}: {conn_target})"
             return self.async_create_entry(title=title, data=data)
