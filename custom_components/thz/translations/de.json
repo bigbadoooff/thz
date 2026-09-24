@@ -2931,7 +2931,7 @@
       "message": "Vom THZ-Gerät konnte kein Register-Block gelesen werden; neuer Versuch folgt"
     },
     "entry_not_found": {
-      "message": "Kein THZ-Eintrag mit der entry_id '{entry_id}' gefunden"
+      "message": "Kein THZ-Eintrag mit der entry_id {entry_id} gefunden"
     },
     "multiple_entries": {
       "message": "Es gibt mehrere THZ-Einträge. Gib mit 'entry_id' das Gerät an."
@@ -2964,19 +2964,19 @@
       "message": "Der Parameter block fehlt"
     },
     "block_not_found": {
-      "message": "Block '{block}' wird von keinem aktiven Koordinator abgefragt"
+      "message": "Block {block} wird von keinem aktiven Koordinator abgefragt"
     },
     "backup_write_failed": {
       "message": "Die Sicherungsdatei konnte nicht geschrieben werden: {error}"
     },
     "backup_not_found": {
-      "message": "Sicherungsdatei '{filename}' nicht gefunden"
+      "message": "Sicherungsdatei {filename} nicht gefunden"
     },
     "no_backups": {
       "message": "Keine Sicherungsdateien in {directory}/ gefunden"
     },
     "backup_read_failed": {
-      "message": "Die Sicherungsdatei '{path}' konnte nicht gelesen werden: {error}"
+      "message": "Die Sicherungsdatei {path} konnte nicht gelesen werden: {error}"
     },
     "fault_memory_not_supported": {
       "message": "Das Gerät unterstützt den D1-Fehlerspeicher nicht: {error}"
@@ -3018,7 +3018,7 @@
       "message": "Fehler beim Senden des Befehls an das Umschaltventil: {error}"
     },
     "button_press_failed": {
-      "message": "THZ-Taste '{name}' konnte nicht ausgeführt werden"
+      "message": "THZ-Taste {name} konnte nicht ausgeführt werden"
     }
   }
 }

@@ -2931,7 +2931,7 @@
       "message": "No register block could be read from the THZ device; will retry"
     },
     "entry_not_found": {
-      "message": "No THZ entry found for entry_id '{entry_id}'"
+      "message": "No THZ entry found for entry_id {entry_id}"
     },
     "multiple_entries": {
       "message": "Multiple THZ config entries found. Provide 'entry_id' to target a specific device."
@@ -2964,19 +2964,19 @@
       "message": "block parameter is required"
     },
     "block_not_found": {
-      "message": "Block '{block}' not found in any active coordinator"
+      "message": "Block {block} not found in any active coordinator"
     },
     "backup_write_failed": {
       "message": "Failed to write backup file: {error}"
     },
     "backup_not_found": {
-      "message": "Backup file '{filename}' not found"
+      "message": "Backup file {filename} not found"
     },
     "no_backups": {
       "message": "No backup files found in {directory}/"
     },
     "backup_read_failed": {
-      "message": "Failed to read backup file '{path}': {error}"
+      "message": "Failed to read backup file {path}: {error}"
     },
     "fault_memory_not_supported": {
       "message": "D1 fault memory is not supported by this device: {error}"
@@ -3018,7 +3018,7 @@
       "message": "Error sending diverter valve command: {error}"
     },
     "button_press_failed": {
-      "message": "Unable to execute THZ button '{name}'"
+      "message": "Unable to execute THZ button {name}"
     }
   }
 }

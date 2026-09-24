@@ -29,7 +29,7 @@ async def test_unknown_entry_id_is_a_validation_error(hass, fake_device):
     # The message comes from the integration's translations.
     assert err.value.translation_domain == DOMAIN
     assert err.value.translation_key == "entry_not_found"
-    assert str(err.value) == "No THZ entry found for entry_id 'missing'"
+    assert str(err.value) == "No THZ entry found for entry_id missing"
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 

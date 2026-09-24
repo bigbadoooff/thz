@@ -3,6 +3,7 @@
 import ast
 import json
 from pathlib import Path
+import re
 import string
 
 import pytest
@@ -66,6 +67,13 @@ def test_translations_have_the_same_keys_and_placeholders():
         assert exceptions.keys() == strings.keys(), name
         for key, entry in exceptions.items():
             assert _fields(entry["message"]) == _fields(strings[key]["message"]), key
+
+
+def test_no_placeholder_in_single_quotes():
+    """Hassfest rejects placeholders inside single quotes."""
+    for name, exceptions in TRANSLATIONS.items():
+        for key, entry in exceptions.items():
+            assert not re.search(r"'\{\w+\}'", entry["message"]), f"{name}: {key}"
 
 
 def test_every_translation_is_used():
