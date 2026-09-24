@@ -171,13 +171,49 @@ class FakeWriteManager:
 
 
 def make_climate(**kwargs):
-    """THZClimate with write-map dicts given for its ``*_entry`` arguments."""
-    from custom_components.thz.climate import THZClimate
+    """THZClimate from the individual pieces a ClimateConfig is made of.
 
-    for key, value in kwargs.items():
-        if key.endswith("_entry") and isinstance(value, dict):
-            kwargs[key] = write_param(value, name=key)
-    return THZClimate(**kwargs)
+    Accepts write-map dicts for the ``*_entry`` arguments, block positions as
+    ``*_offset``/``*_length`` pairs and the pxx0A0176 status coordinator and
+    bits, and builds the entity's ClimateConfig from them.
+    """
+    from custom_components.thz.climate import ClimateConfig, StatusBits, THZClimate
+
+    def param(key):
+        value = kwargs.pop(key, None)
+        return write_param(value, name=key) if isinstance(value, dict) else value
+
+    def position(name):
+        offset = kwargs.pop(f"{name}_offset", None)
+        length = kwargs.pop(f"{name}_length", None)
+        return None if offset is None or length is None else (offset, length)
+
+    status_coordinator = kwargs.pop("cooling_coordinator", None)
+    bits = {
+        "byte": kwargs.pop("cooling_byte", None),
+        "cooling_bit": kwargs.pop("cooling_bit", None),
+        "compressor_bit": kwargs.pop("compressor_bit", None),
+    }
+    status = (
+        StatusBits(coordinator=status_coordinator, **bits)
+        if status_coordinator is not None or any(v is not None for v in bits.values())
+        else None
+    )
+    config = ClimateConfig(
+        target=position("target_temp"),
+        current=position("current_temp"),
+        op_mode=position("op_mode"),
+        heat_setpoint=param("heat_setpoint_entry"),
+        night_setpoint=param("night_setpoint_entry"),
+        manual_setpoint=param("manual_setpoint_entry"),
+        cool_switch=param("cool_switch_entry"),
+        cool_setpoint=param("cool_setpoint_entry"),
+        opmode=param("opmode_entry"),
+        fan_stage=param("fan_stage_entry"),
+        status=status,
+    )
+    coordinator = kwargs.pop("coordinator")
+    return THZClimate(coordinator, config, **kwargs)
 
 
 def make_runtime_data(**fields):

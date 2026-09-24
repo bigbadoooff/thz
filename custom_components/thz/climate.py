@@ -69,7 +69,7 @@ read-only mode — ``target_temperature`` is still shown but
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any, cast
@@ -117,26 +117,8 @@ PARALLEL_UPDATES = 1
 
 _TEMP_FACTOR = 10.0
 
-# Write-register name candidates for heat setpoints (tried in order)
-_HC1_HEAT_SETPOINT_NAMES = ["p01RoomTempDayHC1", "p01RoomTempDay"]
-_HC1_NIGHT_SETPOINT_NAMES = ["p02RoomTempNightHC1", "p02RoomTempNight"]
-_DHW_SETPOINT_NAMES = ["p04DHWsetDayTemp", "p04DHWsetTempDay"]
-_DHW_NIGHT_SETPOINT_NAMES = ["p05DHWsetNightTemp", "p05DHWsetTempNight"]
-_DHW_MANUAL_SETPOINT_NAMES = ["p11DHWsetManualTemp", "p11DHWsetTempManual"]
-
-# Write-register names for HC1 cooling (present on devices with active cooling support)
-_HC1_COOL_SWITCH_NAME = "p99CoolingHC1Switch"
-_HC1_COOL_SETPOINT_NAME = "p99CoolingHC1SetTemp"
-
-# Write-register names for HC2
-_HC2_HEAT_SETPOINT_NAMES = ["p01RoomTempDayHC2"]
-_HC2_NIGHT_SETPOINT_NAMES = ["p02RoomTempNightHC2"]
-_HC2_COOL_SWITCH_NAME = "p99CoolingHC2Switch"
-_HC2_COOL_SETPOINT_NAME = "p99CoolingHC2SetTemp"
-
-# Write-register names for global operating mode and day fan stage
+# Write-register names shared by the heating circuits.
 _OPMODE_NAME = "pOpMode"
-_FAN_STAGE_DAY_NAME = "p07FanStageDay"
 
 # decode_type key for pOpMode in SELECT_MAP (value_maps.py) -- the device's
 # own global operating-mode names ("standby", "automatic", "DAYmode",
@@ -204,7 +186,7 @@ def _get_step(entry: WriteParam) -> float:
 
 
 def _find_entry(
-    write_registers: Mapping[str, WriteParam], names: list[str]
+    write_registers: Mapping[str, WriteParam], names: Iterable[str]
 ) -> WriteParam | None:
     """Return the first of ``names`` that the write map has, with a command.
 
@@ -219,164 +201,178 @@ def _find_entry(
     return None
 
 
+@dataclass(frozen=True, kw_only=True)
+class _Circuit:
+    """A climate entity described by register-map names.
+
+    Field names refer to the circuit's block in the read map; the setpoint,
+    cooling and fan names to the write map, where the first existing name
+    of each tuple wins (the maps name some registers differently per
+    firmware).
+    """
+
+    translation_key: str
+    block: str
+    target_field: str
+    current_field: str | None = None
+    op_mode_field: str
+    # HC2's block has no operating mode on some firmwares; it then reports
+    # a fixed HEAT mode instead of being skipped.
+    op_mode_required: bool = True
+    heat_setpoint_names: tuple[str, ...]
+    heat_setpoint_required: bool = False
+    night_setpoint_names: tuple[str, ...] = ()
+    manual_setpoint_names: tuple[str, ...] = ()
+    cool_switch_name: str | None = None
+    cool_setpoint_name: str | None = None
+    fan_stage_name: str | None = None
+    # Heating circuits show the pxx0A0176 status bits (hvac_action, cooling
+    # active) and the global operating mode as presets.
+    heating_circuit: bool = False
+    # Config option that enables the entity by default (None: always).
+    enabled_option: str | None = None
+
+
+_CIRCUITS = (
+    _Circuit(
+        translation_key="heating_circuit",
+        block="pxxF4",
+        current_field="insideTempRC",
+        target_field="roomSetTemp",
+        op_mode_field="hcOpMode",
+        heat_setpoint_names=("p01RoomTempDayHC1", "p01RoomTempDay"),
+        night_setpoint_names=("p02RoomTempNightHC1", "p02RoomTempNight"),
+        cool_switch_name="p99CoolingHC1Switch",
+        cool_setpoint_name="p99CoolingHC1SetTemp",
+        fan_stage_name="p07FanStageDay",
+        heating_circuit=True,
+    ),
+    _Circuit(
+        translation_key="heating_circuit_2",
+        block="pxxF5",
+        target_field="hc2SetpointTemp",
+        op_mode_field="hcOpMode",
+        op_mode_required=False,
+        heat_setpoint_names=("p01RoomTempDayHC2",),
+        heat_setpoint_required=True,
+        night_setpoint_names=("p02RoomTempNightHC2",),
+        cool_switch_name="p99CoolingHC2Switch",
+        cool_setpoint_name="p99CoolingHC2SetTemp",
+        heating_circuit=True,
+        enabled_option=CONF_ENABLE_HC2,
+    ),
+    _Circuit(
+        translation_key="dhw_heating",
+        block="pxxF3",
+        current_field="dhwTemp",
+        target_field="dhwSetTemp",
+        op_mode_field="dhwOpMode",
+        heat_setpoint_names=("p04DHWsetDayTemp", "p04DHWsetTempDay"),
+        night_setpoint_names=("p05DHWsetNightTemp", "p05DHWsetTempNight"),
+        manual_setpoint_names=("p11DHWsetManualTemp", "p11DHWsetTempManual"),
+    ),
+)
+
+
 @dataclass(frozen=True)
-class _ClimateSetup:
-    """What the climate entities of one config entry have in common."""
+class StatusBits:
+    """Cooling/compressor flags of the pxx0A0176 status block."""
 
-    device: Any
-    device_id: str
-    write_registers: Mapping[str, WriteParam]
-    register_manager: Any
-    entity_id_style: str
-    entity_id_prefix: str | None
-    cooling_coordinator: DataUpdateCoordinator | None
-    opmode_entry: WriteParam | None
-    cooling_byte: int | None
-    cooling_bit: int | None
-    compressor_bit: int | None
+    coordinator: DataUpdateCoordinator | None
+    byte: int | None = None
+    cooling_bit: int | None = None
+    compressor_bit: int | None = None
 
-    def field(self, block: str, name: str) -> tuple[int, int] | None:
-        return _field_layout(self.register_manager, block, name)
 
-    def entity_kwargs(self) -> dict[str, Any]:
-        return {
-            "device": self.device,
-            "device_id": self.device_id,
-            "entity_id_style": self.entity_id_style,
-            "entity_id_prefix": self.entity_id_prefix,
-        }
+@dataclass(frozen=True)
+class ClimateConfig:
+    """Everything one climate entity reads and writes, resolved for a firmware.
+
+    Block fields are (byte offset, byte length) in the circuit's block.
+    """
+
+    target: tuple[int, int]
+    current: tuple[int, int] | None = None
+    op_mode: tuple[int, int] | None = None
+    heat_setpoint: WriteParam | None = None
+    night_setpoint: WriteParam | None = None
+    manual_setpoint: WriteParam | None = None
+    cool_switch: WriteParam | None = None
+    cool_setpoint: WriteParam | None = None
+    opmode: WriteParam | None = None
+    fan_stage: WriteParam | None = None
+    status: StatusBits | None = None
 
 
 def _command_entry(
-    write_registers: Mapping[str, WriteParam], name: str
+    write_registers: Mapping[str, WriteParam], name: str | None
 ) -> WriteParam | None:
     """Return a write parameter if it exists and has a command."""
-    entry = write_registers.get(name)
+    entry = write_registers.get(name) if name is not None else None
     return entry if entry is not None and entry.command else None
 
 
-def _cooling_entries(
-    write_registers: Mapping[str, WriteParam], switch_name: str, setpoint_name: str
-) -> tuple[WriteParam | None, WriteParam | None]:
-    """Return the cooling switch and setpoint entries, only if both exist."""
-    switch = _command_entry(write_registers, switch_name)
-    setpoint = _command_entry(write_registers, setpoint_name)
-    if switch is None or setpoint is None:
-        return None, None
-    return switch, setpoint
+def _resolve(
+    circuit: _Circuit,
+    register_manager: Any,
+    write_registers: Mapping[str, WriteParam],
+    status: StatusBits,
+) -> ClimateConfig | None:
+    """Look a circuit's fields and registers up in the firmware's maps.
 
-
-def _hc1_entity(
-    setup: _ClimateSetup, coordinator: DataUpdateCoordinator
-) -> THZClimate | None:
-    current = setup.field("pxxF4", "insideTempRC")
-    target = setup.field("pxxF4", "roomSetTemp")
-    opmode = setup.field("pxxF4", "hcOpMode")
-    if current is None or target is None or opmode is None:
+    Returns None (and logs why) if a required field or register is missing.
+    """
+    target = _field_layout(register_manager, circuit.block, circuit.target_field)
+    current = (
+        _field_layout(register_manager, circuit.block, circuit.current_field)
+        if circuit.current_field is not None
+        else None
+    )
+    op_mode = _field_layout(register_manager, circuit.block, circuit.op_mode_field)
+    if (
+        target is None
+        or (circuit.current_field is not None and current is None)
+        or (circuit.op_mode_required and op_mode is None)
+    ):
         _LOGGER.error(
-            "Required fields missing from pxxF4 map; skipping HC1 climate entity"
+            "Required fields missing from %s map; skipping %s climate entity",
+            circuit.block,
+            circuit.translation_key,
         )
         return None
-    registers = setup.write_registers
-    cool_switch, cool_setpoint = _cooling_entries(
-        registers, _HC1_COOL_SWITCH_NAME, _HC1_COOL_SETPOINT_NAME
-    )
-    return THZClimate(
-        coordinator=coordinator,
-        cooling_coordinator=setup.cooling_coordinator,
-        translation_key="heating_circuit",
-        current_temp_offset=current[0],
-        current_temp_length=current[1],
-        target_temp_offset=target[0],
-        target_temp_length=target[1],
-        op_mode_offset=opmode[0],
-        op_mode_length=opmode[1],
-        cooling_byte=setup.cooling_byte,
-        cooling_bit=setup.cooling_bit,
-        compressor_bit=setup.compressor_bit,
-        heat_setpoint_entry=_find_entry(registers, _HC1_HEAT_SETPOINT_NAMES),
-        night_setpoint_entry=_find_entry(registers, _HC1_NIGHT_SETPOINT_NAMES),
-        cool_switch_entry=cool_switch,
-        cool_setpoint_entry=cool_setpoint,
-        opmode_entry=setup.opmode_entry,
-        fan_stage_entry=_command_entry(registers, _FAN_STAGE_DAY_NAME),
-        **setup.entity_kwargs(),
-    )
-
-
-def _hc2_entity(
-    setup: _ClimateSetup, coordinator: DataUpdateCoordinator, enabled: bool
-) -> THZClimate | None:
-    target = setup.field("pxxF5", "hc2SetpointTemp")
-    if target is None:
-        _LOGGER.error(
-            "Required fields missing from pxxF5 map; skipping HC2 climate entity"
-        )
-        return None
-    opmode = setup.field("pxxF5", "hcOpMode")
-    if opmode is None:
+    if op_mode is None:
         _LOGGER.debug(
-            "pxxF5 has no hcOpMode field; HC2 climate reports a fixed "
-            "HEAT mode instead of live per-circuit status"
+            "%s has no %s field; %s reports a fixed HEAT mode instead of live "
+            "per-circuit status",
+            circuit.block,
+            circuit.op_mode_field,
+            circuit.translation_key,
         )
-    registers = setup.write_registers
-    heat_entry = _find_entry(registers, _HC2_HEAT_SETPOINT_NAMES)
-    if heat_entry is None:
-        return None
-    cool_switch, cool_setpoint = _cooling_entries(
-        registers, _HC2_COOL_SWITCH_NAME, _HC2_COOL_SETPOINT_NAME
-    )
-    return THZClimate(
-        coordinator=coordinator,
-        cooling_coordinator=setup.cooling_coordinator,
-        translation_key="heating_circuit_2",
-        current_temp_offset=None,
-        current_temp_length=None,
-        target_temp_offset=target[0],
-        target_temp_length=target[1],
-        op_mode_offset=opmode[0] if opmode else None,
-        op_mode_length=opmode[1] if opmode else None,
-        enabled_default=enabled,
-        cooling_byte=setup.cooling_byte,
-        cooling_bit=setup.cooling_bit,
-        compressor_bit=setup.compressor_bit,
-        heat_setpoint_entry=heat_entry,
-        night_setpoint_entry=_find_entry(registers, _HC2_NIGHT_SETPOINT_NAMES),
-        cool_switch_entry=cool_switch,
-        cool_setpoint_entry=cool_setpoint,
-        opmode_entry=setup.opmode_entry,
-        **setup.entity_kwargs(),
-    )
 
-
-def _dhw_entity(
-    setup: _ClimateSetup, coordinator: DataUpdateCoordinator
-) -> THZClimate | None:
-    current = setup.field("pxxF3", "dhwTemp")
-    target = setup.field("pxxF3", "dhwSetTemp")
-    opmode = setup.field("pxxF3", "dhwOpMode")
-    if current is None or target is None or opmode is None:
-        _LOGGER.error(
-            "Required fields missing from pxxF3 map; skipping DHW climate entity"
-        )
+    heat = _find_entry(write_registers, circuit.heat_setpoint_names)
+    if heat is None and circuit.heat_setpoint_required:
         return None
-    registers = setup.write_registers
-    return THZClimate(
-        coordinator=coordinator,
-        cooling_coordinator=None,
-        translation_key="dhw_heating",
-        current_temp_offset=current[0],
-        current_temp_length=current[1],
-        target_temp_offset=target[0],
-        target_temp_length=target[1],
-        op_mode_offset=opmode[0],
-        op_mode_length=opmode[1],
-        heat_setpoint_entry=_find_entry(registers, _DHW_SETPOINT_NAMES),
-        night_setpoint_entry=_find_entry(registers, _DHW_NIGHT_SETPOINT_NAMES),
-        manual_setpoint_entry=_find_entry(registers, _DHW_MANUAL_SETPOINT_NAMES),
-        cool_switch_entry=None,
-        cool_setpoint_entry=None,
-        **setup.entity_kwargs(),
+    cool_switch = _command_entry(write_registers, circuit.cool_switch_name)
+    cool_setpoint = _command_entry(write_registers, circuit.cool_setpoint_name)
+    if cool_switch is None or cool_setpoint is None:
+        # Cooling needs both the switch and the setpoint.
+        cool_switch = cool_setpoint = None
+    return ClimateConfig(
+        target=target,
+        current=current,
+        op_mode=op_mode,
+        heat_setpoint=heat,
+        night_setpoint=_find_entry(write_registers, circuit.night_setpoint_names),
+        manual_setpoint=_find_entry(write_registers, circuit.manual_setpoint_names),
+        cool_switch=cool_switch,
+        cool_setpoint=cool_setpoint,
+        opmode=(
+            _command_entry(write_registers, _OPMODE_NAME)
+            if circuit.heating_circuit
+            else None
+        ),
+        fan_stage=_command_entry(write_registers, circuit.fan_stage_name),
+        status=status if circuit.heating_circuit else None,
     )
 
 
@@ -404,30 +400,38 @@ async def async_setup_entry(
     # Bit-field layouts for pxx0A0176 — None when not present in map
     cooling = _bit_field_layout(register_manager, "pxx0A0176", "cooling")
     compressor = _bit_field_layout(register_manager, "pxx0A0176", "compressor")
-    setup = _ClimateSetup(
-        device=entry_data.device,
-        device_id=entry_data.device_id,
-        write_registers=write_registers,
-        register_manager=register_manager,
-        entity_id_style=entry_data.entity_id_style,
-        entity_id_prefix=entry_data.entity_id_prefix,
-        cooling_coordinator=coordinators.get("pxx0A0176"),
-        opmode_entry=_command_entry(write_registers, _OPMODE_NAME),
-        cooling_byte=cooling[0] if cooling else None,
+    status = StatusBits(
+        coordinator=coordinators.get("pxx0A0176"),
+        byte=cooling[0] if cooling else None,
         cooling_bit=cooling[1] if cooling else None,
         compressor_bit=compressor[1] if compressor else None,
     )
 
-    candidates: list[THZClimate | None] = []
-    if (hc1 := coordinators.get("pxxF4")) is not None:
-        candidates.append(_hc1_entity(setup, hc1))
-    if (hc2 := coordinators.get("pxxF5")) is not None:
-        enable_hc2 = bool(config_entry.data.get(CONF_ENABLE_HC2, False))
-        candidates.append(_hc2_entity(setup, hc2, enable_hc2))
-    if (dhw := coordinators.get("pxxF3")) is not None:
-        candidates.append(_dhw_entity(setup, dhw))
+    entities: list[THZClimate] = []
+    for circuit in _CIRCUITS:
+        coordinator = coordinators.get(circuit.block)
+        if coordinator is None:
+            continue
+        config = _resolve(circuit, register_manager, write_registers, status)
+        if config is None:
+            continue
+        entities.append(
+            THZClimate(
+                coordinator,
+                config,
+                device=entry_data.device,
+                device_id=entry_data.device_id,
+                translation_key=circuit.translation_key,
+                entity_id_style=entry_data.entity_id_style,
+                entity_id_prefix=entry_data.entity_id_prefix,
+                enabled_default=(
+                    bool(config_entry.data.get(circuit.enabled_option, False))
+                    if circuit.enabled_option is not None
+                    else True
+                ),
+            )
+        )
 
-    entities = [entity for entity in candidates if entity is not None]
     if entities:
         assign_subdevices(entities, config_entry.data)
         async_add_entities(entities, True)
@@ -545,26 +549,11 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
     def __init__(
         self,
         coordinator: DataUpdateCoordinator,
-        cooling_coordinator: DataUpdateCoordinator | None,
+        config: ClimateConfig,
+        *,
         device: Any,
         device_id: str,
         translation_key: str,
-        current_temp_offset: int | None,
-        current_temp_length: int | None,
-        target_temp_offset: int,
-        target_temp_length: int,
-        op_mode_offset: int | None,
-        op_mode_length: int | None,
-        heat_setpoint_entry: WriteParam | None,
-        cool_switch_entry: WriteParam | None,
-        cool_setpoint_entry: WriteParam | None,
-        opmode_entry: WriteParam | None = None,
-        fan_stage_entry: WriteParam | None = None,
-        cooling_byte: int | None = None,
-        cooling_bit: int | None = None,
-        compressor_bit: int | None = None,
-        night_setpoint_entry: WriteParam | None = None,
-        manual_setpoint_entry: WriteParam | None = None,
         entity_id_style: str = ENTITY_ID_STYLE_DEFAULT,
         entity_id_prefix: str | None = None,
         enabled_default: bool = True,
@@ -572,39 +561,15 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         """Initialise a THZ climate entity.
 
         Args:
-            coordinator: Primary DataUpdateCoordinator (pxxF4 or pxxF3).
-            cooling_coordinator: Optional coordinator for pxx0A0176 (cooling
-                status bit); only used when cooling entries are present.
+            coordinator: The circuit's block coordinator (pxxF4, pxxF5 or
+                pxxF3).
+            config: The circuit's fields and registers, resolved for the
+                firmware (see ``_resolve``). Optional parts switch features
+                on: cooling needs both cooling registers, presets the
+                pOpMode register, fan modes the fan-stage register.
             device: THZDevice instance used for write operations.
             device_id: Stable device identifier for the HA device registry.
             translation_key: HA translation key (e.g. ``"heating_circuit"``).
-            current_temp_offset: Byte offset of current temperature in block.
-            current_temp_length: Byte length of current temperature field.
-            target_temp_offset: Byte offset of target temperature in block.
-            target_temp_length: Byte length of target temperature field.
-            op_mode_offset: Byte offset of operating-mode field in block, or
-                ``None`` when the block has none (HC2); ``hvac_mode`` is then
-                a fixed ``HEAT``.
-            op_mode_length: Byte length of operating-mode field. Ignored when
-                ``op_mode_offset`` is ``None``.
-            heat_setpoint_entry: Write-register metadata for heat setpoint.
-            cool_switch_entry: Write-register metadata for cooling switch.
-            cool_setpoint_entry: Write-register metadata for cooling setpoint.
-            opmode_entry: Write-register metadata for the global operating-mode
-                register (``pOpMode``).  Enables preset mode when provided.
-            fan_stage_entry: Write-register metadata for the day fan-stage
-                register (``p07FanStageDay``).  Enables fan mode when provided.
-            cooling_byte: Byte index of the cooling-active bit in the
-                ``pxx0A0176`` coordinator data, or ``None`` if unavailable.
-            cooling_bit: Bit index of the cooling-active flag within
-                ``cooling_byte``, or ``None`` if unavailable.
-            compressor_bit: Bit index of the compressor-active flag within
-                ``cooling_byte``, or ``None`` if unavailable.
-            night_setpoint_entry: Write-register metadata for the night
-                setpoint sharing this circuit's heat setpoint, or ``None``
-                if the circuit has no separate night register.
-            manual_setpoint_entry: Write-register metadata for the circuit's
-                manual-mode setpoint, or ``None`` if not available.
             entity_id_style: One of the ``ENTITY_ID_STYLE_*`` values from
                 const.py. "fhem" sets ``self.entity_id`` directly (using
                 ``translation_key`` as the raw name, since a climate entity
@@ -624,32 +589,35 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         if not enabled_default:
             self._attr_entity_registry_enabled_default = False
 
-        self._cooling_coordinator = cooling_coordinator
+        status = config.status or StatusBits(coordinator=None)
+        self._cooling_coordinator = status.coordinator
         self._device = device
         self._device_id = device_id
 
-        self._current_temp_offset = current_temp_offset
-        self._current_temp_length = current_temp_length
-        self._target_temp_offset = target_temp_offset
-        self._target_temp_length = target_temp_length
-        self._op_mode_offset = op_mode_offset
-        self._op_mode_length = op_mode_length
+        # (byte offset, byte length) in the block; HC2 has no current
+        # temperature and may have no operating mode.
+        current, op_mode = config.current, config.op_mode
+        self._current_temp_offset: int | None = current[0] if current else None
+        self._current_temp_length: int | None = current[1] if current else None
+        self._target_temp_offset, self._target_temp_length = config.target
+        self._op_mode_offset: int | None = op_mode[0] if op_mode else None
+        self._op_mode_length: int | None = op_mode[1] if op_mode else None
 
-        self._heat_setpoint_entry = heat_setpoint_entry
-        self._night_setpoint_entry = night_setpoint_entry
-        self._manual_setpoint_entry = manual_setpoint_entry
-        self._cool_switch_entry = cool_switch_entry
-        self._cool_setpoint_entry = cool_setpoint_entry
-        self._cooling_byte = cooling_byte
-        self._cooling_bit = cooling_bit
-        self._compressor_bit = compressor_bit
+        self._heat_setpoint_entry = config.heat_setpoint
+        self._night_setpoint_entry = config.night_setpoint
+        self._manual_setpoint_entry = config.manual_setpoint
+        self._cool_switch_entry = config.cool_switch
+        self._cool_setpoint_entry = config.cool_setpoint
+        self._cooling_byte = status.byte
+        self._cooling_bit = status.cooling_bit
+        self._compressor_bit = status.compressor_bit
 
         # Cached cooling setpoint (populated on first device read)
         self._cooling_target_temp: float | None = None
 
         # Optional write entries for preset mode and fan mode
-        self._opmode_entry = opmode_entry
-        self._fan_stage_entry = fan_stage_entry
+        self._opmode_entry = config.opmode
+        self._fan_stage_entry = config.fan_stage
         self._fan_stage_cache: int | None = None
         self._op_mode_cache: str | None = None
 
@@ -681,7 +649,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         # The device's real "off" is the global pOpMode standby state, which
         # is exposed via preset_mode instead.
         self._supports_cooling = (
-            cool_switch_entry is not None and cool_setpoint_entry is not None
+            self._cool_switch_entry is not None
+            and self._cool_setpoint_entry is not None
         )
         # HVACMode/ClimateEntityFeature members are mistyped as plain `str`/
         # `int` in some older homeassistant-stubs snapshots; not real type
@@ -694,12 +663,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         # TARGET_TEMPERATURE feature is available whenever we have a heat
         # setpoint command OR cooling is supported (then both heat/cool temps
         # are settable depending on the current mode)
-        if heat_setpoint_entry is not None or self._supports_cooling:
+        if self._heat_setpoint_entry is not None or self._supports_cooling:
             self._attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
         else:
             self._attr_supported_features = ClimateEntityFeature(0)
 
-        if opmode_entry is not None:
+        if self._opmode_entry is not None:
             self._attr_supported_features |= ClimateEntityFeature.PRESET_MODE
             # Use the device's own mode names directly (sorted the same way
             # FHEM's setList did: case-insensitively) instead of mapping onto
@@ -708,14 +677,18 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 SELECT_MAP[_OPMODE_DECODE_TYPE].values(), key=str.lower
             )
 
-        if fan_stage_entry is not None:
+        if self._fan_stage_entry is not None:
             self._attr_supported_features |= ClimateEntityFeature.FAN_MODE
             self._attr_fan_modes = list(_FAN_MODES)
 
         # Temperature bounds from heat setpoint entry
-        if heat_setpoint_entry is not None:
-            self._attr_min_temp = float(heat_setpoint_entry.min or _DEFAULT_MIN_TEMP)
-            self._attr_max_temp = float(heat_setpoint_entry.max or _DEFAULT_MAX_TEMP)
+        if self._heat_setpoint_entry is not None:
+            self._attr_min_temp = float(
+                self._heat_setpoint_entry.min or _DEFAULT_MIN_TEMP
+            )
+            self._attr_max_temp = float(
+                self._heat_setpoint_entry.max or _DEFAULT_MAX_TEMP
+            )
         else:
             self._attr_min_temp = _DEFAULT_MIN_TEMP
             self._attr_max_temp = _DEFAULT_MAX_TEMP
