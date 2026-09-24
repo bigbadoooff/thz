@@ -3,8 +3,8 @@
 Exercises async_setup_write_platform():
 - Filtering write registers by platform_type.
 - Entity construction path (entity_type(...)).
-- write_interval sourced from config_entry.data, with DEFAULT_WRITE_INTERVAL
-  fallback when absent.
+- The entities get the block coordinators and the poller, and are added
+  without a read before adding (the poller reads them).
 - Empty register map -> async_add_entities called with an empty list.
 """
 
@@ -12,7 +12,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from custom_components.thz.const import DEFAULT_WRITE_INTERVAL
 from custom_components.thz.platform_setup import async_setup_write_platform
 from tests.helpers import FakeWriteManager, make_runtime_data
 
@@ -26,7 +25,6 @@ class FakeEntity:
         entry,
         device,
         device_id,
-        scan_interval,
         entity_id_style="default",
         entity_visibility="default",
         entity_id_prefix=None,
@@ -35,7 +33,6 @@ class FakeEntity:
         self.entry = entry
         self.device = device
         self.device_id = device_id
-        self.scan_interval = scan_interval
         self.entity_id_style = entity_id_style
         self.entity_visibility = entity_visibility
         self.entity_id_prefix = entity_id_prefix
@@ -76,14 +73,15 @@ class TestAsyncSetupWritePlatformDefaultFactory:
         )
 
         assert async_add_entities.call_count == 1
-        entities, update_before_add = async_add_entities.call_args.args
-        assert update_before_add is True
+        (entities,) = async_add_entities.call_args.args
         assert len(entities) == 2
         names = {e.name for e in entities}
         assert names == {"reg_number_1", "reg_number_2"}
         for e in entities:
             assert e.device is device
             assert e.device_id == "dev1"
+            assert e._poller is config_entry.runtime_data.poller
+            assert e._coordinators is config_entry.runtime_data.coordinators
 
     @pytest.mark.asyncio
     async def test_no_matching_entries_yields_empty_list(self):
@@ -95,7 +93,7 @@ class TestAsyncSetupWritePlatformDefaultFactory:
             hass, config_entry, async_add_entities, FakeEntity, "number"
         )
 
-        entities, _ = async_add_entities.call_args.args
+        (entities,) = async_add_entities.call_args.args
         assert entities == []
 
     @pytest.mark.asyncio
@@ -107,37 +105,5 @@ class TestAsyncSetupWritePlatformDefaultFactory:
             hass, config_entry, async_add_entities, FakeEntity, "select"
         )
 
-        entities, flag = async_add_entities.call_args.args
+        (entities,) = async_add_entities.call_args.args
         assert entities == []
-        assert flag is True
-
-    @pytest.mark.asyncio
-    async def test_write_interval_defaults_when_missing(self):
-        registers = {"reg1": {"type": "time", "command": "cmd"}}
-        hass, config_entry, _, _ = _make_hass_and_entry(
-            registers, write_interval_data={}
-        )
-        async_add_entities = MagicMock()
-
-        await async_setup_write_platform(
-            hass, config_entry, async_add_entities, FakeEntity, "time"
-        )
-
-        entities, _ = async_add_entities.call_args.args
-        assert len(entities) == 1
-        assert entities[0].scan_interval == DEFAULT_WRITE_INTERVAL
-
-    @pytest.mark.asyncio
-    async def test_write_interval_taken_from_config_entry(self):
-        registers = {"reg1": {"type": "time", "command": "cmd"}}
-        hass, config_entry, _, _ = _make_hass_and_entry(
-            registers, write_interval_data={"write_interval": 4242}
-        )
-        async_add_entities = MagicMock()
-
-        await async_setup_write_platform(
-            hass, config_entry, async_add_entities, FakeEntity, "time"
-        )
-
-        entities, _ = async_add_entities.call_args.args
-        assert entities[0].scan_interval == 4242

@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
     from .fault_state import THZFaultTracker
+    from .parameter_poller import ParameterPoller
     from .register_maps.register_map_manager import (
         RegisterMapManager,
         RegisterMapManagerWrite,
@@ -35,6 +36,8 @@ class THZRuntimeData:
     device_id: str
     write_manager: RegisterMapManagerWrite
     register_manager: RegisterMapManager
+    # Polls the registers of the number, select, switch and time entities.
+    poller: ParameterPoller
     # Block coordinators by block name ("pxxFB").
     coordinators: dict[str, DataUpdateCoordinator[Any]] = field(default_factory=dict)
     # Polled blocks the firmware does not have (no entities are created).

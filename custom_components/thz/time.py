@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .base_entity import THZBaseEntity
+from .base_entity import THZBaseEntity, THZParameterEntity
 from .const import (
     TIME_VALUE_UNSET,
 )
@@ -18,6 +18,7 @@ from .devices import assign_subdevices
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
 from .parameter_io import async_read_parameter, async_write_parameter
+from .parameter_poller import ReadKey
 from .register_maps.model import WriteParam
 from .register_maps.register_map_manager import RegisterMapManagerWrite
 from .runtime_data import THZConfigEntry
@@ -25,8 +26,12 @@ from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-# Each entity polls and writes to the device directly (no coordinator);
-# limit to one in-flight update/service call at a time.
+# A schedule register's start and end bytes and the two after them.
+SCHEDULE_OFFSET = 4
+SCHEDULE_LENGTH = 4
+
+# Values come from the parameter poller or a block coordinator; writes go
+# to the device directly, one at a time.
 PARALLEL_UPDATES = 1
 
 
@@ -149,7 +154,6 @@ def _create_time_entities(
     entry: WriteParam,
     device,
     device_id,
-    write_interval,
     entity_id_style="default",
     entity_visibility="default",
     entity_id_prefix=None,
@@ -166,7 +170,6 @@ def _create_time_entities(
                 device=device,
                 device_id=device_id,
                 time_type="start",
-                scan_interval=write_interval,
                 entity_id_style=entity_id_style,
                 entity_visibility=entity_visibility,
                 entity_id_prefix=entity_id_prefix,
@@ -178,7 +181,6 @@ def _create_time_entities(
                 device=device,
                 device_id=device_id,
                 time_type="end",
-                scan_interval=write_interval,
                 entity_id_style=entity_id_style,
                 entity_visibility=entity_visibility,
                 entity_id_prefix=entity_id_prefix,
@@ -191,7 +193,6 @@ def _create_time_entities(
             entry=entry,
             device=device,
             device_id=device_id,
-            scan_interval=write_interval,
             entity_id_style=entity_id_style,
             entity_visibility=entity_visibility,
             entity_id_prefix=entity_id_prefix,
@@ -213,10 +214,6 @@ async def async_setup_entry(
     entity_visibility = entry_data.entity_visibility
     entity_id_prefix = entry_data.entity_id_prefix
 
-    from .const import DEFAULT_WRITE_INTERVAL
-
-    write_interval = config_entry.data.get("write_interval", DEFAULT_WRITE_INTERVAL)
-
     params = write_manager.params()
     _LOGGER.debug("Loading time platform with %d registers", len(params))
 
@@ -234,7 +231,6 @@ async def async_setup_entry(
                 entry,
                 device,
                 device_id,
-                write_interval,
                 entity_id_style,
                 entity_visibility,
                 entity_id_prefix,
@@ -242,10 +238,14 @@ async def async_setup_entry(
             entities.extend(
                 new_entities if isinstance(new_entities, list) else [new_entities]
             )
+    for entity in entities:
+        entity._coordinators = entry_data.coordinators
+        entity._poller = entry_data.poller
 
     _LOGGER.info("Created %d time entities", len(entities))
     assign_subdevices(entities, config_entry.data)
-    async_add_entities(entities, True)
+    # Values arrive from the poller; see parameter_poller.py.
+    async_add_entities(entities)
 
     # Home Assistant's built-in time.set_value service cannot represent "no
     # time" -- its schema requires a real datetime.time -- so there is no
@@ -260,7 +260,7 @@ async def async_setup_entry(
     )
 
 
-class THZTime(THZBaseEntity, TimeEntity):
+class THZTime(THZParameterEntity, TimeEntity):
     """Time entity for THZ devices."""
 
     def __init__(
@@ -269,7 +269,6 @@ class THZTime(THZBaseEntity, TimeEntity):
         entry: WriteParam,
         device: THZDevice,
         device_id: str,
-        scan_interval: int | None = None,
         entity_id_style: str = "default",
         entity_visibility: str = "default",
         entity_id_prefix: str | None = None,
@@ -281,7 +280,6 @@ class THZTime(THZBaseEntity, TimeEntity):
             entry: The write-map parameter.
             device: THZ device instance.
             device_id: The device identifier for linking to device.
-            scan_interval: The scan interval in seconds for polling updates.
             entity_id_style: "default" or "fhem" (see base_entity.py).
             entity_visibility: "default"/"extended"/"all" (see base_entity.py).
             entity_id_prefix: Optional device alias prefix for "fhem"-style
@@ -294,7 +292,6 @@ class THZTime(THZBaseEntity, TimeEntity):
             device=device,
             device_id=device_id,
             icon=entry.icon,
-            scan_interval=scan_interval,
             translation_key=get_translation_key(name),
             entity_id_style=entity_id_style,
             entity_visibility=entity_visibility,
@@ -314,15 +311,11 @@ class THZTime(THZBaseEntity, TimeEntity):
         """Return the native value of the time."""
         return self._attr_native_value
 
-    async def async_update(self):
-        """Fetch new state data for the time."""
-        # Time values are stored as single bytes (0-95 quarters)
-        value_bytes = await self._async_guarded_read(
-            async_read_parameter(self.hass, self._device, self._entry)
-        )
-        if value_bytes is None:
+    def _apply_value(self, value_bytes: bytes) -> None:
+        """Decode the time from its byte of the register."""
+        if len(value_bytes) <= self._byte_index:
+            _LOGGER.warning("Too little data for time %s: %s", self.name, value_bytes)
             return
-
         num = value_bytes[self._byte_index]
         self._attr_native_value = quarters_to_time(num)
         _LOGGER.debug(
@@ -363,9 +356,10 @@ class THZTime(THZBaseEntity, TimeEntity):
         # "quarter"), not the raw value passed in -- the device can only
         # store 15-minute increments, so e.g. 14:37 is stored as 14:30.
         # Round-tripping through quarters_to_time() keeps this in sync with
-        # what the next poll's async_update() would read back anyway.
+        # what the next poll would read back anyway.
         self._attr_native_value = quarters_to_time(num)
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+        await self._async_after_write()
 
     async def _async_write_quarters(self, num: int) -> None:
         """Write ``num`` into this entity's byte of the 2-byte register.
@@ -402,6 +396,7 @@ class THZTime(THZBaseEntity, TimeEntity):
 
         self._attr_native_value = None
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+        await self._async_after_write()
 
 
 class THZScheduleTime(THZBaseEntity, TimeEntity):
@@ -415,7 +410,6 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         device: THZDevice,
         device_id: str,
         time_type: str,
-        scan_interval: int | None = None,
         entity_id_style: str = "default",
         entity_visibility: str = "default",
         entity_id_prefix: str | None = None,
@@ -432,7 +426,6 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             device: THZ device instance.
             device_id: The device identifier for linking to device.
             time_type: Either "start" or "end".
-            scan_interval: The scan interval in seconds for polling updates.
             entity_id_style: "default" or "fhem" (see base_entity.py). Applied
                 using the full ``name`` (already including the " Start"/" End"
                 suffix), so the FHEM-style entity_id naturally ends in
@@ -460,7 +453,6 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             device=device,
             device_id=device_id,
             icon=entry.icon,
-            scan_interval=scan_interval,
             translation_key=translation_key,
             entity_id_style=entity_id_style,
             entity_visibility=entity_visibility,
@@ -485,22 +477,19 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         """Return the native value of the time."""
         return self._attr_native_value
 
-    async def async_update(self):
-        """Fetch new state data for the schedule time."""
-        # Schedules exist only as 4.x/5.x registers whose four data bytes hold
-        # start and end together, so they are read and written whole here
-        # rather than as one parameter through parameter_io.
-        value_bytes = await self._async_read_register(4, 4)
-        if value_bytes is None:
-            return
+    def _poll_key(self) -> ReadKey:
+        """Return the schedule's four data bytes; start and end share them.
 
-        # Schedule data format (from FHEM 7prog):
-        # - Bytes 0-3: header/other data
-        # - Byte 4 (offset 8 hex digits): start time (1 byte, 0-95 quarters)
-        # - Byte 5 (offset 10 hex digits): end time (1 byte, 0-95 quarters)
-        # However, read_value returns data starting at offset 4, so:
-        # - value_bytes[0]: start time
-        # - value_bytes[1]: end time
+        Schedules exist only as 4.x/5.x registers whose data bytes hold
+        start and end together, so they are read and written whole here
+        rather than as one parameter through parameter_io.
+        """
+        return self._command, SCHEDULE_OFFSET, SCHEDULE_LENGTH
+
+    def _apply_value(self, value_bytes: bytes) -> None:
+        """Decode the start (first byte) or end (second byte) time."""
+        # FHEM 7prog: start at nibble offset 8 (byte 4), end at nibble
+        # offset 10 (byte 5); the read starts at byte 4.
         if len(value_bytes) < 2:
             _LOGGER.warning(
                 "No data received for schedule time %s (%s), keeping previous value",
@@ -551,8 +540,8 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
                 self._device.read_value,
                 bytes.fromhex(self._command),
                 "get",
-                4,
-                4,
+                SCHEDULE_OFFSET,
+                SCHEDULE_LENGTH,
             )
 
             # Modify only the relevant byte (start or end time)
@@ -581,9 +570,10 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
 
         # Reflect what was actually written (quantized to a 15-minute
         # "quarter", with the same end-of-day 96 -> 00:00 handling
-        # async_update()'s read path applies), not the raw value passed in.
+        # _apply_value applies), not the raw value passed in.
         self._attr_native_value = quarters_to_time(new_num)
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+        await self._async_after_write()
 
     async def async_clear_value(self) -> None:
         """Clear this schedule start/end time to the device's own "unset" state.
@@ -603,8 +593,8 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             self._device.read_value,
             bytes.fromhex(self._command),
             "get",
-            4,
-            4,
+            SCHEDULE_OFFSET,
+            SCHEDULE_LENGTH,
         )
 
         schedule_bytes = bytearray(current_bytes)
@@ -622,3 +612,4 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
 
         self._attr_native_value = None
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+        await self._async_after_write()

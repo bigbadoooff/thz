@@ -64,10 +64,11 @@ class TestAsyncSetupEntry:
         await async_setup_entry(hass, config_entry, async_add_entities)
 
         async_add_entities.assert_called_once()
-        entities, update_before_add = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         assert len(entities) == 1
         assert isinstance(entities[0], THZButton)
-        assert update_before_add is True
+        # Values come from the poller, not a read before adding.
+        assert entities[0]._poller is config_entry.runtime_data.poller
 
 
 class TestTHZButtonInit:
@@ -96,12 +97,17 @@ class TestTHZButtonLifecycle:
     """Tests for THZButton's overridden lifecycle/no-op methods."""
 
     @pytest.mark.asyncio
-    async def test_async_added_to_hass_is_noop(self):
+    async def test_button_is_not_polled(self, monkeypatch):
+        import custom_components.thz.base_entity as base_entity_mod
+
+        monkeypatch.setattr(
+            base_entity_mod.Entity, "async_added_to_hass", AsyncMock(), raising=False
+        )
         entity = _make_entity()
-        # Should return without raising, and not touch _unsub_update.
-        result = await entity.async_added_to_hass()
-        assert result is None
-        assert entity._unsub_update is None
+        entity._poller = MagicMock()
+        await entity.async_added_to_hass()
+        entity._poller.async_subscribe.assert_not_called()
+        assert entity._unsub_poll is None
 
     @pytest.mark.asyncio
     async def test_async_update_is_noop(self):

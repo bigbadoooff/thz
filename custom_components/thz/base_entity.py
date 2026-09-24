@@ -7,18 +7,16 @@ across entity platforms (number, switch, select, time).
 from __future__ import annotations
 
 from collections.abc import Callable, Coroutine, Mapping
-from datetime import datetime, timedelta
 import logging
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import EntityCategory
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.event import async_track_time_interval
 
 from .const import (
-    DEFAULT_UPDATE_INTERVAL,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
     should_hide_entity,
@@ -27,8 +25,18 @@ from .const import (
 from .devices import thz_device_info
 from .entity_id_style import resolve_suggested_object_id
 from .exceptions import DEVICE_ERRORS
+from .parameter_io import (
+    block_coordinator_key,
+    parameter_from_block,
+    parameter_from_read,
+    parameter_read_key,
+)
 
 if TYPE_CHECKING:
+    from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+    from .parameter_poller import ParameterPoller, ReadKey
+    from .register_maps.model import WriteParam
     from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,6 +53,8 @@ class THZBaseEntity(Entity):
     # Block coordinators by key ("pxx17"), set by the platform setup; lets
     # 2xx block parameters read from data that is already being polled.
     _coordinators: Mapping[str, Any] = MappingProxyType({})
+    # The poller of the config entry, set by the platform setup.
+    _poller: ParameterPoller | None = None
 
     def __init__(
         self,
@@ -54,7 +64,6 @@ class THZBaseEntity(Entity):
         device_id: str,
         icon: str | None = None,
         unique_id: str | None = None,
-        scan_interval: int | None = None,
         translation_key: str | None = None,
         entity_id_style: str = ENTITY_ID_STYLE_DEFAULT,
         entity_visibility: str = ENTITY_VISIBILITY_DEFAULT,
@@ -72,8 +81,6 @@ class THZBaseEntity(Entity):
                 None (defaults to "mdi:eye"). Translated entities get their
                 icon from icons.json instead.
             unique_id: Optional unique ID (auto-generated if not provided).
-            scan_interval: Update interval in seconds (uses DEFAULT_UPDATE_INTERVAL if
-                not provided).
             translation_key: Optional translation key for localization.
             entity_id_style: One of the ``ENTITY_ID_STYLE_*`` values from
                 const.py. "fhem" sets ``self.entity_id`` directly from the
@@ -150,12 +157,7 @@ class THZBaseEntity(Entity):
             getattr(self, "_attr_translation_key", None),
         )
 
-        # Store update interval for use in async_added_to_hass
-        interval = (
-            scan_interval if scan_interval is not None else DEFAULT_UPDATE_INTERVAL
-        )
-        self._update_interval = timedelta(seconds=interval)
-        self._unsub_update: Callable[[], None] | None = None
+        self._unsub_poll: Callable[[], None] | None = None
 
         # Set default visibility based on entity naming conventions and the
         # configured entity_visibility tier.
@@ -191,25 +193,119 @@ class THZBaseEntity(Entity):
         """
         return f"thz_set_{command.lower()}_{name.lower().replace(' ', '_')}"
 
-    async def async_added_to_hass(self) -> None:
-        """Schedule periodic updates when entity is added to Home Assistant."""
-        await super().async_added_to_hass()
-        self._unsub_update = async_track_time_interval(
-            self.hass,
-            self._async_scheduled_update,
-            self._update_interval,
-        )
+    # Where the entity's value comes from: a 2.x parameter inside a polled
+    # block listens to the block's coordinator; any other entity with a
+    # _poll_key subscribes it at the poller. Buttons have neither.
 
-    async def _async_scheduled_update(self, _now: datetime) -> None:
-        """Trigger an update from the periodic timer."""
-        await self.async_update_ha_state(force_refresh=True)
+    def _poll_key(self) -> ReadKey | None:
+        """Return the register read the poller does for this entity."""
+        return None
+
+    def _block_coordinator(self) -> DataUpdateCoordinator[Any] | None:
+        """Return the block coordinator this entity reads its value from."""
+        return None
+
+    def _value_from_poll(self, raw: bytes) -> bytes:
+        """Return the value bytes from the bytes read for _poll_key."""
+        return raw
+
+    def _value_from_block(self, block_data: bytes) -> bytes | None:
+        """Return the value bytes from the block coordinator's data."""
+        return None
+
+    def _apply_value(self, value_bytes: bytes) -> None:
+        """Decode value bytes into the entity's state."""
+
+    async def async_added_to_hass(self) -> None:
+        """Start listening to the block coordinator or the poller."""
+        await super().async_added_to_hass()
+        coordinator = self._block_coordinator()
+        if coordinator is not None:
+            self._unsub_poll = coordinator.async_add_listener(self._handle_block_update)
+            self._update_from_block(coordinator)
+            return
+        key = self._poll_key()
+        if key is None or self._poller is None:
+            return
+        self._unsub_poll = self._poller.async_subscribe(key, self._handle_poll)
+        if key in self._poller.data:
+            self._update_from_poll(self._poller.data[key])
 
     async def async_will_remove_from_hass(self) -> None:
-        """Cancel the periodic update timer when entity is removed."""
-        if self._unsub_update is not None:
-            self._unsub_update()
-            self._unsub_update = None
+        """Stop listening."""
+        if self._unsub_poll is not None:
+            self._unsub_poll()
+            self._unsub_poll = None
         await super().async_will_remove_from_hass()
+
+    async def async_update(self) -> None:
+        """Read the value from the device now (homeassistant.update_entity)."""
+        value_bytes = await self._async_guarded_read(self._async_read_value())
+        if value_bytes is not None:
+            self._apply_value(value_bytes)
+
+    @callback
+    def _handle_poll(self, raw: bytes | None) -> None:
+        """Take a poller result and write the state."""
+        self._update_from_poll(raw)
+        self.async_write_ha_state()
+
+    @callback
+    def _handle_block_update(self) -> None:
+        """Take new block data and write the state."""
+        coordinator = self._block_coordinator()
+        if coordinator is not None:
+            self._update_from_block(coordinator)
+        self.async_write_ha_state()
+
+    def _update_from_poll(self, raw: bytes | None) -> None:
+        """Apply a poller result: None is a failed read, b"" keeps the value."""
+        if raw is None:
+            # The poller logs the failed read.
+            self._set_unavailable("read failed", logging.DEBUG)
+            return
+        self._attr_available = True
+        if not raw:
+            _LOGGER.warning(
+                "No data received for %s, keeping previous value", self.name
+            )
+            return
+        self._apply_value(self._value_from_poll(raw))
+
+    def _update_from_block(self, coordinator: DataUpdateCoordinator[Any]) -> None:
+        """Apply the block coordinator's data, if it has any."""
+        if not coordinator.last_update_success:
+            # The coordinator logs the failed read.
+            self._set_unavailable("block read failed", logging.DEBUG)
+            return
+        if not coordinator.data:
+            return
+        value_bytes = self._value_from_block(coordinator.data)
+        if value_bytes is None:
+            return
+        self._attr_available = True
+        self._apply_value(value_bytes)
+
+    def _set_unavailable(self, reason: object, level: int = logging.WARNING) -> None:
+        """Mark the entity unavailable, logging only the transition."""
+        if self._attr_available:
+            _LOGGER.log(level, "%s became unavailable: %s", self.name, reason)
+        self._attr_available = False
+
+    async def _async_after_write(self) -> None:
+        """Keep the polled data in step with a value just written.
+
+        The block is re-read, so its other listeners do not show the old
+        value until the next poll; a polled key's last result is dropped,
+        so an entity added later does not start with the old value.
+        """
+        coordinator = self._block_coordinator()
+        if coordinator is not None:
+            await coordinator.async_request_refresh()
+            return
+        key = self._poll_key()
+        if key is not None and self._poller is not None:
+            self._poller.async_invalidate(key)
 
     # No property overrides needed!
     # Home Assistant uses ONLY the _attr_* attributes for translation:
@@ -234,36 +330,35 @@ class THZBaseEntity(Entity):
         """Return True if the device was reachable on the last update."""
         return self._attr_available
 
-    async def _async_read_register(self, offset: int, length: int) -> bytes | None:
-        """Read this entity's register, tracking availability along the way.
-
-        On a connectivity failure, marks the entity unavailable (logging once
-        on the transition) and returns None. On success but an empty
-        response, logs a warning and also returns None. Either way, callers
-        should treat None as "nothing to decode this cycle, keep the
-        previous value" and return from their own async_update.
-        """
-        return await self._async_guarded_read(
-            self._device.async_execute(
-                self.hass,
-                self._device.read_value,
-                bytes.fromhex(self._command),
-                "get",
-                offset,
-                length,
-            )
+    async def _async_read_value(self) -> bytes:
+        """Read the value bytes of _poll_key from the device."""
+        key = self._poll_key()
+        if key is None:
+            return b""
+        command, offset, length = key
+        raw: bytes = await self._device.async_execute(
+            self.hass,
+            self._device.read_value,
+            bytes.fromhex(command),
+            "get",
+            offset,
+            length,
         )
+        return self._value_from_poll(raw) if raw else raw
 
     async def _async_guarded_read(
         self, read: Coroutine[Any, Any, bytes]
     ) -> bytes | None:
-        """Await a device read with the availability handling described above."""
+        """Await a device read, tracking availability along the way.
+
+        On a device error, marks the entity unavailable (logging once on
+        the transition) and returns None. An empty answer logs a warning
+        and also returns None: nothing to decode, keep the previous value.
+        """
         try:
             value_bytes = await read
         except DEVICE_ERRORS as err:
-            if self._attr_available:
-                _LOGGER.warning("%s became unavailable: %s", self.name, err)
-            self._attr_available = False
+            self._set_unavailable(err)
             return None
         self._attr_available = True
 
@@ -302,3 +397,31 @@ class THZBaseEntity(Entity):
             self._subdevice_device_name,
             self._subdevice_area,
         )
+
+
+class THZParameterEntity(THZBaseEntity):
+    """Base class for entities showing one write-map parameter.
+
+    The parameter's access mode (own register or inside a 2.x block) is
+    handled by parameter_io; subclasses set ``_entry`` and decode the value
+    bytes in _apply_value.
+    """
+
+    _entry: WriteParam
+
+    def _poll_key(self) -> ReadKey | None:
+        """Return the register read that holds the parameter."""
+        return parameter_read_key(self._entry)
+
+    def _value_from_poll(self, raw: bytes) -> bytes:
+        """Return the parameter's bytes (a flag's bit) from the read."""
+        return parameter_from_read(self._entry, raw)
+
+    def _block_coordinator(self) -> DataUpdateCoordinator[Any] | None:
+        """Return the coordinator polling this 2.x parameter's block, if any."""
+        key = block_coordinator_key(self._entry)
+        return self._coordinators.get(key) if key else None
+
+    def _value_from_block(self, block_data: bytes) -> bytes | None:
+        """Cut the parameter out of the block data."""
+        return parameter_from_block(self._entry, block_data)
