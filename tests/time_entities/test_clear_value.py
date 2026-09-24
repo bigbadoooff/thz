@@ -32,9 +32,7 @@ def _make_device(read_return: bytes | None = None):
     device = MagicMock()
     device.lock = asyncio.Lock()
     # async_execute runs the blocking device function (lock/timeout elided).
-    device.async_execute = AsyncMock(
-        side_effect=lambda _hass, fn, *args, **_kw: fn(*args)
-    )
+    device.async_execute = AsyncMock(side_effect=lambda fn, *args, **_kw: fn(*args))
     if read_return is not None:
         device.read_value = MagicMock(return_value=read_return)
     return device

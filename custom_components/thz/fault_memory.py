@@ -166,9 +166,7 @@ async def read_fault_memory(hass: HomeAssistant, device: THZDevice) -> dict[str,
     Raises communication errors (and ``THZProtocolError`` for an invalid payload)
     so callers decide how to report them.
     """
-    data = await device.async_execute(
-        hass, device.read_block, FAULT_MEMORY_COMMAND, "get"
-    )
+    data = await device.async_execute(device.read_block, FAULT_MEMORY_COMMAND, "get")
     if data is None:
         raise THZProtocolError("D1 fault-memory read returned no data")
     raw = bytes(data)
@@ -223,7 +221,7 @@ async def clear_fault_memory(hass: HomeAssistant, device: THZDevice) -> dict[str
     _LOGGER.warning("Clearing THZ D1 fault memory (%d record(s) stored)", before_count)
     try:
         await device.async_execute(
-            hass, device.write_value, FAULT_MEMORY_COMMAND, FAULT_CLEAR_PAYLOAD
+            device.write_value, FAULT_MEMORY_COMMAND, FAULT_CLEAR_PAYLOAD
         )
     except DEVICE_ERRORS as err:
         raise THZProtocolError(

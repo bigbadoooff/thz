@@ -65,7 +65,7 @@ class TestHelpers:
             None, device, write_param({"command": "0A0005"}), b"\x00\x01"
         )
         device.async_execute.assert_awaited_once_with(
-            None, device.write_value, bytes.fromhex("0A0005"), b"\x00\x01"
+            device.write_value, bytes.fromhex("0A0005"), b"\x00\x01"
         )
 
     @pytest.mark.asyncio
@@ -75,7 +75,6 @@ class TestHelpers:
         entry = write_map_206["p02RoomTempNight"]
         await async_write_parameter(None, device, entry, b"\x00\xaa")
         device.async_execute.assert_awaited_once_with(
-            None,
             device.write_block_value,
             b"\x17",
             entry.block.offset,

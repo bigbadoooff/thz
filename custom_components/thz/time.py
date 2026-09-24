@@ -556,7 +556,6 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         try:
             # Read the current schedule data (4 bytes total)
             current_bytes = await self._device.async_execute(
-                self.hass,
                 self._device.read_value,
                 bytes.fromhex(self._command),
                 "get",
@@ -573,7 +572,6 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
 
             # Write the modified schedule back
             await self._device.async_execute(
-                self.hass,
                 self._device.write_value,
                 bytes.fromhex(self._command),
                 bytes(schedule_bytes),
@@ -609,7 +607,6 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         # Read the current schedule data (4 bytes total) so only the
         # relevant byte (start or end) is touched, same as async_set_value.
         current_bytes = await self._device.async_execute(
-            self.hass,
             self._device.read_value,
             bytes.fromhex(self._command),
             "get",
@@ -624,7 +621,6 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             schedule_bytes[1] = TIME_VALUE_UNSET
 
         await self._device.async_execute(
-            self.hass,
             self._device.write_value,
             bytes.fromhex(self._command),
             bytes(schedule_bytes),

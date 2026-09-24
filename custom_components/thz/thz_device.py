@@ -400,7 +400,6 @@ class THZDevice:
 
     async def async_execute(
         self,
-        hass: HomeAssistant,
         fn: Callable[..., Awaitable[_T]],
         *args: Any,
         timeout: float = 8.0,  # noqa: ASYNC109 - bounds the whole device call
@@ -413,7 +412,6 @@ class THZDevice:
 
         On any failure except a "register not supported" answer the
         connection is closed, so the next call starts on a fresh one.
-        ``hass`` is not used; it keeps the call sites uniform.
         """
         try:
             async with asyncio.timeout(_LOCK_WAIT_TIMEOUT):

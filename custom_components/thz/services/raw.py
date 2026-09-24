@@ -236,7 +236,7 @@ async def async_handle_read_raw_register(
     # Read the register
     try:
         _LOGGER.debug("Reading raw register: %s", command_str)
-        data = await device.async_execute(hass, device.read_block, command_bytes, "get")
+        data = await device.async_execute(device.read_block, command_bytes, "get")
 
         formatted = _format_hex_dump(data)
         hex_string = data.hex()
@@ -315,9 +315,7 @@ async def async_handle_scan_raw_registers(
     for command_str in commands:
         command_bytes = bytes.fromhex(command_str)
         try:
-            data = await device.async_execute(
-                hass, device.read_block, command_bytes, "get"
-            )
+            data = await device.async_execute(device.read_block, command_bytes, "get")
             success_count += 1
             result_item: dict[str, result_value] = {
                 "command": command_str,
@@ -423,9 +421,7 @@ async def async_handle_watch_raw_registers_changes(
     for command_str in commands:
         command_bytes = bytes.fromhex(command_str)
         try:
-            data = await device.async_execute(
-                hass, device.read_block, command_bytes, "get"
-            )
+            data = await device.async_execute(device.read_block, command_bytes, "get")
             valid_registers[command_str] = data.hex()
         except Exception:  # noqa: BLE001
             continue
@@ -441,7 +437,7 @@ async def async_handle_watch_raw_registers_changes(
             command_bytes = bytes.fromhex(command_str)
             try:
                 data = await device.async_execute(
-                    hass, device.read_block, command_bytes, "get"
+                    device.read_block, command_bytes, "get"
                 )
                 total_reads += 1
                 new_hex = data.hex()

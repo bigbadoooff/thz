@@ -355,7 +355,6 @@ class THZFan(THZBaseEntity, FanEntity):
     async def _async_read_block(self, block: str) -> bytes | None:
         return await self._async_guarded_read(
             self._device.async_execute(
-                self.hass,
                 self._device.read_block,
                 bytes.fromhex(block.removeprefix("pxx")),
                 "get",

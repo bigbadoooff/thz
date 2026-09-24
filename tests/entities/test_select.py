@@ -192,7 +192,7 @@ class TestTHZSelectSelectOption:
         assert entity.current_option == "automatic"
         entity.async_write_ha_state.assert_called_once()
         write_call = device.async_execute.call_args[0]
-        assert write_call[1] == device.write_value
+        assert write_call[0] == device.write_value
 
     @pytest.mark.asyncio
     async def test_async_select_option_invalid_option_logged(self):
