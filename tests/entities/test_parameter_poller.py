@@ -1,6 +1,7 @@
 """Tests for parameter_poller.py: one read per subscribed register and round."""
 
 import asyncio
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -301,8 +302,6 @@ async def test_a_failing_register_warns_once(timers, caplog):
 
 @pytest.mark.asyncio
 async def test_failures_while_the_heat_pump_does_not_answer_are_debug(timers, caplog):
-    import logging
-
     caplog.set_level(logging.DEBUG, logger=poller_mod.__name__)
     poller, device = _poller({A: THZNotSupportedError("no")})
     device.link_ok = False  # THZDevice has logged that once
@@ -313,6 +312,69 @@ async def test_failures_while_the_heat_pump_does_not_answer_are_debug(timers, ca
 
     levels = {r.levelname for r in caplog.records if r.name == poller_mod.__name__}
     assert levels == {"DEBUG"}
+
+
+@pytest.mark.asyncio
+async def test_a_register_reading_again_after_a_warning_logs_info(timers, caplog):
+    caplog.set_level(logging.INFO, logger=poller_mod.__name__)
+    poller, device = _poller({A: THZNotSupportedError("no")})
+    poller.async_subscribe(A, MagicMock())
+    poller.async_start()
+    ((tick, _),) = timers["interval"]
+    await _run_delayed(timers)
+    await _drain(poller)
+    device.answers[A] = b"\x00\x01"
+    tick(None)
+    await _drain(poller)
+    tick(None)
+    await _drain(poller)
+
+    records = [
+        (r.levelname, r.getMessage())
+        for r in caplog.records
+        if r.name == poller_mod.__name__
+    ]
+    assert [level for level, _ in records] == ["WARNING", "INFO"]
+    assert "0B0005" in records[1][1]
+    assert "works again" in records[1][1]
+
+
+@pytest.mark.asyncio
+async def test_a_register_failing_only_while_unreachable_logs_no_recovery(
+    timers, caplog
+):
+    caplog.set_level(logging.INFO, logger=poller_mod.__name__)
+    poller, device = _poller({A: THZNotSupportedError("no")})
+    device.link_ok = False
+    poller.async_subscribe(A, MagicMock())
+    poller.async_start()
+    ((tick, _),) = timers["interval"]
+    await _run_delayed(timers)
+    await _drain(poller)
+    device.link_ok = True
+    device.answers[A] = b"\x00\x01"
+    tick(None)
+    await _drain(poller)
+
+    assert not [r for r in caplog.records if r.name == poller_mod.__name__]
+
+
+@pytest.mark.asyncio
+async def test_unsubscribing_forgets_the_warning(timers, caplog):
+    caplog.set_level(logging.INFO, logger=poller_mod.__name__)
+    poller, device = _poller({A: THZNotSupportedError("no")})
+    unsubscribe = poller.async_subscribe(A, MagicMock())
+    poller.async_start()
+    await _run_delayed(timers)
+    await _drain(poller)
+    unsubscribe()
+    device.answers[A] = b"\x00\x01"
+    poller.async_subscribe(A, MagicMock())
+    await _run_delayed(timers)
+    await _drain(poller)
+
+    levels = [r.levelname for r in caplog.records if r.name == poller_mod.__name__]
+    assert levels == ["WARNING"]
 
 
 def test_a_round_without_subscribers_starts_no_task(timers):

@@ -60,6 +60,8 @@ class ParameterPoller:
         self.data: dict[ReadKey, bytes | None] = {}
         # Keys waiting to be read, in subscription order.
         self._queue: dict[ReadKey, None] = {}
+        # Keys whose failure was logged as a warning, until they read again.
+        self._warned: set[ReadKey] = set()
         self._task: asyncio.Task[None] | None = None
         self._unsub_delay: Callable[[], None] | None = None
         self._unsub_interval: Callable[[], None] | None = None
@@ -106,6 +108,7 @@ class ParameterPoller:
             if not callbacks:
                 self._subscribers.pop(key, None)
                 self.data.pop(key, None)
+                self._warned.discard(key)
 
         return unsubscribe
 
@@ -191,20 +194,23 @@ class ParameterPoller:
                 value = None
             else:
                 connection_errors = 0
+                if key in self._warned:
+                    self._warned.discard(key)
+                    _LOGGER.info("Reading register %s works again", key)
             self._async_report(key, value)
 
     def _log_failure(self, key: ReadKey, err: Exception) -> None:
         """Log a failed read of a register.
 
         A warning only when the key last read fine and the heat pump still
-        answers; while it does not, THZDevice has logged that once.
+        answers; while it does not, THZDevice has logged that once. A key
+        that was warned about is logged again when it reads fine.
         """
-        level = (
-            logging.DEBUG
-            if (key in self.data and self.data[key] is None) or not self._device.link_ok
-            else logging.WARNING
-        )
-        _LOGGER.log(level, "Reading register %s failed: %s", key, err)
+        if (key in self.data and self.data[key] is None) or not self._device.link_ok:
+            _LOGGER.debug("Reading register %s failed: %s", key, err)
+            return
+        self._warned.add(key)
+        _LOGGER.warning("Reading register %s failed: %s", key, err)
 
     @callback
     def _async_report(self, key: ReadKey, value: bytes | None) -> None:
