@@ -261,17 +261,13 @@ class SimulatedDirectDevice(Simulated2xxDevice):
 
 
 def _direct_entries(firmware: str) -> dict:
-    """Writable 4.x/5.x entries whose value FHEM can encode on its own.
-
-    "8party" is left out: FHEM writes party start and end in one call,
-    while the integration exposes only the start as a time entity.
-    """
+    """Writable 4.x/5.x entries whose value FHEM can encode on its own."""
     registers = RegisterMapManagerWrite(firmware).params()
     entries = {}
     for name, entry in registers.items():
         kind, decode = entry.type, entry.decode_type
         if kind in ("number", "switch", "select", "schedule") or (
-            kind == "time" and decode == "9holy"
+            kind == "time" and decode in ("9holy", "8party")
         ):
             entries[name] = entry
     return entries
@@ -310,6 +306,10 @@ def _direct_cases(entries: dict) -> list[tuple[str, str, object]]:
                     continue
                 fhem_arg = option if decode == "2opmode" else str(int(key))
                 cases.append((name, fhem_arg, option))
+        elif kind == "time" and decode == "8party":
+            # FHEM sets start and end together; HA has an entity for each.
+            cases.append((name, "07:00--22:30", (dt_time(7, 0), dt_time(22, 30))))
+            cases.append((name, "18:15--24:00", (dt_time(18, 15), dt_time(0, 0))))
         elif kind == "time":
             cases.append((name, "07:30", dt_time(7, 30)))
         else:  # schedule
@@ -335,6 +335,10 @@ async def _our_direct_telegram(name: str, entry: dict, value) -> str:
     elif kind == "select":
         entity = _prepare(THZSelect(name, entry, device, "dev"))
         await entity.async_select_option(value)
+    elif kind == "time" and isinstance(value, tuple):  # party start and end
+        start, end = _create_time_entities(name, entry, device, "dev", 60)
+        await _prepare(start).async_set_value(value[0])
+        await _prepare(end).async_set_value(value[1])
     elif kind == "time":
         entity = _prepare(_create_time_entities(name, entry, device, "dev", 60))
         await entity.async_set_value(value)

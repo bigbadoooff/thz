@@ -2187,7 +2187,10 @@
         "name": "Urlaubsende Zeit"
       },
       "party_time": {
-        "name": "Party-Zeit"
+        "name": "Party-Beginn"
+      },
+      "party_time_end": {
+        "name": "Party-Ende"
       },
       "programhc1_mo_0": {
         "name": "HK1 Programm Montag 1"

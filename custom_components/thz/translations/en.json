@@ -2226,7 +2226,10 @@
         "name": "Holiday End Time"
       },
       "party_time": {
-        "name": "Party Time"
+        "name": "Party Start"
+      },
+      "party_time_end": {
+        "name": "Party End"
       },
       "programhc1_mo_0": {
         "name": "HC1 Program Monday 1"

@@ -451,3 +451,49 @@ class TestHolidayAndPartyTimeByte:
         await entity.async_set_value(time(7, 30))
         written = device.async_execute.await_args_list[-1].args[3]
         assert written == bytes([0x50, 0x1E])
+
+
+class TestPartyStartAndEnd:
+    """The party register holds start (second byte) and end (first byte)."""
+
+    @staticmethod
+    def _pair(read_bytes):
+        device = MagicMock()
+        device.async_execute = AsyncMock(return_value=read_bytes)
+        entry = write_param(
+            {"command": "0A05D1", "type": "time", "decode_type": "8party"}
+        )
+        start, end = _create_time_entities("party-time", entry, device, "dev1", 600)
+        for entity in (start, end):
+            entity.hass = MagicMock()
+            entity.async_write_ha_state = MagicMock()
+        return start, end, device
+
+    def test_two_entities_the_start_keeps_its_identity(self):
+        start, end, _ = self._pair(b"")
+        assert start._attr_unique_id == "thz_set_0a05d1_party-time"
+        assert start._attr_translation_key == "party_time"
+        assert end._attr_unique_id == "thz_set_0a05d1_party-time_end"
+        assert end._attr_translation_key == "party_time_end"
+
+    @pytest.mark.asyncio
+    async def test_each_reads_its_own_byte(self):
+        start, end, _ = self._pair(bytes([0x5A, 0x1C]))
+        await start.async_update()
+        await end.async_update()
+        assert (start.native_value, end.native_value) == (dtime(7, 0), dtime(22, 30))
+
+    @pytest.mark.asyncio
+    async def test_end_write_keeps_the_start_and_writes_midnight_as_24h(self):
+        _, end, device = self._pair(bytes([0x5A, 0x1C]))
+        await end.async_set_value(dtime(0, 0))
+        written = device.async_execute.await_args_list[-1].args[3]
+        assert written == bytes([96, 0x1C])
+        assert end.native_value == dtime(0, 0)
+
+    @pytest.mark.asyncio
+    async def test_clearing_the_end_keeps_the_start(self):
+        _, end, device = self._pair(bytes([0x5A, 0x1C]))
+        await end.async_clear_value()
+        written = device.async_execute.await_args_list[-1].args[3]
+        assert written == bytes([0x80, 0x1C])
