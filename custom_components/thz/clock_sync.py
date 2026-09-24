@@ -199,15 +199,13 @@ async def async_check_and_maybe_sync_clock(
     drift = (device_dt - local_now).total_seconds()
     if abs(drift) <= CLOCK_DRIFT_WARN_SECONDS:
         return
-    _LOGGER.warning(
-        "THZ device clock drifted %.0f minute(s) from local time (device=%s, local=%s)",
-        drift / 60,
-        device_dt,
-        local_now,
-    )
     if config_entry.data.get("auto_sync_clock", False):
         await async_write_device_clock(hass, device, write_manager, local_now)
-        _LOGGER.info("THZ device clock auto-corrected to %s", local_now)
+        _LOGGER.info(
+            "Corrected the heat pump clock by %.0f minute(s) (it read %s)",
+            -drift / 60,
+            device_dt,
+        )
         return
 
     # auto_sync_clock is off, so this drift can't be corrected automatically.
@@ -218,8 +216,15 @@ async def async_check_and_maybe_sync_clock(
     today = dt_util.now().date()
     if entry_data is not None:
         if entry_data.clock_notify_date == today:
+            _LOGGER.debug("Heat pump clock still off by %.0f minute(s)", drift / 60)
             return
         entry_data.clock_notify_date = today
+    _LOGGER.warning(
+        "The heat pump clock is off by %.0f minute(s) (device=%s, local=%s)",
+        drift / 60,
+        device_dt,
+        local_now,
+    )
     async_notify(
         hass,
         title="THZ Device Clock Drifted",
@@ -250,6 +255,7 @@ def async_setup_clock_check(
                 hass, config_entry, device, write_manager
             )
         except Exception as err:  # noqa: BLE001
-            _LOGGER.warning("THZ periodic clock check failed: %s", err)
+            # A lost connection is logged by the device once.
+            _LOGGER.debug("THZ periodic clock check failed: %s", err)
 
     return async_track_time_interval(hass, _periodic_clock_check, CLOCK_CHECK_INTERVAL)

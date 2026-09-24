@@ -91,6 +91,6 @@ async def async_setup_write_platform(
             entity._coordinators = entry_data.coordinators
             entities.append(entity)
 
-    _LOGGER.info("Created %d %s entities", len(entities), platform_type)
+    _LOGGER.debug("Created %d %s entities", len(entities), platform_type)
     assign_subdevices(entities, config_entry.data)
     async_add_entities(entities, True)

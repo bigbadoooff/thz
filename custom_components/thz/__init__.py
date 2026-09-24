@@ -36,6 +36,7 @@ from .const import (
     FIRMWARE_OVERRIDE_AUTO,
     should_hide_entity,
 )
+from .coordinator_log import coordinator_logger
 from .devices import (
     async_release_subdevices,
     async_remove_empty_subdevices,
@@ -75,25 +76,24 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
     """Migrate an entry to the current version (see THZConfigFlow)."""
     if config_entry.version > 1:
         return False  # created by a newer version
-    if config_entry.minor_version < 2:
+    minor_version = config_entry.minor_version
+    if minor_version >= 3:
+        return True
+    data = {**config_entry.data}
+    if minor_version < 2:
         # The registry identifier was derived from the connection on every
         # setup; keep the one the heat pump is registered under.
-        data = {**config_entry.data}
         data.setdefault(CONF_DEVICE_IDENTIFIER, entry_unique_id(data))
-        hass.config_entries.async_update_entry(config_entry, data=data, minor_version=2)
-        _LOGGER.debug("Migrated entry to 1.2 (%s)", CONF_DEVICE_IDENTIFIER)
+    # Old entries fixed the integration's log level; Home Assistant's
+    # `logger:` configuration controls it now.
+    data.pop("log_level", None)
+    hass.config_entries.async_update_entry(config_entry, data=data, minor_version=3)
+    _LOGGER.debug("Migrated entry from 1.%d to 1.3", minor_version)
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up THZ from config entry."""
-    # Only entries created by old versions carry a "log_level" option; for
-    # all others leave the level to Home Assistant's `logger:` configuration
-    # instead of overriding it (e.g. forcing INFO over a configured DEBUG).
-    log_level_str = config_entry.data.get("log_level")
-    if log_level_str:
-        _LOGGER.setLevel(getattr(logging, log_level_str.upper(), logging.INFO))
-        _LOGGER.info("Log level set to: %s", log_level_str)
     _LOGGER.debug("THZ async_setup_entry called with entry: %s", config_entry.as_dict())
 
     # Clean up any orphaned THZ entities from previous installations
@@ -116,7 +116,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         raise ConfigEntryNotReady(
             f"Cannot connect to THZ device ({err}); will retry"
         ) from err
-    _LOGGER.info("THZ device fully initialized (FW %s)", device.firmware_version)
+    _LOGGER.info("Connected to the heat pump (firmware %s)", device.firmware_version)
 
     unique_id = data[CONF_DEVICE_IDENTIFIER]
     device_entry = _register_heat_pump(hass, config_entry, device, unique_id)
@@ -132,7 +132,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         _LOGGER.debug("Paired register blocks for dual-read: %s", paired_blocks)
 
     coordinators, unsupported_blocks, failed_blocks = await _async_create_coordinators(
-        hass, device, _refresh_intervals(data, device), paired_blocks
+        hass,
+        device,
+        _refresh_intervals(data, device),
+        paired_blocks,
+        coordinator_logger(config_entry.entry_id, device),
     )
     if coordinators and len(failed_blocks) == len(coordinators):
         # Not a single block answered: the device is not really reachable,
@@ -249,7 +253,7 @@ def _refresh_intervals(data: Mapping[str, Any], device: THZDevice) -> dict[str, 
             "and no refresh_intervals in config"
         )
         return {}
-    _LOGGER.warning(
+    _LOGGER.debug(
         "No refresh_intervals found in config, using default "
         "interval of %s seconds for %d blocks",
         DEFAULT_UPDATE_INTERVAL,
@@ -263,6 +267,7 @@ async def _async_create_coordinators(
     device: THZDevice,
     refresh_intervals: Mapping[str, Any],
     paired_blocks: dict[str, str],
+    logger: logging.Logger = _LOGGER,
 ) -> tuple[dict[str, DataUpdateCoordinator[Any]], set[str], list[str]]:
     """Create and first-refresh one coordinator per block.
 
@@ -293,7 +298,7 @@ async def _async_create_coordinators(
         jitter = random.uniform(0, max(int(interval) * 0.10, 5))
         coordinator = DataUpdateCoordinator(
             hass,
-            _LOGGER,
+            logger,
             name=f"THZ {block}",
             update_interval=timedelta(seconds=int(interval) + jitter),
             update_method=_make_update_method(block),
@@ -316,13 +321,13 @@ async def _async_create_coordinators(
             continue
         if coordinator.data is None:
             unsupported_blocks.add(block)
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Block %s is unsupported on this firmware; "
                 "no entities will be created for it.",
                 block,
             )
         else:
-            _LOGGER.info("Initial data fetch completed for block %s", block)
+            _LOGGER.debug("Initial data fetch completed for block %s", block)
     return coordinators, unsupported_blocks, failed_blocks
 
 
@@ -449,7 +454,7 @@ async def _async_apply_entity_visibility_tier(
             )
 
     if disabled_count or enabled_count:
-        _LOGGER.info(
+        _LOGGER.debug(
             "Entity visibility tier '%s' applied: disabled %d entities, "
             "re-enabled %d entities",
             visibility,
@@ -506,7 +511,7 @@ async def _async_cleanup_orphaned_entities(hass: HomeAssistant) -> None:
             orphaned_count += 1
 
     if orphaned_count > 0:
-        _LOGGER.info(
+        _LOGGER.debug(
             "Cleaned up %d orphaned THZ entities from registry", orphaned_count
         )
 
@@ -566,7 +571,7 @@ async def _async_update_block(
         # Device permanently doesn't support this block — return None so the
         # coordinator marks the block as unsupported without triggering a reconnect
         # or raising UpdateFailed (which would propagate as ConfigEntryNotReady).
-        _LOGGER.info(
+        _LOGGER.debug(
             "Block %s is not supported by this device firmware; skipping.", block_name
         )
         return None

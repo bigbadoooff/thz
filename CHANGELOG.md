@@ -8,6 +8,16 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **Much quieter log.** A normal start logs one line instead of about 40.
+  A lost connection is logged once as a warning and once as info when it
+  is back, instead of per request and per block. Problems that recur on
+  every poll (short or undecodable sensor data, unknown select values, a
+  drifted clock) are logged once. Details moved to the debug level; see
+  "Logging" in the README.
+- **The old `log_level` setting is removed.** Entries from old versions
+  fixed the integration's log level with it, overriding Home Assistant's
+  `logger:` configuration; they are migrated to version 1.3 without it.
+
 - **The connection runs on asyncio** (#185): serial port and ser2net TCP
   no longer use a worker thread per request. The serial port is opened with
   `pyserial-asyncio-fast`, a new requirement that Home Assistant installs

@@ -372,6 +372,40 @@ class TestClockDriftCheck:
         assert "drift" in message or "off by" in message
 
     @pytest.mark.asyncio
+    async def test_drift_is_warned_once_a_day(self, caplog):
+        """The check runs every 15 minutes; the warning comes once a day."""
+        import logging
+
+        from custom_components.thz.clock_sync import async_check_and_maybe_sync_clock
+
+        caplog.set_level(logging.DEBUG, logger="custom_components.thz.clock_sync")
+        notify = _reset_notifications()
+        config_entry = MagicMock()
+        config_entry.entry_id = "entry_1"
+        config_entry.data = {"auto_sync_clock": False}
+        config_entry.runtime_data = make_runtime_data()
+        local_now = datetime(2026, 8, 25, 10, 0)
+        fake_dt_util = MagicMock()
+        fake_dt_util.now = MagicMock(return_value=local_now)
+
+        with patch("custom_components.thz.clock_sync.dt_util", fake_dt_util):
+            for _ in range(2):
+                device = self._make_device(
+                    read_values=iter(bytes([v]) for v in [26, 8, 25, 12, 0])
+                )
+                await async_check_and_maybe_sync_clock(
+                    MagicMock(), config_entry, device, self._make_write_manager()
+                )
+
+        notify.assert_called_once()
+        levels = [
+            r.levelname
+            for r in caplog.records
+            if r.name == "custom_components.thz.clock_sync"
+        ]
+        assert levels == ["WARNING", "DEBUG"]
+
+    @pytest.mark.asyncio
     async def test_drift_check_no_notification_when_within_threshold(self):
         """Small drift (<=60s) must not trigger a notification."""
         from custom_components.thz.clock_sync import async_check_and_maybe_sync_clock

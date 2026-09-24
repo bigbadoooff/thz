@@ -435,7 +435,7 @@ async def async_setup_entry(
     if entities:
         assign_subdevices(entities, config_entry.data)
         async_add_entities(entities, True)
-        _LOGGER.info("Created %d climate entities", len(entities))
+        _LOGGER.debug("Created %d climate entities", len(entities))
 
 
 def _read_temp(data: bytes, offset: int, length: int) -> float | None:

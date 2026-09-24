@@ -34,8 +34,9 @@ rules:
   log-when-unavailable:
     status: todo
     comment: >
-      Coordinator entities are covered by the coordinator; directly polled
-      entities log going unavailable but not coming back.
+      The device logs a lost and a restored connection once, and block
+      coordinators stay quiet meanwhile; directly polled write entities
+      still log going unavailable per entity, and not coming back.
   parallel-updates: done
   reauthentication-flow:
     status: exempt

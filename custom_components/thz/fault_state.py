@@ -111,7 +111,7 @@ class THZFaultTracker:
             # First run: pre-existing history must not raise an alarm.
             self._set_baseline(current)
             new_start = len(current)
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Fault baseline initialised with %d existing D1 record(s)",
                 len(current),
             )

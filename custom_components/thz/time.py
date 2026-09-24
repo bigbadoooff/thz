@@ -253,7 +253,7 @@ async def async_setup_entry(
                 new_entities if isinstance(new_entities, list) else [new_entities]
             )
 
-    _LOGGER.info("Created %d time entities", len(entities))
+    _LOGGER.debug("Created %d time entities", len(entities))
     assign_subdevices(entities, config_entry.data)
     async_add_entities(entities, True)
 

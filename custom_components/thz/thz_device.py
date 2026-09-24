@@ -58,6 +58,9 @@ class THZDevice:
         self.read_timeout = read_timeout
         self._firmware_override = firmware_override
         self._initialized = False
+        # Whether the last device call got through; a change is logged once
+        # (warning when the connection is lost, info when it is back).
+        self._link_ok = True
 
         self._transport: THZTransport = (
             TcpTransport(host, tcp_port, connect_timeout=read_timeout)
@@ -114,11 +117,11 @@ class THZDevice:
         except BaseException:
             self._force_close()
             raise
-        _LOGGER.info("Firmware version detected: %s", self._firmware_version)
+        _LOGGER.debug("Firmware version detected: %s", self._firmware_version)
 
         effective_firmware = self._resolve_effective_firmware()
         if effective_firmware != self._firmware_version:
-            _LOGGER.info(
+            _LOGGER.debug(
                 "Firmware profile overridden: detected %s, forcing %s",
                 self._firmware_version,
                 effective_firmware,
@@ -134,7 +137,7 @@ class THZDevice:
         if fw_int >= 500:
             self.has_cooling = await self._probe_cooling_support()
             if not self.has_cooling:
-                _LOGGER.info(
+                _LOGGER.debug(
                     "Cooling not supported on this device; 539 cooling maps excluded"
                 )
 
@@ -173,14 +176,14 @@ class THZDevice:
         """Close the connection and open it again (not after close())."""
         if self._closed:
             raise THZConnectionError("Device closed")
-        _LOGGER.warning("Attempting to reconnect...")
+        _LOGGER.debug("Reconnecting")
         self._force_close()
         try:
             await self._connect()
         except THZConnectionError as e:
             _LOGGER.debug("Reconnection failed: %s", e)
             raise
-        _LOGGER.info("Reconnection successful")
+        _LOGGER.debug("Reconnected")
 
     async def _do_handshake_1(self) -> None:
         """Perform handshake step 1: send 0x02 and expect 0x10.
@@ -288,8 +291,8 @@ class THZDevice:
             THZProtocolError: If a protocol/handshake error occurs.
         """
         if self._initialized and not self._transport.is_alive():
-            _LOGGER.warning(
-                "Connection not alive, attempting reconnect (attempt %d/%d)",
+            _LOGGER.debug(
+                "Connection not alive, reconnecting (attempt %d/%d)",
                 attempt + 1,
                 max_retries + 1,
             )
@@ -357,7 +360,7 @@ class THZDevice:
                         await self._reconnect()
                         continue
                     except THZConnectionError as reconnect_error:
-                        _LOGGER.warning("Reconnect failed: %s", reconnect_error)
+                        _LOGGER.debug("Reconnect failed: %s", reconnect_error)
                 if isinstance(e, THZConnectionError):
                     raise THZConnectionError(
                         f"Connection failed after {attempt + 1} attempts: {e}"
@@ -422,22 +425,45 @@ class THZDevice:
 
         try:
             async with asyncio.timeout(timeout):
-                return await fn(*args)
+                result = await fn(*args)
         except TimeoutError:
             self._force_close()
-            _LOGGER.warning(
-                "Device call timed out after %.1fs; closing connection", timeout
-            )
-            raise THZConnectionError(
-                f"Device communication timed out after {timeout}s"
-            ) from None
+            err = THZConnectionError(f"Device communication timed out after {timeout}s")
+            self._note_link(err)
+            raise err from None
         except THZNotSupportedError:
-            raise  # device said "not supported" — connection is fine, keep it
-        except BaseException:
+            # The device said "not supported": the connection is fine, keep it.
+            self._note_link(None)
+            raise
+        except BaseException as err:
             self._force_close()
+            if isinstance(err, THZWriteRejectedError):
+                self._note_link(None)  # rejected, but the device answered
+            elif isinstance(err, DEVICE_ERRORS):
+                self._note_link(err)
             raise
         finally:
             self.lock.release()
+        self._note_link(None)
+        return result
+
+    @property
+    def link_ok(self) -> bool:
+        """Return whether the last device call got through."""
+        return self._link_ok
+
+    def _note_link(self, err: BaseException | None) -> None:
+        """Log a lost or restored connection once per change."""
+        if err is None:
+            if not self._link_ok:
+                self._link_ok = True
+                _LOGGER.info("Connection to the heat pump is back")
+            return
+        if self._link_ok:
+            self._link_ok = False
+            _LOGGER.warning("Lost the connection to the heat pump: %s", err)
+        else:
+            _LOGGER.debug("Heat pump still unreachable: %s", err)
 
     def close(self) -> None:
         """Close the connection for good; safe to call repeatedly, never raises.

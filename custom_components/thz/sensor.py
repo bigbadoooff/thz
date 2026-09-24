@@ -44,6 +44,7 @@ from .cop_sensor import async_setup_cop_sensors
 from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
 from .fault_sensor import async_setup_fault_sensors
+from .log_once import OncePerEpisode
 from .register_maps.register_map_manager import RegisterMapManager
 from .runtime_data import THZConfigEntry
 from .value_codec import decode_raw_value
@@ -121,9 +122,7 @@ async def async_setup_entry(
         # Get the coordinator for this block
         coordinator = coordinators.get(block)
         if coordinator is None:
-            _LOGGER.warning(
-                "No coordinator found for block %s, skipping sensors", block
-            )
+            _LOGGER.debug("No coordinator found for block %s, skipping sensors", block)
             continue
 
         if block in unsupported_blocks:
@@ -399,6 +398,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
 
         # Store the name for later use in unique_id and visibility checks
         self._entity_name = e["name"]
+        self._read_problem = OncePerEpisode(_LOGGER)
 
         # Handle translation: don't set _attr_name when translation_key exists
         # Setting _attr_name blocks HA's translation lookup
@@ -455,7 +455,8 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             payload = self.coordinator.data
             # Validate payload length before slicing
             if len(payload) < self._offset + self._length:
-                _LOGGER.warning(
+                self._read_problem.log(
+                    logging.WARNING,
                     "Payload too short for sensor %s: "
                     "expected at least %d bytes, got %d",
                     self._entity_name,
@@ -469,6 +470,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
             elif self._nibble == "low":
                 raw_bytes = bytes([raw_bytes[0] & 0x0F])
             value = decode_value(raw_bytes, self._decode_type, self._factor)
+            self._read_problem.resolved()
             if self._translated_states:
                 self._raw_hex = raw_bytes.hex()
                 return to_state(self._decode_type, value)
@@ -476,8 +478,12 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
                 return self._translate_fault_list(value)
             return self._discard_implausible(value, raw_bytes)
         except (ValueError, IndexError, TypeError) as err:
-            _LOGGER.error(
-                "Error decoding sensor %s: %s", self._entity_name, err, exc_info=True
+            self._read_problem.log(
+                logging.ERROR,
+                "Error decoding sensor %s: %s",
+                self._entity_name,
+                err,
+                exc_info=True,
             )
             return None
 

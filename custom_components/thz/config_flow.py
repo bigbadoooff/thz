@@ -54,13 +54,6 @@ from .thz_device import THZDevice
 if TYPE_CHECKING:
     from ._typing_compat import ConfigFlowResult
 
-LOG_LEVELS = {
-    "Error": "error",
-    "Warning": "warning",
-    "Info": "info",
-    "Debug": "debug",
-}
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -131,7 +124,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
     # 1.2: CONF_DEVICE_IDENTIFIER in the entry data (async_migrate_entry).
-    MINOR_VERSION = 2
+    MINOR_VERSION = 3
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -678,10 +671,10 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
             firmware = device.firmware_version
-            _LOGGER.info("Firmware detected: %s", firmware)
+            _LOGGER.debug("Firmware detected: %s", firmware)
 
             blocks = device.available_reading_blocks
-            _LOGGER.info("Available blocks: %s", blocks)
+            _LOGGER.debug("Available blocks: %s", blocks)
 
             # Determine available write groups from the write register map
             write_manager = device.write_register_map_manager
