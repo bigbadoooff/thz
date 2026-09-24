@@ -303,13 +303,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 entry, unique_id=unique_id, data=updated_data, reason="reconfigured"
             )
 
-        # Prefill current values
-        data = dict(entry.data)
-        if data is None:
-            return self.async_abort(reason="no_data_in_entry")
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=await self.reconfigure_schema(data),
+            data_schema=await self.reconfigure_schema(dict(entry.data)),
         )
 
     async def reconfigure_schema(self, defaults: dict | None = None) -> vol.Schema:
