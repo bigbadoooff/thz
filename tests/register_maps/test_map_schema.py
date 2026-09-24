@@ -10,6 +10,7 @@ not their contents: the offsets themselves were confirmed on devices.
 from collections import Counter
 import json
 from pathlib import Path
+import re
 
 import pytest
 
@@ -201,8 +202,8 @@ def test_every_entity_translation_is_used():
     """strings.json names no entity that no firmware profile creates.
 
     A key counts as used if a register map produces it, a fault sensor
-    class has it, or the code names it (climate and COP entities set
-    theirs directly).
+    class has it, or the code assigns it (``translation_key = "..."``, as
+    the climate and COP entities do).
     """
     from custom_components.thz.fault_sensor import _THZFaultSensor
 
@@ -214,10 +215,11 @@ def test_every_entity_translation_is_used():
         path.read_text()
         for path in (Path(__file__).parents[2] / "custom_components/thz").rglob("*.py")
     )
+    set_in_code = set(re.findall(r'translation_key\s*=\s*"(\w+)"', source))
     unused = [
         f"{platform}.{key}"
         for platform, keys in _STRINGS.items()
         for key in keys
-        if key not in used.get(platform, set()) and f'"{key}"' not in source
+        if key not in used.get(platform, set()) and key not in set_in_code
     ]
     assert unused == []
