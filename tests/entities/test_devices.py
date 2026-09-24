@@ -31,6 +31,8 @@ DEVICE = "ip-192.0.2.10"
         ("set_0a0140_p32hystdhw", "dhw"),
         (f"{DEVICE}_water_heater_dhw", "dhw"),
         (f"{DEVICE}_fan_ventilation", "ventilation"),
+        (f"{DEVICE}_new_fault", None),
+        (f"{DEVICE}_filter_change", "ventilation"),
         ("bin_fb_24_signalanode", "dhw"),
         ("set_0a056c_p07fanstageday", "ventilation"),
         ("bin_0a0176_4_filterup", "ventilation"),

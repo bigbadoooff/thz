@@ -8,6 +8,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Added
 
+- **Event entities for a new fault and a filter change.** "Fault" fires
+  `fault` for every record that appears in the fault memory, with its code,
+  name, time and date; "Filter change" fires `filter_both`, `filter_up` or
+  `filter_down` when the heat pump starts asking for that filter change.
+  Both read data that is polled anyway.
 - **Repair issue for a drifted device clock.** Without automatic clock
   sync, a heat pump clock that is off by more than a minute raises a repair
   issue instead of a daily persistent notification. Its fix sets the clock

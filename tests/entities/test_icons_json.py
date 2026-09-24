@@ -69,6 +69,7 @@ class TestIconsJsonStructure:
             "climate",
             "water_heater",
             "fan",
+            "event",
         }
         assert set(icons_json["entity"]) <= known_domains
 

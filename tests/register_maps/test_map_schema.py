@@ -202,14 +202,18 @@ def test_every_entity_translation_is_used():
     """strings.json names no entity that no firmware profile creates.
 
     A key counts as used if a register map produces it, a fault sensor
-    class has it, or the code assigns it (``translation_key = "..."``, as
+    or event class has it, or the code assigns it (``translation_key = "..."``, as
     the climate and COP entities do).
     """
+    from custom_components.thz.event import _THZEvent
     from custom_components.thz.fault_sensor import _THZFaultSensor
 
     used = _translation_keys_in_use()
     used.setdefault("sensor", set()).update(
         f"fault_{cls.KEY}" for cls in _THZFaultSensor.__subclasses__()
+    )
+    used.setdefault("event", set()).update(
+        cls.KEY for cls in _THZEvent.__subclasses__()
     )
     source = "\n".join(
         path.read_text()

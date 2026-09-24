@@ -2902,6 +2902,45 @@
       "window_open": {
         "name": "Fenster offen"
       }
+    },
+    "event": {
+      "fault": {
+        "name": "Störung",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "fault": "Neue Störung"
+            }
+          },
+          "fault_number": {
+            "name": "Fehlernummer"
+          },
+          "fault_code": {
+            "name": "Fehlercode"
+          },
+          "description": {
+            "name": "Beschreibung"
+          },
+          "time": {
+            "name": "Uhrzeit"
+          },
+          "date": {
+            "name": "Datum"
+          }
+        }
+      },
+      "filter": {
+        "name": "Filterwechsel",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "filter_both": "Beide Filter wechseln",
+              "filter_up": "Filter (oben) wechseln",
+              "filter_down": "Filter (unten) wechseln"
+            }
+          }
+        }
+      }
     }
   },
   "selector": {
