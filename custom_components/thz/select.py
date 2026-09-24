@@ -10,11 +10,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZBaseEntity
-from .const import (
-    WRITE_REGISTER_LENGTH,
-    WRITE_REGISTER_OFFSET,
-)
 from .entity_translations import get_translation_key
+from .exceptions import DEVICE_ERRORS
+from .parameter_io import async_read_parameter, async_write_parameter
 from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
 from .thz_device import THZDevice
@@ -103,6 +101,7 @@ class THZSelect(THZBaseEntity, SelectEntity):
         )
 
         # Select-specific attributes
+        self._entry = entry
         self._decode_type = entry.decode_type
 
         # Set available options based on decode_type, bounded by the entry's
@@ -138,8 +137,8 @@ class THZSelect(THZBaseEntity, SelectEntity):
 
     async def async_update(self) -> None:
         """Fetch new state data for the select."""
-        value_bytes = await self._async_read_register(
-            WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH
+        value_bytes = await self._async_guarded_read(
+            async_read_parameter(self.hass, self._device, self._entry)
         )
         if value_bytes is None:
             return
@@ -170,16 +169,13 @@ class THZSelect(THZBaseEntity, SelectEntity):
             )
             _LOGGER.debug("Encoded value bytes: %s", value_bytes.hex())
 
-            await self._device.async_execute(
-                self.hass,
-                self._device.write_value,
-                bytes.fromhex(self._command),
-                value_bytes,
+            await async_write_parameter(
+                self.hass, self._device, self._entry, value_bytes
             )
 
             self._attr_current_option = option
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-        except Exception as err:
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error setting select %s to option %s: %s",
                 self.name,
