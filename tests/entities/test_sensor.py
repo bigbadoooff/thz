@@ -436,3 +436,34 @@ class TestAbsentAndNibbleFields:
 
         sensor = async_add_entities.call_args_list[0][0][0][0]
         assert sensor.native_value == state_slug(SELECT_MAP["weekday"]["3"]) == expected
+
+
+class TestPlaceholderSensorCleanup:
+    """Registry entries for "n.a." placeholder fields are removed."""
+
+    def test_removes_only_this_entrys_placeholders(self, monkeypatch):
+        import custom_components.thz.sensor as sensor_module
+
+        entries = {
+            "sensor.mine": MagicMock(config_entry_id="entry1"),
+            "sensor.foreign": MagicMock(config_entry_id="entry2"),
+        }
+        ids = {"uid_mine": "sensor.mine", "uid_foreign": "sensor.foreign"}
+        registry = MagicMock()
+        registry.async_get_entity_id.side_effect = lambda _d, _p, uid: ids.get(uid)
+        registry.async_get.side_effect = entries.get
+        monkeypatch.setattr(
+            sensor_module.er, "async_get", MagicMock(return_value=registry)
+        )
+        config_entry = MagicMock(entry_id="entry1")
+
+        sensor_module._async_remove_placeholder_sensors(
+            MagicMock(), config_entry, {"uid_mine", "uid_foreign", "uid_unknown"}
+        )
+
+        registry.async_remove.assert_called_once_with("sensor.mine")
+
+    def test_unique_id_formula(self):
+        from custom_components.thz.sensor import sensor_unique_id
+
+        assert sensor_unique_id(b"\xfb", 2, "dewPoint") == "thz_b'\\xfb'_2_dewpoint"
