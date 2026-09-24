@@ -26,7 +26,8 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.typing import StateType
@@ -114,6 +115,8 @@ async def async_setup_entry(
     # Create sensors
     sensors = []
     seen_sensor_names = set()  # Track sensor names to avoid duplicates
+    # Unique ids the skipped placeholder fields would have (see below).
+    placeholder_ids: set[str] = set()
     for block, fields in register_manager.fields().items():
         # Get the coordinator for this block
         coordinator = coordinators.get(block)
@@ -135,6 +138,11 @@ async def async_setup_entry(
         for read_field in fields:
             # Skip fields that are disabled or absent on this firmware
             if read_field.decode_type in _SKIPPED_DECODE_TYPES:
+                placeholder_ids.add(
+                    sensor_unique_id(
+                        block_bytes, read_field.byte_offset, read_field.name
+                    )
+                )
                 continue
 
             # Bit flags are handled by the binary_sensor platform
@@ -184,10 +192,50 @@ async def async_setup_entry(
             )
     assign_subdevices(sensors, config_entry.data)
     async_add_entities(sensors, True)
+    _async_remove_placeholder_sensors(
+        hass,
+        config_entry,
+        placeholder_ids - {sensor.unique_id for sensor in sensors},
+    )
 
     # Set up COP sensors separately
     await async_setup_cop_sensors(hass, config_entry, async_add_entities)
     await async_setup_fault_sensors(hass, config_entry, async_add_entities)
+
+
+def sensor_unique_id(block: bytes, byte_offset: int, name: str) -> str:
+    """Return the unique id of the sensor for a read-map field.
+
+    ``block`` is formatted as its bytes repr (as Python prints the bytes of
+    pxxFB, for example); changing that would change the unique id of every
+    sensor.
+    """
+    name_slug = name.lower().replace(" ", "_")
+    return f"thz_{block!r}_{byte_offset}_{name_slug}"
+
+
+@callback
+def _async_remove_placeholder_sensors(
+    hass: HomeAssistant, config_entry: THZConfigEntry, unique_ids: set[str]
+) -> None:
+    """Remove registry entries of sensors for "n.a." placeholder fields.
+
+    Fields the firmware does not have ("n.a."/"n.a" in the map) get no
+    sensor. Entries that earlier versions registered for them would stay
+    as "no longer provided"; they are removed, for this config entry only.
+    """
+    registry = er.async_get(hass)
+    for unique_id in unique_ids:
+        entity_id = registry.async_get_entity_id("sensor", DOMAIN, unique_id)
+        if entity_id is None:
+            continue
+        registry_entry = registry.async_get(entity_id)
+        if registry_entry is None or (
+            registry_entry.config_entry_id != config_entry.entry_id
+        ):
+            continue
+        registry.async_remove(entity_id)
+        _LOGGER.info("Removed %s: the firmware has no such value", entity_id)
 
 
 def decode_value(
@@ -535,8 +583,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         Returns:
             A string representing the unique ID of the sensor.
         """
-        name_slug = self._entity_name.lower().replace(" ", "_")
-        return f"thz_{self._block}_{self._offset}_{name_slug}"
+        return sensor_unique_id(self._block, self._offset, self._entity_name)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
