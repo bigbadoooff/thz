@@ -13,12 +13,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .base_entity import THZBaseEntity
 from .const import (
     TIME_VALUE_UNSET,
-    WRITE_REGISTER_LENGTH,
-    WRITE_REGISTER_OFFSET,
 )
 from .devices import assign_subdevices
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
+from .parameter_io import async_read_parameter, async_write_parameter
 from .register_maps.model import WriteParam
 from .register_maps.register_map_manager import RegisterMapManagerWrite
 from .runtime_data import THZConfigEntry
@@ -307,6 +306,7 @@ class THZTime(THZBaseEntity, TimeEntity):
         self._attr_has_entity_name = True
 
         self._attr_native_value = None
+        self._entry = entry
         self._byte_index = time_byte_index(entry.decode_type)
 
     @property
@@ -317,8 +317,8 @@ class THZTime(THZBaseEntity, TimeEntity):
     async def async_update(self):
         """Fetch new state data for the time."""
         # Time values are stored as single bytes (0-95 quarters)
-        value_bytes = await self._async_read_register(
-            WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH
+        value_bytes = await self._async_guarded_read(
+            async_read_parameter(self.hass, self._device, self._entry)
         )
         if value_bytes is None:
             return
@@ -375,23 +375,15 @@ class THZTime(THZBaseEntity, TimeEntity):
         time next to the party start; the others are written as
         ``[num, 0]`` as before.
         """
-        command = bytes.fromhex(self._command)
         if self._byte_index == 0:
             payload = bytearray([num, 0])
         else:
-            current = await self._device.async_execute(
-                self.hass,
-                self._device.read_value,
-                command,
-                "get",
-                WRITE_REGISTER_OFFSET,
-                WRITE_REGISTER_LENGTH,
-            )
+            current = await async_read_parameter(self.hass, self._device, self._entry)
             payload = bytearray(current or b"") + bytearray(2)
             payload = payload[:2]
             payload[self._byte_index] = num
-        await self._device.async_execute(
-            self.hass, self._device.write_value, command, bytes(payload)
+        await async_write_parameter(
+            self.hass, self._device, self._entry, bytes(payload)
         )
 
     async def async_clear_value(self) -> None:
@@ -495,6 +487,9 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
 
     async def async_update(self):
         """Fetch new state data for the schedule time."""
+        # Schedules exist only as 4.x/5.x registers whose four data bytes hold
+        # start and end together, so they are read and written whole here
+        # rather than as one parameter through parameter_io.
         value_bytes = await self._async_read_register(4, 4)
         if value_bytes is None:
             return

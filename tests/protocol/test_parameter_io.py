@@ -283,3 +283,104 @@ class TestNumberReadsFromBlockCoordinator:
         from_block = parameter_from_block(entry, response)
         from_device = await async_read_parameter(None, device, entry)
         assert from_block == from_device
+
+
+class TestEveryWriteEntityUsesParameterIo:
+    """Select, switch, button and time write through parameter_io too.
+
+    None of them sits in a 2.x block today; if one ever does, it must be
+    written by read-modify-write of its block instead of a plain SET that
+    would overwrite the block's start.
+    """
+
+    @staticmethod
+    def _block_param(**fields):
+        layout = {"write_mode": "block", "offset": 4, "length": 2, "signed": False}
+        return write_param({"command": "17", **layout, **fields})
+
+    @staticmethod
+    def _prepare(entity):
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        return entity
+
+    @pytest.mark.asyncio
+    async def test_switch_in_a_block_writes_only_its_slot(self):
+        from custom_components.thz.switch import THZSwitch
+
+        device = Simulated2xxDevice({b"\x17": _block_17()})
+        switch = self._prepare(
+            THZSwitch("pSwitchInBlock", self._block_param(type="switch"), device, "d")
+        )
+        await switch.async_turn_on()
+
+        block = device.blocks[b"\x17"]
+        assert block[2:4] == b"\x00\x01"
+        assert block[:2] == _block_17()[:2]
+        assert block[4:] == _block_17()[4:]
+        await switch.async_update()
+        assert switch.is_on is True
+
+    @pytest.mark.asyncio
+    async def test_select_in_a_block_writes_only_its_slot(self):
+        from custom_components.thz.select import THZSelect
+
+        device = Simulated2xxDevice({b"\x17": _block_17()})
+        select = self._prepare(
+            THZSelect(
+                "pSelectInBlock",
+                self._block_param(type="select", decode_type="1clean"),
+                device,
+                "d",
+            )
+        )
+        await select.async_select_option(select._attr_options[1])
+
+        block = device.blocks[b"\x17"]
+        assert block[2:4] == b"\x00\x01"
+        assert block[4:] == _block_17()[4:]
+        await select.async_update()
+        assert select.current_option == select._attr_options[1]
+
+    @pytest.mark.asyncio
+    async def test_time_in_a_block_writes_only_its_slot(self):
+        from datetime import time as dt_time
+
+        from custom_components.thz.time import THZTime
+
+        device = Simulated2xxDevice({b"\x17": _block_17()})
+        entity = self._prepare(
+            THZTime("pTimeInBlock", self._block_param(type="time"), device, "d")
+        )
+        await entity.async_set_value(dt_time(1, 0))
+
+        block = device.blocks[b"\x17"]
+        assert block[2:4] == b"\x04\x00"  # 1:00 = 4 quarters in the first byte
+        assert block[4:] == _block_17()[4:]
+        await entity.async_update()
+        assert entity.native_value == dt_time(1, 0)
+
+    @pytest.mark.asyncio
+    async def test_button_in_a_block_writes_only_its_slot(self):
+        from custom_components.thz.button import THZButton
+
+        device = Simulated2xxDevice({b"\x17": _block_17()})
+        button = self._prepare(
+            THZButton(
+                "pButtonInBlock",
+                write_param(
+                    {"command": "17", "type": "button", "write_mode": "block"},
+                    offset=5,
+                    length=1,
+                ),
+                device,
+                "d",
+            )
+        )
+        await button.async_press()
+
+        # Offset 5 is data byte 3 (0xB4, the low byte of p02) before the press.
+        block = device.blocks[b"\x17"]
+        assert block[3] == 0x00
+        assert block[:3] == _block_17()[:3]
+        assert block[4:] == _block_17()[4:]

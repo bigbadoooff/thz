@@ -11,12 +11,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZBaseEntity
-from .const import (
-    WRITE_REGISTER_LENGTH,
-    WRITE_REGISTER_OFFSET,
-)
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
+from .parameter_io import async_read_parameter, async_write_parameter
 from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
 from .thz_device import THZDevice
@@ -83,6 +80,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
         )
 
         # Switch-specific attributes
+        self._entry = entry
         self._is_on = False
 
     @property
@@ -94,8 +92,8 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
         """Update the switch state by reading the current value from the device."""
         _LOGGER.debug("Updating switch %s with command %s", self.name, self._command)
 
-        value_bytes = await self._async_read_register(
-            WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH
+        value_bytes = await self._async_guarded_read(
+            async_read_parameter(self.hass, self._device, self._entry)
         )
         if value_bytes is None:
             return
@@ -118,11 +116,8 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             # Use centralized codec for encoding
             value_bytes = THZValueCodec.encode_switch(True)
 
-            await self._device.async_execute(
-                self.hass,
-                self._device.write_value,
-                bytes.fromhex(self._command),
-                value_bytes,
+            await async_write_parameter(
+                self.hass, self._device, self._entry, value_bytes
             )
 
             self._is_on = True
@@ -140,11 +135,8 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             # Use centralized codec for encoding
             value_bytes = THZValueCodec.encode_switch(False)
 
-            await self._device.async_execute(
-                self.hass,
-                self._device.write_value,
-                bytes.fromhex(self._command),
-                value_bytes,
+            await async_write_parameter(
+                self.hass, self._device, self._entry, value_bytes
             )
 
             self._is_on = False

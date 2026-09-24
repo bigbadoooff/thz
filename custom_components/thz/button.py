@@ -21,6 +21,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .base_entity import THZBaseEntity
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
+from .parameter_io import async_write_parameter
 from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
 from .thz_device import THZDevice
@@ -87,6 +88,7 @@ class THZButton(THZBaseEntity, ButtonEntity):
             entity_id_prefix=entity_id_prefix,
             domain="button",
         )
+        self._entry = entry
 
     async def async_added_to_hass(self) -> None:
         """Skip base periodic polling setup for stateless buttons."""
@@ -108,12 +110,7 @@ class THZButton(THZBaseEntity, ButtonEntity):
         """
         _LOGGER.debug("Pressing button %s (command: %s)", self.name, self._command)
         try:
-            await self._device.async_execute(
-                self.hass,
-                self._device.write_value,
-                bytes.fromhex(self._command),
-                b"\x00",
-            )
+            await async_write_parameter(self.hass, self._device, self._entry, b"\x00")
             _LOGGER.info("Button %s pressed successfully", self.name)
         except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error("Error pressing button %s: %s", self.name, err, exc_info=True)
