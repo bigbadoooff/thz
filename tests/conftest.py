@@ -127,8 +127,37 @@ core_mock.callback = lambda func: func
 sys.modules["homeassistant.core"] = core_mock
 
 
+def _exception_message(key, placeholders):
+    """English text of a translated exception, as Home Assistant renders it."""
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).parent.parent / "custom_components/thz/translations/en.json"
+    message = json.loads(path.read_text())["exceptions"][key]["message"]
+    return message.format(**(placeholders or {}))
+
+
 class HomeAssistantError(Exception):
-    """Real exception stand-in so `pytest.raises(HomeAssistantError)` works."""
+    """Real exception stand-in so `pytest.raises(HomeAssistantError)` works.
+
+    Like Home Assistant's, it renders a translated exception's message from
+    the English translation.
+    """
+
+    def __init__(
+        self,
+        *args,
+        translation_domain=None,
+        translation_key=None,
+        translation_placeholders=None,
+    ):
+        """Store the translation and render its English message."""
+        self.translation_domain = translation_domain
+        self.translation_key = translation_key
+        self.translation_placeholders = translation_placeholders
+        if not args and translation_key is not None:
+            args = (_exception_message(translation_key, translation_placeholders),)
+        super().__init__(*args)
 
 
 class ConfigEntryNotReady(HomeAssistantError):

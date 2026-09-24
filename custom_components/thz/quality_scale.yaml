@@ -65,9 +65,7 @@ rules:
   entity-device-class: done
   entity-disabled-by-default: done
   entity-translations: done
-  exception-translations:
-    status: todo
-    comment: Service errors are raised with English messages.
+  exception-translations: done
   icon-translations: done
   reconfiguration-flow: done
   repair-issues:

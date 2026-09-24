@@ -118,7 +118,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         await device.async_initialize(hass)
     except OSError as err:
         raise ConfigEntryNotReady(
-            f"Cannot connect to THZ device ({err}); will retry"
+            translation_domain=DOMAIN,
+            translation_key="cannot_connect",
+            translation_placeholders={"error": str(err)},
         ) from err
     _LOGGER.info("THZ device fully initialized (FW %s)", device.firmware_version)
 
@@ -129,7 +131,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     register_manager = device.register_map_manager
     if write_manager is None or register_manager is None:
         device.close()
-        raise ConfigEntryNotReady("THZ register maps could not be loaded")
+        raise ConfigEntryNotReady(
+            translation_domain=DOMAIN, translation_key="register_maps_missing"
+        )
     # Paired register blocks for energy sensors (cmd2 + cmd3)
     paired_blocks = register_manager.get_paired_blocks()
     if paired_blocks:
@@ -144,7 +148,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         # an integration without any data.
         device.close()
         raise ConfigEntryNotReady(
-            "No register block could be read from the THZ device; will retry"
+            translation_domain=DOMAIN, translation_key="no_block_readable"
         )
 
     poller = ParameterPoller(

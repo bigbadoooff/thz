@@ -2931,5 +2931,106 @@
         "539technician": "5.39 Technician"
       }
     }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Cannot connect to THZ device ({error}); will retry"
+    },
+    "register_maps_missing": {
+      "message": "THZ register maps could not be loaded"
+    },
+    "no_block_readable": {
+      "message": "No register block could be read from the THZ device; will retry"
+    },
+    "entry_not_found": {
+      "message": "No THZ entry found for entry_id {entry_id}"
+    },
+    "multiple_entries": {
+      "message": "Multiple THZ config entries found. Provide 'entry_id' to target a specific device."
+    },
+    "no_device_loaded": {
+      "message": "No THZ device is loaded"
+    },
+    "max_results_invalid": {
+      "message": "max_results must be greater than 0"
+    },
+    "scan_target_required": {
+      "message": "Provide either 'pattern' or both 'start' and 'end'"
+    },
+    "invalid_scan_request": {
+      "message": "Invalid scan request: {error}"
+    },
+    "invalid_hex_command": {
+      "message": "Invalid hex command: {command} - {error}"
+    },
+    "raw_read_failed": {
+      "message": "Error reading register {command}: {error}"
+    },
+    "duration_too_short": {
+      "message": "duration_seconds must be greater than or equal to 1"
+    },
+    "interval_negative": {
+      "message": "interval_seconds must be greater than or equal to 0"
+    },
+    "block_required": {
+      "message": "block parameter is required"
+    },
+    "block_not_found": {
+      "message": "Block {block} not found in any active coordinator"
+    },
+    "backup_write_failed": {
+      "message": "Failed to write backup file: {error}"
+    },
+    "backup_not_found": {
+      "message": "Backup file {filename} not found"
+    },
+    "no_backups": {
+      "message": "No backup files found in {directory}/"
+    },
+    "backup_read_failed": {
+      "message": "Failed to read backup file {path}: {error}"
+    },
+    "fault_memory_not_supported": {
+      "message": "D1 fault memory is not supported by this device: {error}"
+    },
+    "fault_memory_read_failed": {
+      "message": "Could not read D1 fault memory: {error}"
+    },
+    "fault_memory_clear_failed": {
+      "message": "Could not clear the fault memory: {error}"
+    },
+    "fault_tracking_unavailable": {
+      "message": "Fault tracking is not available: it needs the Fault Log (pxxD1) read block on firmware 4.x/5.x"
+    },
+    "no_fault_data": {
+      "message": "No fault data available to acknowledge"
+    },
+    "confirmation_incorrect": {
+      "message": "Confirmation phrase incorrect. Expected exactly: {phrase}"
+    },
+    "diverter_block_not_polled": {
+      "message": "Cannot verify valve state: {block} is not polled"
+    },
+    "diverter_flag_missing": {
+      "message": "Cannot verify valve state: no {field} flag in the {block} register map of this firmware"
+    },
+    "diverter_block_unreadable": {
+      "message": "Cannot verify valve state: {block} could not be read"
+    },
+    "diverter_data_short": {
+      "message": "Insufficient data from {block} block"
+    },
+    "diverter_not_in_dhw": {
+      "message": "Heat pump is not in DHW mode (diverterValve bit = 0 in pxxF2). Moving valve to DHW refused — heating circuit is under pressure."
+    },
+    "diverter_in_dhw": {
+      "message": "Heat pump is in DHW mode (diverterValve bit = 1 in pxxF2). Moving valve to heating refused — DHW circuit is under pressure."
+    },
+    "diverter_command_failed": {
+      "message": "Error sending diverter valve command: {error}"
+    },
+    "button_press_failed": {
+      "message": "Unable to execute THZ button {name}"
+    }
   }
 }

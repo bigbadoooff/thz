@@ -26,6 +26,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **Error messages are translated.** Errors from the services, the button
+  and the setup ("will retry") come from the integration's translations
+  (English and German) instead of fixed English text.
+
 - **Settings are polled by one poller per heat pump** (#185): number,
   select, switch and time entities no longer run a timer each. The poller
   reads every register once per `write_interval`, one after the other; a

@@ -2931,5 +2931,106 @@
         "539technician": "5.39 Techniker"
       }
     }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Keine Verbindung zum THZ-Gerät ({error}); neuer Versuch folgt"
+    },
+    "register_maps_missing": {
+      "message": "Die THZ-Register-Maps konnten nicht geladen werden"
+    },
+    "no_block_readable": {
+      "message": "Vom THZ-Gerät konnte kein Register-Block gelesen werden; neuer Versuch folgt"
+    },
+    "entry_not_found": {
+      "message": "Kein THZ-Eintrag mit der entry_id {entry_id} gefunden"
+    },
+    "multiple_entries": {
+      "message": "Es gibt mehrere THZ-Einträge. Gib mit 'entry_id' das Gerät an."
+    },
+    "no_device_loaded": {
+      "message": "Es ist kein THZ-Gerät geladen"
+    },
+    "max_results_invalid": {
+      "message": "max_results muss größer als 0 sein"
+    },
+    "scan_target_required": {
+      "message": "Gib entweder 'pattern' oder 'start' und 'end' an"
+    },
+    "invalid_scan_request": {
+      "message": "Ungültige Scan-Anfrage: {error}"
+    },
+    "invalid_hex_command": {
+      "message": "Ungültiger Hex-Befehl: {command} - {error}"
+    },
+    "raw_read_failed": {
+      "message": "Fehler beim Lesen von Register {command}: {error}"
+    },
+    "duration_too_short": {
+      "message": "duration_seconds muss mindestens 1 sein"
+    },
+    "interval_negative": {
+      "message": "interval_seconds darf nicht negativ sein"
+    },
+    "block_required": {
+      "message": "Der Parameter block fehlt"
+    },
+    "block_not_found": {
+      "message": "Block {block} wird von keinem aktiven Koordinator abgefragt"
+    },
+    "backup_write_failed": {
+      "message": "Die Sicherungsdatei konnte nicht geschrieben werden: {error}"
+    },
+    "backup_not_found": {
+      "message": "Sicherungsdatei {filename} nicht gefunden"
+    },
+    "no_backups": {
+      "message": "Keine Sicherungsdateien in {directory}/ gefunden"
+    },
+    "backup_read_failed": {
+      "message": "Die Sicherungsdatei {path} konnte nicht gelesen werden: {error}"
+    },
+    "fault_memory_not_supported": {
+      "message": "Das Gerät unterstützt den D1-Fehlerspeicher nicht: {error}"
+    },
+    "fault_memory_read_failed": {
+      "message": "Der D1-Fehlerspeicher konnte nicht gelesen werden: {error}"
+    },
+    "fault_memory_clear_failed": {
+      "message": "Der Fehlerspeicher konnte nicht gelöscht werden: {error}"
+    },
+    "fault_tracking_unavailable": {
+      "message": "Die Fehlerverfolgung ist nicht verfügbar: Sie braucht den Lese-Block Fehlerspeicher (pxxD1) auf Firmware 4.x/5.x"
+    },
+    "no_fault_data": {
+      "message": "Es gibt keine Fehlerdaten zum Quittieren"
+    },
+    "confirmation_incorrect": {
+      "message": "Bestätigungstext falsch. Erwartet wird genau: {phrase}"
+    },
+    "diverter_block_not_polled": {
+      "message": "Stellung des Umschaltventils nicht prüfbar: {block} wird nicht abgefragt"
+    },
+    "diverter_flag_missing": {
+      "message": "Stellung des Umschaltventils nicht prüfbar: Die Register-Map von {block} hat auf dieser Firmware kein Flag {field}"
+    },
+    "diverter_block_unreadable": {
+      "message": "Stellung des Umschaltventils nicht prüfbar: {block} konnte nicht gelesen werden"
+    },
+    "diverter_data_short": {
+      "message": "Zu wenig Daten aus Block {block}"
+    },
+    "diverter_not_in_dhw": {
+      "message": "Die Wärmepumpe ist nicht im Warmwasserbetrieb (diverterValve-Bit = 0 in pxxF2). Umschalten auf Warmwasser abgelehnt – der Heizkreis steht unter Druck."
+    },
+    "diverter_in_dhw": {
+      "message": "Die Wärmepumpe ist im Warmwasserbetrieb (diverterValve-Bit = 1 in pxxF2). Umschalten auf Heizung abgelehnt – der Warmwasserkreis steht unter Druck."
+    },
+    "diverter_command_failed": {
+      "message": "Fehler beim Senden des Befehls an das Umschaltventil: {error}"
+    },
+    "button_press_failed": {
+      "message": "THZ-Taste {name} konnte nicht ausgeführt werden"
+    }
   }
 }
