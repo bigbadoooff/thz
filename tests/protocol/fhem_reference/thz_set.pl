@@ -20,10 +20,12 @@
 #    "blocks": {"17": "<hex data after the address byte>", ...},
 #    "cases": [["p01RoomTempDay", "21"], ...],
 #    "parse": {"17": "<parsing type to decode block 17 with>", ...},
+#    "parse_direct": {"0A0112 0100": "<parsing type>", ...},
 #    "decode": ["<raw answer hex>", ...]}
 # Output (JSON on stdout):
 #   {"sets": {"<param> <value>": {"telegrams": [hex, ...]} | {"error": msg}},
 #    "parsed": {"<block>": "<THZ_Parse1 output>"},
+#    "parsed_direct": {"<command> <data>": "<THZ_Parse1 output>"},
 #    "decoded": {"<raw answer hex>": "<THZ_decode error>" | null}}
 use strict;
 use warnings;
@@ -66,9 +68,9 @@ sub THZ_TestOverride {
 }
 
 sub THZ_TestParse {
-    my ($hash, $message, $type) = @_;
+    my ($hash, $message, $type, $cmd) = @_;
     my %saved = %gets;
-    %gets = (test_block => { cmd2 => substr($message, 2, 2), type => $type });
+    %gets = (test_block => { cmd2 => $cmd, type => $type });
     my $parsed = THZ_Parse1($hash, $message);
     %gets = %saved;
     return $parsed;
@@ -139,11 +141,27 @@ my %parsed;
 for my $addr (keys %{ $input->{parse} || {} }) {
     my $data = uc($addr) . $blocks{uc($addr)};
     my $crc = THZ_checksum("0100XX" . $data . "1003");
-    $parsed{$addr} = THZ_TestParse($hash, $crc . $data, $input->{parse}{$addr});
+    $parsed{$addr} = THZ_TestParse(
+        $hash, $crc . $data, $input->{parse}{$addr}, uc($addr)
+    );
+}
+# 4.x/5.x registers: "<command> <data>" => parsing type; the command is
+# three bytes, the data is what the register holds.
+my %parsed_direct;
+for my $key (keys %{ $input->{parse_direct} || {} }) {
+    my ($cmd, $value) = split / /, uc($key);
+    my $data = $cmd . $value;
+    my $crc = THZ_checksum("0100XX" . $data . "1003");
+    $parsed_direct{$key} = THZ_TestParse(
+        $hash, $crc . $data, $input->{parse_direct}{$key}, $cmd
+    );
 }
 my %decoded;
 for my $answer (@{ $input->{decode} || [] }) {
     my ($err) = THZ_decode(uc($answer));
     $decoded{$answer} = $err;
 }
-print encode_json({ sets => \%result, parsed => \%parsed, decoded => \%decoded });
+print encode_json({
+    sets => \%result, parsed => \%parsed, parsed_direct => \%parsed_direct,
+    decoded => \%decoded,
+});

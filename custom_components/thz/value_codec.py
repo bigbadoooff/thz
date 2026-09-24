@@ -299,10 +299,12 @@ class THZValueCodec:
         if decode_type == "4temp":
             value = int.from_bytes(value_bytes, byteorder="big", signed=True)
             return value / 256 * step
-        else:
-            # Standard 2-byte signed integer decoding with scaling
-            value = int.from_bytes(value_bytes, byteorder="big", signed=signed)
-            return value * step
+        if decode_type == "6gradient":
+            # FHEM parses "6gradient" as "hex": unsigned (00_THZ.pm).
+            signed = False
+        # Standard 2-byte integer decoding with scaling
+        value = int.from_bytes(value_bytes, byteorder="big", signed=signed)
+        return value * step
 
     @staticmethod
     def encode_select(option: str, decode_type: str | None) -> bytes:

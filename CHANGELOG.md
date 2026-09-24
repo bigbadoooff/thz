@@ -52,6 +52,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Heating curve gradients are read unsigned, as FHEM does** (#185): the
+  `6gradient` parameters (p13/p16 gradient HC1/HC2) were decoded as signed
+  values, so a raw value from 0x8000 up showed as negative. Real gradients
+  stay far below that; the change makes the reading match FHEM's.
+
 - **Leftover placeholder sensors on 2.06/2.14 are removed** (#176, #185):
   sensors such as *Dew Point*, *P_Nd*/*P_Hd* and *actualPower_\** that
   earlier versions created for fields the firmware does not have stayed in
