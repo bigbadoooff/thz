@@ -52,6 +52,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Heating curve gradients are read unsigned, as FHEM does** (#185): the
+  `6gradient` parameters (p13/p16 gradient HC1/HC2) were decoded as signed
+  values, so a raw value from 0x8000 up showed as negative. Real gradients
+  stay far below that; the change makes the reading match FHEM's.
+
 - **The diverter valve check used polled data** (#185): `thz.set_diverter_valve`
   decided from the `diverterValve` bit of the last `pxxF2` poll, which can be
   one poll interval old. The block is now read right before the check, and

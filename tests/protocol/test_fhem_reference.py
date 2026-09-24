@@ -436,7 +436,7 @@ def _direct_read_samples(name: str, entry) -> list[str]:
             THZValueCodec.encode_number(value, step, decode, 2).hex()
             for value in values
         }
-        return sorted(samples | {"0000"})
+        return sorted(samples | {"0000", "ffff", "8000"})
     if kind == "switch":
         return ["0000", "0001", "0100"]
     if kind == "select":
@@ -499,8 +499,20 @@ def _fhem_reading(entry, parsed: str) -> str:
     return parsed.replace("24:00", "00:00")
 
 
+# Every 4.x/5.x/7.x profile; FHEM only needs the firmware to tell 2.x apart.
+_DIRECT_READ_FIRMWARES = {
+    "419": "4.19",
+    "439": "4.39",
+    "439technician": "4.39",
+    "509": "5.09",
+    "539": "5.39",
+    "539technician": "5.39",
+    "709": "7.09",
+}
+
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize("firmware", sorted(_DIRECT_FIRMWARES))
+@pytest.mark.parametrize("firmware", sorted(_DIRECT_READ_FIRMWARES))
 async def test_direct_reads_match_fhem(firmware):
     entries = _direct_entries(firmware)
     cases = [
@@ -509,7 +521,7 @@ async def test_direct_reads_match_fhem(firmware):
         for data in _direct_read_samples(name, entry)
     ]
     parsed = _fhem(
-        _DIRECT_FIRMWARES[firmware],
+        _DIRECT_READ_FIRMWARES[firmware],
         parse_direct={
             f"{entries[name].command} {data}": _fhem_value_type(entries[name])
             for name, data in cases
