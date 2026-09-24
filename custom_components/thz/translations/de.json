@@ -2692,7 +2692,12 @@
     },
     "fan": {
       "ventilation": {
-        "name": "Lüftung"
+        "name": "Lüftung",
+        "state_attributes": {
+          "stage": {
+            "name": "Stufe"
+          }
+        }
       }
     },
     "binary_sensor": {

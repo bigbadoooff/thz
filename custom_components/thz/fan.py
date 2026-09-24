@@ -8,12 +8,20 @@ before the program takes over again. Setting a speed starts unscheduled
 ventilation at stage 1-3; turning the fan off starts it at stage 0. The
 stage settings of the program (``p07FanStageDay`` etc.) are not touched.
 
-The fan shows the stage the ventilation runs at, read in this order:
+Firmware 2.x has no such command, so there the fan only shows the stage.
 
-1. The supply airflow of the current stage (``pFanstageXAirflowInlet`` in
+The fan shows the stage the ventilation runs at (also as the ``stage``
+attribute, since Home Assistant shows no percentage for a fan whose speed
+cannot be set), read in this order:
+
+1. On 2.x, the stage set at the device (``userSetFanStage`` in ``pxxF6``)
+   while its time runs (``userSetFanRemainingTime``), otherwise the stage
+   of the program state (``ProgStateFAN`` in ``pxxEE``): day, night or
+   standby stage (``p07`` to ``p09``).
+2. The supply airflow of the current stage (``pFanstageXAirflowInlet`` in
    ``pxxE8``) compared with the airflows set for stages 1-3 (``p37`` to
    ``p39``); 0 m³/h is stage 0.
-2. Otherwise the fan time program of today: inside one of its windows the
+3. Otherwise the fan time program of today: inside one of its windows the
    day stage (``p07FanStageDay``), outside it the night stage
    (``p08FanStageNight``). While an unscheduled ventilation started here
    runs, its stage is shown instead, since the program does not know it.
@@ -43,8 +51,8 @@ from .parameter_io import (
     async_write_parameter,
     parameter_length,
 )
-from .register_maps.model import WriteParam
-from .value_codec import THZValueCodec
+from .register_maps.model import ReadField, WriteParam
+from .value_codec import THZValueCodec, decode_raw_value
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
@@ -73,11 +81,18 @@ _AIRFLOW_NAMES = (
 )
 _DAY_STAGE_NAME = "p07FanStageDay"
 _NIGHT_STAGE_NAME = "p08FanStageNight"
+_STANDBY_STAGE_NAME = "p09FanStageStandby"
 # programFan_<day>_<n>: up to three windows per weekday, Monday first.
 _PROGRAM_DAYS = ("Mo", "Tu", "We", "Th", "Fr", "Sa", "So")
 _PROGRAM_WINDOWS = 3
 _AIRFLOW_BLOCK = "pxxE8"
 _AIRFLOW_FIELD = "pFanstageXAirflowInlet"
+# 2.x status: the stage set at the device and the program state.
+_STATUS_BLOCK = "pxxF6"
+_USER_STAGE_FIELD = "userSetFanStage"
+_USER_REMAINING_FIELD = "userSetFanRemainingTime"
+_PROGRAM_BLOCK = "pxxEE"
+_PROGRAM_STATE_FIELD = "ProgStateFAN"
 # Schedule times are quarter hours since midnight; 0x80 is an unset window.
 _UNSET_TIME = 0x80
 
@@ -91,6 +106,7 @@ class FanParams:
         self.airflows = tuple(params.get(name) for name in _AIRFLOW_NAMES)
         self.day_stage = params.get(_DAY_STAGE_NAME)
         self.night_stage = params.get(_NIGHT_STAGE_NAME)
+        self.standby_stage = params.get(_STANDBY_STAGE_NAME)
         self.programs = {
             day: tuple(
                 params.get(f"programFan_{day}_{window}")
@@ -100,16 +116,44 @@ class FanParams:
         }
 
 
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+class FanStatus:
+    """The 2.x read fields that show the ventilation stage."""
+
+    def __init__(self, register_manager: Any) -> None:
+        """Look the fields up in the firmware's read map."""
+        self.user_stage: ReadField | None = register_manager.find_field(
+            _STATUS_BLOCK, _USER_STAGE_FIELD
+        )
+        self.user_remaining: ReadField | None = register_manager.find_field(
+            _STATUS_BLOCK, _USER_REMAINING_FIELD
+        )
+        self.program_state: ReadField | None = register_manager.find_field(
+            _PROGRAM_BLOCK, _PROGRAM_STATE_FIELD
+        )
+
+    def __bool__(self) -> bool:
+        """Return whether the read map has any of the fields."""
+        has_user_stage = bool(self.user_stage and self.user_remaining)
+        return has_user_stage or self.program_state is not None
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: THZConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the ventilation fan if the firmware can start ventilation."""
+    """Set up the ventilation fan: controllable on 4.x/5.x, shown on 2.x."""
     entry_data = config_entry.runtime_data
     params = entry_data.write_manager.params()
     start = params.get(_START_NAME)
-    if start is None or not start.command:
+    if start is not None and not start.command:
+        start = None
+    status = FanStatus(entry_data.register_manager)
+    if start is None and not status:
         return
     airflow_field = entry_data.register_manager.find_field(
         _AIRFLOW_BLOCK, _AIRFLOW_FIELD
@@ -117,6 +161,7 @@ async def async_setup_entry(
     entity = THZFan(
         start=start,
         params=FanParams(params),
+        status=status if status else None,
         airflow=(
             None
             if airflow_field is None
@@ -138,16 +183,12 @@ class THZFan(THZBaseEntity, FanEntity):
     """The heat pump's ventilation (see the module docstring)."""
 
     _attr_speed_count = _MAX_STAGE
-    _attr_supported_features = (
-        FanEntityFeature.SET_SPEED
-        | FanEntityFeature.TURN_ON
-        | FanEntityFeature.TURN_OFF
-    )
 
     def __init__(
         self,
-        start: WriteParam,
+        start: WriteParam | None,
         params: FanParams,
+        status: FanStatus | None,
         airflow: tuple[int, int] | None,
         device: THZDevice,
         device_id: str,
@@ -156,10 +197,10 @@ class THZFan(THZBaseEntity, FanEntity):
         entity_visibility: str = "default",
         entity_id_prefix: str | None = None,
     ) -> None:
-        """Initialize the fan from its parameters and the airflow field."""
+        """Initialize the fan; without ``start`` it only shows the stage."""
         super().__init__(
             name="ventilation",
-            command=start.command,
+            command=start.command if start is not None else _STATUS_BLOCK[3:],
             device=device,
             device_id=device_id,
             unique_id=f"thz_{device_id}_fan_ventilation",
@@ -172,6 +213,15 @@ class THZFan(THZBaseEntity, FanEntity):
         )
         self._start_param = start
         self._params = params
+        self._status = status
+        if start is not None:
+            self._attr_supported_features = (
+                FanEntityFeature.SET_SPEED
+                | FanEntityFeature.TURN_ON
+                | FanEntityFeature.TURN_OFF
+            )
+        else:
+            self._attr_supported_features = FanEntityFeature(0)
         self._airflow = airflow
         self._stage: int | None = None
         # Stage and end of an unscheduled ventilation started here.
@@ -193,9 +243,16 @@ class THZFan(THZBaseEntity, FanEntity):
             return 0
         return ranged_value_to_percentage((1, _MAX_STAGE), self._stage)
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Add the stage; Home Assistant shows a percentage only if settable."""
+        return {**super().extra_state_attributes, "stage": self._stage}
+
     async def async_update(self) -> None:
         """Read the stage the ventilation runs at."""
-        stage = await self._async_stage_from_airflow()
+        stage = await self._async_stage_from_status()
+        if stage is None:
+            stage = await self._async_stage_from_airflow()
         if stage is None:
             stage = self._running_unscheduled_stage()
         if stage is None:
@@ -228,6 +285,57 @@ class THZFan(THZBaseEntity, FanEntity):
         except (ValueError, IndexError, TypeError) as err:
             _LOGGER.error("Error decoding %s for %s: %s", param.name, self.name, err)
             return None
+
+    async def _async_block(self, block: str) -> bytes | None:
+        """Return a block's data from its coordinator, or read it."""
+        coordinator = self._coordinators.get(block)
+        if coordinator is not None:
+            data: bytes | None = coordinator.data
+            return data
+        return await self._async_guarded_read(
+            self._device.async_execute(
+                self.hass,
+                self._device.read_block,
+                bytes.fromhex(block.removeprefix("pxx")),
+                "get",
+            )
+        )
+
+    @staticmethod
+    def _field_value(data: bytes | None, read_field: ReadField | None) -> Any:
+        if not data or read_field is None:
+            return None
+        offset, length = read_field.byte_offset, read_field.byte_length
+        raw = data[offset : offset + length]
+        if len(raw) < length:
+            return None
+        try:
+            return decode_raw_value(raw, read_field.decode_type, read_field.factor)
+        except (ValueError, IndexError, TypeError):
+            return None
+
+    async def _async_stage_from_status(self) -> int | None:
+        """2.x: the stage set at the device, else the program state's stage."""
+        status = self._status
+        if status is None:
+            return None
+        if status.user_stage is not None and status.user_remaining is not None:
+            data = await self._async_block(_STATUS_BLOCK)
+            remaining = self._field_value(data, status.user_remaining)
+            stage = self._field_value(data, status.user_stage)
+            if _is_number(remaining) and remaining > 0 and _is_number(stage):
+                return int(stage)
+        if status.program_state is None:
+            return None
+        state = self._field_value(
+            await self._async_block(_PROGRAM_BLOCK), status.program_state
+        )
+        param = {
+            "normal": self._params.day_stage,
+            "setback": self._params.night_stage,
+            "standby": self._params.standby_stage,
+        }.get(str(state))
+        return await self._async_read_number(param)
 
     async def _async_stage_from_airflow(self) -> int | None:
         """Match the current supply airflow with the airflow of each stage."""
@@ -280,6 +388,8 @@ class THZFan(THZBaseEntity, FanEntity):
     async def _async_start(self, stage: int) -> None:
         """Start unscheduled ventilation at ``stage``."""
         param = self._start_param
+        if param is None:
+            return
         try:
             value_bytes = THZValueCodec.encode_number(
                 float(stage),

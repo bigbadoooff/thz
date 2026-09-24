@@ -179,3 +179,20 @@ async def test_fan_starts_unscheduled_ventilation(hass, fake_device, freezer):
     assert device.sets_for(DAY_STAGE) == []
     assert device.sets_for(NIGHT_STAGE) == []
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_fan_on_2xx_only_shows_the_stage(hass, fake_device):
+    fake_device.firmware = 206
+    status = bytearray(BLOCK_SIZE)
+    # The map's offsets count CRC and command byte in front of the data.
+    status[15 - 2] = 2  # userSetFanStage
+    status[18 - 2 : 20 - 2] = (30).to_bytes(2, "big")  # userSetFanRemainingTime
+    fake_device.initial_registers = {b"\xf6": bytes(status)}
+    entry = await setup_entry(hass)
+    fan = entity_id(hass, entry, "fan", "fan_ventilation")
+
+    state = hass.states.get(fan)
+    assert state.state == STATE_ON
+    assert state.attributes["stage"] == 2
+    assert state.attributes["supported_features"] == 0
+    assert await hass.config_entries.async_unload(entry.entry_id)

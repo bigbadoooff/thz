@@ -372,7 +372,12 @@
     },
     "fan": {
       "ventilation": {
-        "name": "Ventilation"
+        "name": "Ventilation",
+        "state_attributes": {
+          "stage": {
+            "name": "Stage"
+          }
+        }
       }
     },
     "sensor": {
