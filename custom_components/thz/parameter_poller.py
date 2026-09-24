@@ -123,6 +123,8 @@ class ParameterPoller:
     def _async_enqueue(self, keys: list[ReadKey], delay: float) -> None:
         """Queue ``keys`` and make sure a read task picks them up."""
         self._queue.update(dict.fromkeys(keys))
+        if not self._queue:
+            return
         if self._task is not None or self._unsub_delay is not None:
             return  # the running or scheduled task reads the queue
         if delay:

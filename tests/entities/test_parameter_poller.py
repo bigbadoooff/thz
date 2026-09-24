@@ -294,3 +294,10 @@ async def test_a_failing_register_warns_once(timers, caplog):
     warnings = [r for r in caplog.records if r.levelname == "WARNING"]
     assert len(warnings) == 1
     assert "0B0005" in warnings[0].getMessage()
+
+
+def test_a_round_without_subscribers_starts_no_task(timers):
+    poller, _ = _poller({})
+    poller._hass.async_create_background_task = MagicMock()
+    poller._async_tick(None)
+    poller._hass.async_create_background_task.assert_not_called()

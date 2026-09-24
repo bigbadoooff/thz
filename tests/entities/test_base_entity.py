@@ -368,6 +368,18 @@ class TestParameterEntity:
         assert entity.available is True
         assert entity.applied == []
 
+    @pytest.mark.asyncio
+    async def test_unsupported_block_polls_the_parameter_itself(self):
+        entity = _ParamEntity(_flag_param())
+        entity._coordinators = {"pxx0B": MagicMock(last_update_success=True, data=None)}
+        entity._poller = poller = _poller()
+
+        await entity.async_added_to_hass()
+
+        poller.async_subscribe.assert_called_once_with(
+            ("0B", 6, 1), entity._handle_poll
+        )
+
     def test_block_listener_after_the_block_is_gone(self):
         entity = _ParamEntity(_flag_param())
         entity._handle_block_update()

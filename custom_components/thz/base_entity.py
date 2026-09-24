@@ -418,9 +418,21 @@ class THZParameterEntity(THZBaseEntity):
         return parameter_from_read(self._entry, raw)
 
     def _block_coordinator(self) -> DataUpdateCoordinator[Any] | None:
-        """Return the coordinator polling this 2.x parameter's block, if any."""
+        """Return the coordinator polling this 2.x parameter's block, if any.
+
+        A block the firmware does not have (read fine, but no data) does not
+        count: the parameter is then polled on its own and shows the
+        device's answer.
+        """
         key = block_coordinator_key(self._entry)
-        return self._coordinators.get(key) if key else None
+        coordinator = self._coordinators.get(key) if key else None
+        if (
+            coordinator is not None
+            and coordinator.last_update_success
+            and coordinator.data is None
+        ):
+            return None
+        return coordinator
 
     def _value_from_block(self, block_data: bytes) -> bytes | None:
         """Cut the parameter out of the block data."""
