@@ -38,7 +38,7 @@ def _make_device(read_return: bytes | None = None):
     value.
     """
     device = MagicMock()
-    device.async_execute = AsyncMock(side_effect=lambda hass, fn, *args: fn(*args))
+    device.async_execute = AsyncMock(side_effect=lambda fn, *args: fn(*args))
     if read_return is not None:
         device.read_value = MagicMock(return_value=read_return)
     return device

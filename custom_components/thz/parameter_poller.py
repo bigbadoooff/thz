@@ -166,7 +166,6 @@ class ParameterPoller:
             value: bytes | None
             try:
                 value = await self._device.async_execute(
-                    self._hass,
                     self._device.read_value,
                     bytes.fromhex(command),
                     "get",

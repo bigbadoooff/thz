@@ -128,8 +128,8 @@ class TestTHZButtonPress:
         await entity.async_press()
 
         write_call = device.async_execute.call_args[0]
-        assert write_call[1] == device.write_value
-        assert write_call[3] == b"\x00"
+        assert write_call[0] == device.write_value
+        assert write_call[2] == b"\x00"
 
     @pytest.mark.asyncio
     async def test_async_press_error_raises_home_assistant_error(self):

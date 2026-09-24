@@ -26,7 +26,7 @@ async def test_returns_result_and_releases_lock():
     async def double(x):
         return x * 2
 
-    assert await device.async_execute(None, double, 21) == 42
+    assert await device.async_execute(double, 21) == 42
     assert not device.lock.locked()
 
 
@@ -40,7 +40,7 @@ async def test_timeout_cancels_the_call_and_closes_the_connection():
         finished.append(True)
 
     with pytest.raises(THZConnectionError, match="timed out"):
-        await device.async_execute(None, stuck, timeout=0.05)
+        await device.async_execute(stuck, timeout=0.05)
 
     await asyncio.sleep(0)
     assert finished == []
@@ -56,7 +56,7 @@ async def test_register_not_supported_keeps_connection():
         raise THZNotSupportedError("nope")
 
     with pytest.raises(THZNotSupportedError):
-        await device.async_execute(None, fn)
+        await device.async_execute(fn)
 
     assert transport.closes == 0
     assert not device.lock.locked()
@@ -70,7 +70,7 @@ async def test_other_errors_close_the_connection():
         raise THZProtocolError("garbled")
 
     with pytest.raises(THZProtocolError):
-        await device.async_execute(None, fn)
+        await device.async_execute(fn)
 
     assert transport.closes == 1
     assert not device.lock.locked()
@@ -85,7 +85,7 @@ async def test_cancelled_call_closes_the_connection_and_releases_the_lock():
         started.set()
         await asyncio.sleep(10)
 
-    task = asyncio.create_task(device.async_execute(None, fn))
+    task = asyncio.create_task(device.async_execute(fn))
     await started.wait()
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
@@ -109,9 +109,7 @@ async def test_calls_never_overlap():
         active.remove(name)
         return name
 
-    results = await asyncio.gather(
-        *(device.async_execute(None, fn, n) for n in range(5))
-    )
+    results = await asyncio.gather(*(device.async_execute(fn, n) for n in range(5)))
 
     assert sorted(results) == list(range(5))
     assert overlaps == []
@@ -129,5 +127,5 @@ async def test_busy_device_gives_up_waiting_for_the_lock():
         patch.object(thz_device, "_LOCK_WAIT_TIMEOUT", 0.01),
         pytest.raises(THZConnectionError, match="busy"),
     ):
-        await device.async_execute(None, fn)
+        await device.async_execute(fn)
     device.lock.release()

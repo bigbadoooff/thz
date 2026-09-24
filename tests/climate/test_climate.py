@@ -267,7 +267,7 @@ class TestTHZClimateEntity:
         device.lock.__aenter__ = AsyncMock(return_value=None)
         device.lock.__aexit__ = AsyncMock(return_value=None)
         device.async_execute = AsyncMock(
-            side_effect=lambda hass, func, *a, **kw: (
+            side_effect=lambda func, *a, **kw: (
                 None if _is_coro(func) else func(*a, **kw)
             )
         )

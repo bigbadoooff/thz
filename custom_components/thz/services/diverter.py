@@ -119,7 +119,7 @@ async def _async_check_valve_direction(
 
 async def _stop_both_motors(hass: HomeAssistant, device: THZDevice) -> None:
     for motor in _VALVE_MOTORS:
-        await device.async_execute(hass, device.write_value, motor, _VALVE_MOTOR_OFF)
+        await device.async_execute(device.write_value, motor, _VALVE_MOTOR_OFF)
 
 
 async def _stop_and_verify(hass: HomeAssistant, device: THZDevice) -> bool:
@@ -127,7 +127,6 @@ async def _stop_and_verify(hass: HomeAssistant, device: THZDevice) -> bool:
     await _stop_both_motors(hass, device)
     states = [
         await device.async_execute(
-            hass,
             device.read_value,
             motor,
             "get",
@@ -152,9 +151,7 @@ async def _emergency_stop(hass: HomeAssistant, device: THZDevice) -> None:
     """Best-effort stop of both motors; one failing never skips the other."""
     for motor in _VALVE_MOTORS:
         try:
-            await device.async_execute(
-                hass, device.write_value, motor, _VALVE_MOTOR_OFF
-            )
+            await device.async_execute(device.write_value, motor, _VALVE_MOTOR_OFF)
         except DEVICE_ERRORS as err:
             _LOGGER.error(
                 "Could not stop diverter valve motor %s: %s", motor.hex(), err
@@ -186,7 +183,7 @@ async def async_handle_set_diverter_valve(
     try:
         if motor_may_run:
             motor = _VALVE_MOTOR_HEATING if position == "heating" else _VALVE_MOTOR_DHW
-            await device.async_execute(hass, device.write_value, motor, _VALVE_MOTOR_ON)
+            await device.async_execute(device.write_value, motor, _VALVE_MOTOR_ON)
             # The lock is released while waiting, so coordinators can poll.
             await asyncio.sleep(_MOTOR_RUN_SECONDS)
         confirmed = await _stop_and_verify(hass, device)

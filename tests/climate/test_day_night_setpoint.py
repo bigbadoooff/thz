@@ -87,8 +87,8 @@ class TestWriteHeatSetpointWithoutNightRegister:
 
         entity._device.async_execute.assert_called_once()
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][1] == entity._device.write_value
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
+        assert write_call[0][0] == entity._device.write_value
+        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_warns_and_noops_with_no_entries_at_all(self):
@@ -124,7 +124,7 @@ class TestWriteHeatSetpointWithNightRegister:
             await entity._async_write_heat_setpoint(17.0)
 
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_NIGHT_ENTRY.command)
+        assert write_call[0][1] == bytes.fromhex(_NIGHT_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_writes_day_register_when_day_is_active(self):
@@ -146,7 +146,7 @@ class TestWriteHeatSetpointWithNightRegister:
             await entity._async_write_heat_setpoint(22.0)
 
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
+        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_neither_register_matches(self):
@@ -169,7 +169,7 @@ class TestWriteHeatSetpointWithNightRegister:
             await entity._async_write_heat_setpoint(20.0)
 
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
+        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_target_temperature_unknown(self):
@@ -188,7 +188,7 @@ class TestWriteHeatSetpointWithNightRegister:
 
         entity._async_read_setpoint.assert_not_called()
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
+        assert write_call[0][1] == bytes.fromhex(_DAY_ENTRY.command)
 
 
 class TestAsyncReadSetpoint:

@@ -93,7 +93,6 @@ async def _read_schedule(hass: HomeAssistant, device: THZDevice, command: str) -
     return cast(
         "bytes",
         await device.async_execute(
-            hass,
             device.read_value,
             bytes.fromhex(command),
             "get",

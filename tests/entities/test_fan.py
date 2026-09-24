@@ -64,7 +64,7 @@ class FakeDevice:
     def write_value(self):
         """Stand-in; THZFan passes it to async_execute."""
 
-    async def _execute(self, hass, func, command, *args):
+    async def _execute(self, func, command, *args):
         if self.fail:
             raise OSError("boom")
         if func == self.write_value:
@@ -482,7 +482,7 @@ class TestDisplayOnly2xx:
         device = FakeDevice({"F6": _f6(2, 10)})
         device.read_block = MagicMock()
 
-        async def execute(hass, func, command, *args):
+        async def execute(func, command, *args):
             if func == device.read_block:
                 return _f6(2, 10) if command == b"\xf6" else _ee(1)
             return device.values.get(command.hex().upper(), b"")

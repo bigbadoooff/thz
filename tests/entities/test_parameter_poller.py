@@ -40,7 +40,7 @@ class FakeDevice:
             raise answer
         return answer
 
-    async def async_execute(self, hass, fn, *args):
+    async def async_execute(self, fn, *args):
         return await fn(*args)
 
 

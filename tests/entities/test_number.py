@@ -207,8 +207,8 @@ class TestTHZNumberSetNativeValue:
         assert entity.native_value == 20.0
         entity.async_write_ha_state.assert_called_once()
         write_call = device.async_execute.call_args[0]
-        assert write_call[1] == device.write_value
-        assert write_call[3] == (40).to_bytes(2, "big", signed=True)
+        assert write_call[0] == device.write_value
+        assert write_call[2] == (40).to_bytes(2, "big", signed=True)
 
     @pytest.mark.asyncio
     async def test_async_set_native_value_0clean(self):
@@ -221,7 +221,7 @@ class TestTHZNumberSetNativeValue:
 
         write_call = device.async_execute.call_args[0]
         # One byte padded to the register's two data bytes, as FHEM sends it.
-        assert write_call[3] == bytes([3, 0])
+        assert write_call[2] == bytes([3, 0])
 
     @pytest.mark.asyncio
     async def test_async_set_native_value_encode_error_logged_not_raised(
