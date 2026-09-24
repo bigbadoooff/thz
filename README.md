@@ -363,6 +363,18 @@ Check HA logs for `thz` entries. Common causes:
 
 Use `thz.read_raw_register` to verify that a specific block returns data on your device.
 
+### Device Clock
+
+The heat pump's time programs run on its own clock. Every 15 minutes the
+integration compares it with Home Assistant's time. If it is off by more
+than a minute:
+
+- with **Auto-sync clock** on (Reconfigure), the clock is corrected;
+- otherwise a **repair issue** appears under Settings → System → Repairs.
+  Fixing it sets the heat pump clock to Home Assistant's time, and can turn
+  on automatic sync for the future. The issue goes away by itself once the
+  clock is right again.
+
 ### Logging
 
 In normal operation the integration logs one line at startup ("Connected to
@@ -372,7 +384,7 @@ the heat pump") and otherwise only what needs attention:
   (the blocks that fail meanwhile are not logged one by one);
 - a sensor whose data is too short or cannot be decoded, and an unknown
   select value, once until it reads correctly again;
-- a drifted device clock once a day (with the notification).
+- a drifted device clock once, when its repair issue is raised (see below).
 
 For troubleshooting, turn on **Enable debug logging** on the integration's
 page, or set the level in `configuration.yaml`, for example:

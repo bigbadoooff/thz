@@ -323,87 +323,76 @@ class TestClockDriftCheck:
 
         assert result is None
 
-    @pytest.mark.asyncio
-    async def test_drift_check_fires_notification_when_drifted_and_no_autosync(self):
-        """A large drift with auto_sync_clock off must notify, not silently no-op.
+    @staticmethod
+    def _issues(existing=None):
+        """A stand-in for issue_registry: async_get_issue returns ``existing``."""
+        fake_ir = MagicMock()
+        fake_ir.async_get.return_value.async_get_issue.return_value = existing
+        return fake_ir
 
-        This is the core regression test: before the fix, the drift check
-        read from the pclean-filtered dict and got nothing back, so it
-        always returned early without ever comparing to local time. Here we
-        prove the device clock IS read (5 executor calls) and a
-        persistent_notification IS created because of the drift.
-        """
+    async def _check(self, device_parts, *, auto_sync=False, issues=None):
         from custom_components.thz.clock_sync import async_check_and_maybe_sync_clock
-
-        hass = MagicMock()
-        hass.services = MagicMock()
-        notify = _reset_notifications()
 
         config_entry = MagicMock()
         config_entry.entry_id = "entry_1"
-        config_entry.data = {"auto_sync_clock": False}
-        config_entry.runtime_data = {}
-
-        write_manager = self._make_write_manager()
-
-        # Device reports a time 2 hours ahead of "now" -> drift beyond the
-        # 60s warn threshold.
-        local_now = datetime(2026, 8, 25, 10, 0)
-        device_time_parts = [26, 8, 25, 12, 0]  # 2 hours ahead
-        device = self._make_device(
-            read_values=iter(bytes([v]) for v in device_time_parts)
-        )
-
+        config_entry.data = {"auto_sync_clock": auto_sync}
+        device = self._make_device(read_values=iter(bytes([v]) for v in device_parts))
         fake_dt_util = MagicMock()
-        fake_dt_util.now = MagicMock(return_value=local_now)
-        fake_dt_util.utcnow = MagicMock(return_value=local_now)
-
-        with patch("custom_components.thz.clock_sync.dt_util", fake_dt_util):
+        fake_dt_util.now = MagicMock(return_value=datetime(2026, 8, 25, 10, 0))
+        issues = issues if issues is not None else self._issues()
+        with (
+            patch("custom_components.thz.clock_sync.dt_util", fake_dt_util),
+            patch("custom_components.thz.clock_sync.ir", issues),
+        ):
             await async_check_and_maybe_sync_clock(
-                hass, config_entry, device, write_manager
+                MagicMock(), config_entry, device, self._make_write_manager()
             )
-
-        # Proves the clock was actually read (not skipped due to the bug).
-        assert device.async_execute.await_count == 5
-        # Proves the drift comparison actually ran and fired the
-        # notification path.
-        notify.assert_called_once()
-        message = notify.call_args.args[1].lower()
-        assert "drift" in message or "off by" in message
+        return device, issues
 
     @pytest.mark.asyncio
-    async def test_drift_is_warned_once_a_day(self, caplog):
-        """The check runs every 15 minutes; the warning comes once a day."""
+    async def test_drift_raises_a_fixable_repair_issue(self):
+        """Without auto sync, a drift beyond the threshold raises a repair issue."""
+        device, issues = await self._check([26, 8, 25, 12, 0])  # 2 h ahead
+
+        # Proves the clock was actually read (not skipped).
+        assert device.async_execute.await_count == 5
+        issues.async_create_issue.assert_called_once()
+        args, kwargs = issues.async_create_issue.call_args
+        assert args[1:] == ("thz", "clock_drift_entry_1")
+        assert kwargs["is_fixable"] is True
+        assert kwargs["translation_key"] == "clock_drift"
+        assert kwargs["translation_placeholders"] == {
+            "minutes": "120",
+            "device_time": "2026-08-25 12:00",
+            "local_time": "2026-08-25 10:00",
+        }
+        assert kwargs["data"] == {"entry_id": "entry_1"}
+
+    @pytest.mark.asyncio
+    async def test_drift_is_warned_once_while_the_issue_stays(self, caplog):
+        """The check runs every 15 minutes; only a new issue is a warning."""
         import logging
 
-        from custom_components.thz.clock_sync import async_check_and_maybe_sync_clock
-
         caplog.set_level(logging.DEBUG, logger="custom_components.thz.clock_sync")
-        notify = _reset_notifications()
-        config_entry = MagicMock()
-        config_entry.entry_id = "entry_1"
-        config_entry.data = {"auto_sync_clock": False}
-        config_entry.runtime_data = make_runtime_data()
-        local_now = datetime(2026, 8, 25, 10, 0)
-        fake_dt_util = MagicMock()
-        fake_dt_util.now = MagicMock(return_value=local_now)
+        await self._check([26, 8, 25, 12, 0])
+        await self._check([26, 8, 25, 12, 0], issues=self._issues(existing=object()))
 
-        with patch("custom_components.thz.clock_sync.dt_util", fake_dt_util):
-            for _ in range(2):
-                device = self._make_device(
-                    read_values=iter(bytes([v]) for v in [26, 8, 25, 12, 0])
-                )
-                await async_check_and_maybe_sync_clock(
-                    MagicMock(), config_entry, device, self._make_write_manager()
-                )
-
-        notify.assert_called_once()
         levels = [
             r.levelname
             for r in caplog.records
             if r.name == "custom_components.thz.clock_sync"
         ]
         assert levels == ["WARNING", "DEBUG"]
+
+    @pytest.mark.asyncio
+    async def test_a_right_clock_removes_the_issue(self):
+        _, issues = await self._check([26, 8, 25, 10, 0])
+        issues.async_create_issue.assert_not_called()
+        issues.async_delete_issue.assert_called_once()
+        assert issues.async_delete_issue.call_args.args[1:] == (
+            "thz",
+            "clock_drift_entry_1",
+        )
 
     @pytest.mark.asyncio
     async def test_drift_check_no_notification_when_within_threshold(self):
