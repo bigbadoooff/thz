@@ -71,8 +71,11 @@ rules:
   icon-translations: done
   reconfiguration-flow: done
   repair-issues:
-    status: todo
-    comment: Persistent notifications are used where a repair issue would fit.
+    status: done
+    comment: >
+      A drifted device clock raises a fixable repair issue. The remaining
+      persistent notifications show the results of service calls
+      (raw register reads, parameter restore), which are no repairs.
   stale-devices: done
 
   # Platinum

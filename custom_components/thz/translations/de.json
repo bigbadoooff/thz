@@ -3032,5 +3032,27 @@
     "button_press_failed": {
       "message": "THZ-Taste {name} konnte nicht ausgeführt werden"
     }
+  },
+  "issues": {
+    "clock_drift": {
+      "title": "Die Uhr der Wärmepumpe geht falsch",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Uhr der Wärmepumpe stellen",
+            "description": "Die Uhr der Wärmepumpe weicht um {minutes} Minute(n) ab: Sie zeigt {device_time}, Home Assistant hat {local_time}. Die Zeitprogramme laufen nach der Uhr der Wärmepumpe.\n\nMit Absenden wird die Uhr der Wärmepumpe auf die Zeit von Home Assistant gestellt.",
+            "data": {
+              "auto_sync_clock": "Uhr künftig automatisch stellen"
+            }
+          }
+        },
+        "error": {
+          "cannot_connect": "Die Wärmepumpe hat nicht geantwortet. Versuche es später noch einmal."
+        },
+        "abort": {
+          "not_loaded": "Die Wärmepumpe ist nicht geladen."
+        }
+      }
+    }
   }
 }

@@ -413,6 +413,30 @@ percentage_mock.percentage_to_ranged_value = _percentage_to_ranged_value
 util_mock.percentage = percentage_mock
 sys.modules["homeassistant.util.percentage"] = percentage_mock
 
+
+# Mock repairs component
+class MockRepairsFlow:
+    """Minimal RepairsFlow: the step results are plain dicts."""
+
+    hass = None
+
+    def async_show_form(self, **kwargs):
+        """Return a form result."""
+        return {"type": "form", **kwargs}
+
+    def async_create_entry(self, **kwargs):
+        """Return a finished-flow result."""
+        return {"type": "create_entry", **kwargs}
+
+    def async_abort(self, **kwargs):
+        """Return an abort result."""
+        return {"type": "abort", **kwargs}
+
+
+repairs_mock = MagicMock()
+repairs_mock.RepairsFlow = MockRepairsFlow
+sys.modules["homeassistant.components.repairs"] = repairs_mock
+
 sys.modules["homeassistant.const"] = MagicMock()
 sys.modules["homeassistant.const"].STATE_OFF = "off"
 # The CONF_* keys are plain strings in Home Assistant; string operations on

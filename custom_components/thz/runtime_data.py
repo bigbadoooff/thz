@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -49,8 +48,6 @@ class THZRuntimeData:
     unsub_clock_check: Callable[[], None] | None = None
     fault_tracker: THZFaultTracker | None = None
     fault_source: DataUpdateCoordinator[Any] | None = None
-    # Day of the last clock-drift notification (one per day at most).
-    clock_notify_date: date | None = None
 
 
 THZConfigEntry = ConfigEntry[THZRuntimeData]

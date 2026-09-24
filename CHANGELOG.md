@@ -6,6 +6,14 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- **Repair issue for a drifted device clock.** Without automatic clock
+  sync, a heat pump clock that is off by more than a minute raises a repair
+  issue instead of a daily persistent notification. Its fix sets the clock
+  to Home Assistant's time and can turn on automatic sync; the issue goes
+  away by itself once the clock is right again.
+
 ### Breaking changes
 
 - **Hot water is a `water_heater` entity** instead of a climate entity.

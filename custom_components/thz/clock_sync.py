@@ -8,9 +8,10 @@ per-entity polling of the individual pClock* number entities.
 Two independent callers rely on this module:
 
 - ``__init__.py`` wires :func:`async_setup_clock_check` into
-  ``async_setup_entry`` to run a periodic (every 15 minutes) drift check —
-  always logging/notifying on drift, and only writing a correction back to
-  the device when the entry's ``auto_sync_clock`` option is enabled.
+  ``async_setup_entry`` to run a periodic (every 15 minutes) drift check.
+  With the entry's ``auto_sync_clock`` option it corrects the clock;
+  without it, a drift raises a repair issue whose fix sets the clock
+  (repairs.py). The issue goes away once the clock is right again.
 - ``services/backup.py``'s ``backup_parameters``/``restore_parameters`` handlers
   use :func:`async_read_device_clock`/:func:`async_write_device_clock`
   directly: backup always corrects a grossly wrong clock (see
@@ -25,16 +26,16 @@ import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
-from .notify import async_notify
+from .const import DOMAIN
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
     parameter_length,
 )
-from .runtime_data import loaded_runtime_data
 from .value_codec import THZValueCodec
 
 if TYPE_CHECKING:
@@ -195,12 +196,15 @@ async def async_check_and_maybe_sync_clock(
     device_dt = await async_read_device_clock(hass, device, write_manager)
     if device_dt is None:
         return
-    local_now = dt_util.now().replace(tzinfo=None, second=0, microsecond=0)
+    issue_id = clock_drift_issue_id(config_entry.entry_id)
+    local_now = local_clock_now()
     drift = (device_dt - local_now).total_seconds()
     if abs(drift) <= CLOCK_DRIFT_WARN_SECONDS:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
         return
     if config_entry.data.get("auto_sync_clock", False):
         await async_write_device_clock(hass, device, write_manager, local_now)
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
         _LOGGER.info(
             "Corrected the heat pump clock by %.0f minute(s) (it read %s)",
             -drift / 60,
@@ -208,36 +212,41 @@ async def async_check_and_maybe_sync_clock(
         )
         return
 
-    # auto_sync_clock is off, so this drift can't be corrected automatically.
-    # Surface it to the user — but at most once per calendar day, since this
-    # check runs every 15 minutes and a persistently-drifted clock would
-    # otherwise spam a fresh notification ~96 times a day.
-    entry_data = loaded_runtime_data(config_entry)
-    today = dt_util.now().date()
-    if entry_data is not None:
-        if entry_data.clock_notify_date == today:
-            _LOGGER.debug("Heat pump clock still off by %.0f minute(s)", drift / 60)
-            return
-        entry_data.clock_notify_date = today
-    _LOGGER.warning(
-        "The heat pump clock is off by %.0f minute(s) (device=%s, local=%s)",
-        drift / 60,
-        device_dt,
-        local_now,
-    )
-    async_notify(
+    # Without auto sync, the user fixes it through the repair issue. The
+    # check runs every 15 minutes; only a new issue is logged as a warning.
+    if ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None:
+        _LOGGER.warning(
+            "The heat pump clock is off by %.0f minute(s) (device=%s, local=%s)",
+            drift / 60,
+            device_dt,
+            local_now,
+        )
+    else:
+        _LOGGER.debug("Heat pump clock still off by %.0f minute(s)", drift / 60)
+    ir.async_create_issue(
         hass,
-        title="THZ Device Clock Drifted",
-        message=(
-            f"The heat pump's clock is off by about {abs(drift) / 60:.0f} "
-            f"minute(s) (device reads {device_dt.strftime('%Y-%m-%d %H:%M')}, "
-            f"local time is {local_now.strftime('%Y-%m-%d %H:%M')}).\n\n"
-            "Auto-sync clock is turned off, so this wasn't corrected "
-            "automatically. Enable it under the integration's "
-            "Reconfigure screen to fix this going forward."
-        ),
-        notification_id=f"thz_clock_drift_{config_entry.entry_id}",
+        DOMAIN,
+        issue_id,
+        is_fixable=True,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="clock_drift",
+        translation_placeholders={
+            "minutes": f"{abs(drift) / 60:.0f}",
+            "device_time": device_dt.strftime("%Y-%m-%d %H:%M"),
+            "local_time": local_now.strftime("%Y-%m-%d %H:%M"),
+        },
+        data={"entry_id": config_entry.entry_id},
     )
+
+
+def clock_drift_issue_id(entry_id: str) -> str:
+    """Return the id of an entry's clock drift repair issue."""
+    return f"clock_drift_{entry_id}"
+
+
+def local_clock_now() -> datetime:
+    """Return local wall-clock time to the minute, as the device clock has it."""
+    return dt_util.now().replace(tzinfo=None, second=0, microsecond=0)
 
 
 def async_setup_clock_check(

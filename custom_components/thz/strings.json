@@ -3032,5 +3032,27 @@
     "button_press_failed": {
       "message": "Unable to execute THZ button {name}"
     }
+  },
+  "issues": {
+    "clock_drift": {
+      "title": "The heat pump clock is off",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Set the heat pump clock",
+            "description": "The heat pump clock is off by {minutes} minute(s): it reads {device_time}, while Home Assistant has {local_time}. The time programs run on the heat pump clock.\n\nSubmit to set the heat pump clock to Home Assistant's time.",
+            "data": {
+              "auto_sync_clock": "Correct the clock automatically from now on"
+            }
+          }
+        },
+        "error": {
+          "cannot_connect": "The heat pump did not answer. Try again later."
+        },
+        "abort": {
+          "not_loaded": "The heat pump is not loaded."
+        }
+      }
+    }
   }
 }

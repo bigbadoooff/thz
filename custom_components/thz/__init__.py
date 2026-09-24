@@ -15,11 +15,12 @@ from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,
     entity_registry as er,
+    issue_registry as ir,
 )
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .clock_sync import async_setup_clock_check
+from .clock_sync import async_setup_clock_check, clock_drift_issue_id
 from .const import (
     CONF_DEVICE_IDENTIFIER,
     CONF_ENABLE_HC2,
@@ -627,6 +628,8 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     This is called when the config entry is completely removed (not just unloaded).
     Clean up all entity registry entries to ensure a fresh start on re-setup.
     """
+    ir.async_delete_issue(hass, DOMAIN, clock_drift_issue_id(entry.entry_id))
+
     # Get entity registry
     entity_reg = er.async_get(hass)
 
