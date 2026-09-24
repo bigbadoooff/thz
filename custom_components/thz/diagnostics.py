@@ -8,6 +8,7 @@ from homeassistant.components.diagnostics import REDACTED, async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
+from .const import CONF_DEVICE_IDENTIFIER
 from .runtime_data import loaded_runtime_data
 
 # Keys to redact from diagnostics to protect user privacy
@@ -18,6 +19,7 @@ TO_REDACT = {
     "serial",
     "alias",
     "area",
+    CONF_DEVICE_IDENTIFIER,
 }
 
 

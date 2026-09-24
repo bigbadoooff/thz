@@ -118,6 +118,12 @@ CONF_ENABLE_HC2 = "enable_hc2"
 CONF_SPLIT_DEVICES = "split_devices"
 DEFAULT_SPLIT_DEVICES_NEW_ENTRY = True
 
+# The heat pump's device registry identifier ("ip-<host>" / "usb-<device>"
+# of the connection the entry was created with). Stored once, so a changed
+# host or serial device keeps the device, its sub-devices and the unique
+# ids derived from it.
+CONF_DEVICE_IDENTIFIER = "device_identifier"
+
 # Write register offsets and lengths
 # These values are used when reading/writing individual parameters
 WRITE_REGISTER_OFFSET = 4  # Byte offset in response for parameter value
