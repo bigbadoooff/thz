@@ -195,6 +195,58 @@ The integration supports Home Assistant's built-in diagnostics download:
 
 The report includes firmware version, connection status, coordinator last-update times, and redacted hex dumps of all currently-polled register blocks.
 
+### How Data Is Updated
+
+The integration polls the heat pump over its serial protocol; the heat pump
+never pushes anything. Only one request is on the line at a time.
+
+- **Read values** (sensors, binary sensors, climate, water heater): each
+  register block has its own coordinator and interval, 600 seconds by
+  default, set per block under **Reconfigure**. A block is read in one
+  request, and all entities of the block update together.
+- **Settings** (number, select, switch, time, fan): one parameter poller per
+  heat pump reads every setting once per **write interval** (3600 seconds by
+  default), one after the other. A register shown by several entities is
+  read once; disabled entities are not read. On 2.x firmware, settings
+  inside a polled block take their value from that block.
+- **After a change from Home Assistant** the value is read back, so the
+  entity shows what the heat pump stored.
+- **Right now:** `homeassistant.update_entity` reads a setting at once;
+  `thz.refresh_block` re-reads a block.
+- **Clock:** compared with Home Assistant's time every 15 minutes (see
+  Device Clock).
+
+When the heat pump does not answer, the entities become unavailable and
+recover with the next successful read.
+
+### Events
+
+See [docs/automations.md](docs/automations.md) for example automations.
+
+Two event entities let automations react to things that happen once:
+
+| Entity | Event types | Fires when | Attributes |
+|--------|-------------|-----------|-----------|
+| Fault | `fault` | a new record appears in the fault memory (`pxxD1`, firmware 4.x/5.x) | `fault_number`, `fault_code`, `description`, `time`, `date` |
+| Filter change | `filter_both`, `filter_up`, `filter_down` | the heat pump starts asking for that filter change (`pxx0A0176`) | — |
+
+They use data that is polled anyway, so the blocks must be selected for
+polling. What is already there when Home Assistant starts (the fault
+history, a filter that is already due) fires nothing; the fault sensors and
+filter binary sensors show that state.
+
+### Device Clock
+
+The heat pump's time programs run on its own clock. Every 15 minutes the
+integration compares it with Home Assistant's time. If it is off by more
+than a minute:
+
+- with **Auto-sync clock** on (Reconfigure), the clock is corrected;
+- otherwise a **repair issue** appears under Settings → System → Repairs.
+  Fixing it sets the heat pump clock to Home Assistant's time, and can turn
+  on automatic sync for the future. The issue goes away by itself once the
+  clock is right again.
+
 ## Compatibility
 
 ### Supported Firmware Versions
@@ -347,6 +399,29 @@ Then restart Home Assistant. No credentials or external accounts are created
 by this integration, so there is nothing else to revoke — only the local
 serial/network connection to the heat pump is released.
 
+## Known Limitations
+
+- **One client per serial line.** The heat pump's interface serves one
+  program at a time. FHEM or another tool on the same USB port or ser2net
+  connection disturbs the communication.
+- **No discovery.** USB and ser2net connections are set up by hand.
+- **Settings update slowly.** A change made at the heat pump's control panel
+  shows up after the next write interval (1 hour by default), unless you
+  refresh the entity (see How Data Is Updated).
+- **Firmware coverage.** The register maps cover 2.06, 2.14, 2.14j, 4.19,
+  4.39, 5.09, 5.39 and 7.09. Any other firmware uses the 4.39 maps; some
+  values may then be missing or wrong. A firmware override is available
+  under Reconfigure.
+- **2.x firmware:** no fault memory sensors or fault events (different
+  `pxxD1` layout), and the ventilation can only be shown, not started.
+- **Cooling:** passive cooling exists on 4.39 and 5.39; active cooling only
+  on 5.x devices whose cooling hardware answers at setup.
+- **Hot water mode** follows the heat pump's time program and operating
+  mode; the water heater sets the temperature, not the mode.
+- **Faults while Home Assistant is down** fire no event when it starts; the
+  fault sensors still show them as new until acknowledged.
+- **Energy values and COP** need firmware 4.39 or newer.
+
 ## Troubleshooting
 
 ### USB connection stops working after host reboot
@@ -363,32 +438,6 @@ Check HA logs for `thz` entries. Common causes:
 
 Use `thz.read_raw_register` to verify that a specific block returns data on your device.
 
-### Events
-
-Two event entities let automations react to things that happen once:
-
-| Entity | Event types | Fires when | Attributes |
-|--------|-------------|-----------|-----------|
-| Fault | `fault` | a new record appears in the fault memory (`pxxD1`, firmware 4.x/5.x) | `fault_number`, `fault_code`, `description`, `time`, `date` |
-| Filter change | `filter_both`, `filter_up`, `filter_down` | the heat pump starts asking for that filter change (`pxx0A0176`) | — |
-
-They use data that is polled anyway, so the blocks must be selected for
-polling. What is already there when Home Assistant starts (the fault
-history, a filter that is already due) fires nothing; the fault sensors and
-filter binary sensors show that state.
-
-### Device Clock
-
-The heat pump's time programs run on its own clock. Every 15 minutes the
-integration compares it with Home Assistant's time. If it is off by more
-than a minute:
-
-- with **Auto-sync clock** on (Reconfigure), the clock is corrected;
-- otherwise a **repair issue** appears under Settings → System → Repairs.
-  Fixing it sets the heat pump clock to Home Assistant's time, and can turn
-  on automatic sync for the future. The issue goes away by itself once the
-  clock is right again.
-
 ### Logging
 
 In normal operation the integration logs one line at startup ("Connected to
@@ -398,7 +447,8 @@ the heat pump") and otherwise only what needs attention:
   (the blocks that fail meanwhile are not logged one by one);
 - a sensor whose data is too short or cannot be decoded, and an unknown
   select value, once until it reads correctly again;
-- a drifted device clock once, when its repair issue is raised (see below).
+- a drifted device clock once, when its repair issue is raised (see Device
+  Clock).
 
 For troubleshooting, turn on **Enable debug logging** on the integration's
 page, or set the level in `configuration.yaml`, for example:

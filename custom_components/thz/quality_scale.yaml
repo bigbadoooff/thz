@@ -53,13 +53,13 @@ rules:
   discovery:
     status: exempt
     comment: Serial and ser2net connections cannot be discovered.
-  docs-data-update: todo
-  docs-examples: todo
-  docs-known-limitations: todo
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
   docs-supported-devices: done
   docs-supported-functions: done
   docs-troubleshooting: done
-  docs-use-cases: todo
+  docs-use-cases: done
   dynamic-devices:
     status: exempt
     comment: A config entry is exactly one heat pump.

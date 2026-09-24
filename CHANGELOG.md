@@ -8,6 +8,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Added
 
+- **Documentation:** use cases and example automations
+  (`docs/automations.md`: fault notification, filter reminder, hot water
+  from PV surplus, ventilation boost, weekly backup), and README sections on
+  how data is updated and on known limitations.
 - **Event entities for a new fault and a filter change.** "Fault" fires
   `fault` for every record that appears in the fault memory, with its code,
   name, time and date; "Filter change" fires `filter_both`, `filter_up` or
