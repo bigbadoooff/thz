@@ -737,6 +737,9 @@
       "party_time": {
         "default": "mdi:calendar-clock"
       },
+      "party_time_end": {
+        "default": "mdi:calendar-clock"
+      },
       "programdhw_fr_0": {
         "default": "mdi:calendar-clock"
       },

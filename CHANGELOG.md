@@ -30,6 +30,12 @@ All notable changes to the THZ integration are documented here.
 
 ### Added
 
+- **Party end time** (4.x/5.x, #185): the party register holds the start
+  and the end of the party; besides the start (now named *Party Start*) a
+  new *Party End* time entity shows and sets the end. Setting 00:00 as the
+  end means 24:00, as for the schedules. Writes match FHEM's
+  `set party-time HH:MM--HH:MM` byte for byte.
+
 - **Optional sub-devices** (#186): a new setting, *Split into sub-devices*,
   groups the entities into sub-devices linked to the heat pump:
   - heating circuit 1,
