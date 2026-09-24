@@ -56,15 +56,17 @@ flags, unique names, existing translations and sane write bounds.
 
 **Write map (parameters).** Settings that can be changed: setpoints, modes,
 schedules, the clock. Each entry names a `command`, a `type` (number, select,
-switch, time, button) and a decode type. There are two access modes:
+switch, time, button) and a decode type. `RegisterMapManagerWrite` turns each
+entry into a `WriteParam` (`register_maps/model.py`, via `params()` /
+`param(name)`); entities, climate, clock sync and backup/restore use these
+typed parameters, not the map dicts. There are two access modes:
 
 - *direct* (4.x/5.x firmware): each parameter is its own register, read and
   written with a single GET or SET.
-- *block* (2.x firmware, `write_mode="block"`): the parameter lives at
-  `offset`/`length` (and possibly `bit`) inside a block. Writing it is a
+- *block* (2.x firmware, `WriteParam.block`): the parameter lives at the
+  layout's offset/length (and possibly bit) inside a block. Writing it is a
   read-modify-write of the whole block. `RegisterMapManagerWrite` derives
-  these fields from the firmware's read map
-  (`_enrich_2xx_write_entries`).
+  the layout from the firmware's read map (`_enrich_2xx_write_entries`).
 
 `parameter_io.py` hides the difference. Anything that reads or writes a
 write-map entry calls `async_read_parameter` / `async_write_parameter`. That

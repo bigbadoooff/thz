@@ -139,6 +139,47 @@ class FakeRegisterManager:
         return next((f for f in self.block_fields(block) if f.name == wanted), None)
 
 
+def write_param(entry=None, name="test_param", **fields):
+    """A WriteParam from a write-map style dict (missing keys get neutral values)."""
+    from custom_components.thz.register_maps.model import WriteParam
+
+    if isinstance(entry, WriteParam) and not fields:
+        return entry
+    data = {"command": "0A0000", "type": "number", "decode_type": "", **(entry or {})}
+    data.update(fields)
+    return WriteParam.from_entry(name, data)
+
+
+class FakeWriteManager:
+    """Write-map manager over hand-written dicts, typed like the real one."""
+
+    def __init__(self, registers) -> None:
+        self._registers = dict(registers)
+        self._params = {
+            name: write_param(entry, name=name) if isinstance(entry, dict) else entry
+            for name, entry in registers.items()
+        }
+
+    def get_all_registers(self):
+        return self._registers
+
+    def params(self):
+        return self._params
+
+    def param(self, name):
+        return self._params.get(name)
+
+
+def make_climate(**kwargs):
+    """THZClimate with write-map dicts given for its ``*_entry`` arguments."""
+    from custom_components.thz.climate import THZClimate
+
+    for key, value in kwargs.items():
+        if key.endswith("_entry") and isinstance(value, dict):
+            kwargs[key] = write_param(value, name=key)
+    return THZClimate(**kwargs)
+
+
 def make_runtime_data(**fields):
     """Build THZRuntimeData for tests; unspecified fields get neutral values."""
     from unittest.mock import MagicMock

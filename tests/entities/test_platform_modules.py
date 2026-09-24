@@ -1,5 +1,7 @@
 """Basic tests for number, select, switch, and time modules."""
 
+from tests.helpers import write_param
+
 
 class TestNumberModule:
     """Test number module can be imported and has expected structure."""
@@ -313,7 +315,7 @@ class TestEntityRegistryEnabledDefault:
                 entity = THZScheduleTime(
                     name=f"{base_name} {suffix}",
                     base_name=base_name,
-                    entry=entry,
+                    entry=write_param(entry),
                     device=device,
                     device_id="test_device",
                     time_type=time_type,
@@ -333,7 +335,7 @@ class TestEntityRegistryEnabledDefault:
         entity = THZScheduleTime(
             name="customSchedule_Mo_0 Start",
             base_name="customSchedule_Mo_0",
-            entry=entry,
+            entry=write_param(entry),
             device=device,
             device_id="test_device",
             time_type="start",
@@ -349,7 +351,7 @@ class TestEntityRegistryEnabledDefault:
 
         entity = THZTime(
             name="pHolidayBeginTime",
-            entry=entry,
+            entry=write_param(entry),
             device=device,
             device_id="test_device",
         )
@@ -364,7 +366,7 @@ class TestEntityRegistryEnabledDefault:
 
         entity = THZSwitch(
             name="programHC1_enable",
-            entry=entry,
+            entry=write_param(entry),
             device=device,
             device_id="test_device",
         )
@@ -379,7 +381,7 @@ class TestEntityRegistryEnabledDefault:
 
         entity = THZSwitch(
             name="pOpMode",
-            entry=entry,
+            entry=write_param(entry),
             device=device,
             device_id="test_device",
         )
@@ -394,7 +396,7 @@ class TestEntityRegistryEnabledDefault:
 
         entity = THZNumber(
             name="p01RoomTempDayHC2",
-            entry=entry,
+            entry=write_param(entry),
             device=device,
             device_id="test_device",
         )
@@ -409,7 +411,7 @@ class TestEntityRegistryEnabledDefault:
 
         entity = THZNumber(
             name="p01RoomTempDayHC1",
-            entry=entry,
+            entry=write_param(entry),
             device=device,
             device_id="test_device",
         )
@@ -424,7 +426,7 @@ class TestEntityRegistryEnabledDefault:
 
         entity = THZNumber(
             name="p13GradientHC1",
-            entry=entry,
+            entry=write_param(entry),
             device=device,
             device_id="test_device",
         )
@@ -439,7 +441,7 @@ class TestEntityRegistryEnabledDefault:
 
         entity = THZSelect(
             name="pOpMode",
-            entry=entry,
+            entry=write_param(entry),
             device=device,
             device_id="test_device",
         )
@@ -466,7 +468,7 @@ class TestEntityRegistryEnabledDefault:
                     entity = THZScheduleTime(
                         name=f"{name} {suffix}",
                         base_name=name,
-                        entry=entry,
+                        entry=write_param(entry),
                         device=device,
                         device_id="test_device",
                         time_type=time_type,

@@ -130,6 +130,8 @@ def _bound(value: str) -> float:
 @pytest.mark.parametrize(("firmware", "cooling"), _PROFILES)
 def test_write_params_are_well_formed(firmware, cooling):
     registers = RegisterMapManagerWrite(firmware, has_cooling=cooling)
+    # Every map entry becomes a typed parameter; none is dropped.
+    assert set(registers.params()) == set(registers.get_all_registers())
     for name, entry in registers.get_all_registers().items():
         where = f"{firmware} {name}"
         bytes.fromhex(entry["command"])

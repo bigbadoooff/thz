@@ -16,6 +16,7 @@ from .const import (
 )
 from .entity_translations import get_translation_key
 from .platform_setup import async_setup_write_platform
+from .register_maps.model import WriteParam
 from .thz_device import THZDevice
 from .value_codec import THZValueCodec
 from .value_maps import SELECT_MAP, state_slug
@@ -65,7 +66,7 @@ class THZSelect(THZBaseEntity, SelectEntity):
     def __init__(
         self,
         name: str,
-        entry: dict,
+        entry: WriteParam,
         device: THZDevice,
         device_id: str,
         scan_interval: int | None = None,
@@ -77,7 +78,7 @@ class THZSelect(THZBaseEntity, SelectEntity):
 
         Args:
             name: The name of the select entity.
-            entry: The register entry dict containing configuration.
+            entry: The write-map parameter.
             device: The device instance this select entity belongs to.
             device_id: The device identifier for linking to device.
             scan_interval: The scan interval in seconds for polling updates.
@@ -89,10 +90,10 @@ class THZSelect(THZBaseEntity, SelectEntity):
         # Initialize base class with common properties
         super().__init__(
             name=name,
-            command=entry["command"],
+            command=entry.command,
             device=device,
             device_id=device_id,
-            icon=entry.get("icon"),
+            icon=entry.icon,
             scan_interval=scan_interval,
             translation_key=get_translation_key(name),
             entity_id_style=entity_id_style,
@@ -102,7 +103,7 @@ class THZSelect(THZBaseEntity, SelectEntity):
         )
 
         # Select-specific attributes
-        self._decode_type = entry.get("decode_type")
+        self._decode_type = entry.decode_type
 
         # Set available options based on decode_type, bounded by the entry's
         # min/max (a firmware may allow fewer values than the shared table).
@@ -111,7 +112,7 @@ class THZSelect(THZBaseEntity, SelectEntity):
         self._table_values: dict[str, str] = {}
         if self._decode_type and self._decode_type in SELECT_MAP:
             bounded = _options_within_bounds(
-                SELECT_MAP[self._decode_type], entry.get("min"), entry.get("max")
+                SELECT_MAP[self._decode_type], entry.min, entry.max
             )
             self._table_values = {
                 state_slug(value): value for value in bounded.values()

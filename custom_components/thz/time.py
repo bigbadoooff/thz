@@ -19,6 +19,7 @@ from .const import (
 from .devices import assign_subdevices
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
+from .register_maps.model import WriteParam
 from .register_maps.register_map_manager import RegisterMapManagerWrite
 from .runtime_data import THZConfigEntry
 from .thz_device import THZDevice
@@ -146,7 +147,7 @@ def time_byte_index(decode_type: str | None) -> int:
 
 def _create_time_entities(
     name,
-    entry,
+    entry: WriteParam,
     device,
     device_id,
     write_interval,
@@ -155,7 +156,7 @@ def _create_time_entities(
     entity_id_prefix=None,
 ):
     """Factory function to create time entities, handling schedule types specially."""
-    if entry["type"] == "schedule":
+    if entry.type == "schedule":
         # Create both start and end time entities for schedule type
         # Pass the base name to both so they can look up the base translation key
         return [
@@ -217,17 +218,17 @@ async def async_setup_entry(
 
     write_interval = config_entry.data.get("write_interval", DEFAULT_WRITE_INTERVAL)
 
-    write_registers = write_manager.get_all_registers()
-    _LOGGER.debug("Loading time platform with %d registers", len(write_registers))
+    params = write_manager.params()
+    _LOGGER.debug("Loading time platform with %d registers", len(params))
 
     entities = []
-    for name, entry in write_registers.items():
-        if entry["type"] in ("time", "schedule"):
+    for name, entry in params.items():
+        if entry.type in ("time", "schedule"):
             _LOGGER.debug(
                 "Creating time entities for %s (type: %s) with command %s",
                 name,
-                entry["type"],
-                entry["command"],
+                entry.type,
+                entry.command,
             )
             new_entities = _create_time_entities(
                 name,
@@ -266,7 +267,7 @@ class THZTime(THZBaseEntity, TimeEntity):
     def __init__(
         self,
         name: str,
-        entry: dict,
+        entry: WriteParam,
         device: THZDevice,
         device_id: str,
         scan_interval: int | None = None,
@@ -278,7 +279,7 @@ class THZTime(THZBaseEntity, TimeEntity):
 
         Args:
             name: The name of the time entity.
-            entry: The register entry dict containing configuration.
+            entry: The write-map parameter.
             device: THZ device instance.
             device_id: The device identifier for linking to device.
             scan_interval: The scan interval in seconds for polling updates.
@@ -290,10 +291,10 @@ class THZTime(THZBaseEntity, TimeEntity):
         # Initialize base class with common properties
         super().__init__(
             name=name,
-            command=entry["command"],
+            command=entry.command,
             device=device,
             device_id=device_id,
-            icon=entry.get("icon", "mdi:clock"),
+            icon=entry.icon,
             scan_interval=scan_interval,
             translation_key=get_translation_key(name),
             entity_id_style=entity_id_style,
@@ -306,7 +307,7 @@ class THZTime(THZBaseEntity, TimeEntity):
         self._attr_has_entity_name = True
 
         self._attr_native_value = None
-        self._byte_index = time_byte_index(entry.get("decode_type"))
+        self._byte_index = time_byte_index(entry.decode_type)
 
     @property
     def native_value(self):
@@ -418,7 +419,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         self,
         name: str,
         base_name: str,
-        entry: dict,
+        entry: WriteParam,
         device: THZDevice,
         device_id: str,
         time_type: str,
@@ -435,7 +436,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
                 (e.g., "programHC1_Mo_0").
                 This is used to construct the translation key as
                 base_translation_key + "_start" or "_end".
-            entry: The register entry dict containing configuration.
+            entry: The write-map parameter.
             device: THZ device instance.
             device_id: The device identifier for linking to device.
             time_type: Either "start" or "end".
@@ -463,10 +464,10 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         # Initialize base class with common properties
         super().__init__(
             name=name,
-            command=entry["command"],
+            command=entry.command,
             device=device,
             device_id=device_id,
-            icon=entry.get("icon", "mdi:calendar-clock"),
+            icon=entry.icon,
             scan_interval=scan_interval,
             translation_key=translation_key,
             entity_id_style=entity_id_style,

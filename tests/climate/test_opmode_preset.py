@@ -24,8 +24,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.thz.climate import _OPMODE_DECODE_TYPE, THZClimate
+from custom_components.thz.climate import _OPMODE_DECODE_TYPE
 from custom_components.thz.value_maps import SELECT_MAP
+from tests.helpers import make_climate, write_param
 
 
 def _make_entity(
@@ -41,7 +42,7 @@ def _make_entity(
     device = MagicMock()
     device.lock = asyncio.Lock()
 
-    entity = THZClimate(
+    entity = make_climate(
         coordinator=coordinator,
         cooling_coordinator=None,
         device=device,
@@ -63,9 +64,16 @@ def _make_entity(
     return entity
 
 
-_OPMODE_ENTRY = {"command": "0A0112"}
-_COOL_SWITCH_ENTRY = {"command": "0B0613"}
-_COOL_SETPOINT_ENTRY = {"command": "0B0582", "min": "12", "max": "27"}
+_OPMODE_ENTRY = write_param(
+    {"command": "0A0112", "decode_type": "2opmode"}, name="opmode_entry"
+)
+_COOL_SWITCH_ENTRY = write_param(
+    {"command": "0B0613", "decode_type": "1clean"}, name="cool_switch_entry"
+)
+_COOL_SETPOINT_ENTRY = write_param(
+    {"command": "0B0582", "min": "12", "max": "27", "decode_type": "5temp"},
+    name="cool_setpoint_entry",
+)
 
 
 class TestHvacModesExcludeOff:

@@ -14,7 +14,7 @@ import pytest
 
 from custom_components.thz.const import DEFAULT_WRITE_INTERVAL
 from custom_components.thz.platform_setup import async_setup_write_platform
-from tests.helpers import make_runtime_data
+from tests.helpers import FakeWriteManager, make_runtime_data
 
 
 class FakeEntity:
@@ -43,9 +43,7 @@ class FakeEntity:
 
 def _make_hass_and_entry(registers, write_interval_data=None):
     device = MagicMock()
-    write_manager = MagicMock()
-    write_manager.get_all_registers.return_value = registers
-
+    write_manager = FakeWriteManager(registers)
     hass = MagicMock()
 
     config_entry = MagicMock()
@@ -102,14 +100,13 @@ class TestAsyncSetupWritePlatformDefaultFactory:
 
     @pytest.mark.asyncio
     async def test_empty_register_map(self):
-        hass, config_entry, _, write_manager = _make_hass_and_entry({})
+        hass, config_entry, _, _ = _make_hass_and_entry({})
         async_add_entities = MagicMock()
 
         await async_setup_write_platform(
             hass, config_entry, async_add_entities, FakeEntity, "select"
         )
 
-        write_manager.get_all_registers.assert_called_once()
         entities, flag = async_add_entities.call_args.args
         assert entities == []
         assert flag is True

@@ -21,6 +21,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from tests.helpers import write_param
+
 
 def _make_hass():
     """Create a mock hass; device I/O goes through device.async_execute."""
@@ -79,7 +81,7 @@ class TestTHZTimeSetValue:
 
         entity = THZTime(
             name="Test Time",
-            entry={"command": "0B0005"},
+            entry=write_param({"command": "0B0005"}),
             device=device,
             device_id="test_device",
         )
@@ -160,7 +162,7 @@ class TestTHZScheduleTimeSetValue:
         entity = THZScheduleTime(
             name=f"Test Schedule {time_type.title()}",
             base_name="programHC1_Mo_0",
-            entry={"command": "0B0100"},
+            entry=write_param({"command": "0B0100"}),
             device=device,
             device_id="test_device",
             time_type=time_type,

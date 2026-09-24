@@ -7,7 +7,7 @@ import pytest
 
 from custom_components.thz.exceptions import THZProtocolError
 from custom_components.thz.select import THZSelect, async_setup_entry
-from tests.helpers import make_runtime_data
+from tests.helpers import FakeWriteManager, make_runtime_data, write_param
 
 
 def _make_device():
@@ -30,7 +30,7 @@ def _select_entry(command="0A0900", decode_type="2opmode"):
 def _make_entity(name="pOpMode", entry=None, device=None):
     entity = THZSelect(
         name=name,
-        entry=entry if entry is not None else _select_entry(),
+        entry=write_param(entry if entry is not None else _select_entry(), name=name),
         device=device or _make_device(),
         device_id="dev1",
     )
@@ -43,12 +43,12 @@ class TestAsyncSetupEntry:
 
     @pytest.mark.asyncio
     async def test_creates_select_entities(self):
-        write_manager = MagicMock()
-        write_manager.get_all_registers.return_value = {
-            "pOpMode": _select_entry("0A0901"),
-            "pNumberOne": {"command": "0A0902", "type": "number"},
-        }
-
+        write_manager = FakeWriteManager(
+            {
+                "pOpMode": _select_entry("0A0901"),
+                "pNumberOne": {"command": "0A0902", "type": "number"},
+            }
+        )
         hass = MagicMock()
         config_entry = MagicMock()
         config_entry.entry_id = "entry1"
@@ -232,7 +232,7 @@ class TestOptionsWithinMapBounds:
             "type": "select",
             "decode_type": "passive_cooling",
         }
-        select = THZSelect("p75passiveCooling", entry, MagicMock(), "dev")
+        select = THZSelect("p75passiveCooling", write_param(entry), MagicMock(), "dev")
         assert select._attr_options == ["off", "exhaust_air", "supply_air"]
 
     def test_no_bounds_keeps_every_option(self):
@@ -242,7 +242,7 @@ class TestOptionsWithinMapBounds:
         from custom_components.thz.value_maps import SELECT_MAP, state_slug
 
         entry = {"command": "0A0112", "min": "", "max": "", "decode_type": "2opmode"}
-        select = THZSelect("pOpMode", entry, MagicMock(), "dev")
+        select = THZSelect("pOpMode", write_param(entry), MagicMock(), "dev")
         assert select._attr_options == [
             state_slug(value) for value in SELECT_MAP["2opmode"].values()
         ]

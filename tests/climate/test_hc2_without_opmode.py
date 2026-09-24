@@ -12,12 +12,17 @@ from homeassistant.components.climate import HVACMode
 import pytest
 
 from custom_components.thz.__init__ import _entity_should_be_hidden
-from custom_components.thz.climate import THZClimate, async_setup_entry
+from custom_components.thz.climate import async_setup_entry
 from custom_components.thz.const import (
     ENTITY_VISIBILITY_ALL,
     ENTITY_VISIBILITY_DEFAULT,
 )
-from tests.helpers import FakeRegisterManager, make_runtime_data
+from tests.helpers import (
+    FakeRegisterManager,
+    FakeWriteManager,
+    make_climate,
+    make_runtime_data,
+)
 
 _F5_REAL = [
     ("hc2SetpointTemp:", 16, 4, "hex2int", 10, {}),
@@ -37,9 +42,7 @@ def _setup(enable_hc2, f5_entries=_F5_REAL):
             "coordinators": {"pxxF5": MagicMock()},
             "device": MagicMock(),
             "device_id": "dev",
-            "write_manager": MagicMock(
-                get_all_registers=MagicMock(return_value=_HC2_WRITE)
-            ),
+            "write_manager": FakeWriteManager(_HC2_WRITE),
             "register_manager": register_manager,
         }
     )
@@ -92,7 +95,7 @@ class TestHc2DisabledByDefault:
         assert added[0].entity_registry_enabled_default is True
 
     def test_other_climate_entities_are_unaffected(self):
-        entity = THZClimate(
+        entity = make_climate(
             coordinator=MagicMock(),
             cooling_coordinator=None,
             device=MagicMock(),

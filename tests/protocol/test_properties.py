@@ -141,35 +141,36 @@ def test_time_is_floored_to_quarter_hours(hour, minute):
 # 2xx block writes touch only their own parameter
 # ---------------------------------------------------------------------------
 
-_BLOCK_ENTRIES = {
-    name: entry
+_BLOCK_PARAMS = {
+    name: param
     for firmware in ("206", "214")
-    for name, entry in RegisterMapManagerWrite(firmware).get_all_registers().items()
-    if entry.get("type") == "number" and is_block_parameter(entry)
+    for name, param in RegisterMapManagerWrite(firmware).params().items()
+    if param.type == "number" and is_block_parameter(param)
 }
 
 
 @settings(max_examples=200, deadline=None)
 @given(
-    name=st.sampled_from(sorted(_BLOCK_ENTRIES)),
+    name=st.sampled_from(sorted(_BLOCK_PARAMS)),
     block=st.binary(min_size=48, max_size=48),
     raw=st.integers(min_value=0, max_value=0xFFFF),
 )
 def test_block_write_changes_only_its_own_parameter(name, block, raw):
-    entry = _BLOCK_ENTRIES[name]
-    addr = bytes.fromhex(entry["command"])
+    entry = _BLOCK_PARAMS[name]
+    layout = entry.block
+    addr = bytes.fromhex(entry.command)
     device = Simulated2xxDevice({addr: block})
-    length = int(entry["length"])
+    length = layout.length
     value = (raw % (1 << (8 * length))).to_bytes(length, "big")
-    if "bit" in entry:
+    if layout.bit is not None:
         value = bytes([raw & 1])
 
     asyncio.run(async_write_parameter(None, device, entry, value))
     after = device.blocks[addr]
 
-    start = int(entry["offset"]) - 2  # CRC and address echo precede the data
-    if "bit" in entry:
-        mask = 1 << int(entry["bit"])
+    start = layout.offset - 2  # CRC and address echo precede the data
+    if layout.bit is not None:
+        mask = 1 << layout.bit
         assert after[start] & ~mask & 0xFF == block[start] & ~mask & 0xFF
         assert bool(after[start] & mask) == bool(raw & 1)
         changed = range(start, start + 1)

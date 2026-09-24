@@ -21,11 +21,38 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-from custom_components.thz.climate import THZClimate
+from tests.helpers import make_climate, write_param
 
-_DAY_ENTRY = {"command": "0A0080", "min": "10", "max": "30", "step": "0.1"}
-_NIGHT_ENTRY = {"command": "0A0081", "min": "10", "max": "30", "step": "0.1"}
-_MANUAL_ENTRY = {"command": "0A0082", "min": "10", "max": "65", "step": "0.1"}
+_DAY_ENTRY = write_param(
+    {
+        "command": "0A0080",
+        "min": "10",
+        "max": "30",
+        "step": "0.1",
+        "decode_type": "5temp",
+    },
+    name="day_entry",
+)
+_NIGHT_ENTRY = write_param(
+    {
+        "command": "0A0081",
+        "min": "10",
+        "max": "30",
+        "step": "0.1",
+        "decode_type": "5temp",
+    },
+    name="night_entry",
+)
+_MANUAL_ENTRY = write_param(
+    {
+        "command": "0A0082",
+        "min": "10",
+        "max": "65",
+        "step": "0.1",
+        "decode_type": "5temp",
+    },
+    name="manual_entry",
+)
 
 
 def _make_dhw_entity(*, night_setpoint_entry=None, manual_setpoint_entry=None):
@@ -35,7 +62,7 @@ def _make_dhw_entity(*, night_setpoint_entry=None, manual_setpoint_entry=None):
     device = MagicMock()
     device.lock = asyncio.Lock()
 
-    entity = THZClimate(
+    entity = make_climate(
         coordinator=coordinator,
         cooling_coordinator=None,
         device=device,
@@ -92,7 +119,7 @@ class TestThreeCandidateMatching:
             await entity._async_write_heat_setpoint(50.0)
 
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_MANUAL_ENTRY["command"])
+        assert write_call[0][2] == bytes.fromhex(_MANUAL_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_writes_day_register_when_day_is_active(self):
@@ -111,7 +138,7 @@ class TestThreeCandidateMatching:
             await entity._async_write_heat_setpoint(22.0)
 
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_zero_matches(self):
@@ -131,7 +158,7 @@ class TestThreeCandidateMatching:
             await entity._async_write_heat_setpoint(31.0)
 
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_falls_back_to_day_when_multiple_registers_coincide(self):
@@ -152,7 +179,7 @@ class TestThreeCandidateMatching:
             await entity._async_write_heat_setpoint(22.0)
 
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
 
     @pytest.mark.asyncio
     async def test_single_candidate_skips_matching_entirely(self):
@@ -170,4 +197,4 @@ class TestThreeCandidateMatching:
 
         entity._async_read_setpoint.assert_not_called()
         write_call = entity._device.async_execute.call_args
-        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY["command"])
+        assert write_call[0][2] == bytes.fromhex(_DAY_ENTRY.command)
