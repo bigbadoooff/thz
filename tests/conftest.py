@@ -414,6 +414,20 @@ util_mock.percentage = percentage_mock
 sys.modules["homeassistant.util.percentage"] = percentage_mock
 
 
+# Mock event component
+class MockEventEntity(MockEntity):
+    """Mock EventEntity: records the triggered events."""
+
+    def _trigger_event(self, event_type, event_attributes=None):
+        """Record an event like EventEntity._trigger_event."""
+        self.__dict__.setdefault("triggered", []).append((event_type, event_attributes))
+
+
+event_mock = MagicMock()
+event_mock.EventEntity = MockEventEntity
+sys.modules["homeassistant.components.event"] = event_mock
+
+
 # Mock repairs component
 class MockRepairsFlow:
     """Minimal RepairsFlow: the step results are plain dicts."""

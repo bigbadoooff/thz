@@ -363,6 +363,20 @@ Check HA logs for `thz` entries. Common causes:
 
 Use `thz.read_raw_register` to verify that a specific block returns data on your device.
 
+### Events
+
+Two event entities let automations react to things that happen once:
+
+| Entity | Event types | Fires when | Attributes |
+|--------|-------------|-----------|-----------|
+| Fault | `fault` | a new record appears in the fault memory (`pxxD1`, firmware 4.x/5.x) | `fault_number`, `fault_code`, `description`, `time`, `date` |
+| Filter change | `filter_both`, `filter_up`, `filter_down` | the heat pump starts asking for that filter change (`pxx0A0176`) | — |
+
+They use data that is polled anyway, so the blocks must be selected for
+polling. What is already there when Home Assistant starts (the fault
+history, a filter that is already due) fires nothing; the fault sensors and
+filter binary sensors show that state.
+
 ### Device Clock
 
 The heat pump's time programs run on its own clock. Every 15 minutes the

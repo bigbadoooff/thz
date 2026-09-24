@@ -2902,6 +2902,45 @@
       "z_reset_last10errors": {
         "name": "Reset Fault Log"
       }
+    },
+    "event": {
+      "fault": {
+        "name": "Fault",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "fault": "New fault"
+            }
+          },
+          "fault_number": {
+            "name": "Fault number"
+          },
+          "fault_code": {
+            "name": "Fault code"
+          },
+          "description": {
+            "name": "Description"
+          },
+          "time": {
+            "name": "Time"
+          },
+          "date": {
+            "name": "Date"
+          }
+        }
+      },
+      "filter": {
+        "name": "Filter change",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "filter_both": "Change both filters",
+              "filter_up": "Change filter (up)",
+              "filter_down": "Change filter (down)"
+            }
+          }
+        }
+      }
     }
   },
   "selector": {

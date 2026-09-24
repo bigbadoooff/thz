@@ -65,6 +65,7 @@ PLATFORMS = [
     "climate",
     "water_heater",
     "fan",
+    "event",
 ]
 
 
