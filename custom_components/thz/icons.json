@@ -746,13 +746,16 @@
             "default": "mdi:thermostat"
           }
         }
-      },
-      "dhw_heating": {
-        "state_attributes": {
-          "preset_mode": {
-            "default": "mdi:thermostat"
-          }
-        }
+      }
+    },
+    "water_heater": {
+      "dhw": {
+        "default": "mdi:water-boiler"
+      }
+    },
+    "fan": {
+      "ventilation": {
+        "default": "mdi:fan"
       }
     }
   }

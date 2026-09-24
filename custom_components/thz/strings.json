@@ -363,9 +363,21 @@
       },
       "heating_circuit_2": {
         "name": "Heating Circuit 2"
-      },
-      "dhw_heating": {
-        "name": "Domestic Hot Water"
+      }
+    },
+    "water_heater": {
+      "dhw": {
+        "name": "Hot Water"
+      }
+    },
+    "fan": {
+      "ventilation": {
+        "name": "Ventilation",
+        "state_attributes": {
+          "stage": {
+            "name": "Stage"
+          }
+        }
       }
     },
     "sensor": {

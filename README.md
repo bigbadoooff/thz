@@ -40,7 +40,9 @@ Parts of this software have been developed by the help of AI.
 - ✅ **Number Platform**: Adjust numeric settings and parameters
 - ✅ **Select Platform**: Choose between predefined options — including **passive cooling mode** (firmware 4.39/5.39)
 - ✅ **Time Platform**: Set time-based parameters, schedules and programmes
-- ✅ **Climate Platform**: Full climate entities for Heating Circuit 1, Heating Circuit 2, and Domestic Hot Water — with temperature control, HVAC mode, preset and fan mode support
+- ✅ **Climate Platform**: Climate entities for Heating Circuit 1 and Heating Circuit 2 — with temperature control, HVAC mode and preset support
+- ✅ **Water Heater Platform**: Hot water as a water heater entity — temperature, setpoint and eco (setback) / performance / off state
+- ✅ **Fan Platform**: Ventilation as a fan entity — shows the current stage and starts unscheduled ventilation at stage 0–3
 - ✅ **Diagnostics**: Download a diagnostics report for troubleshooting (via Settings → Devices & Services)
 - ✅ **Device Registry Integration**: Proper device identification in Home Assistant
 - ✅ **Per-Block Polling Intervals**: Each register block has its own configurable poll interval
@@ -49,13 +51,14 @@ Parts of this software have been developed by the help of AI.
 
 ### Climate Entities
 
-Three climate entities are automatically created when the required data blocks are available:
+These entities are created when the required data blocks and parameters are available:
 
-| Entity | Source block | Supports |
+| Entity | Source | Supports |
 |--------|-------------|---------|
-| Heating Circuit 1 | `pxxF4` | Temperature setpoint, HVAC mode, preset (comfort/sleep/away), fan mode |
-| Heating Circuit 2 | `pxxF5` | Temperature setpoint, HVAC mode, preset — created only when HC2 is configured |
-| Domestic Hot Water | `pxxF3` | Temperature setpoint, HVAC mode |
+| Heating Circuit 1 (climate) | `pxxF4` | Temperature setpoint, HVAC mode, preset (operating mode) |
+| Heating Circuit 2 (climate) | `pxxF5` | Temperature setpoint, HVAC mode, preset — created only when HC2 is configured |
+| Hot Water (water heater) | `pxxF3` | Temperature and setpoint in effect; state `performance` (day), `eco` (setback, night setpoint) or `off` (standby). Setting a temperature writes the day setpoint (`p04`), or the night setpoint (`p05`) while in eco. |
+| Ventilation (fan) | `p99startUnschedVent` (4.x/5.x), `pxxF6`/`pxxEE` (2.x) | The time programs set the ventilation stage; the fan controls *unscheduled ventilation*. A speed of 33/66/100 % starts it at stage 1/2/3, off starts it at stage 0, each for the time set in `p43`–`p46`; then the program takes over again. The program's stage settings (`p07` etc.) are not changed. Shown is the stage the ventilation runs at, also as the `stage` attribute: from the supply airflow of the current stage (`pxxE8`, when polled) compared with `p37`–`p39`, otherwise from today's fan time program (day stage `p07` inside a window, night stage `p08` outside). On 2.x firmware, which has no command to start ventilation, the fan only shows the stage (from the polled blocks `pxxF6` and `pxxEE`): the one set at the device while its time runs, otherwise the stage of the fan program state (day, night or standby). The fan reads its registers through the same parameter poller as the other settings, so it adds no extra requests for registers that are polled anyway. |
 
 HC1 also exposes **HVAC action** (heating / cooling / idle) and optional **cooling mode** when the device supports active cooling.
 
