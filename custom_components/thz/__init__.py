@@ -312,7 +312,9 @@ async def _async_create_coordinators(
             # on the next successful poll. Registers the firmware genuinely
             # lacks are reported as data=None below instead.
             failed_blocks.append(block)
-            _LOGGER.warning(
+            # While the heat pump does not answer, THZDevice has said so once.
+            _LOGGER.log(
+                logging.WARNING if device.link_ok else logging.DEBUG,
                 "Block %s could not be read at startup (%s); its entities "
                 "stay unavailable until the next successful poll.",
                 block,

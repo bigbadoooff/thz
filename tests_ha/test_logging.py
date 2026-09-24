@@ -62,12 +62,12 @@ async def test_outage_is_logged_once(hass, fake_device, caplog):
         async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=minutes))
         await hass.async_block_till_done()
     assert _records(caplog, start) == [
-        ("WARNING", "Lost the connection to the heat pump: no answer"),
+        ("WARNING", "The heat pump does not answer: no answer"),
     ]
 
     start = len(caplog.records)
     device.send_request = real_send
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=6))
     await hass.async_block_till_done()
-    assert _records(caplog, start) == [("INFO", "Connection to the heat pump is back")]
+    assert _records(caplog, start) == [("INFO", "The heat pump answers again")]
     assert await hass.config_entries.async_unload(entry.entry_id)

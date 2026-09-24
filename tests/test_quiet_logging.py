@@ -65,8 +65,8 @@ class TestConnectionLogging:
             if r.name == LOGGER and r.levelno >= logging.INFO
         ]
         assert messages == [
-            ("WARNING", "Lost the connection to the heat pump: gone"),
-            ("INFO", "Connection to the heat pump is back"),
+            ("WARNING", "The heat pump does not answer: gone"),
+            ("INFO", "The heat pump answers again"),
         ]
 
     @pytest.mark.asyncio

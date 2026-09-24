@@ -457,11 +457,11 @@ class THZDevice:
         if err is None:
             if not self._link_ok:
                 self._link_ok = True
-                _LOGGER.info("Connection to the heat pump is back")
+                _LOGGER.info("The heat pump answers again")
             return
         if self._link_ok:
             self._link_ok = False
-            _LOGGER.warning("Lost the connection to the heat pump: %s", err)
+            _LOGGER.warning("The heat pump does not answer: %s", err)
         else:
             _LOGGER.debug("Heat pump still unreachable: %s", err)
 

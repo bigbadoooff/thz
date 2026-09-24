@@ -254,6 +254,38 @@ class TestAsyncSetupEntry:
         assert stored.coordinators["pxxFB"] is failing_coordinator
         assert "pxxFB" not in stored.unsupported_blocks
 
+    @pytest.mark.parametrize(
+        ("link_ok", "level"), [(True, "WARNING"), (False, "DEBUG")]
+    )
+    @pytest.mark.asyncio
+    async def test_startup_block_failure_warns_only_while_connected(
+        self, caplog, link_ok, level
+    ):
+        import logging
+
+        # While the heat pump does not answer, THZDevice already said so.
+        caplog.set_level(logging.DEBUG, logger=thz_module._LOGGER.name)
+        hass = _mock_hass()
+        entry = _mock_config_entry(refresh_intervals={"pxxFB": 300, "pxxF2": 300})
+        device = _fake_device()
+        device.link_ok = link_ok
+        failing_coordinator = _fake_coordinator(data=None)
+        failing_coordinator.async_config_entry_first_refresh = AsyncMock(
+            side_effect=thz_module.ConfigEntryNotReady("block failed")
+        )
+        coordinators = iter([failing_coordinator, _fake_coordinator()])
+
+        with _patched_setup(
+            device=device, coordinator_factory=lambda *a, **kw: next(coordinators)
+        ):
+            await thz_module.async_setup_entry(hass, entry)
+
+        assert [
+            r.levelname
+            for r in caplog.records
+            if "could not be read at startup" in r.getMessage()
+        ] == [level]
+
     @pytest.mark.asyncio
     async def test_all_blocks_failing_retries_whole_entry(self):
         hass = _mock_hass()
