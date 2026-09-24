@@ -328,6 +328,59 @@ class TestListSerialPorts:
         assert result["/dev/ttyUSB0"] == "/dev/ttyUSB0"
 
 
+class TestPortErrors:
+    """OS errors while resolving ports never break the port list."""
+
+    @staticmethod
+    def _port(device, description):
+        port = MagicMock()
+        port.device = device
+        port.description = description
+        return port
+
+    def _call(self, realpath, listdir=None, current_device=None):
+        with (
+            patch(
+                "serial.tools.list_ports.comports",
+                return_value=[self._port("/dev/ttyUSB0", "adapter")],
+            ),
+            patch("os.path.isdir", return_value=True),
+            patch("os.listdir", side_effect=listdir or (lambda p: ["usb-THZ"])),
+            patch("os.path.realpath", side_effect=realpath),
+            patch("os.path.join", side_effect=lambda *parts: "/".join(parts)),
+            patch("os.path.basename", side_effect=lambda p: p.split("/")[-1]),
+        ):
+            return THZConfigFlow._list_serial_ports(current_device)
+
+    def test_unreadable_by_id_directory(self):
+        def listdir(path):
+            raise OSError("permission denied")
+
+        result, canonical = self._call(realpath=lambda p: p, listdir=listdir)
+        assert result == {"/dev/ttyUSB0": "adapter (/dev/ttyUSB0)"}
+        assert canonical == "/dev/ttyUSB0"
+
+    def test_unresolvable_paths_are_used_as_they_are(self):
+        def realpath(path):
+            raise OSError("broken link")
+
+        result, canonical = self._call(realpath, current_device="/dev/ttyUSB9")
+        assert result["/dev/ttyUSB0"] == "adapter (/dev/ttyUSB0)"
+        # The stored device cannot be resolved: it stays selectable.
+        assert result["/dev/ttyUSB9"] == "/dev/ttyUSB9"
+        assert canonical == "/dev/ttyUSB9"
+
+    def test_unresolvable_candidate_is_skipped(self):
+        def realpath(path):
+            if path == "/dev/ttyUSB0":
+                raise OSError("gone")
+            return path
+
+        result, canonical = self._call(realpath, current_device="/dev/ttyACM3")
+        assert canonical == "/dev/ttyACM3"
+        assert result["/dev/ttyACM3"] == "/dev/ttyACM3"
+
+
 class TestEntityIdStyleOption:
     """Tests for the entity_id_style config-flow option (FHEM-style entity_id)."""
 

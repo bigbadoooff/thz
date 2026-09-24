@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.thz.const import (
@@ -185,3 +186,169 @@ async def test_host_change_keeps_the_device_and_its_entities(hass, fake_device):
     # the identifier in their unique id) is still the same one.
     assert snapshot() == before
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+class _Port:
+    """A serial port as serial.tools.list_ports.comports() lists it."""
+
+    def __init__(self, device: str, description: str) -> None:
+        self.device = device
+        self.description = description
+
+
+BY_ID = "/dev/serial/by-id"
+ADAPTER = f"{BY_ID}/usb-FTDI_THZ-if00"
+
+
+@pytest.fixture
+def serial_ports(monkeypatch):
+    """Two ports; /dev/ttyUSB0 has a stable by-id link."""
+    import os
+
+    real_isdir, real_listdir, real_realpath = (
+        os.path.isdir,
+        os.listdir,
+        os.path.realpath,
+    )
+    links = {ADAPTER: "/dev/ttyUSB0"}
+    monkeypatch.setattr(os.path, "isdir", lambda p: p == BY_ID or real_isdir(p))
+    monkeypatch.setattr(
+        os,
+        "listdir",
+        lambda p: (
+            [os.path.basename(k) for k in links] if p == BY_ID else real_listdir(p)
+        ),
+    )
+    monkeypatch.setattr(
+        os.path,
+        "realpath",
+        lambda p, **kw: (
+            links.get(p, p) if p.startswith("/dev") else real_realpath(p, **kw)
+        ),
+    )
+    ports = [
+        _Port("/dev/ttyUSB0", "FT232R USB UART"),
+        _Port("/dev/ttyACM0", "/dev/ttyACM0"),
+    ]
+    with patch("serial.tools.list_ports.comports", return_value=ports):
+        yield
+
+
+def _usb_entry(device: str) -> MockConfigEntry:
+    return make_entry(
+        connection_type="usb", device=device, Baudrate=115200, host=None, port=None
+    )
+
+
+async def test_usb_ports_offer_stable_by_id_paths(hass, fake_device, serial_ports):
+    result = await _start(hass, "usb")
+    schema = result["data_schema"].schema
+    device_field = next(k for k in schema if k == "device")
+    ports = schema[device_field].container
+    assert ports == {
+        ADAPTER: "FT232R USB UART (/dev/ttyUSB0) [usb-FTDI_THZ-if00]",
+        "/dev/ttyACM0": "/dev/ttyACM0",
+    }
+    assert device_field.default() == ADAPTER
+
+
+async def test_usb_without_detected_ports_offers_the_usual_devices(hass, fake_device):
+    with patch("serial.tools.list_ports.comports", return_value=[]):
+        result = await _start(hass, "usb")
+    schema = result["data_schema"].schema
+    device_field = next(k for k in schema if k == "device")
+    assert "/dev/ttyUSB0" in schema[device_field].container
+    assert device_field.default() == "/dev/ttyUSB0"
+
+
+async def test_reconfigure_usb_upgrades_the_stored_port(
+    hass, fake_device, serial_ports
+):
+    entry = _usb_entry("/dev/ttyUSB0")
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    schema = result["data_schema"].schema
+    device_field = next(k for k in schema if k == "device")
+    # The stored /dev/ttyUSB0 is preselected by its stable by-id path.
+    assert device_field.default() == ADAPTER
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"device": ADAPTER, "Baudrate": 115200}
+    )
+    await hass.async_block_till_done()
+    assert result["reason"] == "reconfigured"
+    assert entry.data["device"] == ADAPTER
+    assert entry.unique_id == f"usb-{ADAPTER}"
+
+
+async def test_reconfigure_usb_keeps_a_disconnected_port(
+    hass, fake_device, serial_ports
+):
+    entry = _usb_entry("/dev/ttyUSB7")
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    schema = result["data_schema"].schema
+    device_field = next(k for k in schema if k == "device")
+    assert schema[device_field].container["/dev/ttyUSB7"] == "/dev/ttyUSB7"
+    assert device_field.default() == "/dev/ttyUSB7"
+
+
+async def test_reconfigure_to_a_device_of_another_entry_is_refused(hass, fake_device):
+    entry = await setup_entry(hass)
+    other = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="ip-192.0.2.99",
+        data={"connection_type": "ip", "host": "192.0.2.99", "port": 2323},
+    )
+    other.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"host": "192.0.2.99", "port": 2323}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert entry.data["host"] == HOST
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_missing_write_map_aborts(hass, fake_device, monkeypatch):
+    real_initialize = fake_device.async_initialize
+
+    async def initialize_without_write_map(self, hass):
+        await real_initialize(self, hass)
+        self.write_register_map_manager = None
+
+    monkeypatch.setattr(fake_device, "async_initialize", initialize_without_write_map)
+    result = await _start(hass, "ip")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"host": HOST, "port": 2323, "connection_type": "ip"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "cannot_detect_blocks"
+    assert fake_device.instances[-1].closed
+
+
+async def test_reconfigure_usb_keeps_a_stored_by_id_path(
+    hass, fake_device, serial_ports
+):
+    entry = _usb_entry(ADAPTER)
+    entry.add_to_hass(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    device_field = next(k for k in result["data_schema"].schema if k == "device")
+    assert device_field.default() == ADAPTER
+
+
+async def test_reconfigure_usb_without_ports_keeps_the_stored_device(hass, fake_device):
+    entry = _usb_entry("/dev/ttyUSB7")
+    entry.add_to_hass(hass)
+
+    with patch("serial.tools.list_ports.comports", return_value=[]):
+        result = await entry.start_reconfigure_flow(hass)
+    schema = result["data_schema"].schema
+    device_field = next(k for k in schema if k == "device")
+    assert "/dev/ttyUSB0" in schema[device_field].container
+    assert device_field.default() == "/dev/ttyUSB7"
