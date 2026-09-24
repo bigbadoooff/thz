@@ -254,6 +254,38 @@ class TestAsyncSetupEntry:
         assert stored.coordinators["pxxFB"] is failing_coordinator
         assert "pxxFB" not in stored.unsupported_blocks
 
+    @pytest.mark.parametrize(
+        ("link_ok", "level"), [(True, "WARNING"), (False, "DEBUG")]
+    )
+    @pytest.mark.asyncio
+    async def test_startup_block_failure_warns_only_while_connected(
+        self, caplog, link_ok, level
+    ):
+        import logging
+
+        # While the heat pump does not answer, THZDevice already said so.
+        caplog.set_level(logging.DEBUG, logger=thz_module._LOGGER.name)
+        hass = _mock_hass()
+        entry = _mock_config_entry(refresh_intervals={"pxxFB": 300, "pxxF2": 300})
+        device = _fake_device()
+        device.link_ok = link_ok
+        failing_coordinator = _fake_coordinator(data=None)
+        failing_coordinator.async_config_entry_first_refresh = AsyncMock(
+            side_effect=thz_module.ConfigEntryNotReady("block failed")
+        )
+        coordinators = iter([failing_coordinator, _fake_coordinator()])
+
+        with _patched_setup(
+            device=device, coordinator_factory=lambda *a, **kw: next(coordinators)
+        ):
+            await thz_module.async_setup_entry(hass, entry)
+
+        assert [
+            r.levelname
+            for r in caplog.records
+            if "could not be read at startup" in r.getMessage()
+        ] == [level]
+
     @pytest.mark.asyncio
     async def test_all_blocks_failing_retries_whole_entry(self):
         hass = _mock_hass()
@@ -309,25 +341,11 @@ class TestAsyncSetupEntry:
         assert kwargs["suggested_area"] == "Basement"
 
     @pytest.mark.asyncio
-    async def test_log_level_applied(self):
+    async def test_log_level_left_to_home_assistant(self):
         import logging
 
         hass = _mock_hass()
-        entry = _mock_config_entry(log_level="debug")
-        device = _fake_device(blocks=[])
-
-        with _patched_setup(device=device):
-            await thz_module.async_setup_entry(hass, entry)
-
-        assert thz_module._LOGGER.level == logging.DEBUG
-        thz_module._LOGGER.setLevel(logging.NOTSET)  # reset for other tests
-
-    @pytest.mark.asyncio
-    async def test_log_level_left_to_home_assistant_without_option(self):
-        import logging
-
-        hass = _mock_hass()
-        entry = _mock_config_entry()  # no "log_level" (current config flow)
+        entry = _mock_config_entry(log_level="error")  # left by an old version
         device = _fake_device(blocks=[])
         thz_module._LOGGER.setLevel(logging.DEBUG)  # e.g. from `logger:` config
         try:
@@ -544,13 +562,30 @@ class TestAsyncMigrateEntry:
         hass.config_entries.async_update_entry.assert_called_once_with(
             entry,
             data={**entry.data, "device_identifier": "ip-192.0.2.1"},
-            minor_version=2,
+            minor_version=3,
+        )
+
+    @pytest.mark.asyncio
+    async def test_drops_the_old_log_level(self):
+        hass = _mock_hass()
+        entry = self._entry(1, 2, device_identifier="ip-192.0.2.1", log_level="debug")
+
+        assert await thz_module.async_migrate_entry(hass, entry)
+
+        hass.config_entries.async_update_entry.assert_called_once_with(
+            entry,
+            data={
+                "connection_type": "ip",
+                "host": "192.0.2.1",
+                "device_identifier": "ip-192.0.2.1",
+            },
+            minor_version=3,
         )
 
     @pytest.mark.asyncio
     async def test_current_entry_is_left_alone(self):
         hass = _mock_hass()
-        assert await thz_module.async_migrate_entry(hass, self._entry(1, 2))
+        assert await thz_module.async_migrate_entry(hass, self._entry(1, 3))
         hass.config_entries.async_update_entry.assert_not_called()
 
     @pytest.mark.asyncio

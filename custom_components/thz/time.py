@@ -252,7 +252,7 @@ async def async_setup_entry(
         entity._coordinators = entry_data.coordinators
         entity._poller = entry_data.poller
 
-    _LOGGER.info("Created %d time entities", len(entities))
+    _LOGGER.debug("Created %d time entities", len(entities))
     assign_subdevices(entities, config_entry.data)
     # Values arrive from the poller; see parameter_poller.py.
     async_add_entities(entities)

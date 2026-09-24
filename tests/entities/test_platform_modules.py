@@ -113,13 +113,6 @@ class TestConfigFlowModule:
 
         assert THZConfigFlow is not None
 
-    def test_config_flow_has_log_levels(self):
-        """Test that config_flow module has LOG_LEVELS constant."""
-        from custom_components.thz.config_flow import LOG_LEVELS
-
-        assert isinstance(LOG_LEVELS, dict)
-        assert len(LOG_LEVELS) > 0
-
 
 class TestInitModule:
     """Test __init__ module can be imported and has expected structure."""

@@ -14,6 +14,9 @@ from .value_maps import SELECT_MAP
 
 _LOGGER = logging.getLogger(__name__)
 
+# (decode_type, value) pairs already reported as unknown.
+_REPORTED_UNKNOWN: set[tuple[str, str]] = set()
+
 
 def _dec_hex2int(raw: bytes, factor: float) -> int | float:
     return int.from_bytes(raw, byteorder="big", signed=True) / factor
@@ -394,7 +397,15 @@ class THZValueCodec:
         if value_str in SELECT_MAP[decode_type]:
             return SELECT_MAP[decode_type][value_str]
 
-        _LOGGER.warning(
+        # Logged once per value: the same register is read on every poll.
+        level = (
+            logging.DEBUG
+            if (decode_type, value_str) in _REPORTED_UNKNOWN
+            else logging.WARNING
+        )
+        _REPORTED_UNKNOWN.add((decode_type, value_str))
+        _LOGGER.log(
+            level,
             "Unknown value %s for decode_type %s, available: %s",
             value_str,
             decode_type,

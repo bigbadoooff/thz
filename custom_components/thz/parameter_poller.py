@@ -175,7 +175,8 @@ class ParameterPoller:
                 self._log_failure(key, err)
                 value = None
                 if connection_errors >= MAX_CONNECTION_ERRORS:
-                    _LOGGER.warning(
+                    # THZDevice logs the heat pump not answering once.
+                    _LOGGER.debug(
                         "Device unreachable (%s); skipping the remaining %d "
                         "parameter reads of this round",
                         err,
@@ -194,10 +195,14 @@ class ParameterPoller:
             self._async_report(key, value)
 
     def _log_failure(self, key: ReadKey, err: Exception) -> None:
-        """Log a failed read; a warning only when the key last read fine."""
+        """Log a failed read of a register.
+
+        A warning only when the key last read fine and the heat pump still
+        answers; while it does not, THZDevice has logged that once.
+        """
         level = (
             logging.DEBUG
-            if key in self.data and self.data[key] is None
+            if (key in self.data and self.data[key] is None) or not self._device.link_ok
             else logging.WARNING
         )
         _LOGGER.log(level, "Reading register %s failed: %s", key, err)

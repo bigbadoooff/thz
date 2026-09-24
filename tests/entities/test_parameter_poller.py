@@ -24,6 +24,9 @@ C = ("0B1410", 4, 4)
 class FakeDevice:
     """Answers read_value from a dict; an exception value is raised."""
 
+    # Whether the heat pump answers (THZDevice.link_ok).
+    link_ok = True
+
     def __init__(self, answers):
         self.answers = answers
         self.reads = []
@@ -294,6 +297,22 @@ async def test_a_failing_register_warns_once(timers, caplog):
     warnings = [r for r in caplog.records if r.levelname == "WARNING"]
     assert len(warnings) == 1
     assert "0B0005" in warnings[0].getMessage()
+
+
+@pytest.mark.asyncio
+async def test_failures_while_the_heat_pump_does_not_answer_are_debug(timers, caplog):
+    import logging
+
+    caplog.set_level(logging.DEBUG, logger=poller_mod.__name__)
+    poller, device = _poller({A: THZNotSupportedError("no")})
+    device.link_ok = False  # THZDevice has logged that once
+    poller.async_subscribe(A, MagicMock())
+    poller.async_start()
+    await _run_delayed(timers)
+    await _drain(poller)
+
+    levels = {r.levelname for r in caplog.records if r.name == poller_mod.__name__}
+    assert levels == {"DEBUG"}
 
 
 def test_a_round_without_subscribers_starts_no_task(timers):

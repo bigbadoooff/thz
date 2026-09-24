@@ -102,7 +102,7 @@ class THZButton(THZBaseEntity, ButtonEntity):
         _LOGGER.debug("Pressing button %s (command: %s)", self.name, self._command)
         try:
             await async_write_parameter(self.hass, self._device, self._entry, b"\x00")
-            _LOGGER.info("Button %s pressed successfully", self.name)
+            _LOGGER.debug("Button %s pressed successfully", self.name)
         except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error("Error pressing button %s: %s", self.name, err, exc_info=True)
             raise HomeAssistantError(

@@ -31,6 +31,7 @@ from .const import (
 )
 from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
+from .log_once import OncePerEpisode
 from .register_maps.register_map_manager import RegisterMapManager
 from .runtime_data import THZConfigEntry
 from .value_codec import decode_raw_value
@@ -107,7 +108,7 @@ async def async_setup_entry(
     for block, fields in register_manager.fields().items():
         coordinator = coordinators.get(block)
         if coordinator is None:
-            _LOGGER.warning(
+            _LOGGER.debug(
                 "No coordinator found for block %s, skipping binary sensors", block
             )
             continue
@@ -153,7 +154,7 @@ async def async_setup_entry(
                 )
             )
 
-    _LOGGER.info("Created %d binary sensor entities", len(entities))
+    _LOGGER.debug("Created %d binary sensor entities", len(entities))
     assign_subdevices(entities, config_entry.data)
     async_add_entities(entities, True)
 
@@ -209,6 +210,7 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         self._decode_type = entry["decode"]
         self._device_id = device_id
         self._entity_name = entry["name"]
+        self._read_problem = OncePerEpisode(_LOGGER)
 
         # Translation: set only translation_key when available so HA can look
         # up the name; setting _attr_name would block translation lookup.
@@ -261,7 +263,8 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         try:
             payload = self.coordinator.data
             if len(payload) < self._offset + self._length:
-                _LOGGER.warning(
+                self._read_problem.log(
+                    logging.WARNING,
                     "Payload too short for binary sensor %s: "
                     "expected at least %d bytes, got %d",
                     self._entity_name,
@@ -270,15 +273,18 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
                 )
                 return None
             raw_bytes = payload[self._offset : self._offset + self._length]
-            return bool(decode_raw_value(raw_bytes, self._decode_type))
+            value = bool(decode_raw_value(raw_bytes, self._decode_type))
         except (ValueError, IndexError, TypeError) as err:
-            _LOGGER.error(
+            self._read_problem.log(
+                logging.ERROR,
                 "Error decoding binary sensor %s: %s",
                 self._entity_name,
                 err,
                 exc_info=True,
             )
             return None
+        self._read_problem.resolved()
+        return value
 
     @property
     def icon(self) -> str | None:

@@ -235,14 +235,14 @@ async def async_handle_read_raw_register(
 
     # Read the register
     try:
-        _LOGGER.info("Reading raw register: %s", command_str)
+        _LOGGER.debug("Reading raw register: %s", command_str)
         data = await device.async_execute(hass, device.read_block, command_bytes, "get")
 
         formatted = _format_hex_dump(data)
         hex_string = data.hex()
 
         # Log the result
-        _LOGGER.info(
+        _LOGGER.debug(
             "Raw register %s read successfully (%d bytes):\n%s",
             command_str,
             len(data),
@@ -342,7 +342,7 @@ async def async_handle_scan_raw_registers(
                     }
                 )
 
-    _LOGGER.info(
+    _LOGGER.debug(
         "Raw register scan done (%s): scanned=%d, success=%d, errors=%d",
         scan_mode,
         len(commands),
@@ -462,7 +462,7 @@ async def async_handle_watch_raw_registers_changes(
         if interval_seconds > 0:
             await asyncio.sleep(interval_seconds)
 
-    _LOGGER.info(
+    _LOGGER.debug(
         "Watch raw register changes done (%s): scanned=%d, valid=%d, "
         "iterations=%d, reads=%d, changes=%d",
         scan_mode,
@@ -508,7 +508,7 @@ async def async_handle_refresh_block(
     found = await async_refresh_block(hass, block, requested_entry_id)
 
     if found:
-        _LOGGER.info("Service refresh_block: refreshed %s", normalized)
+        _LOGGER.debug("Service refresh_block: refreshed %s", normalized)
         return {"success": True, "block": normalized}
 
     error_msg = f"Block '{normalized}' not found in any active coordinator"

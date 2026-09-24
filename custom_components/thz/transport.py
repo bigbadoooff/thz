@@ -182,7 +182,7 @@ class TcpTransport(THZTransport):
                 lambda: protocol, self.host, self.port
             )
         _enable_keepalive(transport.get_extra_info("socket"))
-        _LOGGER.info("TCP connection established")
+        _LOGGER.debug("TCP connection established")
         return transport
 
 

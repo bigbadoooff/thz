@@ -363,6 +363,27 @@ Check HA logs for `thz` entries. Common causes:
 
 Use `thz.read_raw_register` to verify that a specific block returns data on your device.
 
+### Logging
+
+In normal operation the integration logs one line at startup ("Connected to
+the heat pump") and otherwise only what needs attention:
+
+- a lost connection once as a warning, and once as info when it is back
+  (the blocks that fail meanwhile are not logged one by one);
+- a sensor whose data is too short or cannot be decoded, and an unknown
+  select value, once until it reads correctly again;
+- a drifted device clock once a day (with the notification).
+
+For troubleshooting, turn on **Enable debug logging** on the integration's
+page, or set the level in `configuration.yaml`, for example:
+
+```yaml
+logger:
+  logs:
+    custom_components.thz: debug              # everything
+    custom_components.thz.thz_device: debug   # only the serial/TCP exchange
+```
+
 ## Disclaimer
 
 **IMPORTANT**: This is an unofficial, community-developed integration and is not affiliated with, endorsed by, or supported by Stiebel Eltron or Tecalor.
