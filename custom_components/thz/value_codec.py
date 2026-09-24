@@ -282,7 +282,7 @@ class THZValueCodec:
             step: The step size (for scaling).
             decode_type: The decoding type.
             signed: Whether the value is two's complement (2xx block
-                parameters carry this as ``entry["signed"]``).
+                parameters carry this as ``WriteParam.signed``).
 
         Returns:
             The decoded numeric value.
