@@ -14,7 +14,7 @@ from typing import Any
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import HomeAssistantError
 
-from ..const import WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
+from ..const import DOMAIN, WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
 from ..exceptions import DEVICE_ERRORS
 from ..runtime_data import THZRuntimeData
 from ..thz_device import THZDevice
@@ -66,23 +66,35 @@ async def _async_diverter_points_to_dhw(entry_data: THZRuntimeData) -> bool:
     coordinator = entry_data.coordinators.get(_DIVERTER_BLOCK)
     if coordinator is None:
         raise HomeAssistantError(
-            f"Cannot verify valve state: {_DIVERTER_BLOCK} is not polled"
+            translation_domain=DOMAIN,
+            translation_key="diverter_block_not_polled",
+            translation_placeholders={"block": _DIVERTER_BLOCK},
         )
     flag = _diverter_bit_position(entry_data.register_manager)
     if flag is None:
         raise HomeAssistantError(
-            f"Cannot verify valve state: no {_DIVERTER_FIELD} flag in "
-            f"the {_DIVERTER_BLOCK} register map of this firmware"
+            translation_domain=DOMAIN,
+            translation_key="diverter_flag_missing",
+            translation_placeholders={
+                "field": _DIVERTER_FIELD,
+                "block": _DIVERTER_BLOCK,
+            },
         )
     await coordinator.async_refresh()
     if not coordinator.last_update_success or coordinator.data is None:
         raise HomeAssistantError(
-            f"Cannot verify valve state: {_DIVERTER_BLOCK} could not be read"
+            translation_domain=DOMAIN,
+            translation_key="diverter_block_unreadable",
+            translation_placeholders={"block": _DIVERTER_BLOCK},
         )
     diverter_byte, diverter_bit = flag
     data: bytes = coordinator.data
     if len(data) <= diverter_byte:
-        raise HomeAssistantError(f"Insufficient data from {_DIVERTER_BLOCK} block")
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="diverter_data_short",
+            translation_placeholders={"block": _DIVERTER_BLOCK},
+        )
     return bool((data[diverter_byte] >> diverter_bit) & 0x01)
 
 
@@ -97,15 +109,11 @@ async def _async_check_valve_direction(
     to_dhw = await _async_diverter_points_to_dhw(entry_data)
     if position == "dhw" and not to_dhw:
         raise HomeAssistantError(
-            "Heat pump is not in DHW mode (diverterValve bit = 0 in "
-            "pxxF2). Moving valve to DHW refused — heating circuit is "
-            "under pressure."
+            translation_domain=DOMAIN, translation_key="diverter_not_in_dhw"
         )
     if position == "heating" and to_dhw:
         raise HomeAssistantError(
-            "Heat pump is in DHW mode (diverterValve bit = 1 in "
-            "pxxF2). Moving valve to heating refused — DHW circuit "
-            "is under pressure."
+            translation_domain=DOMAIN, translation_key="diverter_in_dhw"
         )
 
 
@@ -192,7 +200,11 @@ async def async_handle_set_diverter_valve(
         await _emergency_stop(hass, device)
         error_msg = f"Error sending diverter valve command: {err}"
         _LOGGER.exception(error_msg)
-        raise HomeAssistantError(error_msg) from err
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="diverter_command_failed",
+            translation_placeholders={"error": str(err)},
+        ) from err
 
     _LOGGER.info(
         "Diverter valve command sent: position=%s confirmed_off=%s",

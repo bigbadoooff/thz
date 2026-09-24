@@ -19,9 +19,6 @@ from tests.helpers import (
 F4_INSIDE_TEMP_OFFSET = 34
 F4_ROOM_SET_TEMP_OFFSET = 28
 F4_HC_OP_MODE_OFFSET = 24
-F3_DHW_TEMP_OFFSET = 2
-F3_DHW_SET_TEMP_OFFSET = 6
-F3_DHW_OP_MODE_OFFSET = 17
 A176_COOLING_BYTE = 5
 A176_COOLING_BIT = 3
 A176_COMPRESSOR_BIT = 1
@@ -284,7 +281,6 @@ class TestTHZClimateEntity:
         coord_data: bytes | None = None,
         cooling_coordinator=None,
         opmode_entry=None,
-        fan_stage_entry=None,
         device=None,
     ):
         """Instantiate an HC1-style THZClimate entity with minimal config."""
@@ -306,7 +302,6 @@ class TestTHZClimateEntity:
             cool_switch_entry=cool_switch_entry,
             cool_setpoint_entry=cool_setpoint_entry,
             opmode_entry=opmode_entry,
-            fan_stage_entry=fan_stage_entry,
             cooling_byte=A176_COOLING_BYTE,
             cooling_bit=A176_COOLING_BIT,
             compressor_bit=A176_COMPRESSOR_BIT,
@@ -350,13 +345,6 @@ class TestTHZClimateEntity:
         entity = self._make_hc1_entity(opmode_entry={"command": "0A0001"})
         assert entity._attr_supported_features & ClimateEntityFeature.PRESET_MODE
         assert entity._attr_preset_modes is not None
-
-    def test_fan_mode_feature_enabled_with_fan_stage_entry(self):
-        from homeassistant.components.climate import ClimateEntityFeature
-
-        entity = self._make_hc1_entity(fan_stage_entry={"command": "070001"})
-        assert entity._attr_supported_features & ClimateEntityFeature.FAN_MODE
-        assert entity._attr_fan_modes is not None
 
     # ── unique_id ────────────────────────────────────────────────────────────
 
@@ -552,21 +540,6 @@ class TestTHZClimateEntity:
         )
         assert entity.preset_mode is None
 
-    # ── fan_mode ─────────────────────────────────────────────────────────────
-
-    def test_fan_mode_none_without_fan_stage_entry(self):
-        entity = self._make_hc1_entity()
-        assert entity.fan_mode is None
-
-    def test_fan_mode_none_before_cache_populated(self):
-        entity = self._make_hc1_entity(fan_stage_entry={"command": "070001"})
-        assert entity.fan_mode is None
-
-    def test_fan_mode_reflects_cached_stage(self):
-        entity = self._make_hc1_entity(fan_stage_entry={"command": "070001"})
-        entity._fan_stage_cache = 2
-        assert entity.fan_mode == "medium"
-
     # ── min/max_temp ─────────────────────────────────────────────────────────
 
     def test_min_max_temp_from_heat_entry(self):
@@ -632,29 +605,6 @@ class TestTHZClimateEntity:
         entity = self._make_hc1_entity()
         assert (DOMAIN, "test_device") in entity.device_info["identifiers"]
 
-    # ── DHW entity ───────────────────────────────────────────────────────────
-
-    def test_dhw_entity_no_cooling_modes(self):
-        """DHW climate entity never supports COOL mode."""
-        entity = make_climate(
-            coordinator=self._make_coordinator(bytes(40)),
-            cooling_coordinator=None,
-            device=self._make_device(),
-            device_id="test_device",
-            translation_key="dhw_heating",
-            current_temp_offset=F3_DHW_TEMP_OFFSET,
-            current_temp_length=2,
-            target_temp_offset=F3_DHW_SET_TEMP_OFFSET,
-            target_temp_length=2,
-            op_mode_offset=F3_DHW_OP_MODE_OFFSET,
-            op_mode_length=1,
-            heat_setpoint_entry=None,
-            cool_switch_entry=None,
-            cool_setpoint_entry=None,
-        )
-        assert HVACMode.COOL not in entity.hvac_modes
-        assert HVACMode.HEAT in entity.hvac_modes
-
 
 def _is_coro(func):
     import asyncio
@@ -704,7 +654,7 @@ class TestTHZClimateAsyncAddedToHass:
         entity.async_on_remove.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_populates_cooling_setpoint_and_fan_stage_caches(self):
+    async def test_populates_cooling_setpoint_cache(self):
 
         coordinator = MagicMock()
         coordinator.data = None
@@ -712,13 +662,8 @@ class TestTHZClimateAsyncAddedToHass:
 
         device = MagicMock()
         # 200 raw -> * step(0.1) = 20.0 for cooling setpoint
-        # 2 raw -> * step(1.0) = 2 for fan stage (decode_type "1clean" falls back to
-        # generic decode branch in THZValueCodec.decode_number)
         device.async_execute = AsyncMock(
-            side_effect=[
-                (200).to_bytes(2, byteorder="big", signed=True),
-                (2).to_bytes(2, byteorder="big", signed=True),
-            ]
+            return_value=(200).to_bytes(2, byteorder="big", signed=True)
         )
 
         entity = make_climate(
@@ -740,7 +685,6 @@ class TestTHZClimateAsyncAddedToHass:
                 "step": 0.1,
                 "decode_type": "5temp",
             },
-            fan_stage_entry={"command": "070001", "decode_type": "1clean"},
         )
         entity.hass = MagicMock()
         entity.async_on_remove = MagicMock()
@@ -748,7 +692,6 @@ class TestTHZClimateAsyncAddedToHass:
         await entity.async_added_to_hass()
 
         assert entity._cooling_target_temp == pytest.approx(20.0)
-        assert entity._fan_stage_cache == 2
 
 
 class TestTHZClimateServiceCalls:
@@ -902,48 +845,6 @@ class TestTHZClimateServiceCalls:
         await entity.async_set_preset_mode("standby")  # Should not raise.
 
     @pytest.mark.asyncio
-    async def test_set_fan_mode_no_entry_is_noop(self):
-        entity = self._entity()
-        entity.hass = MagicMock()
-        await entity.async_set_fan_mode("low")
-        entity._device.async_execute.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_set_fan_mode_unknown_warns_and_skips(self):
-        entity = self._entity(fan_stage_entry={"command": "070001"})
-        entity.hass = MagicMock()
-        await entity.async_set_fan_mode("not-a-real-mode")
-        entity._device.async_execute.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_set_fan_mode_writes_and_rereads(self):
-        device = MagicMock()
-        device.async_execute = AsyncMock(
-            side_effect=[
-                None,
-                (1).to_bytes(2, byteorder="big", signed=True),
-            ]
-        )
-        entity = self._entity(
-            fan_stage_entry={"command": "070001", "decode_type": "1clean"},
-            device=device,
-        )
-        entity.hass = MagicMock()
-        entity.async_write_ha_state = MagicMock()
-        await entity.async_set_fan_mode("low")
-        assert device.async_execute.await_count == 2
-        assert entity._fan_stage_cache == 1
-        entity.async_write_ha_state.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_set_fan_mode_handles_device_error(self):
-        device = MagicMock()
-        device.async_execute = AsyncMock(side_effect=OSError("boom"))
-        entity = self._entity(fan_stage_entry={"command": "070001"}, device=device)
-        entity.hass = MagicMock()
-        await entity.async_set_fan_mode("low")  # Should not raise.
-
-    @pytest.mark.asyncio
     async def test_set_cooling_switch_no_entry_is_noop(self):
         entity = self._entity()
         entity.hass = MagicMock()
@@ -980,22 +881,6 @@ class TestTHZClimateServiceCalls:
         entity.hass = MagicMock()
         await entity._async_read_cooling_setpoint()
         assert entity._cooling_target_temp is None
-
-    @pytest.mark.asyncio
-    async def test_read_fan_stage_no_entry_is_noop(self):
-        entity = self._entity()
-        entity.hass = MagicMock()
-        await entity._async_read_fan_stage()
-        entity._device.async_execute.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_read_fan_stage_handles_device_error(self):
-        device = MagicMock()
-        device.async_execute = AsyncMock(side_effect=OSError("boom"))
-        entity = self._entity(fan_stage_entry={"command": "070001"}, device=device)
-        entity.hass = MagicMock()
-        await entity._async_read_fan_stage()  # Should not raise.
-        assert entity._fan_stage_cache is None
 
 
 class TestClimateAsyncSetupEntry:
@@ -1045,7 +930,7 @@ class TestClimateAsyncSetupEntry:
     ]
 
     @pytest.mark.asyncio
-    async def test_creates_hc1_and_dhw_entities(self):
+    async def test_creates_hc1_but_no_dhw_climate(self):
         from custom_components.thz.climate import async_setup_entry
 
         register_manager = self._register_manager(
@@ -1076,9 +961,9 @@ class TestClimateAsyncSetupEntry:
         async_add_entities = MagicMock(side_effect=lambda ents, *a: added.extend(ents))
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        assert len(added) == 2
+        assert len(added) == 1
         keys = {e._attr_translation_key for e in added}
-        assert keys == {"heating_circuit", "dhw_heating"}
+        assert keys == {"heating_circuit"}
 
     @pytest.mark.asyncio
     async def test_creates_hc1_with_cooling_when_entries_present(self):

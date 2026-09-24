@@ -66,8 +66,8 @@
     'binary_sensor | bin_fb_27_lowpressuresensor | compressor | low_pressure_sensor',
     'binary_sensor | bin_fb_27_ovenfireplace | ventilation | oven_fireplace',
     'binary_sensor | bin_fb_27_signalanode | dhw | signal_anode',
-    'climate | ip-192.0.2.20_climate_dhw_heating | dhw | dhw_heating',
     'climate | ip-192.0.2.20_climate_heating_circuit | heating | heating_circuit',
+    'fan | ip-192.0.2.20_fan_ventilation | ventilation | ventilation',
     'number | set_01_p37fanstage1airflowinlet | ventilation | fan_stage1_airflow_inlet | config |  |  m3/h',
     'number | set_01_p38fanstage2airflowinlet | ventilation | fan_stage2_airflow_inlet | config |  |  m3/h',
     'number | set_01_p39fanstage3airflowinlet | ventilation | fan_stage3_airflow_inlet | config |  |  m3/h',
@@ -385,6 +385,7 @@
     "sensor | b'\\xfd'_2_version | heat_pump | firmware_version",
     "sensor | b'\\xfe'_15_hw | heat_pump | hw_version",
     "sensor | b'\\xfe'_16_sw | heat_pump | sw_version",
+    'water_heater | ip-192.0.2.20_water_heater_dhw | dhw | dhw',
   ])
 # ---
 # name: test_entities_per_firmware[214]
@@ -454,8 +455,8 @@
     'binary_sensor | bin_fb_27_ovenfireplace | ventilation | oven_fireplace',
     'binary_sensor | bin_fb_27_signalanode | dhw | signal_anode',
     'button | set_f8_reseterrors | heat_pump | reset_errors',
-    'climate | ip-192.0.2.20_climate_dhw_heating | dhw | dhw_heating',
     'climate | ip-192.0.2.20_climate_heating_circuit | heating | heating_circuit',
+    'fan | ip-192.0.2.20_fan_ventilation | ventilation | ventilation',
     'number | set_01_p37fanstage1airflowinlet | ventilation | fan_stage1_airflow_inlet | config |  |  m3/h',
     'number | set_01_p38fanstage2airflowinlet | ventilation | fan_stage2_airflow_inlet | config |  |  m3/h',
     'number | set_01_p39fanstage3airflowinlet | ventilation | fan_stage3_airflow_inlet | config |  |  m3/h',
@@ -765,6 +766,7 @@
     "sensor | b'\\xfd'_2_version | heat_pump | firmware_version",
     "sensor | b'\\xfe'_15_hw | heat_pump | hw_version",
     "sensor | b'\\xfe'_16_sw | heat_pump | sw_version",
+    'water_heater | ip-192.0.2.20_water_heater_dhw | dhw | dhw',
   ])
 # ---
 # name: test_entities_per_firmware[214j]
@@ -834,8 +836,8 @@
     'binary_sensor | bin_fb_27_ovenfireplace | ventilation | oven_fireplace',
     'binary_sensor | bin_fb_27_signalanode | dhw | signal_anode',
     'button | set_f8_reseterrors | heat_pump | reset_errors',
-    'climate | ip-192.0.2.20_climate_dhw_heating | dhw | dhw_heating',
     'climate | ip-192.0.2.20_climate_heating_circuit | heating | heating_circuit',
+    'fan | ip-192.0.2.20_fan_ventilation | ventilation | ventilation',
     'number | set_01_p37fanstage1airflowinlet | ventilation | fan_stage1_airflow_inlet | config |  |  m3/h',
     'number | set_01_p38fanstage2airflowinlet | ventilation | fan_stage2_airflow_inlet | config |  |  m3/h',
     'number | set_01_p39fanstage3airflowinlet | ventilation | fan_stage3_airflow_inlet | config |  |  m3/h',
@@ -1148,6 +1150,7 @@
     "sensor | b'\\xfd'_2_version | heat_pump | firmware_version",
     "sensor | b'\\xfe'_15_hw | heat_pump | hw_version",
     "sensor | b'\\xfe'_16_sw | heat_pump | sw_version",
+    'water_heater | ip-192.0.2.20_water_heater_dhw | dhw | dhw',
   ])
 # ---
 # name: test_entities_per_firmware[419]
@@ -1184,9 +1187,9 @@
     'binary_sensor | bin_fb_24_quickairvent | ventilation | quick_air_vent',
     'binary_sensor | bin_fb_24_signalanode | dhw | signal_anode',
     'binary_sensor | bin_fb_24_stb | heat_pump | stb',
-    'climate | ip-192.0.2.20_climate_dhw_heating | dhw | dhw_heating',
     'climate | ip-192.0.2.20_climate_heating_circuit | heating | heating_circuit',
     'climate | ip-192.0.2.20_climate_heating_circuit_2 | heating_hc2 | heating_circuit_2 |  |  |  | disabled',
+    'fan | ip-192.0.2.20_fan_ventilation | ventilation | ventilation',
     'number | set_0a0013_p04dhwsetdaytemp | dhw | dhw_temp_day |  | measurement | °C',
     'number | set_0a0027_p99hc1maxflowtemp | heating | hc1_max_flow_temp | config | measurement |  °C',
     'number | set_0a0109_p76roomthermcorrection | heating | room_therm_correction | config | measurement |  K',
@@ -1623,6 +1626,7 @@
     'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
+    'water_heater | ip-192.0.2.20_water_heater_dhw | dhw | dhw',
   ])
 # ---
 # name: test_entities_per_firmware[439]
@@ -1659,9 +1663,9 @@
     'binary_sensor | bin_fb_24_quickairvent | ventilation | quick_air_vent',
     'binary_sensor | bin_fb_24_signalanode | dhw | signal_anode',
     'binary_sensor | bin_fb_24_stb | heat_pump | stb',
-    'climate | ip-192.0.2.20_climate_dhw_heating | dhw | dhw_heating',
     'climate | ip-192.0.2.20_climate_heating_circuit | heating | heating_circuit',
     'climate | ip-192.0.2.20_climate_heating_circuit_2 | heating_hc2 | heating_circuit_2 |  |  |  | disabled',
+    'fan | ip-192.0.2.20_fan_ventilation | ventilation | ventilation',
     'number | set_0a0013_p04dhwsetdaytemp | dhw | dhw_temp_day |  | measurement | °C',
     'number | set_0a0027_p99hc1maxflowtemp | heating | hc1_max_flow_temp | config | measurement |  °C',
     'number | set_0a0109_p76roomthermcorrection | heating | room_therm_correction | config | measurement |  K',
@@ -2107,6 +2111,7 @@
     'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
+    'water_heater | ip-192.0.2.20_water_heater_dhw | dhw | dhw',
   ])
 # ---
 # name: test_entities_per_firmware[439technician]
@@ -2144,9 +2149,9 @@
     'binary_sensor | bin_fb_24_signalanode | dhw | signal_anode',
     'binary_sensor | bin_fb_24_stb | heat_pump | stb',
     'button | set_d1_zresetlast10errors | heat_pump | z_reset_last10errors',
-    'climate | ip-192.0.2.20_climate_dhw_heating | dhw | dhw_heating',
     'climate | ip-192.0.2.20_climate_heating_circuit | heating | heating_circuit',
     'climate | ip-192.0.2.20_climate_heating_circuit_2 | heating_hc2 | heating_circuit_2 |  |  |  | disabled',
+    'fan | ip-192.0.2.20_fan_ventilation | ventilation | ventilation',
     'number | set_0a0013_p04dhwsetdaytemp | dhw | dhw_temp_day |  | measurement | °C',
     'number | set_0a0027_p99hc1maxflowtemp | heating | hc1_max_flow_temp | config | measurement |  °C',
     'number | set_0a0052_zpumphc | heating | z_pump_hc',
@@ -2595,6 +2600,7 @@
     'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
+    'water_heater | ip-192.0.2.20_water_heater_dhw | dhw | dhw',
   ])
 # ---
 # name: test_entities_per_firmware[509]
@@ -2631,9 +2637,9 @@
     'binary_sensor | bin_fb_24_quickairvent | ventilation | quick_air_vent',
     'binary_sensor | bin_fb_24_signalanode | dhw | signal_anode',
     'binary_sensor | bin_fb_24_stb | heat_pump | stb',
-    'climate | ip-192.0.2.20_climate_dhw_heating | dhw | dhw_heating',
     'climate | ip-192.0.2.20_climate_heating_circuit | heating | heating_circuit',
     'climate | ip-192.0.2.20_climate_heating_circuit_2 | heating_hc2 | heating_circuit_2 |  |  |  | disabled',
+    'fan | ip-192.0.2.20_fan_ventilation | ventilation | ventilation',
     'number | set_0a0013_p04dhwsetdaytemp | dhw | dhw_temp_day |  | measurement | °C',
     'number | set_0a0027_p99hc1maxflowtemp | heating | hc1_max_flow_temp | config | measurement |  °C',
     'number | set_0a0109_p76roomthermcorrection | heating | room_therm_correction | config | measurement |  K',
@@ -3094,6 +3100,7 @@
     'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
+    'water_heater | ip-192.0.2.20_water_heater_dhw | dhw | dhw',
   ])
 # ---
 # name: test_entities_per_firmware[539]
@@ -3130,9 +3137,9 @@
     'binary_sensor | bin_fb_24_quickairvent | ventilation | quick_air_vent',
     'binary_sensor | bin_fb_24_signalanode | dhw | signal_anode',
     'binary_sensor | bin_fb_24_stb | heat_pump | stb',
-    'climate | ip-192.0.2.20_climate_dhw_heating | dhw | dhw_heating',
     'climate | ip-192.0.2.20_climate_heating_circuit | heating | heating_circuit',
     'climate | ip-192.0.2.20_climate_heating_circuit_2 | heating_hc2 | heating_circuit_2 |  |  |  | disabled',
+    'fan | ip-192.0.2.20_fan_ventilation | ventilation | ventilation',
     'number | set_0a0013_p04dhwsetdaytemp | dhw | dhw_temp_day |  | measurement | °C',
     'number | set_0a0027_p99hc1maxflowtemp | heating | hc1_max_flow_temp | config | measurement |  °C',
     'number | set_0a0109_p76roomthermcorrection | heating | room_therm_correction | config | measurement |  K',
@@ -3607,6 +3614,7 @@
     'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
+    'water_heater | ip-192.0.2.20_water_heater_dhw | dhw | dhw',
   ])
 # ---
 # name: test_entities_per_firmware[539_no_cooling]
@@ -3643,9 +3651,9 @@
     'binary_sensor | bin_fb_24_quickairvent | ventilation | quick_air_vent',
     'binary_sensor | bin_fb_24_signalanode | dhw | signal_anode',
     'binary_sensor | bin_fb_24_stb | heat_pump | stb',
-    'climate | ip-192.0.2.20_climate_dhw_heating | dhw | dhw_heating',
     'climate | ip-192.0.2.20_climate_heating_circuit | heating | heating_circuit',
     'climate | ip-192.0.2.20_climate_heating_circuit_2 | heating_hc2 | heating_circuit_2 |  |  |  | disabled',
+    'fan | ip-192.0.2.20_fan_ventilation | ventilation | ventilation',
     'number | set_0a0013_p04dhwsetdaytemp | dhw | dhw_temp_day |  | measurement | °C',
     'number | set_0a0027_p99hc1maxflowtemp | heating | hc1_max_flow_temp | config | measurement |  °C',
     'number | set_0a0109_p76roomthermcorrection | heating | room_therm_correction | config | measurement |  K',
@@ -4107,6 +4115,7 @@
     'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
+    'water_heater | ip-192.0.2.20_water_heater_dhw | dhw | dhw',
   ])
 # ---
 # name: test_entities_per_firmware[539technician]
@@ -4144,9 +4153,9 @@
     'binary_sensor | bin_fb_24_signalanode | dhw | signal_anode',
     'binary_sensor | bin_fb_24_stb | heat_pump | stb',
     'button | set_d1_zresetlast10errors | heat_pump | z_reset_last10errors',
-    'climate | ip-192.0.2.20_climate_dhw_heating | dhw | dhw_heating',
     'climate | ip-192.0.2.20_climate_heating_circuit | heating | heating_circuit',
     'climate | ip-192.0.2.20_climate_heating_circuit_2 | heating_hc2 | heating_circuit_2 |  |  |  | disabled',
+    'fan | ip-192.0.2.20_fan_ventilation | ventilation | ventilation',
     'number | set_0a0013_p04dhwsetdaytemp | dhw | dhw_temp_day |  | measurement | °C',
     'number | set_0a0027_p99hc1maxflowtemp | heating | hc1_max_flow_temp | config | measurement |  °C',
     'number | set_0a0052_zpumphc | heating | z_pump_hc',
@@ -4624,5 +4633,6 @@
     'time | set_0a05d1_party-time_end | heat_pump | party_time_end',
     'time | set_0a05d3_pholidaybegintime | heat_pump | holiday_begin_time',
     'time | set_0a05d4_pholidayendtime | heat_pump | holiday_end_time',
+    'water_heater | ip-192.0.2.20_water_heater_dhw | dhw | dhw',
   ])
 # ---

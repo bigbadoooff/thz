@@ -127,8 +127,37 @@ core_mock.callback = lambda func: func
 sys.modules["homeassistant.core"] = core_mock
 
 
+def _exception_message(key, placeholders):
+    """English text of a translated exception, as Home Assistant renders it."""
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).parent.parent / "custom_components/thz/translations/en.json"
+    message = json.loads(path.read_text())["exceptions"][key]["message"]
+    return message.format(**(placeholders or {}))
+
+
 class HomeAssistantError(Exception):
-    """Real exception stand-in so `pytest.raises(HomeAssistantError)` works."""
+    """Real exception stand-in so `pytest.raises(HomeAssistantError)` works.
+
+    Like Home Assistant's, it renders a translated exception's message from
+    the English translation.
+    """
+
+    def __init__(
+        self,
+        *args,
+        translation_domain=None,
+        translation_key=None,
+        translation_placeholders=None,
+    ):
+        """Store the translation and render its English message."""
+        self.translation_domain = translation_domain
+        self.translation_key = translation_key
+        self.translation_placeholders = translation_placeholders
+        if not args and translation_key is not None:
+            args = (_exception_message(translation_key, translation_placeholders),)
+        super().__init__(*args)
 
 
 class ConfigEntryNotReady(HomeAssistantError):
@@ -316,7 +345,76 @@ button_mock = MagicMock()
 button_mock.ButtonEntity = MockButtonEntity
 sys.modules["homeassistant.components.button"] = button_mock
 
+
+# Mock water_heater component
+from enum import IntFlag  # noqa: E402
+
+
+class MockWaterHeaterEntityFeature(IntFlag):
+    """Minimal WaterHeaterEntityFeature stand-in."""
+
+    TARGET_TEMPERATURE = 1
+    OPERATION_MODE = 2
+
+
+class MockWaterHeaterEntity(MockEntity):
+    """Mock WaterHeaterEntity base class."""
+
+
+water_heater_mock = MagicMock()
+water_heater_mock.WaterHeaterEntity = MockWaterHeaterEntity
+water_heater_mock.WaterHeaterEntityFeature = MockWaterHeaterEntityFeature
+water_heater_mock.STATE_ECO = "eco"
+water_heater_mock.STATE_PERFORMANCE = "performance"
+sys.modules["homeassistant.components.water_heater"] = water_heater_mock
+
+
+# Mock fan component
+class MockFanEntityFeature(IntFlag):
+    """Minimal FanEntityFeature stand-in."""
+
+    SET_SPEED = 1
+    OSCILLATE = 2
+    DIRECTION = 4
+    PRESET_MODE = 8
+    TURN_OFF = 16
+    TURN_ON = 32
+
+
+class MockFanEntity(MockEntity):
+    """Mock FanEntity base class."""
+
+    async def async_added_to_hass(self) -> None:
+        """No-op stand-in for Entity.async_added_to_hass."""
+
+
+fan_mock = MagicMock()
+fan_mock.FanEntity = MockFanEntity
+fan_mock.FanEntityFeature = MockFanEntityFeature
+sys.modules["homeassistant.components.fan"] = fan_mock
+
+
+# homeassistant.util.percentage, same arithmetic as Home Assistant's.
+def _ranged_value_to_percentage(low_high_range, value):
+    offset = low_high_range[0] - 1
+    states = low_high_range[1] - low_high_range[0] + 1
+    return int(((value - offset) * 100) // states)
+
+
+def _percentage_to_ranged_value(low_high_range, percentage):
+    offset = low_high_range[0] - 1
+    states = low_high_range[1] - low_high_range[0] + 1
+    return states * percentage / 100 + offset
+
+
+percentage_mock = MagicMock()
+percentage_mock.ranged_value_to_percentage = _ranged_value_to_percentage
+percentage_mock.percentage_to_ranged_value = _percentage_to_ranged_value
+util_mock.percentage = percentage_mock
+sys.modules["homeassistant.util.percentage"] = percentage_mock
+
 sys.modules["homeassistant.const"] = MagicMock()
+sys.modules["homeassistant.const"].STATE_OFF = "off"
 # The CONF_* keys are plain strings in Home Assistant; string operations on
 # them (startswith, formatting) must behave the same here.
 sys.modules["homeassistant.const"].CONF_HOST = "host"

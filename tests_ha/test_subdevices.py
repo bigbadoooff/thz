@@ -42,8 +42,10 @@ async def test_split_creates_linked_subdevices(hass, fake_device):
     assert dhw.area_id == main.area_id is not None
 
     registry = er.async_get(hass)
-    climate = registry.async_get(entity_id(hass, entry, "climate", "dhw_heating"))
-    assert climate.device_id == dhw.id
+    water_heater = registry.async_get(
+        entity_id(hass, entry, "water_heater", "water_heater_dhw")
+    )
+    assert water_heater.device_id == dhw.id
     outside = registry.async_get(entity_id(hass, entry, "sensor", "_outsidetemp"))
     assert outside.device_id == main.id
     assert await hass.config_entries.async_unload(entry.entry_id)
@@ -52,8 +54,8 @@ async def test_split_creates_linked_subdevices(hass, fake_device):
 async def test_switching_off_moves_entities_back_and_keeps_settings(hass, fake_device):
     entry = await setup_entry(hass, **{CONF_SPLIT_DEVICES: True})
     registry = er.async_get(hass)
-    climate_id = entity_id(hass, entry, "climate", "dhw_heating")
-    registry.async_update_entity(climate_id, name="My hot water")
+    heater_id = entity_id(hass, entry, "water_heater", "water_heater_dhw")
+    registry.async_update_entity(heater_id, name="My hot water")
 
     hass.config_entries.async_update_entry(
         entry, data={**entry.data, CONF_SPLIT_DEVICES: False}
@@ -63,7 +65,7 @@ async def test_switching_off_moves_entities_back_and_keeps_settings(hass, fake_d
 
     found = _devices(hass, entry)
     assert list(found) == [MAIN]
-    climate = registry.async_get(climate_id)
-    assert climate.device_id == found[MAIN].id
-    assert climate.name == "My hot water"
+    heater = registry.async_get(heater_id)
+    assert heater.device_id == found[MAIN].id
+    assert heater.name == "My hot water"
     assert await hass.config_entries.async_unload(entry.entry_id)

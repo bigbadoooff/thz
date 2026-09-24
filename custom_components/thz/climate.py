@@ -36,14 +36,8 @@ entities are created when the required data blocks are available:
   temperature writes to whichever register is currently active, using the
   same logic as HC1.
 
-- **Domestic Hot Water (DHW)**: reads current / target water temperature from
-  the ``pxxF3`` coordinator and supports ``HEAT`` mode only.  Like HC1, DHW
-  has independently-scheduled day (``p04DHWsetDayTemp``) and night
-  (``p05DHWsetNightTemp``) setpoints, plus a distinct manual-mode setpoint
-  (``p11DHWsetManualTemp``) that -- unlike HC1's manual register -- *is*
-  present on 439/539-series maps. Setting a new temperature writes to
-  whichever of the three registers is currently active, using the same
-  logic as HC1.
+Hot water is a ``water_heater`` entity (water_heater.py) and ventilation
+a ``fan`` entity (fan.py).
 
 All HC entities expose:
 
@@ -53,8 +47,6 @@ All HC entities expose:
   ``manual``/``setback``/``standby`` -- see ``SELECT_MAP["2opmode"]`` in
   value_maps.py, matching FHEM's ``%OpMode`` in docs/legacy/00_THZ.pm)
   instead of HA's generic comfort/sleep/away vocabulary.
-- HC1 additionally exposes ``fan_mode`` (off / low / medium / high) when
-  ``p07FanStageDay`` is writable.
 
 ``hvac_mode`` only ever offers ``HEAT`` (plus ``COOL`` when the device
 supports active cooling) -- there is no working ``OFF`` for an individual
@@ -82,6 +74,7 @@ from homeassistant.components.climate import (
 )
 from homeassistant.const import PRECISION_TENTHS, UnitOfTemperature
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
@@ -90,6 +83,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from .const import (
     CONF_ENABLE_HC2,
+    DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
 )
 from .devices import assign_subdevices, thz_device_info
@@ -146,11 +140,6 @@ _OP_MODE_TO_HVAC: dict[str, HVACMode] = cast(
 _DEFAULT_MIN_TEMP = 10.0
 _DEFAULT_MAX_TEMP = 60.0
 
-# Fan stage ↔ HA fan mode names  (stage 0 = off/bypass, 1-3 = low/medium/high)
-_FAN_MODES: list[str] = ["off", "low", "medium", "high"]
-_FAN_MODE_TO_STAGE: dict[str, int] = {m: i for i, m in enumerate(_FAN_MODES)}
-_FAN_STAGE_TO_MODE: dict[int, str] = {i: m for i, m in enumerate(_FAN_MODES)}
-
 
 def _field_layout(
     register_manager, block: str, field_name: str
@@ -206,7 +195,7 @@ class _Circuit:
     """A climate entity described by register-map names.
 
     Field names refer to the circuit's block in the read map; the setpoint,
-    cooling and fan names to the write map, where the first existing name
+    cooling names to the write map, where the first existing name
     of each tuple wins (the maps name some registers differently per
     firmware).
     """
@@ -222,10 +211,8 @@ class _Circuit:
     heat_setpoint_names: tuple[str, ...]
     heat_setpoint_required: bool = False
     night_setpoint_names: tuple[str, ...] = ()
-    manual_setpoint_names: tuple[str, ...] = ()
     cool_switch_name: str | None = None
     cool_setpoint_name: str | None = None
-    fan_stage_name: str | None = None
     # Heating circuits show the pxx0A0176 status bits (hvac_action, cooling
     # active) and the global operating mode as presets.
     heating_circuit: bool = False
@@ -244,7 +231,6 @@ _CIRCUITS = (
         night_setpoint_names=("p02RoomTempNightHC1", "p02RoomTempNight"),
         cool_switch_name="p99CoolingHC1Switch",
         cool_setpoint_name="p99CoolingHC1SetTemp",
-        fan_stage_name="p07FanStageDay",
         heating_circuit=True,
     ),
     _Circuit(
@@ -260,16 +246,6 @@ _CIRCUITS = (
         cool_setpoint_name="p99CoolingHC2SetTemp",
         heating_circuit=True,
         enabled_option=CONF_ENABLE_HC2,
-    ),
-    _Circuit(
-        translation_key="dhw_heating",
-        block="pxxF3",
-        current_field="dhwTemp",
-        target_field="dhwSetTemp",
-        op_mode_field="dhwOpMode",
-        heat_setpoint_names=("p04DHWsetDayTemp", "p04DHWsetTempDay"),
-        night_setpoint_names=("p05DHWsetNightTemp", "p05DHWsetTempNight"),
-        manual_setpoint_names=("p11DHWsetManualTemp", "p11DHWsetTempManual"),
     ),
 )
 
@@ -296,11 +272,9 @@ class ClimateConfig:
     op_mode: tuple[int, int] | None = None
     heat_setpoint: WriteParam | None = None
     night_setpoint: WriteParam | None = None
-    manual_setpoint: WriteParam | None = None
     cool_switch: WriteParam | None = None
     cool_setpoint: WriteParam | None = None
     opmode: WriteParam | None = None
-    fan_stage: WriteParam | None = None
     status: StatusBits | None = None
 
 
@@ -363,7 +337,6 @@ def _resolve(
         op_mode=op_mode,
         heat_setpoint=heat,
         night_setpoint=_find_entry(write_registers, circuit.night_setpoint_names),
-        manual_setpoint=_find_entry(write_registers, circuit.manual_setpoint_names),
         cool_switch=cool_switch,
         cool_setpoint=cool_setpoint,
         opmode=(
@@ -371,7 +344,6 @@ def _resolve(
             if circuit.heating_circuit
             else None
         ),
-        fan_stage=_command_entry(write_registers, circuit.fan_stage_name),
         status=status if circuit.heating_circuit else None,
     )
 
@@ -383,9 +355,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up THZ climate entities from a config entry.
 
-    Creates the HC1 (``pxxF4``), HC2 (``pxxF5``) and DHW (``pxxF3``)
-    climate entities for the blocks that are polled and whose fields the
-    firmware's register map defines.
+    Creates the HC1 (``pxxF4``) and HC2 (``pxxF5``) climate entities for
+    the blocks that are polled and whose fields the firmware's register map
+    defines.
 
     Args:
         hass: The Home Assistant instance.
@@ -436,6 +408,25 @@ async def async_setup_entry(
         assign_subdevices(entities, config_entry.data)
         async_add_entities(entities, True)
         _LOGGER.debug("Created %d climate entities", len(entities))
+    _async_remove_dhw_climate(hass, config_entry)
+
+
+@callback
+def _async_remove_dhw_climate(
+    hass: HomeAssistant, config_entry: THZConfigEntry
+) -> None:
+    """Remove the hot water climate entity; hot water is a water_heater now."""
+    registry = er.async_get(hass)
+    unique_id = f"thz_{config_entry.runtime_data.device_id}_climate_dhw_heating"
+    entity_id = registry.async_get_entity_id("climate", DOMAIN, unique_id)
+    if entity_id is None:
+        return
+    registry_entry = registry.async_get(entity_id)
+    if registry_entry is not None and registry_entry.config_entry_id == (
+        config_entry.entry_id
+    ):
+        registry.async_remove(entity_id)
+        _LOGGER.info("Removed %s: hot water is a water heater entity now", entity_id)
 
 
 def _read_temp(data: bytes, offset: int, length: int) -> float | None:
@@ -519,7 +510,7 @@ def _bit_active(data: bytes, byte_idx: int, bit_idx: int) -> bool:
 
 
 class THZClimate(CoordinatorEntity, ClimateEntity):
-    """Unified climate entity for THZ heating circuits and DHW.
+    """Climate entity for a THZ heating circuit.
 
     Supports heating (always) and optional cooling (when the write-register
     map contains the cooling switch and setpoint entries).  The HVAC mode is
@@ -537,9 +528,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             first update when cooling is supported).
         _opmode_entry: Write-register entry for the global operating-mode
             register (``pOpMode``), or ``None`` when not available.
-        _fan_stage_entry: Write-register entry for the day fan-stage register
-            (``p07FanStageDay``), or ``None`` when not available.
-        _fan_stage_cache: Last known fan stage (0-3), populated on startup.
     """
 
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
@@ -561,12 +549,11 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         """Initialise a THZ climate entity.
 
         Args:
-            coordinator: The circuit's block coordinator (pxxF4, pxxF5 or
-                pxxF3).
+            coordinator: The circuit's block coordinator (pxxF4 or pxxF5).
             config: The circuit's fields and registers, resolved for the
                 firmware (see ``_resolve``). Optional parts switch features
                 on: cooling needs both cooling registers, presets the
-                pOpMode register, fan modes the fan-stage register.
+                pOpMode register.
             device: THZDevice instance used for write operations.
             device_id: Stable device identifier for the HA device registry.
             translation_key: HA translation key (e.g. ``"heating_circuit"``).
@@ -605,7 +592,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
         self._heat_setpoint_entry = config.heat_setpoint
         self._night_setpoint_entry = config.night_setpoint
-        self._manual_setpoint_entry = config.manual_setpoint
         self._cool_switch_entry = config.cool_switch
         self._cool_setpoint_entry = config.cool_setpoint
         self._cooling_byte = status.byte
@@ -615,10 +601,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         # Cached cooling setpoint (populated on first device read)
         self._cooling_target_temp: float | None = None
 
-        # Optional write entries for preset mode and fan mode
+        # Optional write entry for the preset mode
         self._opmode_entry = config.opmode
-        self._fan_stage_entry = config.fan_stage
-        self._fan_stage_cache: int | None = None
         self._op_mode_cache: str | None = None
 
         self._attr_translation_key = translation_key
@@ -677,10 +661,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 SELECT_MAP[_OPMODE_DECODE_TYPE].values(), key=str.lower
             )
 
-        if self._fan_stage_entry is not None:
-            self._attr_supported_features |= ClimateEntityFeature.FAN_MODE
-            self._attr_fan_modes = list(_FAN_MODES)
-
         # Temperature bounds from heat setpoint entry
         if self._heat_setpoint_entry is not None:
             self._attr_min_temp = float(
@@ -710,10 +690,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         # Populate the cooling setpoint cache on startup
         if self._supports_cooling:
             await self._async_read_cooling_setpoint()
-
-        # Populate the fan stage cache on startup
-        if self._fan_stage_entry is not None:
-            await self._async_read_fan_stage()
 
         # Populate the global operating-mode (pOpMode) cache on startup
         if self._opmode_entry is not None:
@@ -863,7 +839,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         (cached via ``_async_read_op_mode``), using the device's own mode
         name -- e.g. ``"DAYmode"``, ``"setback"``, ``"standby"``,
         ``"automatic"``, ``"DHWmode"``, ``"manual"``, or ``"emergency"``. Note
-        this is a device-wide setting shared by HC1, HC2, and DHW alike (not
+        this is a device-wide setting shared by HC1, HC2 and hot water alike (not
         derived from this entity's own per-circuit ``hcOpMode``/``dhwOpMode``
         block, which only distinguishes normal/setback/standby/restart and
         can't represent all seven pOpMode states).
@@ -875,22 +851,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         if self._opmode_entry is None:
             return None
         return self._op_mode_cache
-
-    @property
-    def fan_mode(self) -> str | None:
-        """Return the current fan mode.
-
-        Returns the fan mode string corresponding to the last known day fan
-        stage (0 = off, 1 = low, 2 = medium, 3 = high).
-
-        Returns:
-            Fan mode string, or ``None`` if unsupported or unknown.
-        """
-        if self._fan_stage_entry is None:
-            return None
-        if self._fan_stage_cache is None:
-            return None
-        return _FAN_STAGE_TO_MODE.get(self._fan_stage_cache)
 
     # ── ClimateEntity service calls ─────────────────────────────────────────
 
@@ -978,43 +938,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 "Error setting preset mode for %s: %s", self.name, err, exc_info=True
             )
 
-    async def async_set_fan_mode(self, fan_mode: str) -> None:
-        """Set the day ventilation fan stage.
-
-        Writes the ``p07FanStageDay`` register with the stage number that
-        corresponds to the requested fan mode:
-
-        - ``off``    → stage 0 (bypass / minimum)
-        - ``low``    → stage 1
-        - ``medium`` → stage 2
-        - ``high``   → stage 3
-
-        Args:
-            fan_mode: One of ``off``, ``low``, ``medium``, or ``high``.
-        """
-        if self._fan_stage_entry is None:
-            return
-        stage = _FAN_MODE_TO_STAGE.get(fan_mode)
-        if stage is None:
-            _LOGGER.warning("Unknown fan mode '%s' for %s", fan_mode, self.name)
-            return
-        entry = self._fan_stage_entry
-        step = _get_step(entry)
-        decode_type = entry.decode_type
-        try:
-            value_bytes = THZValueCodec.encode_number(
-                float(stage), step, decode_type, parameter_length(entry)
-            )
-            await async_write_parameter(self.hass, self._device, entry, value_bytes)
-            await self._async_read_fan_stage()
-            self.async_write_ha_state()
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error(
-                "Error setting fan mode for %s: %s", self.name, err, exc_info=True
-            )
-
-    # ── Private write helpers ───────────────────────────────────────────────
-
     async def _async_read_setpoint(self, entry: WriteParam) -> float | None:
         """Read a heat-setpoint register's current value directly from the device."""
         step = _get_step(entry)
@@ -1034,18 +957,14 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
     async def _async_write_heat_setpoint(self, temperature: float) -> None:
         """Write the heating setpoint that is currently driving roomSetTemp.
 
-        HC1/HC2/DHW each have multiple independently-writable setpoint
-        registers -- day and night always, plus a distinct manual-mode
-        register on firmware maps that have one (e.g. DHW's
-        p11DHWsetManualTemp -- HC1/HC2 have no such register wired up here,
-        since their MANUAL MODE sets a flow temperature, a different
-        physical quantity from the room-temperature day/night setpoints,
-        not a valid matching candidate at all). The
+        HC1 and HC2 each have independently-writable day and night setpoint
+        registers (their MANUAL MODE sets a flow temperature, a different
+        physical quantity, so it is no candidate here). The
         device itself decides which register is currently in effect; always
         writing the day register silently no-ops from the user's point of
         view whenever a different one is actually active. Instead, read
         every candidate register fresh and write to whichever single one
-        currently matches the live roomSetTemp/dhwTemp target reading,
+        currently matches the live roomSetTemp target reading,
         falling back to day if none match unambiguously (e.g. right at a
         day/night transition, or if the active mode uses a register this
         integration doesn't know about).
@@ -1060,8 +979,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             candidates.append(("day", day_entry))
         if self._night_setpoint_entry is not None:
             candidates.append(("night", self._night_setpoint_entry))
-        if self._manual_setpoint_entry is not None:
-            candidates.append(("manual", self._manual_setpoint_entry))
 
         target_label, target_entry = "day", day_entry
 
@@ -1194,26 +1111,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             _LOGGER.warning(
                 "Could not read cooling setpoint for %s: %s", self.name, err
             )
-
-    async def _async_read_fan_stage(self) -> None:
-        """Read and cache the current day fan stage from the device."""
-        if self._fan_stage_entry is None:
-            return
-        entry = self._fan_stage_entry
-        step = _get_step(entry)
-        decode_type = entry.decode_type
-        try:
-            value_bytes = await async_read_parameter(self.hass, self._device, entry)
-            if value_bytes:
-                raw = THZValueCodec.decode_number(
-                    value_bytes, step, decode_type, entry.signed
-                )
-                self._fan_stage_cache = int(raw)
-                _LOGGER.debug(
-                    "Cached fan stage for %s: %d", self.name, self._fan_stage_cache
-                )
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.warning("Could not read fan stage for %s: %s", self.name, err)
 
     async def _async_read_op_mode(self) -> None:
         """Read and cache the current global operating mode (pOpMode)."""

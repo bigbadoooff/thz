@@ -19,6 +19,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZBaseEntity
+from .const import DOMAIN
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
 from .parameter_io import async_write_parameter
@@ -105,5 +106,7 @@ class THZButton(THZBaseEntity, ButtonEntity):
         except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error("Error pressing button %s: %s", self.name, err, exc_info=True)
             raise HomeAssistantError(
-                f"Unable to execute THZ button '{self.name}'"
+                translation_domain=DOMAIN,
+                translation_key="button_press_failed",
+                translation_placeholders={"name": str(self.name)},
             ) from err

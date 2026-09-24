@@ -26,6 +26,7 @@ from ..clock_sync import (
     async_read_device_clock,
     async_write_device_clock,
 )
+from ..const import DOMAIN
 from ..exceptions import DEVICE_ERRORS, THZNotSupportedError
 from ..notify import async_notify
 from ..parameter_io import (
@@ -254,7 +255,11 @@ async def async_handle_backup_parameters(
         )
     except OSError as err:
         _LOGGER.exception("backup_parameters: failed to write backup file")
-        raise HomeAssistantError(f"Failed to write backup file: {err}") from err
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="backup_write_failed",
+            translation_placeholders={"error": str(err)},
+        ) from err
 
     _LOGGER.info(
         "THZ backup_parameters: saved %d parameters to %s (%d read errors)",
@@ -371,6 +376,30 @@ def _restore_notification(
     )
 
 
+async def _async_backup_path(
+    hass: HomeAssistant, requested_filename: str | None
+) -> str:
+    """Return the backup file to restore, or raise if there is none."""
+    path = await hass.async_add_executor_job(
+        _resolve_backup_path, hass, requested_filename
+    )
+    if not path:
+        if requested_filename:
+            _LOGGER.error("restore_parameters: %s not found", requested_filename)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="backup_not_found",
+                translation_placeholders={"filename": requested_filename},
+            )
+        _LOGGER.error("restore_parameters: no backup files in %s/", BACKUP_SUBDIR)
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="no_backups",
+            translation_placeholders={"directory": BACKUP_SUBDIR},
+        )
+    return path
+
+
 async def async_handle_restore_parameters(
     hass: HomeAssistant, call: ServiceCall
 ) -> ServiceResponse:
@@ -393,24 +422,17 @@ async def async_handle_restore_parameters(
     write_manager = entry_data.write_manager
     device: THZDevice = entry_data.device
 
-    path = await hass.async_add_executor_job(
-        _resolve_backup_path, hass, requested_filename
-    )
-    if not path:
-        error_msg = (
-            f"Backup file '{requested_filename}' not found"
-            if requested_filename
-            else f"No backup files found in {BACKUP_SUBDIR}/"
-        )
-        _LOGGER.error("restore_parameters: %s", error_msg)
-        raise HomeAssistantError(error_msg)
+    path = await _async_backup_path(hass, requested_filename)
 
     try:
         backup_doc = await hass.async_add_executor_job(_read_backup, path)
     except (OSError, ValueError) as err:
-        error_msg = f"Failed to read backup file '{path}': {err}"
-        _LOGGER.exception(error_msg)
-        raise HomeAssistantError(error_msg) from err
+        _LOGGER.exception("restore_parameters: failed to read %s", path)
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="backup_read_failed",
+            translation_placeholders={"path": str(path), "error": str(err)},
+        ) from err
 
     saved_parameters: dict[str, dict[str, Any]] = backup_doc.get("parameters", {})
     restored = 0

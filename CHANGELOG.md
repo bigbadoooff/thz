@@ -6,6 +6,24 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **Hot water is a `water_heater` entity** instead of a climate entity.
+  The old `climate` hot water entity is removed from the entity registry on
+  update; automations and dashboards that used it need the new
+  `water_heater` entity. Its state is `performance` (day setpoint),
+  `eco` (setback, night setpoint) or `off` (standby); setting a temperature
+  writes the setpoint of the current state (`p04` or `p05`), or the
+  manual setpoint (`p11`) when that is the one in effect.
+- **Ventilation is a `fan` entity** and the heating
+  circuit climate entity no longer has a fan mode, which wrote the day
+  stage of the program (`p07FanStageDay`). The fan starts *unscheduled
+  ventilation* (`p99startUnschedVent`): a speed starts it at stage 1-3,
+  off at stage 0, for the time set in `p43`-`p46`. It shows the stage the
+  ventilation runs at, from the supply airflow (`pxxE8`) or else from the
+  fan time program. On 2.x firmware the fan only shows the stage (set at
+  the device, or of the fan program state).
+
 ### Changed
 
 - **Much quieter log.** A normal start logs one line instead of about 40.
@@ -17,6 +35,10 @@ All notable changes to the THZ integration are documented here.
 - **The old `log_level` setting is removed.** Entries from old versions
   fixed the integration's log level with it, overriding Home Assistant's
   `logger:` configuration; they are migrated to version 1.3 without it.
+
+- **Error messages are translated.** Errors from the services, the button
+  and the setup ("will retry") come from the integration's translations
+  (English and German) instead of fixed English text.
 
 - **Settings are polled by one poller per heat pump** (#185): number,
   select, switch and time entities no longer run a timer each. The poller
