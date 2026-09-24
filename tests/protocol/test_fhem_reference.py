@@ -10,8 +10,9 @@ the tables in the FHEM module. The Perl harness (tests/protocol/fhem_reference/
 thz_set.pl) therefore hands FHEM *our* parameter definitions -- block,
 position, length, type, factor and limits -- and only FHEM's protocol code
 turns them into telegrams. Our code and FHEM then write the same values into
-the same simulated registers and must produce byte-identical SET telegrams;
-for 2.x blocks the values we decode must also equal FHEM's decoding.
+the same simulated registers and must produce byte-identical SET telegrams,
+and the values our entities show for a block or register must equal
+FHEM's decoding (THZ_Parse1) of the same bytes.
 """
 
 from datetime import time as dt_time
@@ -41,7 +42,7 @@ from custom_components.thz.switch import THZSwitch
 from custom_components.thz.thz_device import THZDevice
 from custom_components.thz.time import _create_time_entities
 from custom_components.thz.value_codec import THZValueCodec
-from custom_components.thz.value_maps import SELECT_MAP
+from custom_components.thz.value_maps import SELECT_MAP, state_slug
 from tests.helpers import Simulated2xxDevice
 
 _REPO = Path(__file__).resolve().parents[2]
@@ -411,4 +412,115 @@ def test_set_answers_are_judged_like_fhem():
             ours = str(err)
         if (fhem_error is None) != (ours is None):
             mismatches.append(f"{answer.hex()}: fhem={fhem_error!r} ours={ours!r}")
+    assert not mismatches, "\n".join(mismatches)
+
+
+# ---------------------------------------------------------------------------
+# 4.x / 5.x reads: the value an entity shows for a register's bytes must be
+# the value FHEM's THZ_Parse1 decodes from the same bytes.
+# ---------------------------------------------------------------------------
+
+
+def _fhem_value_type(entry) -> str:
+    decode = entry.decode_type
+    return decode if decode in _FHEM_VALUE_TYPES else "1clean"
+
+
+def _direct_read_samples(name: str, entry) -> list[str]:
+    """Register data (hex) to decode for one parameter."""
+    kind, decode = entry.type, entry.decode_type
+    if kind == "number":
+        values = _number_values(entry)
+        step = float(entry.step)
+        samples = {
+            THZValueCodec.encode_number(value, step, decode, 2).hex()
+            for value in values
+        }
+        return sorted(samples | {"0000"})
+    if kind == "switch":
+        return ["0000", "0001", "0100"]
+    if kind == "select":
+        offered = THZSelect(name, entry, MagicMock(), "dev")._attr_options
+        return [
+            THZValueCodec.encode_select(option, decode).hex()
+            for option in SELECT_MAP[decode].values()
+            if state_slug(option) in offered
+        ]
+    if kind == "time" and decode == "8party":
+        return ["5a1c", "601c", "8080"]
+    if kind == "time":
+        return ["001e", "0080"]
+    return ["1858", "0060", "8080"]  # schedule: start, end
+
+
+def _time_text(value) -> str:
+    return "n.a." if value is None else value.strftime("%H:%M")
+
+
+async def _our_direct_reading(name: str, entry, data: str) -> str:
+    """What our entity shows for the register data, in FHEM's notation."""
+    device = SimulatedDirectDevice()
+    device.registers[bytes.fromhex(entry.command)] = bytes.fromhex(data)
+
+    async def _updated(entity):
+        entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        await entity.async_update()
+        return entity
+
+    kind = entry.type
+    if kind == "number":
+        return (
+            f"{(await _updated(THZNumber(name, entry, device, 'dev'))).native_value:g}"
+        )
+    if kind == "switch":
+        return str(int((await _updated(THZSwitch(name, entry, device, "dev"))).is_on))
+    if kind == "select":
+        return (await _updated(THZSelect(name, entry, device, "dev"))).current_option
+    created = _create_time_entities(name, entry, device, "dev", 60)
+    if not isinstance(created, list):
+        return _time_text((await _updated(created)).native_value)
+    start, end = [await _updated(entity) for entity in created]
+    return f"{_time_text(start.native_value)}--{_time_text(end.native_value)}"
+
+
+def _fhem_reading(entry, parsed: str) -> str:
+    """FHEM's parsed value in the notation _our_direct_reading uses."""
+    kind = entry.type
+    if kind == "number":
+        return f"{float(parsed):g}"
+    if kind == "switch":
+        return str(int(bool(int(parsed))))
+    if kind == "select":
+        table = SELECT_MAP[entry.decode_type]
+        option = parsed if entry.decode_type == "2opmode" else table[str(int(parsed))]
+        return state_slug(option)
+    # A schedule's end "24:00" is shown as 00:00 (see quarters_to_time).
+    return parsed.replace("24:00", "00:00")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("firmware", sorted(_DIRECT_FIRMWARES))
+async def test_direct_reads_match_fhem(firmware):
+    entries = _direct_entries(firmware)
+    cases = [
+        (name, data)
+        for name, entry in entries.items()
+        for data in _direct_read_samples(name, entry)
+    ]
+    parsed = _fhem(
+        _DIRECT_FIRMWARES[firmware],
+        parse_direct={
+            f"{entries[name].command} {data}": _fhem_value_type(entries[name])
+            for name, data in cases
+        },
+    )["parsed_direct"]
+
+    mismatches = []
+    for name, data in cases:
+        entry = entries[name]
+        fhem = _fhem_reading(entry, parsed[f"{entry.command} {data}"])
+        ours = await _our_direct_reading(name, entry, data)
+        if fhem != ours:
+            mismatches.append(f"{name} {data}: fhem={fhem} ours={ours}")
     assert not mismatches, "\n".join(mismatches)
