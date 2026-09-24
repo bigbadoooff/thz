@@ -13,7 +13,8 @@ All notable changes to the THZ integration are documented here.
   update; automations and dashboards that used it need the new
   `water_heater` entity. Its state is `performance` (day setpoint),
   `eco` (setback, night setpoint) or `off` (standby); setting a temperature
-  writes the setpoint of the current state (`p04` or `p05`).
+  writes the setpoint of the current state (`p04` or `p05`), or the
+  manual setpoint (`p11`) when that is the one in effect.
 - **Ventilation is a `fan` entity** and the heating circuit climate entity
   no longer has a fan mode. The fan's speed is the ventilation stage
   (`p07FanStageDay`, 0–3); the `boost` preset starts unscheduled

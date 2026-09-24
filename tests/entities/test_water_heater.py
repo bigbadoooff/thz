@@ -25,6 +25,7 @@ _DAY = {
     "decode_type": "5temp",
 }
 _NIGHT = {**_DAY, "command": "0A0014"}
+_MANUAL = {**_DAY, "command": "0A0015"}
 
 
 def _block(current=48.5, target=50.0, op_mode=1) -> bytes:
@@ -48,7 +49,9 @@ def _device():
     return device
 
 
-def _heater(data=None, *, day=_DAY, night=_NIGHT, op_mode=(17, 1), device=None):
+def _heater(
+    data=None, *, day=_DAY, night=_NIGHT, manual=None, op_mode=(17, 1), device=None
+):
     entity = THZWaterHeater(
         _coordinator(data),
         device=device or _device(),
@@ -59,6 +62,9 @@ def _heater(data=None, *, day=_DAY, night=_NIGHT, op_mode=(17, 1), device=None):
         day_setpoint=write_param(day, name="p04DHWsetDayTemp") if day else None,
         night_setpoint=(
             write_param(night, name="p05DHWsetNightTemp") if night else None
+        ),
+        manual_setpoint=(
+            write_param(manual, name="p11DHWsetManualTemp") if manual else None
         ),
         entity_id_style="default",
         entity_id_prefix=None,
@@ -86,7 +92,11 @@ class TestAsyncSetupEntry:
         config_entry = _config_entry(
             {"pxxF3": _F3_ENTRIES},
             {"pxxF3": _coordinator()},
-            {"p04DHWsetDayTemp": _DAY, "p05DHWsetNightTemp": _NIGHT},
+            {
+                "p04DHWsetDayTemp": _DAY,
+                "p05DHWsetNightTemp": _NIGHT,
+                "p11DHWsetManualTemp": _MANUAL,
+            },
         )
         add = MagicMock()
         await async_setup_entry(MagicMock(), config_entry, add)
@@ -96,6 +106,7 @@ class TestAsyncSetupEntry:
         assert isinstance(heater, THZWaterHeater)
         assert heater._day_setpoint.command == "0A0013"
         assert heater._night_setpoint.command == "0A0014"
+        assert heater._manual_setpoint.command == "0A0015"
 
     @pytest.mark.asyncio
     async def test_no_coordinator_no_entity(self):
@@ -209,3 +220,66 @@ class TestSetTemperature:
         heater = _heater(_block(), device=device)
         await heater.async_set_temperature(temperature=50.0)
         heater.coordinator.async_request_refresh.assert_not_awaited()
+
+
+def _tenths(value):
+    return int(value * 10).to_bytes(2, "big", signed=True)
+
+
+class TestManualSetpoint:
+    """In manual mode the heat pump uses p11; it is written when only it matches."""
+
+    @staticmethod
+    def _written_command(heater):
+        _, _, command, _ = heater._device.async_execute.await_args_list[-1][0]
+        return command
+
+    @pytest.mark.asyncio
+    async def test_mode_setpoint_matches(self):
+        device = _device()
+        device.async_execute.side_effect = [_tenths(50.0), None]
+        heater = _heater(_block(target=50.0), manual=_MANUAL, device=device)
+        await heater.async_set_temperature(temperature=55.0)
+        assert device.async_execute.await_count == 2
+        assert self._written_command(heater) == bytes.fromhex("0A0013")
+
+    @pytest.mark.asyncio
+    async def test_only_manual_matches(self):
+        device = _device()
+        device.async_execute.side_effect = [_tenths(45.0), _tenths(50.0), None]
+        heater = _heater(_block(target=50.0), manual=_MANUAL, device=device)
+        await heater.async_set_temperature(temperature=55.0)
+        assert self._written_command(heater) == bytes.fromhex("0A0015")
+
+    @pytest.mark.asyncio
+    async def test_nothing_matches_keeps_mode_setpoint(self):
+        device = _device()
+        device.async_execute.side_effect = [_tenths(45.0), b"", None]
+        heater = _heater(_block(target=50.0), manual=_MANUAL, device=device)
+        await heater.async_set_temperature(temperature=55.0)
+        assert self._written_command(heater) == bytes.fromhex("0A0013")
+
+    @pytest.mark.asyncio
+    async def test_read_error_keeps_mode_setpoint(self):
+        device = _device()
+        device.async_execute.side_effect = [OSError("boom"), OSError("boom"), None]
+        heater = _heater(_block(target=50.0), manual=_MANUAL, device=device)
+        await heater.async_set_temperature(temperature=55.0)
+        assert self._written_command(heater) == bytes.fromhex("0A0013")
+
+    @pytest.mark.asyncio
+    async def test_no_mode_setpoint_uses_matching_manual(self):
+        device = _device()
+        device.async_execute.side_effect = [_tenths(50.0), None]
+        heater = _heater(
+            _block(target=50.0), day=None, night=None, manual=_MANUAL, device=device
+        )
+        await heater.async_set_temperature(temperature=55.0)
+        assert self._written_command(heater) == bytes.fromhex("0A0015")
+
+    @pytest.mark.asyncio
+    async def test_unknown_target_skips_reads(self):
+        heater = _heater(None, manual=_MANUAL)
+        await heater.async_set_temperature(temperature=55.0)
+        assert heater._device.async_execute.await_count == 1
+        assert self._written_command(heater) == bytes.fromhex("0A0013")

@@ -10,7 +10,9 @@ The mode itself follows the heat pump's time program and global operating
 mode (``pOpMode``, a preset of the heating circuit's climate entity), so it
 is shown, not set here. Setting a temperature writes the setpoint of the
 current mode: the night setpoint (``p05``) in ``eco``, otherwise the day
-setpoint (``p04``).
+setpoint (``p04``). In the global manual mode the heat pump uses the manual
+setpoint (``p11``) instead; it is written when it, and not the mode's
+setpoint, matches the setpoint in effect.
 """
 
 from __future__ import annotations
@@ -36,7 +38,11 @@ from .climate import _field_layout, _find_entry, _read_op_mode_raw, _read_temp
 from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
 from .exceptions import DEVICE_ERRORS
-from .parameter_io import async_write_parameter, parameter_length
+from .parameter_io import (
+    async_read_parameter,
+    async_write_parameter,
+    parameter_length,
+)
 from .register_maps.model import WriteParam
 from .value_codec import THZValueCodec
 
@@ -57,6 +63,9 @@ _OP_MODE_FIELD = "dhwOpMode"
 # The maps name the setpoints differently per firmware; the first wins.
 _DAY_SETPOINT_NAMES = ("p04DHWsetDayTemp", "p04DHWsetTempDay")
 _NIGHT_SETPOINT_NAMES = ("p05DHWsetNightTemp", "p05DHWsetTempNight")
+_MANUAL_SETPOINT_NAMES = ("p11DHWsetManualTemp", "p11DHWsetTempManual")
+# Two setpoints within this many kelvin are the same value.
+_MATCH_TOLERANCE = 0.05
 
 # dhwOpMode (OpModeHC table) → water heater operation.
 _OPERATIONS = {"setback": STATE_ECO, "standby": STATE_OFF}
@@ -92,6 +101,7 @@ async def async_setup_entry(
         op_mode=op_mode,
         day_setpoint=_find_entry(write_registers, _DAY_SETPOINT_NAMES),
         night_setpoint=_find_entry(write_registers, _NIGHT_SETPOINT_NAMES),
+        manual_setpoint=_find_entry(write_registers, _MANUAL_SETPOINT_NAMES),
         entity_id_style=entry_data.entity_id_style,
         entity_id_prefix=entry_data.entity_id_prefix,
     )
@@ -122,6 +132,7 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         op_mode: tuple[int, int] | None,
         day_setpoint: WriteParam | None,
         night_setpoint: WriteParam | None,
+        manual_setpoint: WriteParam | None,
         entity_id_style: str,
         entity_id_prefix: str | None,
     ) -> None:
@@ -134,6 +145,7 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         self._op_mode = op_mode
         self._day_setpoint = day_setpoint
         self._night_setpoint = night_setpoint
+        self._manual_setpoint = manual_setpoint
         self._attr_unique_id = f"thz_{device_id}_water_heater_dhw"
         suggested = resolve_suggested_object_id(
             "dhw", entity_id_style, device_prefix=entity_id_prefix
@@ -186,17 +198,47 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
             return None
         return _OPERATIONS.get(mode, STATE_PERFORMANCE)
 
-    def _setpoint_to_write(self) -> WriteParam | None:
+    def _mode_setpoint(self) -> WriteParam | None:
         """Return the setpoint of the current mode: night in eco, else day."""
         if self.current_operation == STATE_ECO and self._night_setpoint is not None:
             return self._night_setpoint
         return self._day_setpoint
 
+    async def _async_read_setpoint(self, entry: WriteParam) -> float | None:
+        try:
+            value_bytes = await async_read_parameter(self.hass, self._device, entry)
+            if not value_bytes:
+                return None
+            return THZValueCodec.decode_number(
+                value_bytes, entry.step or 1.0, entry.decode_type, entry.signed
+            )
+        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
+            _LOGGER.warning("Could not read %s for %s: %s", entry.name, self.name, err)
+            return None
+
+    async def _async_matches_target(self, entry: WriteParam, target: float) -> bool:
+        value = await self._async_read_setpoint(entry)
+        return value is not None and abs(value - target) < _MATCH_TOLERANCE
+
+    async def _async_setpoint_to_write(self) -> WriteParam | None:
+        """Return the mode's setpoint, or the manual one if only it is in effect."""
+        entry = self._mode_setpoint()
+        target = self.target_temperature
+        if self._manual_setpoint is None or target is None:
+            return entry
+        if entry is not None and await self._async_matches_target(entry, target):
+            return entry
+        if await self._async_matches_target(self._manual_setpoint, target):
+            return self._manual_setpoint
+        return entry
+
     async def async_set_temperature(self, **kwargs: Any) -> None:
-        """Write the setpoint of the current mode."""
+        """Write the setpoint in effect (see the module docstring)."""
         temperature: float | None = kwargs.get("temperature")
-        entry = self._setpoint_to_write()
-        if temperature is None or entry is None:
+        if temperature is None:
+            return
+        entry = await self._async_setpoint_to_write()
+        if entry is None:
             return
         try:
             value_bytes = THZValueCodec.encode_number(
