@@ -209,8 +209,9 @@ never pushes anything. Only one request is on the line at a time.
   default), one after the other. A register shown by several entities is
   read once; disabled entities are not read. On 2.x firmware, settings
   inside a polled block take their value from that block.
-- **After a change from Home Assistant** the value is read back, so the
-  entity shows what the heat pump stored.
+- **After a change from Home Assistant** the entity shows the written value
+  at once; the next read confirms it. A 2.x setting inside a polled block
+  re-reads its block right away.
 - **Right now:** `homeassistant.update_entity` reads a setting at once;
   `thz.refresh_block` re-reads a block.
 - **Clock:** compared with Home Assistant's time every 15 minutes (see
