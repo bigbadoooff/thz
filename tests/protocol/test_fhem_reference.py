@@ -41,7 +41,7 @@ from custom_components.thz.select import THZSelect
 from custom_components.thz.switch import THZSwitch
 from custom_components.thz.thz_device import THZDevice
 from custom_components.thz.time import _create_time_entities
-from custom_components.thz.value_codec import THZValueCodec
+from custom_components.thz.value_codec import THZValueCodec, decode_raw_value
 from custom_components.thz.value_maps import SELECT_MAP, state_slug
 from tests.helpers import Simulated2xxDevice
 
@@ -535,4 +535,19 @@ async def test_direct_reads_match_fhem(firmware):
         ours = await _our_direct_reading(name, entry, data)
         if fhem != ours:
             mismatches.append(f"{name} {data}: fhem={fhem} ours={ours}")
+    assert not mismatches, "\n".join(mismatches)
+
+
+def test_party_sensor_reads_match_fhem():
+    """The party-time sensor shows the register as FHEM's get does."""
+    samples = ["5a1c", "601c", "1c80", "8080", "0000"]
+    parsed = _fhem(
+        "4.39", parse_direct={f"0A05D1 {data}": "8party" for data in samples}
+    )["parsed_direct"]
+    mismatches = []
+    for data in samples:
+        fhem = parsed[f"0A05D1 {data}"]
+        ours = decode_raw_value(bytes.fromhex(data), "8party", 1)
+        if fhem != ours:
+            mismatches.append(f"{data}: fhem={fhem} ours={ours}")
     assert not mismatches, "\n".join(mismatches)

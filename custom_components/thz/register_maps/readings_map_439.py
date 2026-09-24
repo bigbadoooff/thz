@@ -193,12 +193,8 @@ REGISTER_MAP = {
             4,
             "8party",
             1,
-            {
-                "unit": "min",
-                "device_class": "duration",
-                "state_class": "measurement",
-                "translation_key": "party_time",
-            },
+            # Start and end as "HH:MM--HH:MM" (see value_codec).
+            {"translation_key": "party_time"},
         ),
     ],
     # Fault log ("sLast10errors", command D1). Despite the FHEM name, both
