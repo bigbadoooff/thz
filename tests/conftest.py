@@ -355,6 +355,9 @@ class MockFanEntityFeature(IntFlag):
 class MockFanEntity(MockEntity):
     """Mock FanEntity base class."""
 
+    async def async_added_to_hass(self) -> None:
+        """No-op stand-in for Entity.async_added_to_hass."""
+
 
 fan_mock = MagicMock()
 fan_mock.FanEntity = MockFanEntity

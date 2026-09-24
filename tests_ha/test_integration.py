@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
 )
 
 from custom_components.thz.const import DOMAIN
+from custom_components.thz.parameter_poller import SUBSCRIBE_DELAY
 from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManagerWrite,
 )
@@ -70,6 +77,50 @@ async def test_number_service_writes_the_register(hass, fake_device):
     # 20.2 degC in tenths, big-endian: 0x00CA (not 0x00C9, see #168).
     assert fake_device.instances[-1].sets_for(command) == [bytes.fromhex("00CA")]
     assert hass.states.get(number.entity_id).state == "20.2"
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_parameters_are_polled_once_per_register(hass, fake_device):
+    command = RegisterMapManagerWrite("439").get_all_registers()["p01RoomTempDayHC1"][
+        "command"
+    ]
+    fake_device.initial_registers = {bytes.fromhex(command): bytes.fromhex("00C8")}
+    entry = await setup_entry(hass)
+    number = entity_id(hass, entry, "number", command.lower() + "_p01roomtempdayhc1")
+    now = dt_util.utcnow()
+
+    async def advance(seconds):
+        nonlocal now
+        now += timedelta(seconds=seconds)
+        async_fire_time_changed(hass, now)
+        await hass.async_block_till_done()
+
+    # Applying the visibility tier disables entities, which reloads the
+    # entry after a delay; poll the reloaded entry's device.
+    await advance(60)
+    device = fake_device.instances[-1]
+
+    def parameter_reads():
+        return [t for t in device.sent if t[:2] == b"\x01\x00" and len(t) > 7]
+
+    # Entities are added without reading; the poller reads them in a batch.
+    assert hass.states.get(number).state == "unknown"
+    before = len(parameter_reads())
+
+    await advance(SUBSCRIBE_DELAY + 1)
+    assert hass.states.get(number).state == "20.0"
+    first_round = len(parameter_reads()) - before
+    reads = parameter_reads()[before:]
+    # Every register once, even where several entities show it.
+    assert len(set(reads)) == len(reads) == first_round > 0
+
+    # The next round reads the register again and picks up the change.
+    (register_read,) = [t for t in reads if bytes.fromhex(command) in t]
+    device.registers[bytes.fromhex(command)] = bytes.fromhex("00CA")
+    await advance(3600)
+    assert hass.states.get(number).state == "20.2"
+    assert parameter_reads()[before + first_round :].count(register_read) == 1
 
     assert await hass.config_entries.async_unload(entry.entry_id)
 

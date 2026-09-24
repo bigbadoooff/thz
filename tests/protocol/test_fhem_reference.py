@@ -337,14 +337,14 @@ async def _our_direct_telegram(name: str, entry: dict, value) -> str:
         entity = _prepare(THZSelect(name, entry, device, "dev"))
         await entity.async_select_option(value)
     elif kind == "time" and isinstance(value, tuple):  # party start and end
-        start, end = _create_time_entities(name, entry, device, "dev", 60)
+        start, end = _create_time_entities(name, entry, device, "dev")
         await _prepare(start).async_set_value(value[0])
         await _prepare(end).async_set_value(value[1])
     elif kind == "time":
-        entity = _prepare(_create_time_entities(name, entry, device, "dev", 60))
+        entity = _prepare(_create_time_entities(name, entry, device, "dev"))
         await entity.async_set_value(value)
     else:  # schedule: HA exposes start and end as two entities
-        start, end = _create_time_entities(name, entry, device, "dev", 60)
+        start, end = _create_time_entities(name, entry, device, "dev")
         await _prepare(start).async_set_value(value[0])
         await _prepare(end).async_set_value(value[1])
 
@@ -477,7 +477,7 @@ async def _our_direct_reading(name: str, entry, data: str) -> str:
         return str(int((await _updated(THZSwitch(name, entry, device, "dev"))).is_on))
     if kind == "select":
         return (await _updated(THZSelect(name, entry, device, "dev"))).current_option
-    created = _create_time_entities(name, entry, device, "dev", 60)
+    created = _create_time_entities(name, entry, device, "dev")
     if not isinstance(created, list):
         return _time_text((await _updated(created)).native_value)
     start, end = [await _updated(entity) for entity in created]

@@ -27,10 +27,12 @@ from homeassistant.const import (
 )
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.thz.const import DOMAIN
+from custom_components.thz.parameter_poller import SUBSCRIBE_DELAY
 
-from .common import entity_id, make_entry, setup_entry
+from .common import BLOCKS, entity_id, make_entry, setup_entry
 from .conftest import BLOCK_SIZE
 
 DHW_DAY = "0A0013"
@@ -141,6 +143,10 @@ async def test_fan_shows_the_program_stage(hass, fake_device, freezer):
     }
     entry = await setup_entry(hass)
     fan = entity_id(hass, entry, "fan", "fan_ventilation")
+    # The poller reads the subscribed registers shortly after setup.
+    freezer.tick(SUBSCRIBE_DELAY + 1)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
 
     state = hass.states.get(fan)
     assert state.state == STATE_ON
@@ -188,7 +194,9 @@ async def test_fan_on_2xx_only_shows_the_stage(hass, fake_device):
     status[15 - 2] = 2  # userSetFanStage
     status[18 - 2 : 20 - 2] = (30).to_bytes(2, "big")  # userSetFanRemainingTime
     fake_device.initial_registers = {b"\xf6": bytes(status)}
-    entry = await setup_entry(hass)
+    entry = await setup_entry(
+        hass, refresh_intervals={**BLOCKS, "pxxF6": 600, "pxxEE": 600}
+    )
     fan = entity_id(hass, entry, "fan", "fan_ventilation")
 
     state = hass.states.get(fan)

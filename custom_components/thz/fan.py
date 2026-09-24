@@ -29,13 +29,15 @@ cannot be set), read in this order:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
 import logging
 import math
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.fan import FanEntity, FanEntityFeature
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 from homeassistant.util.percentage import (
     percentage_to_ranged_value,
@@ -43,13 +45,16 @@ from homeassistant.util.percentage import (
 )
 
 from .base_entity import THZBaseEntity
-from .const import DEFAULT_WRITE_INTERVAL
 from .devices import assign_subdevices
 from .exceptions import DEVICE_ERRORS
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
+    block_coordinator_key,
+    parameter_from_block,
+    parameter_from_read,
     parameter_length,
+    parameter_read_key,
 )
 from .register_maps.model import ReadField, WriteParam
 from .value_codec import THZValueCodec, decode_raw_value
@@ -61,7 +66,8 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-# Reads and writes go to the device directly, one at a time.
+# Reads come from the poller and the block coordinators; writes go to the
+# device one at a time.
 PARALLEL_UPDATES = 1
 
 _START_NAME = "p99startUnschedVent"
@@ -93,6 +99,9 @@ _USER_STAGE_FIELD = "userSetFanStage"
 _USER_REMAINING_FIELD = "userSetFanRemainingTime"
 _PROGRAM_BLOCK = "pxxEE"
 _PROGRAM_STATE_FIELD = "ProgStateFAN"
+# How often the stage is recomputed from the polled data (no device I/O),
+# so a program window or an unscheduled ventilation ends on time.
+_RECOMPUTE_INTERVAL = timedelta(minutes=1)
 # Schedule times are quarter hours since midnight; 0x80 is an unset window.
 _UNSET_TIME = 0x80
 
@@ -169,14 +178,14 @@ async def async_setup_entry(
         ),
         device=entry_data.device,
         device_id=entry_data.device_id,
-        scan_interval=config_entry.data.get("write_interval", DEFAULT_WRITE_INTERVAL),
         entity_id_style=entry_data.entity_id_style,
         entity_visibility=entry_data.entity_visibility,
         entity_id_prefix=entry_data.entity_id_prefix,
     )
     entity._coordinators = entry_data.coordinators
+    entity._poller = entry_data.poller
     assign_subdevices([entity], config_entry.data)
-    async_add_entities([entity], True)
+    async_add_entities([entity])
 
 
 class THZFan(THZBaseEntity, FanEntity):
@@ -192,7 +201,6 @@ class THZFan(THZBaseEntity, FanEntity):
         airflow: tuple[int, int] | None,
         device: THZDevice,
         device_id: str,
-        scan_interval: int | None = None,
         entity_id_style: str = "default",
         entity_visibility: str = "default",
         entity_id_prefix: str | None = None,
@@ -204,7 +212,6 @@ class THZFan(THZBaseEntity, FanEntity):
             device=device,
             device_id=device_id,
             unique_id=f"thz_{device_id}_fan_ventilation",
-            scan_interval=scan_interval,
             translation_key="ventilation",
             entity_id_style=entity_id_style,
             entity_visibility=entity_visibility,
@@ -248,50 +255,104 @@ class THZFan(THZBaseEntity, FanEntity):
         """Add the stage; Home Assistant shows a percentage only if settable."""
         return {**super().extra_state_attributes, "stage": self._stage}
 
-    async def async_update(self) -> None:
-        """Read the stage the ventilation runs at."""
-        stage = await self._async_stage_from_status()
-        if stage is None:
-            stage = await self._async_stage_from_airflow()
-        if stage is None:
-            stage = self._running_unscheduled_stage()
-        if stage is None:
-            stage = await self._async_stage_from_program()
+    # Where the stage comes from. The fan subscribes the registers it needs
+    # at the poller (or, for 2.x block parameters, listens to their block
+    # coordinator) and computes the stage from the data they hold, without
+    # device I/O; homeassistant.update_entity reads them all directly.
+
+    def _watched_params(self) -> list[WriteParam]:
+        params = self._params
+        watched: list[WriteParam | None] = [
+            params.day_stage,
+            params.night_stage,
+            params.standby_stage,
+        ]
+        if self._airflow is not None:
+            watched.extend(params.airflows)
+        for windows in params.programs.values():
+            watched.extend(windows)
+        return [param for param in watched if param is not None]
+
+    def _param_coordinator(self, param: WriteParam) -> Any:
+        block = block_coordinator_key(param)
+        return self._coordinators.get(block) if block is not None else None
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe the registers and blocks the stage is computed from."""
+        await super().async_added_to_hass()
+        coordinators: dict[int, Any] = {}
+        for block in (_AIRFLOW_BLOCK, _STATUS_BLOCK, _PROGRAM_BLOCK):
+            if (coordinator := self._coordinators.get(block)) is not None:
+                coordinators[id(coordinator)] = coordinator
+        keys = set()
+        for param in self._watched_params():
+            if (coordinator := self._param_coordinator(param)) is not None:
+                coordinators[id(coordinator)] = coordinator
+            else:
+                keys.add(parameter_read_key(param))
+        for coordinator in coordinators.values():
+            self.async_on_remove(coordinator.async_add_listener(self._handle_change))
+        if self._poller is not None:
+            for key in sorted(keys):
+                self.async_on_remove(
+                    self._poller.async_subscribe(key, self._handle_poll_result)
+                )
+        # The program windows and an unscheduled ventilation end with time.
+        self.async_on_remove(
+            async_track_time_interval(self.hass, self._handle_tick, _RECOMPUTE_INTERVAL)
+        )
+        self._recompute()
+
+    @callback
+    def _handle_poll_result(self, _raw: bytes | None) -> None:
+        self._handle_change()
+
+    @callback
+    def _handle_tick(self, _now: datetime) -> None:
+        self._handle_change()
+
+    @callback
+    def _handle_change(self) -> None:
+        self._recompute()
+        self.async_write_ha_state()
+
+    def _recompute(self) -> None:
+        stage = self._compute_stage(self._live_raw, self._live_block)
         if stage is not None:
             self._set_stage(stage)
 
-    def _set_stage(self, stage: int) -> None:
-        self._stage = stage
-        if stage > 0:
-            self._last_on_stage = stage
-
-    async def _async_read_raw(self, param: WriteParam) -> bytes | None:
-        return await self._async_guarded_read(
-            async_read_parameter(self.hass, self._device, param)
-        )
-
-    async def _async_read_number(self, param: WriteParam | None) -> int | None:
-        if param is None:
-            return None
-        value_bytes = await self._async_read_raw(param)
-        if value_bytes is None:
-            return None
-        try:
-            return int(
-                THZValueCodec.decode_number(
-                    value_bytes, param.step or 1.0, param.decode_type, param.signed
-                )
-            )
-        except (ValueError, IndexError, TypeError) as err:
-            _LOGGER.error("Error decoding %s for %s: %s", param.name, self.name, err)
-            return None
-
-    async def _async_block(self, block: str) -> bytes | None:
-        """Return a block's data from its coordinator, or read it."""
-        coordinator = self._coordinators.get(block)
+    def _live_raw(self, param: WriteParam) -> bytes | None:
+        """Return a parameter's value bytes from the polled data."""
+        coordinator = self._param_coordinator(param)
         if coordinator is not None:
-            data: bytes | None = coordinator.data
-            return data
+            data = coordinator.data
+            return parameter_from_block(param, data) if data else None
+        if self._poller is None:
+            return None
+        raw = self._poller.data.get(parameter_read_key(param))
+        return parameter_from_read(param, raw) if raw else None
+
+    def _live_block(self, block: str) -> bytes | None:
+        coordinator = self._coordinators.get(block)
+        data: bytes | None = coordinator.data if coordinator is not None else None
+        return data
+
+    async def async_update(self) -> None:
+        """Read everything the stage depends on now (update_entity)."""
+        raws: dict[str, bytes | None] = {}
+        for param in self._watched_params():
+            raws[param.name] = await self._async_guarded_read(
+                async_read_parameter(self.hass, self._device, param)
+            )
+        blocks: dict[str, bytes | None] = {}
+        for block in (_AIRFLOW_BLOCK, _STATUS_BLOCK, _PROGRAM_BLOCK):
+            if block in self._coordinators or self._status is not None:
+                blocks[block] = await self._async_read_block(block)
+        stage = self._compute_stage(lambda param: raws.get(param.name), blocks.get)
+        if stage is not None:
+            self._set_stage(stage)
+
+    async def _async_read_block(self, block: str) -> bytes | None:
         return await self._async_guarded_read(
             self._device.async_execute(
                 self.hass,
@@ -300,6 +361,39 @@ class THZFan(THZBaseEntity, FanEntity):
                 "get",
             )
         )
+
+    def _set_stage(self, stage: int) -> None:
+        self._stage = stage
+        if stage > 0:
+            self._last_on_stage = stage
+
+    def _number(self, raw: bytes | None, param: WriteParam | None) -> int | None:
+        if raw is None or param is None:
+            return None
+        try:
+            return int(
+                THZValueCodec.decode_number(
+                    raw, param.step or 1.0, param.decode_type, param.signed
+                )
+            )
+        except (ValueError, IndexError, TypeError) as err:
+            _LOGGER.debug("Error decoding %s for %s: %s", param.name, self.name, err)
+            return None
+
+    def _compute_stage(
+        self,
+        raw_of: Callable[[WriteParam], bytes | None],
+        block_of: Callable[[str], bytes | None],
+    ) -> int | None:
+        """Return the stage from the first source that gives one."""
+        stage = self._stage_from_status(raw_of, block_of)
+        if stage is None:
+            stage = self._stage_from_airflow(raw_of, block_of)
+        if stage is None:
+            stage = self._running_unscheduled_stage()
+        if stage is None:
+            stage = self._stage_from_program(raw_of)
+        return stage
 
     @staticmethod
     def _field_value(data: bytes | None, read_field: ReadField | None) -> Any:
@@ -314,33 +408,38 @@ class THZFan(THZBaseEntity, FanEntity):
         except (ValueError, IndexError, TypeError):
             return None
 
-    async def _async_stage_from_status(self) -> int | None:
+    def _stage_from_status(
+        self,
+        raw_of: Callable[[WriteParam], bytes | None],
+        block_of: Callable[[str], bytes | None],
+    ) -> int | None:
         """2.x: the stage set at the device, else the program state's stage."""
         status = self._status
         if status is None:
             return None
         if status.user_stage is not None and status.user_remaining is not None:
-            data = await self._async_block(_STATUS_BLOCK)
+            data = block_of(_STATUS_BLOCK)
             remaining = self._field_value(data, status.user_remaining)
             stage = self._field_value(data, status.user_stage)
             if _is_number(remaining) and remaining > 0 and _is_number(stage):
                 return int(stage)
         if status.program_state is None:
             return None
-        state = self._field_value(
-            await self._async_block(_PROGRAM_BLOCK), status.program_state
-        )
+        state = self._field_value(block_of(_PROGRAM_BLOCK), status.program_state)
         param = {
             "normal": self._params.day_stage,
             "setback": self._params.night_stage,
             "standby": self._params.standby_stage,
         }.get(str(state))
-        return await self._async_read_number(param)
+        return self._number(raw_of(param) if param else None, param)
 
-    async def _async_stage_from_airflow(self) -> int | None:
+    def _stage_from_airflow(
+        self,
+        raw_of: Callable[[WriteParam], bytes | None],
+        block_of: Callable[[str], bytes | None],
+    ) -> int | None:
         """Match the current supply airflow with the airflow of each stage."""
-        coordinator = self._coordinators.get(_AIRFLOW_BLOCK)
-        data = coordinator.data if coordinator is not None else None
+        data = block_of(_AIRFLOW_BLOCK)
         if self._airflow is None or not data:
             return None
         offset, length = self._airflow
@@ -350,10 +449,11 @@ class THZFan(THZBaseEntity, FanEntity):
         airflow = int.from_bytes(raw, "big")
         if airflow == 0:
             return 0
-        matches = []
-        for stage, param in enumerate(self._params.airflows, start=1):
-            if await self._async_read_number(param) == airflow:
-                matches.append(stage)
+        matches = [
+            stage
+            for stage, param in enumerate(self._params.airflows, start=1)
+            if param is not None and self._number(raw_of(param), param) == airflow
+        ]
         return matches[0] if len(matches) == 1 else None
 
     def _running_unscheduled_stage(self) -> int | None:
@@ -365,7 +465,9 @@ class THZFan(THZBaseEntity, FanEntity):
         self._unscheduled = None
         return None
 
-    async def _async_stage_from_program(self) -> int | None:
+    def _stage_from_program(
+        self, raw_of: Callable[[WriteParam], bytes | None]
+    ) -> int | None:
         """Day stage inside today's fan program windows, night stage outside."""
         now = dt_util.now()
         windows = self._params.programs[_PROGRAM_DAYS[now.weekday()]]
@@ -376,14 +478,14 @@ class THZFan(THZBaseEntity, FanEntity):
         for param in windows:
             if param is None:
                 continue
-            raw = await self._async_read_raw(param)
+            raw = raw_of(param)
             if raw is None or len(raw) < 2:
                 return None
             start, end = raw[0], raw[1]
             if _UNSET_TIME not in (start, end) and start <= quarter < end:
                 in_window = True
         param = self._params.day_stage if in_window else self._params.night_stage
-        return await self._async_read_number(param)
+        return self._number(raw_of(param) if param else None, param)
 
     async def _async_start(self, stage: int) -> None:
         """Start unscheduled ventilation at ``stage``."""
@@ -401,7 +503,17 @@ class THZFan(THZBaseEntity, FanEntity):
         except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error("Error starting ventilation stage %s: %s", stage, err)
             return
-        minutes = await self._async_read_number(self._params.durations[stage])
+        duration = self._params.durations[stage]
+        minutes = (
+            self._number(
+                await self._async_guarded_read(
+                    async_read_parameter(self.hass, self._device, duration)
+                ),
+                duration,
+            )
+            if duration is not None
+            else None
+        )
         if minutes:
             self._unscheduled = (stage, dt_util.now() + timedelta(minutes=minutes))
         self._set_stage(stage)

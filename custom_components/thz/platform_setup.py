@@ -9,10 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from .const import (
-    DEFAULT_WRITE_INTERVAL,
-    get_write_group_for_key,
-)
+from .const import get_write_group_for_key
 from .devices import assign_subdevices
 from .runtime_data import THZConfigEntry
 
@@ -54,9 +51,6 @@ async def async_setup_write_platform(
     entity_visibility = entry_data.entity_visibility
     entity_id_prefix = entry_data.entity_id_prefix
 
-    # Same default the config flow stores for new entries.
-    write_interval = config_entry.data.get("write_interval", DEFAULT_WRITE_INTERVAL)
-
     # Get selected write groups (if not set, all groups are enabled)
     selected_write_groups = config_entry.data.get("selected_write_groups")
 
@@ -83,14 +77,17 @@ async def async_setup_write_platform(
                 entry=entry,
                 device=device,
                 device_id=device_id,
-                scan_interval=write_interval,
                 entity_id_style=entity_id_style,
                 entity_visibility=entity_visibility,
                 entity_id_prefix=entity_id_prefix,
             )
             entity._coordinators = entry_data.coordinators
+            entity._poller = entry_data.poller
             entities.append(entity)
 
     _LOGGER.info("Created %d %s entities", len(entities), platform_type)
     assign_subdevices(entities, config_entry.data)
-    async_add_entities(entities, True)
+    # Values arrive from the poller or the block coordinators; reading
+    # every entity before adding it would put hundreds of reads on the line
+    # at once.
+    async_add_entities(entities)

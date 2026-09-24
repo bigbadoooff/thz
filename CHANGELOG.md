@@ -26,6 +26,18 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **Settings are polled by one poller per heat pump** (#185): number,
+  select, switch and time entities no longer run a timer each. The poller
+  reads every register once per `write_interval`, one after the other; a
+  register shown by several entities (a schedule's start and end) is read
+  once, and disabled entities are not read at all. At startup the entities
+  are added first and read in one batch right after, instead of each one
+  reading the device before it is added. When the heat pump stops
+  answering, a round ends after a few failed reads and the entities become
+  unavailable, instead of every entity waiting for its own timeout. 2.x
+  switches, selects and times inside a polled block now take their value
+  from the block, like 2.x numbers already did.
+
 - **The connection runs on asyncio** (#185): serial port and ser2net TCP
   no longer use a worker thread per request. The serial port is opened with
   `pyserial-asyncio-fast`, a new requirement that Home Assistant installs

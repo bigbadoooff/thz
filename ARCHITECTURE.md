@@ -16,7 +16,8 @@ Integration setup           __init__.py, config_flow.py, platform_setup.py
 Entities                    sensor, binary_sensor, cop_sensor, fault_sensor,
   │                         climate, water_heater, fan, number, select,
   │                         switch, time, button
-  │  read:  coordinator data (read map) or parameter_io (write map)
+  │  read:  coordinator data (read map and 2.x blocks) or
+  │         parameter_poller.py (write map)
   │  write: parameter_io only
   ▼
 parameter_io.py             the single read/write path for write-map parameters
@@ -85,20 +86,33 @@ includes entities, climate, clock sync and backup/restore.
    - A block that fails transiently keeps its coordinator, and its entities
      start unavailable.
    - If every block fails, setup raises `ConfigEntryNotReady`.
-3. Runtime state (`device`, `coordinators`, both map managers, visibility and
-   naming settings) is stored as the entry's runtime data, a
+3. It creates the `ParameterPoller` (`parameter_poller.py`), which polls the
+   write-map registers every `write_interval`.
+4. Runtime state (`device`, `coordinators`, `poller`, both map managers,
+   visibility and naming settings) is stored as the entry's runtime data, a
    `THZRuntimeData` dataclass (`runtime_data.py`); the platforms take a
    typed `THZConfigEntry`.
-4. The platforms create their entities (`platform_setup.py` for the write-map
+5. The platforms create their entities (`platform_setup.py` for the write-map
    platforms):
    - Read-map entities are `CoordinatorEntity`s and decode from
      `coordinator.data`.
-   - Write-map entities poll themselves every `write_interval` via
-     `THZBaseEntity`. On 2.x, a number whose block is already polled by a
-     coordinator takes its value from the coordinator data
-     (`parameter_from_block`) instead of reading the device again.
-5. After a write, an entity requests a refresh of the coordinator that shows
-   the value.
+   - Write-map entities (number, select, switch, time) do not poll
+     themselves. A 2.x parameter whose block is polled by a coordinator
+     listens to it and cuts its value out of the block
+     (`parameter_from_block`). Every other one subscribes its read key
+     `(command, offset, length)` at the poller while it is added to Home
+     Assistant (`THZBaseEntity.async_added_to_hass`).
+   - The poller reads each subscribed key once per round, one after the
+     other, and hands the bytes to the key's entities. Entities sharing a
+     key (a schedule's start and end) cost one read; disabled entities
+     none. New keys are read in one batch shortly after they are
+     subscribed, so entities are added without a read of their own.
+     Several connection errors in a row end a round and mark the rest
+     unavailable.
+   - `homeassistant.update_entity` still reads an entity's register
+     directly (`async_update`).
+6. After a write, an entity requests a refresh of the block coordinator
+   that shows the value, or drops the poller's last result for its key.
 
 All device I/O runs on the event loop and goes through
 `THZDevice.async_execute`. It serialises access with the device lock and

@@ -73,6 +73,29 @@ class FakeDevice:
         return self.values.get(command.hex().upper(), b"")
 
 
+class FakePoller:
+    """The poller's data: the fake device's values by read key."""
+
+    def __init__(self, device):
+        self.data = _PolledData(device)
+        self.subscribed = []
+
+    def async_subscribe(self, key, handler):
+        self.subscribed.append((key, handler))
+        return MagicMock()
+
+
+class _PolledData(dict):
+    def __init__(self, device):
+        super().__init__()
+        self._device = device
+
+    def get(self, key, default=None):
+        if self._device.fail:
+            return None
+        return self._device.values.get(key[0], default)
+
+
 @pytest.fixture
 def now(monkeypatch):
     clock = {"now": MONDAY_8}
@@ -102,6 +125,7 @@ def _fan(
         coordinator = MagicMock()
         coordinator.data = e8
         entity._coordinators = {"pxxE8": coordinator}
+    entity._poller = FakePoller(entity._device)
     entity.hass = MagicMock()
     entity.async_write_ha_state = MagicMock()
     return entity
@@ -178,8 +202,8 @@ class TestAsyncSetupEntry:
             {"pxxE8": [("pFanstageXAirflowInlet:", 62, 4, "hex", 1, {})]},
         )
         await async_setup_entry(MagicMock(), config_entry, add)
-        entities, update_before_add = add.call_args[0]
-        assert update_before_add is True
+        (entities,) = add.call_args[0]
+        assert entities[0]._poller is config_entry.runtime_data.poller
         assert entities[0]._airflow == (31, 2)
         assert entities[0]._params.day_stage.command == "0A056C"
 
@@ -187,7 +211,7 @@ class TestAsyncSetupEntry:
     async def test_creates_fan_without_airflow_field(self):
         add = MagicMock()
         await async_setup_entry(MagicMock(), self._config_entry(REGISTERS), add)
-        (entities, _) = add.call_args[0]
+        (entities,) = add.call_args[0]
         assert entities[0]._airflow is None
 
     @pytest.mark.asyncio
@@ -197,7 +221,7 @@ class TestAsyncSetupEntry:
         await async_setup_entry(
             MagicMock(), self._config_entry(registers, BLOCKS_2XX), add
         )
-        (entities, _) = add.call_args[0]
+        (entities,) = add.call_args[0]
         assert entities[0]._start_param is None
         assert entities[0]._status is not None
         assert entities[0]._attr_supported_features == 0
@@ -247,7 +271,7 @@ class TestState:
     @pytest.mark.asyncio
     async def test_stage_from_airflow(self, now, airflow, stage, percentage):
         fan = _fan(FakeDevice(_AIRFLOWS), e8=_e8(airflow))
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == stage
         assert fan.percentage == percentage
         assert fan.is_on is (stage > 0)
@@ -261,14 +285,14 @@ class TestState:
             "0A056C": _word(2),
         }
         fan = _fan(FakeDevice(values), e8=_e8(90))
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == 2
 
     @pytest.mark.asyncio
     async def test_short_e8_data_falls_back_to_program(self, now):
         values = {"0A1D10": _window(6, 9), "0A056C": _word(2)}
         fan = _fan(FakeDevice(values), e8=bytes(3))
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == 2
 
     @pytest.mark.asyncio
@@ -280,7 +304,7 @@ class TestState:
             "0A056D": _word(1),
         }
         fan = _fan(FakeDevice(values), airflow=None)
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == 2
 
     @pytest.mark.asyncio
@@ -292,20 +316,20 @@ class TestState:
             "0A056D": _word(1),
         }
         fan = _fan(FakeDevice(values), airflow=None)
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == 1
 
     @pytest.mark.asyncio
     async def test_no_program_for_today_leaves_state(self, now):
         now["now"] = MONDAY_8 + timedelta(days=1)
         fan = _fan(FakeDevice({"0A056C": _word(2)}), airflow=None)
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage is None
 
     @pytest.mark.asyncio
     async def test_unreadable_program_leaves_state(self, now):
         fan = _fan(FakeDevice({}), airflow=None)
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage is None
 
     @pytest.mark.asyncio
@@ -324,7 +348,7 @@ class TestState:
         )
         values = {"0A1D10": _window(6, 9), "0A056C": _word(2)}
         fan = _fan(FakeDevice(values), airflow=None)
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage is None
 
 
@@ -400,11 +424,11 @@ class TestWrites:
         await fan.async_set_percentage(100)
 
         now["now"] = MONDAY_8 + timedelta(minutes=29)
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == 3
 
         now["now"] = MONDAY_8 + timedelta(minutes=31)
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == 1
         assert fan._unscheduled is None
 
@@ -413,7 +437,7 @@ class TestWrites:
         values = {**_AIRFLOWS, "0A0574": _word(30)}
         fan = _fan(FakeDevice(values), e8=_e8(90))
         await fan.async_set_percentage(100)
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == 1
 
     @pytest.mark.asyncio
@@ -436,7 +460,7 @@ class TestDisplayOnly2xx:
     @pytest.mark.asyncio
     async def test_stage_set_at_device_while_its_time_runs(self):
         fan = _status_fan(FakeDevice(), f6=_f6(3, 25), ee=_ee(1))
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == 3
 
     @pytest.mark.parametrize(("program_state", "stage"), [(1, 2), (2, 1), (3, 0)])
@@ -444,13 +468,13 @@ class TestDisplayOnly2xx:
     async def test_program_state_stage(self, program_state, stage):
         values = {"0A056C": _word(2), "0A056D": _word(1), "0A056F": _word(0)}
         fan = _status_fan(FakeDevice(values), f6=_f6(3, 0), ee=_ee(program_state))
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == stage
 
     @pytest.mark.asyncio
     async def test_unknown_program_state_leaves_state(self):
         fan = _status_fan(FakeDevice({"0A056C": _word(2)}), f6=_f6(3, 0), ee=_ee(4))
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage is None
 
     @pytest.mark.asyncio
@@ -471,21 +495,21 @@ class TestDisplayOnly2xx:
     @pytest.mark.asyncio
     async def test_short_blocks_leave_state(self):
         fan = _status_fan(FakeDevice(), f6=bytes(4), ee=bytes(4))
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage is None
 
     @pytest.mark.asyncio
     async def test_only_program_state_field(self):
         blocks = {"pxxEE": BLOCKS_2XX["pxxEE"]}
         fan = _status_fan(FakeDevice({"0A056D": _word(1)}), ee=_ee(2), blocks=blocks)
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage == 1
 
     @pytest.mark.asyncio
     async def test_only_user_stage_fields(self):
         blocks = {"pxxF6": BLOCKS_2XX["pxxF6"]}
         fan = _status_fan(FakeDevice(), f6=_f6(3, 0), blocks=blocks)
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage is None
 
     @pytest.mark.asyncio
@@ -494,7 +518,7 @@ class TestDisplayOnly2xx:
             fan_module, "decode_raw_value", MagicMock(side_effect=ValueError("bad"))
         )
         fan = _status_fan(FakeDevice(), f6=_f6(3, 25), ee=_ee(1))
-        await fan.async_update()
+        fan._recompute()
         assert fan._stage is None
 
     @pytest.mark.asyncio
@@ -503,3 +527,101 @@ class TestDisplayOnly2xx:
         fan = _status_fan(device)
         await fan.async_set_percentage(100)
         assert device.writes == []
+
+
+class TestPolling:
+    """The fan follows the poller and the block coordinators."""
+
+    @pytest.mark.asyncio
+    async def test_subscribes_registers_and_blocks(self, now, monkeypatch):
+        tracked = []
+        monkeypatch.setattr(
+            fan_module,
+            "async_track_time_interval",
+            lambda hass, action, interval: tracked.append(interval) or MagicMock(),
+        )
+        e8 = MagicMock(data=_e8(0))
+        fan = _fan(FakeDevice(_AIRFLOWS))
+        fan._coordinators = {"pxxE8": e8}
+        fan.async_on_remove = MagicMock()
+
+        await fan.async_added_to_hass()
+
+        e8.async_add_listener.assert_called_once_with(fan._handle_change)
+        keys = {key for key, _ in fan._poller.subscribed}
+        # Day and night stage, three airflows, two Monday windows.
+        assert len(keys) == 7
+        assert ("0A056C", 4, 2) in keys
+        assert tracked == [fan_module._RECOMPUTE_INTERVAL]
+        assert fan._stage == 0
+
+    @pytest.mark.asyncio
+    async def test_block_parameters_listen_to_their_block(self, now, monkeypatch):
+        monkeypatch.setattr(
+            fan_module, "async_track_time_interval", lambda *a: MagicMock()
+        )
+        block_param = {
+            **_NUMBER,
+            "command": "17",
+            "write_mode": "block",
+            "offset": 5,
+            "length": 1,
+        }
+        registers = {**REGISTERS_2XX, "p07FanStageDay": block_param}
+        pxx17 = MagicMock(data=bytes([0, 0, 0, 0, 0, 2]))
+        fan = _fan(
+            FakeDevice({"0A056D": _word(1)}),
+            registers=registers,
+            airflow=None,
+            status=FanStatus(FakeRegisterManager(BLOCKS_2XX)),
+            start=False,
+        )
+        fan._coordinators = {"pxx17": pxx17, "pxxEE": MagicMock(data=_ee(1))}
+        fan.async_on_remove = MagicMock()
+
+        await fan.async_added_to_hass()
+
+        pxx17.async_add_listener.assert_called_once()
+        assert all(key[0] != "17" for key, _ in fan._poller.subscribed)
+        assert fan._stage == 2
+
+    def test_handlers_recompute_and_write(self, now):
+        values = {"0A1D10": _window(6, 9), "0A056C": _word(2)}
+        fan = _fan(FakeDevice(values), airflow=None)
+        fan._handle_poll_result(b"")
+        assert fan._stage == 2
+        fan._stage = None
+        fan._handle_tick(MONDAY_8)
+        assert fan._stage == 2
+        assert fan.async_write_ha_state.call_count == 2
+
+    def test_without_poller_nothing_is_known(self, now):
+        fan = _fan(FakeDevice({"0A1D10": _window(6, 9)}), airflow=None)
+        fan._poller = None
+        fan._recompute()
+        assert fan._stage is None
+
+    def test_block_without_data_gives_nothing(self):
+        param = write_param(
+            {
+                **_NUMBER,
+                "command": "17",
+                "write_mode": "block",
+                "offset": 5,
+                "length": 1,
+            },
+            name="p07FanStageDay",
+        )
+        fan = _fan()
+        fan._coordinators = {"pxx17": MagicMock(data=None)}
+        assert fan._live_raw(param) is None
+
+    @pytest.mark.asyncio
+    async def test_update_entity_reads_directly(self, now):
+        values = {"0A1D10": _window(6, 9), "0A056C": _word(3)}
+        device = FakeDevice(values)
+        fan = _fan(device, airflow=None)
+        fan._poller = None
+        await fan.async_update()
+        assert fan._stage == 3
+        assert device.async_execute.await_count >= 3
