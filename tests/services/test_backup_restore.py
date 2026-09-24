@@ -274,7 +274,7 @@ class TestClockDriftCheck:
         """Build a device whose async_execute drives read_value/write_value."""
         device = MagicMock()
 
-        async def _execute(hass, fn, *args, **kwargs):
+        async def _execute(fn, *args, **kwargs):
             if fn is device.read_value:
                 return next(read_values)
             if fn is device.write_value:
@@ -553,7 +553,7 @@ class TestBackupParametersService:
         mock_hass.data[DOMAIN]["entry_1"] = entry_data
         device = entry_data["device"]
 
-        async def fake_execute(hass, fn, *args, **kwargs):
+        async def fake_execute(fn, *args, **kwargs):
             assert fn is device.read_value
             hexcmd = args[0].hex().upper()
             if hexcmd == "0A0200":
@@ -775,7 +775,7 @@ class TestRestoreParametersService:
         fake_dt_util = MagicMock()
         fake_dt_util.now = MagicMock(return_value=datetime(2026, 8, 25, 10, 0))
 
-        async def fake_execute(hass, fn, *args, **kwargs):
+        async def fake_execute(fn, *args, **kwargs):
             if fn is device.write_value:
                 return None
             if fn is device.read_value:
@@ -901,7 +901,7 @@ class TestRestoreParametersService:
 
         written_commands = []
 
-        async def fake_execute(hass, fn, *args, **kwargs):
+        async def fake_execute(fn, *args, **kwargs):
             if fn is device.write_value:
                 written_commands.append(args[0])
                 return None
@@ -962,7 +962,7 @@ class TestRestoreParametersService:
 
         clock_writes = []
 
-        async def fake_execute(hass, fn, *args, **kwargs):
+        async def fake_execute(fn, *args, **kwargs):
             if fn is device.write_value:
                 clock_writes.append(args)
                 return None
@@ -1010,7 +1010,7 @@ class _FakeClockDevice:
         self.read_value = object()
         self.write_value = object()
 
-    async def async_execute(self, hass, fn, *args):
+    async def async_execute(self, fn, *args):
         name = self.COMMANDS[args[0].hex().upper()]
         if fn is self.read_value:
             if self.fail_reads:

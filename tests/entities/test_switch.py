@@ -170,8 +170,8 @@ class TestTHZSwitchTurnOnOff:
         assert entity.is_on is True
         entity.async_write_ha_state.assert_called_once()
         write_call = device.async_execute.call_args[0]
-        assert write_call[1] == device.write_value
-        assert write_call[3] == bytes([0, 1])
+        assert write_call[0] == device.write_value
+        assert write_call[2] == bytes([0, 1])
 
     @pytest.mark.asyncio
     async def test_async_turn_off_success(self):
@@ -186,7 +186,7 @@ class TestTHZSwitchTurnOnOff:
         assert entity.is_on is False
         entity.async_write_ha_state.assert_called_once()
         write_call = device.async_execute.call_args[0]
-        assert write_call[3] == bytes([0, 0])
+        assert write_call[2] == bytes([0, 0])
 
     @pytest.mark.asyncio
     async def test_async_turn_on_encode_error_logged_not_raised(self, monkeypatch):

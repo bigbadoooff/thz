@@ -493,7 +493,7 @@ class TestSetDiverterValveService:
         ):
             await handler(call)
 
-        writes = [c.args[2:] for c in device.async_execute.await_args_list]
+        writes = [c.args[1:] for c in device.async_execute.await_args_list]
         assert writes[0] == (bytes.fromhex("0A0653"), bytes.fromhex("0001"))
         assert (bytes.fromhex("0A0653"), bytes.fromhex("0000")) in writes[1:]
         assert (bytes.fromhex("0A0652"), bytes.fromhex("0000")) in writes[1:]
@@ -504,7 +504,7 @@ class TestSetDiverterValveService:
         device = _mock_device()
         calls = []
 
-        async def _execute(_hass, _fn, command, value, *rest):
+        async def _execute(_fn, command, value, *rest):
             calls.append((command, value))
             if (command, value) == (bytes.fromhex("0A0653"), bytes.fromhex("0000")):
                 raise ConnectionError("lost")

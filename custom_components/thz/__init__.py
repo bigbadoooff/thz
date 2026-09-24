@@ -553,7 +553,7 @@ async def _async_update_block(
     try:
         _LOGGER.debug("Reading block %s", block_name)
         result: bytes = await device.async_execute(
-            hass, device.read_block, block_bytes, "get"
+            device.read_block, block_bytes, "get"
         )
 
         # If this block has a paired cmd3 register, read it too
@@ -561,7 +561,7 @@ async def _async_update_block(
             cmd3_name = paired_blocks[block_name]
             cmd3_bytes = bytes.fromhex(cmd3_name.removeprefix("pxx"))
             cmd3_result = await device.async_execute(
-                hass, device.read_block, cmd3_bytes, "get"
+                device.read_block, cmd3_bytes, "get"
             )
 
             # Extract low (cmd2) and high (cmd3) values

@@ -335,7 +335,6 @@ class THZBaseEntity(Entity):
             return b""
         command, offset, length = key
         raw: bytes = await self._device.async_execute(
-            self.hass,
             self._device.read_value,
             bytes.fromhex(command),
             "get",

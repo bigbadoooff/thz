@@ -464,7 +464,7 @@ class TestHolidayAndPartyTimeByte:
 
         entity, device = self._entity("8party", bytes([0x50, 0x10]))
         await entity.async_set_value(time(7, 30))
-        written = device.async_execute.await_args_list[-1].args[3]
+        written = device.async_execute.await_args_list[-1].args[2]
         assert written == bytes([0x50, 0x1E])
 
 
@@ -502,7 +502,7 @@ class TestPartyStartAndEnd:
     async def test_end_write_keeps_the_start_and_writes_midnight_as_24h(self):
         _, end, device = self._pair(bytes([0x5A, 0x1C]))
         await end.async_set_value(dtime(0, 0))
-        written = device.async_execute.await_args_list[-1].args[3]
+        written = device.async_execute.await_args_list[-1].args[2]
         assert written == bytes([96, 0x1C])
         assert end.native_value == dtime(0, 0)
 
@@ -510,5 +510,5 @@ class TestPartyStartAndEnd:
     async def test_clearing_the_end_keeps_the_start(self):
         _, end, device = self._pair(bytes([0x5A, 0x1C]))
         await end.async_clear_value()
-        written = device.async_execute.await_args_list[-1].args[3]
+        written = device.async_execute.await_args_list[-1].args[2]
         assert written == bytes([0x80, 0x1C])

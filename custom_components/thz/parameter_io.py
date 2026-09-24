@@ -91,7 +91,6 @@ async def async_read_parameter(
     """Read the raw value bytes of a write-map parameter."""
     command, offset, length = parameter_read_key(param)
     result: bytes = await device.async_execute(
-        hass,
         device.read_value,
         bytes.fromhex(command),
         "get",
@@ -115,13 +114,12 @@ async def async_write_parameter(
     command = bytes.fromhex(param.command)
     block = param.block
     if block is None:
-        await device.async_execute(hass, device.write_value, command, value_bytes)
+        await device.async_execute(device.write_value, command, value_bytes)
         return
     if block.bit is not None:
         # Single-bit flag: set/clear only this bit, keep its neighbours.
         flag = 1 if any(value_bytes) else 0
         await device.async_execute(
-            hass,
             device.write_block_value,
             command,
             block.offset,
@@ -131,7 +129,6 @@ async def async_write_parameter(
         )
         return
     await device.async_execute(
-        hass,
         device.write_block_value,
         command,
         block.offset,

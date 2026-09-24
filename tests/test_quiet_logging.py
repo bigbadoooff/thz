@@ -53,10 +53,10 @@ class TestConnectionLogging:
 
         for _ in range(3):
             with pytest.raises(THZConnectionError):
-                await device.async_execute(None, fail)
+                await device.async_execute(fail)
         assert device.link_ok is False
-        await device.async_execute(None, ok)
-        await device.async_execute(None, ok)
+        await device.async_execute(ok)
+        await device.async_execute(ok)
         assert device.link_ok is True
 
         messages = [
@@ -79,7 +79,7 @@ class TestConnectionLogging:
             await asyncio.sleep(10)
 
         with pytest.raises(THZConnectionError):
-            await device.async_execute(None, stuck, timeout=0.01)
+            await device.async_execute(stuck, timeout=0.01)
         assert device.link_ok is False
 
     @pytest.mark.asyncio
@@ -90,7 +90,7 @@ class TestConnectionLogging:
             raise THZWriteRejectedError("NAK")
 
         with pytest.raises(THZWriteRejectedError):
-            await device.async_execute(None, rejected)
+            await device.async_execute(rejected)
         assert device.link_ok is True
 
     @pytest.mark.asyncio
@@ -101,7 +101,7 @@ class TestConnectionLogging:
             raise KeyError("x")
 
         with pytest.raises(KeyError):
-            await device.async_execute(None, bug)
+            await device.async_execute(bug)
         assert device.link_ok is True
 
 

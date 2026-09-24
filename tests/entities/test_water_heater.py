@@ -182,7 +182,7 @@ class TestSetTemperature:
         heater = _heater(_block(op_mode=1))
         await heater.async_set_temperature(temperature=52.0)
         device = heater._device
-        _, _, command, value = device.async_execute.await_args[0]
+        _, command, value = device.async_execute.await_args[0]
         assert command == bytes.fromhex("0A0013")
         assert value == (520).to_bytes(2, "big", signed=True)
         heater.coordinator.async_request_refresh.assert_awaited_once()
@@ -191,14 +191,14 @@ class TestSetTemperature:
     async def test_eco_writes_night_setpoint(self):
         heater = _heater(_block(op_mode=2))
         await heater.async_set_temperature(temperature=40.0)
-        _, _, command, _ = heater._device.async_execute.await_args[0]
+        _, command, _ = heater._device.async_execute.await_args[0]
         assert command == bytes.fromhex("0A0014")
 
     @pytest.mark.asyncio
     async def test_eco_without_night_setpoint_writes_day(self):
         heater = _heater(_block(op_mode=2), night=None)
         await heater.async_set_temperature(temperature=40.0)
-        _, _, command, _ = heater._device.async_execute.await_args[0]
+        _, command, _ = heater._device.async_execute.await_args[0]
         assert command == bytes.fromhex("0A0013")
 
     @pytest.mark.asyncio
@@ -231,7 +231,7 @@ class TestManualSetpoint:
 
     @staticmethod
     def _written_command(heater):
-        _, _, command, _ = heater._device.async_execute.await_args_list[-1][0]
+        _, command, _ = heater._device.async_execute.await_args_list[-1][0]
         return command
 
     @pytest.mark.asyncio

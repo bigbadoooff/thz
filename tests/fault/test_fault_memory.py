@@ -236,7 +236,7 @@ def _device(*payloads, write_error=None):
     reads = list(payloads)
     calls = []
 
-    async def execute(hass, func, *args):
+    async def execute(func, *args):
         calls.append((func, args))
         if func is device.write_value:
             if write_error:
@@ -328,7 +328,7 @@ class TestClearFaultMemory:
         device = MagicMock()
         writes = []
 
-        async def execute(hass, func, *args):
+        async def execute(func, *args):
             if func is device.write_value:
                 writes.append(args)
                 return None
@@ -353,7 +353,7 @@ class TestClearFaultMemory:
         state = {"n": 0}
         device = MagicMock()
 
-        async def execute(hass, func, *args):
+        async def execute(func, *args):
             if func is device.write_value:
                 return None
             state["n"] += 1

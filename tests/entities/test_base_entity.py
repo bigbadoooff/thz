@@ -256,7 +256,7 @@ class TestAsyncUpdate:
         await entity.async_update()
 
         entity._device.async_execute.assert_awaited_once_with(
-            entity.hass, entity._device.read_value, bytes.fromhex("0A0100"), "get", 4, 2
+            entity._device.read_value, bytes.fromhex("0A0100"), "get", 4, 2
         )
         assert entity.applied == [b"\x00\x05"]
 

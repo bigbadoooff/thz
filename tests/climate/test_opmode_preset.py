@@ -149,7 +149,7 @@ class TestAsyncSetPresetMode:
         # No translation table involved -- the write value is the encoded
         # "standby" option itself.
         call_args = entity._device.async_execute.call_args
-        assert call_args[0][1] == entity._device.write_value
+        assert call_args[0][0] == entity._device.write_value
 
     @pytest.mark.asyncio
     async def test_rejects_unknown_preset(self):
