@@ -14,6 +14,7 @@ from typing import cast
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
+from ..const import DOMAIN
 from ..notify import async_notify
 from ..value_codec import decode_raw_value
 from ..value_maps import SELECT_MAP
@@ -88,13 +89,15 @@ def _resolve_scan_commands(
         logging and notification text.
     """
     if max_results <= 0:
-        raise ServiceValidationError("max_results must be greater than 0")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="max_results_invalid"
+        )
 
     use_pattern = bool(pattern)
     use_range = bool(start) or bool(end)
     if use_pattern == use_range:
         raise ServiceValidationError(
-            "Provide either 'pattern' or both 'start' and 'end'"
+            translation_domain=DOMAIN, translation_key="scan_target_required"
         )
 
     try:
@@ -107,7 +110,11 @@ def _resolve_scan_commands(
             commands = _expand_scan_range(start, end)
             scan_mode = f"range:{start.strip().upper()}-{end.strip().upper()}"
     except ValueError as err:
-        raise ServiceValidationError(str(err)) from err
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="invalid_scan_request",
+            translation_placeholders={"error": str(err)},
+        ) from err
 
     if len(commands) > max_results:
         commands = commands[:max_results]
@@ -204,7 +211,11 @@ async def async_handle_read_raw_register(
             message=error_msg,
             notification_id=f"thz_raw_{command_str}",
         )
-        raise ServiceValidationError(error_msg) from err
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="invalid_hex_command",
+            translation_placeholders={"command": command_str, "error": str(err)},
+        ) from err
 
     # Locate the target device. With a single entry no entry_id is needed.
     # With multiple entries, entry_id is required — raise if omitted.
@@ -271,7 +282,11 @@ async def async_handle_read_raw_register(
             message=error_msg,
             notification_id=f"thz_raw_{command_str}",
         )
-        raise HomeAssistantError(error_msg) from err
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="raw_read_failed",
+            translation_placeholders={"command": command_str, "error": str(err)},
+        ) from err
 
 
 async def async_handle_scan_raw_registers(
@@ -391,12 +406,12 @@ async def async_handle_watch_raw_registers_changes(
 
     if duration_seconds < 1:
         raise ServiceValidationError(
-            "duration_seconds must be greater than or equal to 1"
+            translation_domain=DOMAIN, translation_key="duration_too_short"
         )
 
     if interval_seconds < 0:
         raise ServiceValidationError(
-            "interval_seconds must be greater than or equal to 0"
+            translation_domain=DOMAIN, translation_key="interval_negative"
         )
 
     commands, scan_mode = _resolve_scan_commands(pattern, start, end, max_results)
@@ -485,7 +500,9 @@ async def async_handle_refresh_block(
     requested_entry_id: str | None = call.data.get("entry_id")
 
     if not block:
-        raise ServiceValidationError("block parameter is required")
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="block_required"
+        )
 
     normalized = _normalize_block_name(block)
     found = await async_refresh_block(hass, block, requested_entry_id)
@@ -496,4 +513,8 @@ async def async_handle_refresh_block(
 
     error_msg = f"Block '{normalized}' not found in any active coordinator"
     _LOGGER.warning(error_msg)
-    raise ServiceValidationError(error_msg)
+    raise ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key="block_not_found",
+        translation_placeholders={"block": normalized},
+    )

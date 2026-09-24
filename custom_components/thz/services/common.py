@@ -36,20 +36,23 @@ def _require_target_entry_data(
         entry_data = available_entries.get(requested_entry_id)
         if entry_data is None:
             raise ServiceValidationError(
-                f"No THZ entry found for entry_id '{requested_entry_id}'"
+                translation_domain=DOMAIN,
+                translation_key="entry_not_found",
+                translation_placeholders={"entry_id": str(requested_entry_id)},
             )
         return requested_entry_id, entry_data
 
     if len(available_entries) > 1:
         raise ServiceValidationError(
-            "Multiple THZ config entries found. "
-            "Provide 'entry_id' to target a specific device."
+            translation_domain=DOMAIN, translation_key="multiple_entries"
         )
 
     if available_entries:
         return next(iter(available_entries.items()))
 
-    raise ServiceValidationError("No THZ device is loaded")
+    raise ServiceValidationError(
+        translation_domain=DOMAIN, translation_key="no_device_loaded"
+    )
 
 
 def _normalize_block_name(block: str) -> str:

@@ -8,6 +8,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **Error messages are translated.** Errors from the services, the button
+  and the setup ("will retry") come from the integration's translations
+  (English and German) instead of fixed English text.
+
 - **The connection runs on asyncio** (#185): serial port and ser2net TCP
   no longer use a worker thread per request. The serial port is opened with
   `pyserial-asyncio-fast`, a new requirement that Home Assistant installs
