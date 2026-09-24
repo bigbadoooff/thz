@@ -188,6 +188,7 @@
           "refresh_pxxF2": "Abfrageintervall: Wärmeanforderung & Betriebsmodus (s)",
           "refresh_pxxF3": "Abfrageintervall: Warmwasser-Status (s)",
           "refresh_pxxF4": "Abfrageintervall: Heizkreis-Status (s)",
+          "refresh_pxxF5": "Abfrageintervall: Heizkreis2-Status (s)",
           "refresh_pxxFC": "Abfrageintervall: Datum & Uhrzeit (s)",
           "refresh_pxxFD": "Abfrageintervall: Firmware-Datum (s)",
           "refresh_pxxFE": "Abfrageintervall: Hardware-/Softwareversion (s)",
@@ -439,6 +440,42 @@
       },
       "collector_temp": {
         "name": "Kollektortemperatur"
+      },
+      "solar_collector_temp": {
+        "name": "Solar Kollektortemperatur"
+      },
+      "solar_dhw_temp": {
+        "name": "Solar Warmwassertemperatur"
+      },
+      "solar_flow_temp": {
+        "name": "Solar Vorlauftemperatur"
+      },
+      "solar_pump_hours": {
+        "name": "Solarpumpe Betriebsstunden"
+      },
+      "solar_out": {
+        "name": "Solarertrag"
+      },
+      "solar_status": {
+        "name": "Solarstatus"
+      },
+      "input_fan_speed": {
+        "name": "Zuluftlüfter Drehzahl"
+      },
+      "output_fan_speed": {
+        "name": "Abluftlüfter Drehzahl"
+      },
+      "fan_stage_airflow_inlet": {
+        "name": "Lüfterstufe Zuluft"
+      },
+      "fan_stage_airflow_outlet": {
+        "name": "Lüfterstufe Abluft"
+      },
+      "input_fan_power": {
+        "name": "Zuluftlüfter Leistung"
+      },
+      "output_fan_power": {
+        "name": "Abluftlüfter Leistung"
       },
       "inside_temp": {
         "name": "Innentemperatur"

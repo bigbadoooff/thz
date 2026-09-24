@@ -97,6 +97,7 @@
           "refresh_pxxF2": "Poll interval: Heat Request & Operating Mode (s)",
           "refresh_pxxF3": "Poll interval: DHW Status (s)",
           "refresh_pxxF4": "Poll interval: Heating Circuit Status (s)",
+          "refresh_pxxF5": "Poll interval: Heating Circuit 2 Status (s)",
           "refresh_pxxFC": "Poll interval: Date & Time (s)",
           "refresh_pxxFD": "Poll interval: Firmware Date (s)",
           "refresh_pxxFE": "Poll interval: Hardware/Software Version (s)",

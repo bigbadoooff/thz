@@ -223,3 +223,25 @@ def test_every_entity_translation_is_used():
         if key not in used.get(platform, set()) and key not in set_in_code
     ]
     assert unused == []
+
+
+@pytest.mark.parametrize("language", ["en", "de"])
+def test_translations_cover_strings(language):
+    """Every entry of strings.json is translated, and nothing more."""
+
+    def paths(tree, prefix=""):
+        found = set()
+        for key, value in tree.items():
+            path = f"{prefix}.{key}"
+            found.add(path)
+            if isinstance(value, dict):
+                found |= paths(value, path)
+        return found
+
+    component = Path(__file__).parents[2] / "custom_components/thz"
+    strings = json.loads((component / "strings.json").read_text())
+    translated = json.loads(
+        (component / "translations" / f"{language}.json").read_text()
+    )
+    assert sorted(paths(strings) - paths(translated)) == []
+    assert sorted(paths(translated) - paths(strings)) == []
