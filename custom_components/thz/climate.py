@@ -100,6 +100,7 @@ from .value_maps import SELECT_MAP
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
+    from .register_maps.register_map_manager import RegisterMapManager
     from .runtime_data import THZConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -142,7 +143,7 @@ _DEFAULT_MAX_TEMP = 60.0
 
 
 def _field_layout(
-    register_manager, block: str, field_name: str
+    register_manager: RegisterMapManager, block: str, field_name: str
 ) -> tuple[int, int] | None:
     """Return (byte_offset, byte_length) of a named field in a register block.
 
@@ -155,7 +156,7 @@ def _field_layout(
 
 
 def _bit_field_layout(
-    register_manager, block: str, field_name: str
+    register_manager: RegisterMapManager, block: str, field_name: str
 ) -> tuple[int, int] | None:
     """Return (byte_index, bit_index) of a named single-bit flag in a block.
 

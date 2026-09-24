@@ -31,7 +31,10 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+)
 
 from .const import (
     DOMAIN,
@@ -271,7 +274,7 @@ def decode_value(
     return decode_raw_value(raw, decode_type, factor)
 
 
-def normalize_entry(entry):
+def normalize_entry(entry: tuple[Any, ...] | dict[str, Any]) -> dict[str, Any]:
     """Normalize a sensor entry to a standard dictionary format.
 
     This function accepts either a tuple or a dictionary representing a
@@ -342,13 +345,13 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator,
-        entry,
-        block,
-        device_id,
-        entity_id_style=ENTITY_ID_STYLE_DEFAULT,
-        entity_visibility=ENTITY_VISIBILITY_DEFAULT,
-        entity_id_prefix=None,
+        coordinator: DataUpdateCoordinator[Any],
+        entry: tuple[Any, ...] | dict[str, Any],
+        block: bytes,
+        device_id: str,
+        entity_id_style: str = ENTITY_ID_STYLE_DEFAULT,
+        entity_visibility: str = ENTITY_VISIBILITY_DEFAULT,
+        entity_id_prefix: str | None = None,
     ) -> None:
         """Initialize a sensor instance with the provided configuration.
 

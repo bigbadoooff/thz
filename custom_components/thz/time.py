@@ -155,14 +155,14 @@ TWO_TIME_DECODE_TYPES = ("8party",)
 
 
 def _create_time_entities(
-    name,
+    name: str,
     entry: WriteParam,
-    device,
-    device_id,
-    entity_id_style="default",
-    entity_visibility="default",
-    entity_id_prefix=None,
-):
+    device: THZDevice,
+    device_id: str,
+    entity_id_style: str = "default",
+    entity_visibility: str = "default",
+    entity_id_prefix: str | None = None,
+) -> list[THZTime | THZScheduleTime]:
     """Factory function to create time entities, handling schedule types specially."""
     if entry.type == "schedule":
         # Create both start and end time entities for schedule type
@@ -191,22 +191,27 @@ def _create_time_entities(
                 entity_id_prefix=entity_id_prefix,
             ),
         ]
-    common = {
-        "entry": entry,
-        "device": device,
-        "device_id": device_id,
-        "entity_id_style": entity_id_style,
-        "entity_visibility": entity_visibility,
-        "entity_id_prefix": entity_id_prefix,
-    }
+
+    def time_entity(
+        entity_name: str, base_name: str | None = None, end: bool = False
+    ) -> THZTime:
+        return THZTime(
+            name=entity_name,
+            base_name=base_name,
+            end=end,
+            entry=entry,
+            device=device,
+            device_id=device_id,
+            entity_id_style=entity_id_style,
+            entity_visibility=entity_visibility,
+            entity_id_prefix=entity_id_prefix,
+        )
+
     if entry.decode_type in TWO_TIME_DECODE_TYPES:
         # The start keeps the parameter's own name (and unique id); the end
         # is a second entity on the other byte of the register.
-        return [
-            THZTime(name=name, **common),
-            THZTime(name=f"{name} End", base_name=name, end=True, **common),
-        ]
-    return THZTime(name=name, **common)
+        return [time_entity(name), time_entity(f"{name} End", name, end=True)]
+    return [time_entity(name)]
 
 
 async def async_setup_entry(
@@ -227,7 +232,7 @@ async def async_setup_entry(
     params = write_manager.params()
     _LOGGER.debug("Loading time platform with %d registers", len(params))
 
-    entities = []
+    entities: list[THZTime | THZScheduleTime] = []
     for name, entry in params.items():
         if entry.type in ("time", "schedule"):
             _LOGGER.debug(
@@ -245,9 +250,7 @@ async def async_setup_entry(
                 entity_visibility,
                 entity_id_prefix,
             )
-            entities.extend(
-                new_entities if isinstance(new_entities, list) else [new_entities]
-            )
+            entities.extend(new_entities)
     for entity in entities:
         entity._coordinators = entry_data.coordinators
         entity._poller = entry_data.poller
@@ -327,7 +330,7 @@ class THZTime(THZParameterEntity, TimeEntity):
         self._keep_other_byte = entry.decode_type in TWO_TIME_DECODE_TYPES
 
     @property
-    def native_value(self):
+    def native_value(self) -> time | None:
         """Return the native value of the time."""
         return self._attr_native_value
 
@@ -490,7 +493,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         )
 
     @property
-    def native_value(self):
+    def native_value(self) -> time | None:
         """Return the native value of the time."""
         return self._attr_native_value
 

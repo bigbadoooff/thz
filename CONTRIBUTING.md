@@ -62,9 +62,8 @@ These keep the protocol code safe to change. Reviews check them.
 
 - ruff decides formatting and import order. The hand-aligned map files in
   `register_maps/` are excluded from formatting.
-- Type hints everywhere. `parameter_io`, `value_codec` and
-  `register_map_manager` are checked with mypy's strict flags. Add a module
-  to that list in `pyproject.toml` once it passes.
+- Type hints everywhere: mypy runs in strict mode on the whole integration
+  (`strict = true` in `pyproject.toml`).
 - User-facing text goes through `strings.json` and `translations/`, never a
   hard-coded English string. Every entity has a translation key and
   `has_entity_name`; a new map entry needs its name in `strings.json`

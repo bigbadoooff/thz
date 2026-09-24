@@ -56,11 +56,7 @@ convention = "google"
 [tool.mypy]
 python_version = "3.13"
 files = ["custom_components/thz"]
-warn_return_any = true
-warn_unused_ignores = true
-warn_redundant_casts = true
-strict_equality = true
-check_untyped_defs = true
+strict = true
 
 # Dev-only type stubs (see requirements_test.txt: mypy, homeassistant-stubs,
 # types-pyserial) may lag behind the minimum Home Assistant version this
@@ -74,26 +70,3 @@ check_untyped_defs = true
 # only read syntax its host interpreter's grammar supports (e.g.
 # homeassistant-stubs' PEP 695/696 `type` statements need mypy running on
 # Python 3.12+ regardless of this setting).
-
-# Strict typing for the protocol core. `strict = true` is not allowed per
-# module, so the flags it enables are listed individually. mypy sees the
-# package as `thz` (custom_components/ has no __init__.py). Add modules here
-# once they pass.
-[[tool.mypy.overrides]]
-module = [
-    "thz.parameter_io",
-    "thz.value_codec",
-    "thz.register_maps.register_map_manager",
-    "thz.register_maps.model",
-    "thz.protocol",
-    "thz.transport",
-    "thz.exceptions",
-]
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-disallow_untyped_calls = true
-disallow_untyped_decorators = true
-disallow_any_generics = true
-disallow_subclassing_any = true
-no_implicit_reexport = true
-extra_checks = true

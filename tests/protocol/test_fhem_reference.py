@@ -341,7 +341,8 @@ async def _our_direct_telegram(name: str, entry: dict, value) -> str:
         await _prepare(start).async_set_value(value[0])
         await _prepare(end).async_set_value(value[1])
     elif kind == "time":
-        entity = _prepare(_create_time_entities(name, entry, device, "dev"))
+        (entity,) = _create_time_entities(name, entry, device, "dev")
+        _prepare(entity)
         await entity.async_set_value(value)
     else:  # schedule: HA exposes start and end as two entities
         start, end = _create_time_entities(name, entry, device, "dev")
@@ -478,8 +479,8 @@ async def _our_direct_reading(name: str, entry, data: str) -> str:
     if kind == "select":
         return (await _updated(THZSelect(name, entry, device, "dev"))).current_option
     created = _create_time_entities(name, entry, device, "dev")
-    if not isinstance(created, list):
-        return _time_text((await _updated(created)).native_value)
+    if len(created) == 1:
+        return _time_text((await _updated(created[0])).native_value)
     start, end = [await _updated(entity) for entity in created]
     return f"{_time_text(start.native_value)}--{_time_text(end.native_value)}"
 
