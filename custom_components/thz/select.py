@@ -9,10 +9,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .base_entity import THZBaseEntity
+from .base_entity import THZParameterEntity
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
-from .parameter_io import async_read_parameter, async_write_parameter
+from .parameter_io import async_write_parameter
 from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
 from .thz_device import THZDevice
@@ -21,8 +21,8 @@ from .value_maps import SELECT_MAP, select_slugs, state_slug
 
 _LOGGER = logging.getLogger(__name__)
 
-# Each entity polls and writes to the device directly (no coordinator);
-# limit to one in-flight update/service call at a time.
+# Values come from the parameter poller or a block coordinator; writes go
+# to the device directly, one at a time.
 PARALLEL_UPDATES = 1
 
 
@@ -58,7 +58,7 @@ def _options_within_bounds(
     }
 
 
-class THZSelect(THZBaseEntity, SelectEntity):
+class THZSelect(THZParameterEntity, SelectEntity):
     """Representation of a THZ Select entity."""
 
     def __init__(
@@ -67,7 +67,6 @@ class THZSelect(THZBaseEntity, SelectEntity):
         entry: WriteParam,
         device: THZDevice,
         device_id: str,
-        scan_interval: int | None = None,
         entity_id_style: str = "default",
         entity_visibility: str = "default",
         entity_id_prefix: str | None = None,
@@ -79,7 +78,6 @@ class THZSelect(THZBaseEntity, SelectEntity):
             entry: The write-map parameter.
             device: The device instance this select entity belongs to.
             device_id: The device identifier for linking to device.
-            scan_interval: The scan interval in seconds for polling updates.
             entity_id_style: "default" or "fhem" (see base_entity.py).
             entity_visibility: "default"/"extended"/"all" (see base_entity.py).
             entity_id_prefix: Optional device alias prefix for "fhem"-style
@@ -92,7 +90,6 @@ class THZSelect(THZBaseEntity, SelectEntity):
             device=device,
             device_id=device_id,
             icon=entry.icon,
-            scan_interval=scan_interval,
             translation_key=get_translation_key(name),
             entity_id_style=entity_id_style,
             entity_visibility=entity_visibility,
@@ -133,28 +130,19 @@ class THZSelect(THZBaseEntity, SelectEntity):
         """Return the current option."""
         return self._attr_current_option
 
-    async def async_update(self) -> None:
-        """Fetch new state data for the select."""
-        value_bytes = await self._async_guarded_read(
-            async_read_parameter(self.hass, self._device, self._entry)
-        )
-        if value_bytes is None:
-            return
-
+    def _apply_value(self, value_bytes: bytes) -> None:
+        """Decode the parameter's bytes into the current option."""
         _LOGGER.debug("Received bytes for %s: %s", self.name, value_bytes.hex())
-
         try:
-            # Use centralized codec for decoding
             option = THZValueCodec.decode_select(value_bytes, self._decode_type)
-            if option:
-                option = state_slug(option)
-                self._attr_current_option = option
-                _LOGGER.debug("Decoded option for %s: %s", self.name, option)
-            else:
-                _LOGGER.warning("Could not map value to option for %s", self.name)
         except (ValueError, IndexError, TypeError) as err:
             _LOGGER.error("Error decoding select %s: %s", self.name, err, exc_info=True)
-            # Keep previous value on error
+            return  # keep the previous value
+        if not option:
+            _LOGGER.warning("Could not map value to option for %s", self.name)
+            return
+        self._attr_current_option = state_slug(option)
+        _LOGGER.debug("Decoded option for %s: %s", self.name, self._attr_current_option)
 
     async def async_select_option(self, option: str) -> None:
         """Set the selected option."""
@@ -173,6 +161,7 @@ class THZSelect(THZBaseEntity, SelectEntity):
 
             self._attr_current_option = option
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+            await self._async_after_write()
         except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error setting select %s to option %s: %s",

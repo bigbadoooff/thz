@@ -34,9 +34,10 @@ rules:
   log-when-unavailable:
     status: todo
     comment: >
-      The device logs a lost and a restored connection once, and block
-      coordinators stay quiet meanwhile; directly polled write entities
-      still log going unavailable per entity, and not coming back.
+      The device logs the heat pump not answering and answering again
+      once; block coordinators and the parameter poller stay quiet
+      meanwhile. A single register failing while the device answers is
+      logged by the poller, but not its coming back.
   parallel-updates: done
   reauthentication-flow:
     status: exempt

@@ -14,16 +14,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .base_entity import THZBaseEntity
+from .base_entity import THZParameterEntity
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
-from .parameter_io import (
-    async_read_parameter,
-    async_write_parameter,
-    block_coordinator_key,
-    parameter_from_block,
-    parameter_length,
-)
+from .parameter_io import async_write_parameter, parameter_length
 from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
 from .thz_device import THZDevice
@@ -31,8 +25,8 @@ from .value_codec import THZValueCodec
 
 _LOGGER = logging.getLogger(__name__)
 
-# Each entity polls and writes to the device directly (no coordinator);
-# limit to one in-flight update/service call at a time.
+# Values come from the parameter poller or a block coordinator; writes go
+# to the device directly, one at a time.
 PARALLEL_UPDATES = 1
 
 
@@ -47,7 +41,7 @@ async def async_setup_entry(
     )
 
 
-class THZNumber(THZBaseEntity, NumberEntity):
+class THZNumber(THZParameterEntity, NumberEntity):
     """Representation of a THZ Number entity."""
 
     def __init__(
@@ -56,7 +50,6 @@ class THZNumber(THZBaseEntity, NumberEntity):
         entry: WriteParam,
         device: THZDevice,
         device_id: str,
-        scan_interval: int | None = None,
         entity_id_style: str = "default",
         entity_visibility: str = "default",
         entity_id_prefix: str | None = None,
@@ -68,7 +61,6 @@ class THZNumber(THZBaseEntity, NumberEntity):
             entry: The write-map parameter.
             device: The device instance this entity belongs to.
             device_id: The device identifier for linking to device.
-            scan_interval: The scan interval in seconds for polling updates.
             entity_id_style: "default" or "fhem" (see base_entity.py).
             entity_visibility: "default"/"extended"/"all" (see base_entity.py).
             entity_id_prefix: Optional device alias prefix for "fhem"-style
@@ -81,7 +73,6 @@ class THZNumber(THZBaseEntity, NumberEntity):
             device=device,
             device_id=device_id,
             icon=entry.icon,
-            scan_interval=scan_interval,
             translation_key=get_translation_key(name),
             entity_id_style=entity_id_style,
             entity_visibility=entity_visibility,
@@ -112,48 +103,21 @@ class THZNumber(THZBaseEntity, NumberEntity):
         """Return the native value of the number."""
         return self._attr_native_value
 
-    def _block_coordinator(self):
-        """Return the coordinator polling this 2xx parameter's block, if any."""
-        key = block_coordinator_key(self._entry)
-        return self._coordinators.get(key) if key else None
-
-    async def async_update(self) -> None:
-        """Fetch new state data for the number.
-
-        2xx block parameters are taken from the block's coordinator when it
-        has fresh data, instead of reading the whole block from the device
-        once per parameter; otherwise the device is read directly.
-        """
-        value_bytes = None
-        coordinator = self._block_coordinator()
-        if (
-            coordinator is not None
-            and coordinator.last_update_success
-            and coordinator.data
-        ):
-            value_bytes = parameter_from_block(self._entry, coordinator.data)
-        if value_bytes is None:
-            value_bytes = await self._async_guarded_read(
-                async_read_parameter(self.hass, self._device, self._entry)
-            )
-        if value_bytes is None:
-            return
-
+    def _apply_value(self, value_bytes: bytes) -> None:
+        """Decode the parameter's bytes into the number."""
         _LOGGER.debug("Received bytes for %s: %s", self.name, value_bytes.hex())
-
         try:
-            # Use centralized codec for decoding
             value = THZValueCodec.decode_number(
                 value_bytes,
                 self._attr_native_step,
                 self._decode_type,
                 self._entry.signed,
             )
-            _LOGGER.debug("Decoded value for %s: %s", self.name, value)
-            self._attr_native_value = value
         except (ValueError, IndexError, TypeError) as err:
             _LOGGER.error("Error decoding number %s: %s", self.name, err, exc_info=True)
-            # Keep previous value on error
+            return  # keep the previous value
+        _LOGGER.debug("Decoded value for %s: %s", self.name, value)
+        self._attr_native_value = value
 
     async def async_set_native_value(self, value: float) -> None:
         """Set new value for the number."""
@@ -175,11 +139,7 @@ class THZNumber(THZBaseEntity, NumberEntity):
 
             self._attr_native_value = value
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-            coordinator = self._block_coordinator()
-            if coordinator is not None:
-                # Keep the block data this entity reads from in step with
-                # the write, so the next update does not show the old value.
-                await coordinator.async_request_refresh()
+            await self._async_after_write()
         except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error encoding number %s value %s: %s",
