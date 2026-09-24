@@ -287,24 +287,13 @@ class TestDecodeOpmodehc:
 
 
 class TestDecode8Party:
-    """Tests for 8party decoding (party time in minutes)."""
+    """8party: party start (second byte) and end (first byte) in quarters."""
 
-    def test_zero_minutes(self):
-        """Test decoding zero party time."""
-        raw = b"\x00\x00\x00\x00"
-        assert decode_value(raw, "8party") == 0
+    def test_start_and_end(self):
+        assert decode_value(bytes([90, 28]), "8party") == "07:00--22:30"
 
-    def test_sixty_minutes(self):
-        """Test decoding 60 minutes."""
-        raw = b"\x00\x00\x00\x3c"  # 60 = 0x3c
-        assert decode_value(raw, "8party") == 60
+    def test_end_of_day_and_unset(self):
+        assert decode_value(bytes([96, 0x80]), "8party") == "n.a.--24:00"
 
-    def test_max_party_time(self):
-        """Test decoding 1439 minutes (23:59)."""
-        raw = b"\x00\x00\x05\x9f"  # 1439 = 0x059f
-        assert decode_value(raw, "8party") == 1439
-
-    def test_factor_applied(self):
-        """Test that factor is applied, consistent with unsigned int decode types."""
-        raw = b"\x00\x00\x00\x3c"  # 60
-        assert decode_value(raw, "8party", 10) == 6.0
+    def test_too_short_is_shown_as_hex(self):
+        assert decode_value(b"\x1c", "8party") == "1c"

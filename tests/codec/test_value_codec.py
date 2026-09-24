@@ -227,8 +227,8 @@ class TestDecodeRawValueHelpers:
         assert decode_raw_value(raw, "opmodehc", 1.0) == "999"
 
     def test_dec_party_time(self):
-        raw = (120).to_bytes(2, byteorder="big")
-        assert decode_raw_value(raw, "8party", 2.0) == 60.0
+        # End 22:30 (quarter 90) in the first byte, start 07:00 in the second.
+        assert decode_raw_value(bytes([90, 28]), "8party", 1.0) == "07:00--22:30"
 
     def test_dec_faultmap_known(self):
         raw = bytes([1])

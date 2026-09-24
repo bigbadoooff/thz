@@ -26,7 +26,7 @@ from custom_components.thz.register_maps.register_map_manager import (
 )
 from custom_components.thz.sensor import sensor_unique_id
 
-from .common import HOST, entity_id, make_entry, setup_entry
+from .common import BLOCKS, HOST, entity_id, make_entry, setup_entry
 
 
 async def test_setup_creates_entities_and_unloads(hass, fake_device):
@@ -243,4 +243,16 @@ async def test_placeholder_sensors_of_old_versions_are_removed(hass, fake_device
         if e.domain == "sensor" and "\\xfb" in e.unique_id
     ]
     assert sensors
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_party_sensor_shows_start_and_end(hass, fake_device):
+    # End 22:30 (quarter 90) in the first data byte, start 07:00 in the second.
+    fake_device.initial_registers = {bytes.fromhex("0A05D1"): bytes([90, 28])}
+    entry = await setup_entry(hass, refresh_intervals={**BLOCKS, "pxx0A05D1": 600})
+
+    sensor = entity_id(hass, entry, "sensor", "_party-time")
+    state = hass.states.get(sensor)
+    assert state.state == "07:00--22:30"
+    assert "unit_of_measurement" not in state.attributes
     assert await hass.config_entries.async_unload(entry.entry_id)

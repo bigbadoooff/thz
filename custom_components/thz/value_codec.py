@@ -64,8 +64,22 @@ def _dec_opmodehc(raw: bytes, factor: float) -> str:
     return SELECT_MAP.get("OpModeHC", {}).get(key, key)
 
 
-def _dec_party_time(raw: bytes, factor: float) -> int | float:
-    return int.from_bytes(raw, byteorder="big") / factor
+def _quarters_text(num: int) -> str:
+    """Format a count of quarter hours like FHEM's quaters2time ("n.a." for 0x80)."""
+    if num == 0x80:
+        return "n.a."
+    return f"{num // 4:02d}:{num % 4 * 15:02d}"
+
+
+def _dec_party_time(raw: bytes, factor: float) -> str:
+    """Decode the party register: start in the second byte, end in the first.
+
+    FHEM's "8party" rule reads both as quarter hours and shows them as
+    "HH:MM--HH:MM" (an end of 24:00 is quarter 96).
+    """
+    if len(raw) < 2:
+        return raw.hex()
+    return f"{_quarters_text(raw[1])}--{_quarters_text(raw[0])}"
 
 
 def _dec_faultmap(raw: bytes, factor: float) -> str:
@@ -199,7 +213,7 @@ def decode_raw_value(
             - "somwinmode": Map lookup for summer/winter mode.
             - "weekday": Map lookup for day of week.
             - "opmodehc": Map lookup for HC operating mode.
-            - "8party": Unsigned integer (party time in minutes).
+            - "8party": Party start and end, "HH:MM--HH:MM" (FHEM notation).
             - "faultmap": Big-endian unsigned int looked up in faultmap table.
             - "hex2time": Big-endian 2-byte decimal-encoded time → "HH:MM"
               (value/100 gives hours, value%100 gives minutes).
@@ -212,7 +226,7 @@ def decode_raw_value(
               4.39/5.39 fault-log times; see "hex2time" for the un-swapped
               2.06 equivalent).
             - Any other: Returns hexadecimal representation.
-        factor: The divisor for "hex2int", "hex", and "8party" decoding.
+        factor: The divisor for "hex2int" and "hex" decoding.
             Defaults to 1.0.
 
     Returns:
@@ -299,10 +313,12 @@ class THZValueCodec:
         if decode_type == "4temp":
             value = int.from_bytes(value_bytes, byteorder="big", signed=True)
             return value / 256 * step
-        else:
-            # Standard 2-byte signed integer decoding with scaling
-            value = int.from_bytes(value_bytes, byteorder="big", signed=signed)
-            return value * step
+        if decode_type == "6gradient":
+            # FHEM parses "6gradient" as "hex": unsigned (00_THZ.pm).
+            signed = False
+        # Standard 2-byte integer decoding with scaling
+        value = int.from_bytes(value_bytes, byteorder="big", signed=signed)
+        return value * step
 
     @staticmethod
     def encode_select(option: str, decode_type: str | None) -> bytes:
