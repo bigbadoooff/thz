@@ -4,6 +4,8 @@ This module contains dictionaries that map between device numeric values
 and human-readable string representations for select entities.
 """
 
+from collections.abc import Mapping
+
 # Selection mappings for different device parameters
 # Keys are decode_type identifiers, values are dicts mapping numeric values to strings
 SELECT_MAP = {
@@ -140,11 +142,11 @@ def to_state(decode_type: str, value: object) -> str:
     return slug if slug in state_options(decode_type) else STATE_UNKNOWN
 
 
-def select_slugs(decode_type: str) -> dict[str, str]:
-    """Return {state key: SELECT_MAP value} for a select entity's table.
+def select_slugs(table: Mapping[str, str]) -> dict[str, str]:
+    """Return {state key: table value} for a select entity's SELECT_MAP table.
 
     Select options must be translation-safe keys too, so entities expose the
     slug ("daymode") while the codec keeps working with the table value
     ("DAYmode"). Tables whose values are already slugs map to themselves.
     """
-    return {state_slug(value): value for value in SELECT_MAP[decode_type].values()}
+    return {state_slug(value): value for value in table.values()}

@@ -17,7 +17,7 @@ from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
 from .thz_device import THZDevice
 from .value_codec import THZValueCodec
-from .value_maps import SELECT_MAP, state_slug
+from .value_maps import SELECT_MAP, select_slugs, state_slug
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -113,9 +113,7 @@ class THZSelect(THZBaseEntity, SelectEntity):
             bounded = _options_within_bounds(
                 SELECT_MAP[self._decode_type], entry.min, entry.max
             )
-            self._table_values = {
-                state_slug(value): value for value in bounded.values()
-            }
+            self._table_values = select_slugs(bounded)
             self._attr_options = list(self._table_values)
             _LOGGER.debug(
                 "Options for %s (%s): %s", name, self._decode_type, self._attr_options
