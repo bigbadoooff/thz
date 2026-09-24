@@ -50,6 +50,7 @@ class TestInit:
     def test_no_translation_key_sets_attr_name(self):
         entity = _make_entity(name="pTestEntity")
         assert entity._attr_name == "pTestEntity"
+        assert entity._attr_has_entity_name is True
         assert not hasattr(entity, "_attr_translation_key")
 
     def test_explicit_unique_id_used(self):

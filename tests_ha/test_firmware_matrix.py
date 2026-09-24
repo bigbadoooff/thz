@@ -6,6 +6,7 @@ compares the resulting entity registry with the stored snapshot. A
 register-map change that adds, drops or renames entities, or changes their
 sub-device, category, device class or unit, shows up as a snapshot diff
 that has to be reviewed and accepted with ``pytest tests_ha --snapshot-update``.
+Every entity must also have a translation key and ``has_entity_name``.
 """
 
 from __future__ import annotations
@@ -97,6 +98,10 @@ async def test_entities_per_firmware(
         )
     }
     assert sorted(_describe(e, prefix, devices) for e in entities) == snapshot
+
+    # Every entity is named by translation, under the device's name.
+    assert [e.entity_id for e in entities if not e.translation_key] == []
+    assert [e.entity_id for e in entities if not e.has_entity_name] == []
 
     assert await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()

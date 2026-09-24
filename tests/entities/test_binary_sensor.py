@@ -189,6 +189,7 @@ class TestTHZBinarySensorAdditional:
             device_id="dev1",
         )
         assert entity._attr_name == "compressor"
+        assert entity._attr_has_entity_name is True
         assert not hasattr(entity, "_attr_translation_key")
 
     def test_init_with_translation_key_sets_has_entity_name(self):

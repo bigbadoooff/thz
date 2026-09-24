@@ -289,6 +289,10 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         no translation is available.
     """
 
+    # The name is the entity's part only; Home Assistant prefixes the device
+    # name. Every entity has a translation key (checked in tests_ha).
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator,
@@ -353,7 +357,6 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         translation_key = e.get("translation_key")
         if translation_key is not None:
             self._attr_translation_key = translation_key
-            self._attr_has_entity_name = True
             # Icon comes from icons.json (icon translations) instead of a
             # hardcoded value, per HA's icon-translations quality-scale rule.
             self._icon = None

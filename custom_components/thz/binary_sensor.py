@@ -173,6 +173,10 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         _entity_name: Internal name used for unique_id and visibility checks.
     """
 
+    # The name is the entity's part only; Home Assistant prefixes the device
+    # name. Every entity has a translation key (checked in tests_ha).
+    _attr_has_entity_name = True
+
     def __init__(
         self,
         coordinator: Any,
@@ -211,7 +215,6 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
         translation_key = entry.get("translation_key")
         if translation_key is not None:
             self._attr_translation_key = translation_key
-            self._attr_has_entity_name = True
             # Icon comes from icons.json (icon translations) instead of a
             # hardcoded value, per HA's icon-translations quality-scale rule.
             self._icon = None

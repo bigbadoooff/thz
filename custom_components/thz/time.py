@@ -302,9 +302,6 @@ class THZTime(THZBaseEntity, TimeEntity):
             domain="time",
         )
 
-        # Explicitly enable has_entity_name for time entities
-        self._attr_has_entity_name = True
-
         self._attr_native_value = None
         self._entry = entry
         self._byte_index = time_byte_index(entry.decode_type)
@@ -467,9 +464,6 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             entity_id_prefix=entity_id_prefix,
             domain="time",
         )
-
-        # Explicitly enable has_entity_name for time entities
-        self._attr_has_entity_name = True
 
         self._time_type = time_type
         self._attr_native_value = None
