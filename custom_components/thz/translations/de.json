@@ -324,7 +324,6 @@
       "cannot_detect_blocks": "Firmware oder verfügbare Blöcke konnten nicht vom Gerät gelesen werden. Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
       "invalid_entry_id": "Die angegebene Konfigurations-ID ist ungültig. Neukonfiguration kann nicht fortgesetzt werden.",
       "missing_entry_id": "Es wurde keine Konfigurations-ID angegeben. Neukonfiguration kann nicht fortgesetzt werden.",
-      "no_data_in_entry": "Keine Konfigurationsdaten im Eintrag gefunden. Neukonfiguration kann nicht fortgesetzt werden.",
       "reconfigured": "Die THZ-Integration wurde erfolgreich neu konfiguriert.",
       "already_configured": "Dieses THZ-Gerät ist bereits eingerichtet."
     },

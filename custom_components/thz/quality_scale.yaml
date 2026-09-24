@@ -5,11 +5,12 @@ rules:
   brands: done
   common-modules: done
   config-flow-test-coverage:
-    status: todo
+    status: done
     comment: >
-      tests_ha/ covers the IP, USB, error, duplicate and reconfigure paths
-      against a real Home Assistant; the rest is covered only with stubs in
-      tests/.
+      tests_ha/ runs every path of the config and reconfigure flow that Home
+      Assistant can reach (IP, USB with port detection, errors, duplicates,
+      reconfigure); tests/ adds the defensive branches (missing entry,
+      OS errors while resolving ports). Together they cover the whole file.
   config-flow: done
   dependency-transparency: done
   docs-actions: done
