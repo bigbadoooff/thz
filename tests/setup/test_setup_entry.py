@@ -106,6 +106,11 @@ def _mock_config_entry(entry_id="entry1", **data_overrides):
         "device": "/dev/ttyUSB0",
     }
     data.update(data_overrides)
+    # Set by the config flow or async_migrate_entry.
+    data.setdefault(
+        "device_identifier",
+        f"{data['connection_type']}-{data.get('host') or data.get('device')}",
+    )
     entry.data = data
     return entry
 
@@ -518,3 +523,36 @@ class TestAsyncUpdateBlock:
 
         with pytest.raises(thz_module.UpdateFailed):
             await thz_module._async_update_block(hass, device, "pxxFB")
+
+
+class TestAsyncMigrateEntry:
+    """Entries of version 1.1 get the device identifier stored."""
+
+    @staticmethod
+    def _entry(version, minor_version, **data):
+        entry = MagicMock(version=version, minor_version=minor_version)
+        entry.data = {"connection_type": "ip", "host": "192.0.2.1", **data}
+        return entry
+
+    @pytest.mark.asyncio
+    async def test_stores_the_identifier_of_the_connection(self):
+        hass = _mock_hass()
+        entry = self._entry(1, 1)
+
+        assert await thz_module.async_migrate_entry(hass, entry)
+
+        hass.config_entries.async_update_entry.assert_called_once_with(
+            entry,
+            data={**entry.data, "device_identifier": "ip-192.0.2.1"},
+            minor_version=2,
+        )
+
+    @pytest.mark.asyncio
+    async def test_current_entry_is_left_alone(self):
+        hass = _mock_hass()
+        assert await thz_module.async_migrate_entry(hass, self._entry(1, 2))
+        hass.config_entries.async_update_entry.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_newer_entry_is_refused(self):
+        assert not await thz_module.async_migrate_entry(_mock_hass(), self._entry(2, 1))

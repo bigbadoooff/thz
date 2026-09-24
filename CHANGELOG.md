@@ -46,6 +46,14 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Changing the host or serial device kept the entities but not the
+  device** (#185): the heat pump's device registry identifier was derived
+  from the connection on every start, so after a Reconfigure to a new host
+  a second device appeared, and the climate, COP and fault entities (whose
+  unique ids contain it) were created anew without their history. The
+  identifier is now stored in the entry when it is created; existing
+  entries keep the one they are registered under (entry migration to 1.2).
+
 - **Three entities had no name of their own**: the pump settings of the
   technician maps (`zPumpHC`, `zPumpDHW`, numbers) and the 2.14 error reset
   (`ResetErrors`, a button) had their translations only under `select`, so

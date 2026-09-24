@@ -16,11 +16,18 @@ from collections.abc import Iterable, Mapping
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_DEVICE, CONF_HOST
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import CONF_SPLIT_DEVICES, DOMAIN
+
+
+def entry_unique_id(data: Mapping[str, Any]) -> str:
+    """Return the unique id of the entry for a connection (``ip-<host>``...)."""
+    return f"{data['connection_type']}-{data.get(CONF_HOST) or data.get(CONF_DEVICE)}"
+
 
 SUBDEVICE_HEATING = "heating"
 SUBDEVICE_HEATING_HC2 = "heating_hc2"

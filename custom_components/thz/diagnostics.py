@@ -18,6 +18,7 @@ TO_REDACT = {
     "serial",
     "alias",
     "area",
+    "device_identifier",
 }
 
 
