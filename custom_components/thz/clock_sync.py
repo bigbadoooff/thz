@@ -21,6 +21,7 @@ Two independent callers rely on this module:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
 import logging
 from typing import TYPE_CHECKING
@@ -41,6 +42,7 @@ from .value_codec import THZValueCodec
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
 
+    from .register_maps.register_map_manager import RegisterMapManagerWrite
     from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -67,7 +69,7 @@ CLOCK_READ_ATTEMPTS = 3
 
 
 async def _read_clock_parts(
-    hass: HomeAssistant, device: THZDevice, write_manager
+    hass: HomeAssistant, device: THZDevice, write_manager: RegisterMapManagerWrite
 ) -> dict[str, int] | None:
     """Read the five pClock* components, retrying each read a few times.
 
@@ -123,7 +125,7 @@ def _parts_to_datetime(parts: dict[str, int]) -> datetime | None:
 
 
 async def async_read_device_clock(
-    hass: HomeAssistant, device: THZDevice, write_manager
+    hass: HomeAssistant, device: THZDevice, write_manager: RegisterMapManagerWrite
 ) -> datetime | None:
     """Read the device's current date/time from its 5 pClock* registers.
 
@@ -136,7 +138,10 @@ async def async_read_device_clock(
 
 
 async def async_write_device_clock(
-    hass: HomeAssistant, device: THZDevice, write_manager, when: datetime
+    hass: HomeAssistant,
+    device: THZDevice,
+    write_manager: RegisterMapManagerWrite,
+    when: datetime,
 ) -> bool:
     """Write ``when`` (a local wall-clock time) onto the 5 pClock* registers.
 
@@ -184,7 +189,7 @@ async def async_check_and_maybe_sync_clock(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     device: THZDevice,
-    write_manager,
+    write_manager: RegisterMapManagerWrite,
 ) -> None:
     """Periodic check: log clock drift, and auto-correct it if opted in.
 
@@ -250,15 +255,18 @@ def local_clock_now() -> datetime:
 
 
 def async_setup_clock_check(
-    hass: HomeAssistant, config_entry: ConfigEntry, device: THZDevice, write_manager
-):
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    device: THZDevice,
+    write_manager: RegisterMapManagerWrite,
+) -> Callable[[], None]:
     """Register the periodic clock-drift check for a config entry.
 
     Returns the unsub callable; the caller is responsible for storing it and
     calling it back on unload (see async_unload_entry in __init__.py).
     """
 
-    async def _periodic_clock_check(_now=None) -> None:
+    async def _periodic_clock_check(_now: datetime | None = None) -> None:
         try:
             await async_check_and_maybe_sync_clock(
                 hass, config_entry, device, write_manager

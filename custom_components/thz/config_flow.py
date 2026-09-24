@@ -136,7 +136,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.enable_hc2 = False
         self.alias = ""
 
-    async def async_step_user(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """First step, select connection type and entity naming style."""
         if user_input is not None:
             self.entity_id_style = user_input.get(
@@ -198,7 +200,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         return self.async_show_form(step_id="user", data_schema=schema)
 
-    async def async_step_setup_ip(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_setup_ip(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Input for IP connection."""
         errors = {}
 
@@ -280,7 +284,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="setup_usb", data_schema=schema)
 
     async def async_step_reconfigure(
-        self, user_input: dict | None = None
+        self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle reconfiguration initiated from the device UI."""
         entry_id = self.context.get("entry_id")
@@ -312,7 +316,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=await self.reconfigure_schema(data),
         )
 
-    async def reconfigure_schema(self, defaults: dict | None = None) -> vol.Schema:
+    async def reconfigure_schema(
+        self, defaults: dict[str, Any] | None = None
+    ) -> vol.Schema:
         """Generate form schema with defaults."""
         defaults = defaults or {}
 
@@ -645,7 +651,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         result = THZConfigFlow._build_result_dict(ports_info, by_id_map)
         return THZConfigFlow._resolve_canonical(result, current_device)
 
-    async def async_step_detect_blocks(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_detect_blocks(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Dynamically read available blocks from the heat pump."""
         data = self.connection_data
         conn_type = data["connection_type"]
@@ -700,7 +708,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.connection_data["firmware"] = firmware
         return await self.async_step_select_groups()
 
-    async def async_step_select_groups(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_select_groups(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Allow user to select which entity groups to enable."""
         if user_input is not None:
             # Collect selected read blocks
@@ -734,7 +744,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=schema,
         )
 
-    async def async_step_refresh_blocks(self, user_input=None) -> ConfigFlowResult:
+    async def async_step_refresh_blocks(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Ask for individual refresh intervals per block."""
         selected_read_blocks = self.connection_data.get("selected_read_blocks")
         if selected_read_blocks is None:

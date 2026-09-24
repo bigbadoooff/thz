@@ -8,6 +8,7 @@ All notable changes to the THZ integration are documented here.
 
 ### Added
 
+- **Strict typing:** mypy checks the whole integration in strict mode.
 - **Documentation:** use cases and example automations
   (`docs/automations.md`: fault notification, filter reminder, hot water
   from PV surplus, ventilation boost, weekly backup), and README sections on

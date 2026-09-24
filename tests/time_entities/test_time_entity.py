@@ -64,7 +64,8 @@ class TestCreateTimeEntitiesFactory:
         result = _create_time_entities(
             "pHolidayBeginTime", write_param(entry), device, "dev1"
         )
-        assert isinstance(result, THZTime)
+        assert len(result) == 1
+        assert isinstance(result[0], THZTime)
 
 
 class TestAsyncSetupEntry:

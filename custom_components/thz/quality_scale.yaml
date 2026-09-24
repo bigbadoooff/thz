@@ -83,8 +83,4 @@ rules:
   inject-websession:
     status: exempt
     comment: No HTTP communication.
-  strict-typing:
-    status: todo
-    comment: >
-      Strict only for parameter_io, value_codec and register_map_manager (see
-      pyproject.toml).
+  strict-typing: done
