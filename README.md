@@ -42,7 +42,7 @@ Parts of this software have been developed by the help of AI.
 - ✅ **Time Platform**: Set time-based parameters, schedules and programmes
 - ✅ **Climate Platform**: Climate entities for Heating Circuit 1 and Heating Circuit 2 — with temperature control, HVAC mode and preset support
 - ✅ **Water Heater Platform**: Hot water as a water heater entity — temperature, setpoint and eco (setback) / performance / off state
-- ✅ **Fan Platform**: Ventilation as a fan entity — stage 0–3 as speed, plus a boost preset
+- ✅ **Fan Platform**: Ventilation as a fan entity — shows the current stage and starts unscheduled ventilation at stage 0–3
 - ✅ **Diagnostics**: Download a diagnostics report for troubleshooting (via Settings → Devices & Services)
 - ✅ **Device Registry Integration**: Proper device identification in Home Assistant
 - ✅ **Per-Block Polling Intervals**: Each register block has its own configurable poll interval
@@ -58,7 +58,7 @@ These entities are created when the required data blocks and parameters are avai
 | Heating Circuit 1 (climate) | `pxxF4` | Temperature setpoint, HVAC mode, preset (operating mode) |
 | Heating Circuit 2 (climate) | `pxxF5` | Temperature setpoint, HVAC mode, preset — created only when HC2 is configured |
 | Hot Water (water heater) | `pxxF3` | Temperature and setpoint in effect; state `performance` (day), `eco` (setback, night setpoint) or `off` (standby). Setting a temperature writes the day setpoint (`p04`), or the night setpoint (`p05`) while in eco. |
-| Ventilation (fan) | `p07FanStageDay` | Speed = ventilation stage 0–3 (0 = off). Preset `boost` starts unscheduled ventilation at stage 3 (`p99startUnschedVent`) for the time set in `p43`. |
+| Ventilation (fan) | `p99startUnschedVent` (firmware 4.x/5.x) | The time programs set the ventilation stage; the fan controls *unscheduled ventilation*. A speed of 33/66/100 % starts it at stage 1/2/3, off starts it at stage 0, each for the time set in `p43`–`p46`; then the program takes over again. The program's stage settings (`p07` etc.) are not changed. Shown is the stage the ventilation runs at: from the supply airflow of the current stage (`pxxE8`, when polled) compared with `p37`–`p39`, otherwise from today's fan time program (day stage `p07` inside a window, night stage `p08` outside). |
 
 HC1 also exposes **HVAC action** (heating / cooling / idle) and optional **cooling mode** when the device supports active cooling.
 

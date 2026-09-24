@@ -2692,14 +2692,7 @@
     },
     "fan": {
       "ventilation": {
-        "name": "Lüftung",
-        "state_attributes": {
-          "preset_mode": {
-            "state": {
-              "boost": "Stoßlüften"
-            }
-          }
-        }
+        "name": "Lüftung"
       }
     },
     "binary_sensor": {

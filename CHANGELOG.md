@@ -15,10 +15,13 @@ All notable changes to the THZ integration are documented here.
   `eco` (setback, night setpoint) or `off` (standby); setting a temperature
   writes the setpoint of the current state (`p04` or `p05`), or the
   manual setpoint (`p11`) when that is the one in effect.
-- **Ventilation is a `fan` entity** and the heating circuit climate entity
-  no longer has a fan mode. The fan's speed is the ventilation stage
-  (`p07FanStageDay`, 0–3); the `boost` preset starts unscheduled
-  ventilation at stage 3 (`p99startUnschedVent`).
+- **Ventilation is a `fan` entity** (firmware 4.x/5.x) and the heating
+  circuit climate entity no longer has a fan mode, which wrote the day
+  stage of the program (`p07FanStageDay`). The fan starts *unscheduled
+  ventilation* (`p99startUnschedVent`): a speed starts it at stage 1-3,
+  off at stage 0, for the time set in `p43`-`p46`. It shows the stage the
+  ventilation runs at, from the supply airflow (`pxxE8`) or else from the
+  fan time program.
 
 ### Changed
 

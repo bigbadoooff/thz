@@ -755,15 +755,7 @@
     },
     "fan": {
       "ventilation": {
-        "default": "mdi:fan",
-        "state_attributes": {
-          "preset_mode": {
-            "default": "mdi:fan",
-            "state": {
-              "boost": "mdi:fan-plus"
-            }
-          }
-        }
+        "default": "mdi:fan"
       }
     }
   }

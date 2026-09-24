@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from homeassistant.components.climate import ATTR_FAN_MODES
 from homeassistant.components.fan import (
     ATTR_PERCENTAGE,
-    ATTR_PRESET_MODE,
     DOMAIN as FAN_DOMAIN,
     SERVICE_SET_PERCENTAGE,
-    SERVICE_SET_PRESET_MODE,
 )
 from homeassistant.components.water_heater import (
     DOMAIN as WATER_HEATER_DOMAIN,
@@ -26,6 +26,7 @@ from homeassistant.const import (
     STATE_ON,
 )
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util import dt as dt_util
 
 from custom_components.thz.const import DOMAIN
 
@@ -34,8 +35,15 @@ from .conftest import BLOCK_SIZE
 
 DHW_DAY = "0A0013"
 DHW_NIGHT = "0A05BF"
-FAN_STAGE = "0A056C"
-BOOST = "0A05DD"
+DAY_STAGE = "0A056C"
+NIGHT_STAGE = "0A056D"
+START_VENT = "0A05DD"
+PROGRAM_MONDAY_0 = "0A1D10"
+
+
+def _monday_8() -> datetime:
+    """A Monday, 08:00 in Home Assistant's time zone."""
+    return datetime(2026, 9, 21, 8, 0, tzinfo=dt_util.get_default_time_zone())
 
 
 def _f3(op_mode: int, set_temp: float = 50.0, temp: float = 48.0) -> bytes:
@@ -124,15 +132,27 @@ async def test_heating_circuit_has_no_fan_mode(hass, fake_device):
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
-async def test_fan_reads_and_writes_the_stage(hass, fake_device):
-    fake_device.initial_registers = {bytes.fromhex(FAN_STAGE): bytes.fromhex("0002")}
+async def test_fan_shows_the_program_stage(hass, fake_device, freezer):
+    freezer.move_to(_monday_8())
+    fake_device.initial_registers = {
+        bytes.fromhex(PROGRAM_MONDAY_0): bytes([6 * 4, 9 * 4]),  # 06:00-09:00
+        bytes.fromhex(DAY_STAGE): bytes.fromhex("0002"),
+        bytes.fromhex(NIGHT_STAGE): bytes.fromhex("0001"),
+    }
     entry = await setup_entry(hass)
     fan = entity_id(hass, entry, "fan", "fan_ventilation")
 
     state = hass.states.get(fan)
     assert state.state == STATE_ON
     assert state.attributes[ATTR_PERCENTAGE] == 66
-    assert state.attributes["preset_modes"] == ["boost"]
+    assert state.attributes["preset_modes"] is None
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_fan_starts_unscheduled_ventilation(hass, fake_device, freezer):
+    freezer.move_to(_monday_8())
+    entry = await setup_entry(hass)
+    fan = entity_id(hass, entry, "fan", "fan_ventilation")
 
     await hass.services.async_call(
         FAN_DOMAIN,
@@ -140,6 +160,7 @@ async def test_fan_reads_and_writes_the_stage(hass, fake_device):
         {ATTR_ENTITY_ID: fan, ATTR_PERCENTAGE: 100},
         blocking=True,
     )
+    assert hass.states.get(fan).attributes[ATTR_PERCENTAGE] == 100
     await hass.services.async_call(
         FAN_DOMAIN, SERVICE_TURN_OFF, {ATTR_ENTITY_ID: fan}, blocking=True
     )
@@ -149,27 +170,12 @@ async def test_fan_reads_and_writes_the_stage(hass, fake_device):
     )
 
     device = fake_device.instances[-1]
-    assert device.sets_for(FAN_STAGE) == [
+    assert device.sets_for(START_VENT) == [
         bytes.fromhex("0003"),
         bytes.fromhex("0000"),
         bytes.fromhex("0003"),
     ]
-    assert hass.states.get(fan).attributes[ATTR_PERCENTAGE] == 100
-    assert await hass.config_entries.async_unload(entry.entry_id)
-
-
-async def test_fan_boost_starts_unscheduled_ventilation(hass, fake_device):
-    entry = await setup_entry(hass)
-    fan = entity_id(hass, entry, "fan", "fan_ventilation")
-
-    await hass.services.async_call(
-        FAN_DOMAIN,
-        SERVICE_SET_PRESET_MODE,
-        {ATTR_ENTITY_ID: fan, ATTR_PRESET_MODE: "boost"},
-        blocking=True,
-    )
-
-    device = fake_device.instances[-1]
-    assert device.sets_for(BOOST) == [bytes.fromhex("0003")]
-    assert device.sets_for(FAN_STAGE) == []
+    # The program's stage settings stay as they are.
+    assert device.sets_for(DAY_STAGE) == []
+    assert device.sets_for(NIGHT_STAGE) == []
     assert await hass.config_entries.async_unload(entry.entry_id)
