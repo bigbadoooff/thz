@@ -446,6 +446,8 @@ the heat pump") and otherwise only what needs attention:
 
 - a lost connection once as a warning, and once as info when it is back
   (the blocks that fail meanwhile are not logged one by one);
+- a single setting that cannot be read while the heat pump answers, once
+  as a warning, and once as info when it reads again;
 - a sensor whose data is too short or cannot be decoded, and an unknown
   select value, once until it reads correctly again;
 - a drifted device clock once, when its repair issue is raised (see Device

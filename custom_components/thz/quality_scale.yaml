@@ -33,12 +33,12 @@ rules:
   entity-unavailable: done
   integration-owner: done
   log-when-unavailable:
-    status: todo
+    status: done
     comment: >
       The device logs the heat pump not answering and answering again
       once; block coordinators and the parameter poller stay quiet
       meanwhile. A single register failing while the device answers is
-      logged by the poller, but not its coming back.
+      logged by the poller as a warning once, and its coming back at info.
   parallel-updates: done
   reauthentication-flow:
     status: exempt

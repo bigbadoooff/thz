@@ -50,6 +50,9 @@ All notable changes to the THZ integration are documented here.
   every poll (short or undecodable sensor data, unknown select values, a
   drifted clock) are logged once. Details moved to the debug level; see
   "Logging" in the README.
+- **A setting that reads again is logged.** When a single setting failed to
+  read while the heat pump answered (logged as a warning), its next
+  successful read is logged at info.
 - **The old `log_level` setting is removed.** Entries from old versions
   fixed the integration's log level with it, overriding Home Assistant's
   `logger:` configuration; they are migrated to version 1.3 without it.
