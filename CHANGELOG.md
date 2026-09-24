@@ -64,6 +64,17 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Leftover placeholder sensors on 2.06/2.14 are removed** (#176, #185):
+  sensors such as *Dew Point*, *P_Nd*/*P_Hd* and *actualPower_\** that
+  earlier versions created for fields the firmware does not have stayed in
+  the entity registry as "no longer provided". They are now removed when
+  the integration starts.
+
+- **The diverter valve check used polled data** (#185): `thz.set_diverter_valve`
+  decided from the `diverterValve` bit of the last `pxxF2` poll, which can be
+  one poll interval old. The block is now read right before the check, and
+  the move is refused if that read fails.
+
 - **Changing the host or serial device kept the entities but not the
   device** (#185): the heat pump's device registry identifier was derived
   from the connection on every start, so after a Reconfigure to a new host
