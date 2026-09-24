@@ -50,7 +50,7 @@ class TestCreateTimeEntitiesFactory:
         device = _make_device()
         entry = _schedule_entry()
         result = _create_time_entities(
-            "programHC1_Mo_0", write_param(entry), device, "dev1", 600
+            "programHC1_Mo_0", write_param(entry), device, "dev1"
         )
         assert isinstance(result, list)
         assert len(result) == 2
@@ -62,7 +62,7 @@ class TestCreateTimeEntitiesFactory:
         device = _make_device()
         entry = _time_entry()
         result = _create_time_entities(
-            "pHolidayBeginTime", write_param(entry), device, "dev1", 600
+            "pHolidayBeginTime", write_param(entry), device, "dev1"
         )
         assert isinstance(result, THZTime)
 
@@ -97,10 +97,10 @@ class TestAsyncSetupEntry:
         await async_setup_entry(hass, config_entry, async_add_entities)
 
         async_add_entities.assert_called_once()
-        entities, update_before_add = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         # 1 plain time entity + 2 schedule entities (start/end) = 3
         assert len(entities) == 3
-        assert update_before_add is True
+        assert all(e._poller is config_entry.runtime_data.poller for e in entities)
         types = sorted(type(e).__name__ for e in entities)
         assert types == ["THZScheduleTime", "THZScheduleTime", "THZTime"]
 
@@ -127,7 +127,7 @@ class TestAsyncSetupEntry:
         async_add_entities = MagicMock()
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        entities, _ = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         assert entities == []
 
 
@@ -171,6 +171,20 @@ class TestTHZTime:
             device_id="dev1",
         )
         assert entity._attr_icon == "mdi:custom"
+
+    def test_value_too_short_for_the_second_byte_is_ignored(self):
+        entity = THZTime(
+            name="pHolidayBeginTime",
+            entry=write_param(
+                {"command": "0A0601", "type": "time"}, decode_type="9holy"
+            ),
+            device=_make_device(),
+            device_id="dev1",
+        )
+        entity._apply_value(b"\x10")
+        assert entity.native_value is None
+        entity._apply_value(b"\x80\x10")
+        assert entity.native_value == dtime(4, 0)
 
     @pytest.mark.asyncio
     async def test_async_update_success(self):
@@ -463,7 +477,7 @@ class TestPartyStartAndEnd:
         entry = write_param(
             {"command": "0A05D1", "type": "time", "decode_type": "8party"}
         )
-        start, end = _create_time_entities("party-time", entry, device, "dev1", 600)
+        start, end = _create_time_entities("party-time", entry, device, "dev1")
         for entity in (start, end):
             entity.hass = MagicMock()
             entity.async_write_ha_state = MagicMock()
