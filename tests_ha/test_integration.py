@@ -8,6 +8,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 import pytest
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
 )
@@ -16,8 +17,9 @@ from custom_components.thz.const import DOMAIN
 from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManagerWrite,
 )
+from custom_components.thz.sensor import sensor_unique_id
 
-from .common import HOST, setup_entry
+from .common import HOST, make_entry, setup_entry
 
 
 async def test_setup_creates_entities_and_unloads(hass, fake_device):
@@ -153,3 +155,41 @@ async def test_services_outlive_the_config_entry(hass, fake_device):
             blocking=True,
             return_response=True,
         )
+
+
+async def test_placeholder_sensors_of_old_versions_are_removed(hass, fake_device):
+    fake_device.firmware = 206
+    entry = make_entry()
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    fb = bytes.fromhex("FB")
+    # Registered by a version that still created sensors for "n.a." fields.
+    stale = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        sensor_unique_id(fb, 2, "dewPoint"),
+        config_entry=entry,
+    )
+    # The same unique id under another integration entry stays untouched.
+    other_entry = MockConfigEntry(domain=DOMAIN, unique_id="ip-192.0.2.77")
+    other_entry.add_to_hass(hass)
+    foreign = registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        sensor_unique_id(fb, 35, "relHumidity"),
+        config_entry=other_entry,
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert registry.async_get(stale.entity_id) is None
+    assert registry.async_get(foreign.entity_id) is not None
+    # Real sensors of the same block are still there.
+    sensors = [
+        e
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.domain == "sensor" and "\\xfb" in e.unique_id
+    ]
+    assert sensors
+    assert await hass.config_entries.async_unload(entry.entry_id)

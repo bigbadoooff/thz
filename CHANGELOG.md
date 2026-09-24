@@ -52,6 +52,12 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Leftover placeholder sensors on 2.06/2.14 are removed** (#176, #185):
+  sensors such as *Dew Point*, *P_Nd*/*P_Hd* and *actualPower_\** that
+  earlier versions created for fields the firmware does not have stayed in
+  the entity registry as "no longer provided". They are now removed when
+  the integration starts.
+
 - **Changing the host or serial device kept the entities but not the
   device** (#185): the heat pump's device registry identifier was derived
   from the connection on every start, so after a Reconfigure to a new host
