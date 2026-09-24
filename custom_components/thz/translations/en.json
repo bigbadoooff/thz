@@ -398,96 +398,6 @@
       "condenser_temp": {
         "name": "Condenser Temperature"
       },
-      "mixer_open": {
-        "name": "Mixer Open"
-      },
-      "mixer_closed": {
-        "name": "Mixer Closed"
-      },
-      "heat_pipe_valve": {
-        "name": "Heat Pipe Valve"
-      },
-      "diverter_valve": {
-        "name": "Diverter Valve"
-      },
-      "dhw_pump": {
-        "name": "Circulation Hot Water"
-      },
-      "heating_circuit_pump": {
-        "name": "Circulation Heating"
-      },
-      "solar_pump": {
-        "name": "Solar Pump"
-      },
-      "compressor": {
-        "name": "Compressor"
-      },
-      "booster_stage_3": {
-        "name": "Booster Stage 3"
-      },
-      "booster_stage_2": {
-        "name": "Booster Stage 2"
-      },
-      "booster_stage_1": {
-        "name": "Booster Stage 1"
-      },
-      "switching_prog": {
-        "name": "Switching Program"
-      },
-      "heating_hc": {
-        "name": "Heating HC"
-      },
-      "heating_dhw": {
-        "name": "Heating DHW"
-      },
-      "booster_hc": {
-        "name": "Booster HC"
-      },
-      "filter_both": {
-        "name": "Filter Both"
-      },
-      "vent_stage": {
-        "name": "Ventilation Stage"
-      },
-      "pump_hc": {
-        "name": "Circulation Pump"
-      },
-      "defrost": {
-        "name": "Defrost"
-      },
-      "filter_up": {
-        "name": "Filter Up"
-      },
-      "filter_down": {
-        "name": "Filter Down"
-      },
-      "cooling": {
-        "name": "Cooling"
-      },
-      "service": {
-        "name": "Service"
-      },
-      "high_pressure_sensor": {
-        "name": "High Pressure Sensor"
-      },
-      "low_pressure_sensor": {
-        "name": "Low Pressure Sensor"
-      },
-      "evaporator_ice_monitor": {
-        "name": "Evaporator Ice Monitor"
-      },
-      "signal_anode": {
-        "name": "Signal Anode"
-      },
-      "evu_release": {
-        "name": "EVU Release"
-      },
-      "oven_fireplace": {
-        "name": "Oven/Fireplace"
-      },
-      "stb": {
-        "name": "Safety Temperature Limiter"
-      },
       "output_ventilator_power": {
         "name": "Output Ventilator Power"
       },
@@ -571,12 +481,6 @@
       },
       "inside_temp": {
         "name": "Inside Temperature"
-      },
-      "window_open": {
-        "name": "Window Open"
-      },
-      "quick_air_vent": {
-        "name": "Quick Air Vent"
       },
       "flow_rate": {
         "name": "Flow Rate"
@@ -1289,29 +1193,8 @@
       "prog_dhw_end_time": {
         "name": "Program DHW End Time"
       },
-      "prog_dhw_friday": {
-        "name": "Program DHW Friday"
-      },
-      "prog_dhw_monday": {
-        "name": "Program DHW Monday"
-      },
-      "prog_dhw_saturday": {
-        "name": "Program DHW Saturday"
-      },
       "prog_dhw_start_time": {
         "name": "Program DHW Start Time"
-      },
-      "prog_dhw_sunday": {
-        "name": "Program DHW Sunday"
-      },
-      "prog_dhw_thursday": {
-        "name": "Program DHW Thursday"
-      },
-      "prog_dhw_tuesday": {
-        "name": "Program DHW Tuesday"
-      },
-      "prog_dhw_wednesday": {
-        "name": "Program DHW Wednesday"
       },
       "prog_fan1_enable": {
         "name": "Program Fan 1 Enabled"
@@ -1319,29 +1202,8 @@
       "prog_fan1_end_time": {
         "name": "Program Fan 1 End Time"
       },
-      "prog_fan1_friday": {
-        "name": "Program Fan 1 Friday"
-      },
-      "prog_fan1_monday": {
-        "name": "Program Fan 1 Monday"
-      },
-      "prog_fan1_saturday": {
-        "name": "Program Fan 1 Saturday"
-      },
       "prog_fan1_start_time": {
         "name": "Program Fan 1 Start Time"
-      },
-      "prog_fan1_sunday": {
-        "name": "Program Fan 1 Sunday"
-      },
-      "prog_fan1_thursday": {
-        "name": "Program Fan 1 Thursday"
-      },
-      "prog_fan1_tuesday": {
-        "name": "Program Fan 1 Tuesday"
-      },
-      "prog_fan1_wednesday": {
-        "name": "Program Fan 1 Wednesday"
       },
       "prog_fan2_enable": {
         "name": "Program Fan 2 Enabled"
@@ -1349,29 +1211,8 @@
       "prog_fan2_end_time": {
         "name": "Program Fan 2 End Time"
       },
-      "prog_fan2_friday": {
-        "name": "Program Fan 2 Friday"
-      },
-      "prog_fan2_monday": {
-        "name": "Program Fan 2 Monday"
-      },
-      "prog_fan2_saturday": {
-        "name": "Program Fan 2 Saturday"
-      },
       "prog_fan2_start_time": {
         "name": "Program Fan 2 Start Time"
-      },
-      "prog_fan2_sunday": {
-        "name": "Program Fan 2 Sunday"
-      },
-      "prog_fan2_thursday": {
-        "name": "Program Fan 2 Thursday"
-      },
-      "prog_fan2_tuesday": {
-        "name": "Program Fan 2 Tuesday"
-      },
-      "prog_fan2_wednesday": {
-        "name": "Program Fan 2 Wednesday"
       },
       "prog_hc1_enable": {
         "name": "Program HC1 Enabled"
@@ -1379,29 +1220,8 @@
       "prog_hc1_end_time": {
         "name": "Program HC1 End Time"
       },
-      "prog_hc1_friday": {
-        "name": "Program HC1 Friday"
-      },
-      "prog_hc1_monday": {
-        "name": "Program HC1 Monday"
-      },
-      "prog_hc1_saturday": {
-        "name": "Program HC1 Saturday"
-      },
       "prog_hc1_start_time": {
         "name": "Program HC1 Start Time"
-      },
-      "prog_hc1_sunday": {
-        "name": "Program HC1 Sunday"
-      },
-      "prog_hc1_thursday": {
-        "name": "Program HC1 Thursday"
-      },
-      "prog_hc1_tuesday": {
-        "name": "Program HC1 Tuesday"
-      },
-      "prog_hc1_wednesday": {
-        "name": "Program HC1 Wednesday"
       },
       "prog_hc2_enable": {
         "name": "Program HC2 Enabled"
@@ -1409,29 +1229,8 @@
       "prog_hc2_end_time": {
         "name": "Program HC2 End Time"
       },
-      "prog_hc2_friday": {
-        "name": "Program HC2 Friday"
-      },
-      "prog_hc2_monday": {
-        "name": "Program HC2 Monday"
-      },
-      "prog_hc2_saturday": {
-        "name": "Program HC2 Saturday"
-      },
       "prog_hc2_start_time": {
         "name": "Program HC2 Start Time"
-      },
-      "prog_hc2_sunday": {
-        "name": "Program HC2 Sunday"
-      },
-      "prog_hc2_thursday": {
-        "name": "Program HC2 Thursday"
-      },
-      "prog_hc2_tuesday": {
-        "name": "Program HC2 Tuesday"
-      },
-      "prog_hc2_wednesday": {
-        "name": "Program HC2 Wednesday"
       },
       "prog_state_dhw": {
         "name": "Program State DHW",
@@ -1605,12 +1404,6 @@
       "x76": {
         "name": "Register X76"
       },
-      "power_nd": {
-        "name": "Power Nd"
-      },
-      "power_hd": {
-        "name": "Power Hd"
-      },
       "fault_status": {
         "name": "Fault status",
         "state": {
@@ -1664,9 +1457,6 @@
       }
     },
     "number": {
-      "op_mode": {
-        "name": "Operating Mode"
-      },
       "room_temp_day": {
         "name": "Room Temperature Day"
       },
@@ -1769,15 +1559,6 @@
       "summer_mode_hysteresis": {
         "name": "Summer Mode Hysteresis"
       },
-      "hysteresis_6": {
-        "name": "Hysteresis 6"
-      },
-      "hysteresis_7": {
-        "name": "Hysteresis 7"
-      },
-      "hysteresis_8": {
-        "name": "Hysteresis 8"
-      },
       "hysteresis_asymmetry": {
         "name": "Hysteresis Asymmetry"
       },
@@ -1865,17 +1646,8 @@
       "enable_solar": {
         "name": "Enable Solar"
       },
-      "diff_temp_solar_loading": {
-        "name": "Differential Temperature Solar Loading"
-      },
-      "delay_comp_start_solar": {
-        "name": "Delay Compressor Start Solar"
-      },
       "dhw_temp_solar_mode": {
         "name": "DHW Temperature Solar Mode"
-      },
-      "enable_dhw_buffer": {
-        "name": "Enable DHW Buffer"
       },
       "solar_hysteresis": {
         "name": "Solar Hysteresis"
@@ -1919,12 +1691,6 @@
       "prog_dhw_enable": {
         "name": "DHW Program Enable"
       },
-      "prog_dhw_start_time": {
-        "name": "DHW Program Start Time"
-      },
-      "prog_dhw_end_time": {
-        "name": "DHW Program End Time"
-      },
       "prog_dhw_monday": {
         "name": "DHW Program Monday"
       },
@@ -1948,12 +1714,6 @@
       },
       "prog_fan1_enable": {
         "name": "Fan 1 Program Enable"
-      },
-      "prog_fan1_start_time": {
-        "name": "Fan 1 Program Start Time"
-      },
-      "prog_fan1_end_time": {
-        "name": "Fan 1 Program End Time"
       },
       "prog_fan1_monday": {
         "name": "Fan 1 Program Monday"
@@ -1979,12 +1739,6 @@
       "prog_fan2_enable": {
         "name": "Fan 2 Program Enable"
       },
-      "prog_fan2_start_time": {
-        "name": "Fan 2 Program Start Time"
-      },
-      "prog_fan2_end_time": {
-        "name": "Fan 2 Program End Time"
-      },
       "prog_fan2_monday": {
         "name": "Fan 2 Program Monday"
       },
@@ -2009,12 +1763,6 @@
       "prog_hc1_enable": {
         "name": "HC1 Program Enable"
       },
-      "prog_hc1_start_time": {
-        "name": "HC1 Program Start Time"
-      },
-      "prog_hc1_end_time": {
-        "name": "HC1 Program End Time"
-      },
       "prog_hc1_monday": {
         "name": "HC1 Program Monday"
       },
@@ -2038,12 +1786,6 @@
       },
       "prog_hc2_enable": {
         "name": "HC2 Program Enable"
-      },
-      "prog_hc2_start_time": {
-        "name": "HC2 Program Start Time"
-      },
-      "prog_hc2_end_time": {
-        "name": "HC2 Program End Time"
       },
       "prog_hc2_monday": {
         "name": "HC2 Program Monday"
@@ -2150,9 +1892,6 @@
       "pasteurisation_temp": {
         "name": "Pasteurisation Temperature"
       },
-      "party_time": {
-        "name": "Party Time"
-      },
       "z_pump_hc": {
         "name": "Circulation Pump"
       },
@@ -2196,18 +1935,6 @@
           "off": "Off",
           "on": "On"
         }
-      },
-      "z_pump_dhw": {
-        "name": "Pump DHW"
-      },
-      "z_pump_hc": {
-        "name": "Circulation Pump"
-      },
-      "z_reset_last10errors": {
-        "name": "Reset Last 10 Errors"
-      },
-      "reset_errors": {
-        "name": "Reset Errors"
       }
     },
     "switch": {
@@ -2231,17 +1958,11 @@
       "party_time_end": {
         "name": "Party End"
       },
-      "programhc1_mo_0": {
-        "name": "HC1 Program Monday 1"
-      },
       "programhc1_mo_0_start": {
         "name": "HC1 Program Monday 1 Start"
       },
       "programhc1_mo_0_end": {
         "name": "HC1 Program Monday 1 End"
-      },
-      "programhc1_mo_1": {
-        "name": "HC1 Program Monday 2"
       },
       "programhc1_mo_1_start": {
         "name": "HC1 Program Monday 2 Start"
@@ -2249,17 +1970,11 @@
       "programhc1_mo_1_end": {
         "name": "HC1 Program Monday 2 End"
       },
-      "programhc1_mo_2": {
-        "name": "HC1 Program Monday 3"
-      },
       "programhc1_mo_2_start": {
         "name": "HC1 Program Monday 3 Start"
       },
       "programhc1_mo_2_end": {
         "name": "HC1 Program Monday 3 End"
-      },
-      "programhc1_tu_0": {
-        "name": "HC1 Program Tuesday 1"
       },
       "programhc1_tu_0_start": {
         "name": "HC1 Program Tuesday 1 Start"
@@ -2267,17 +1982,11 @@
       "programhc1_tu_0_end": {
         "name": "HC1 Program Tuesday 1 End"
       },
-      "programhc1_tu_1": {
-        "name": "HC1 Program Tuesday 2"
-      },
       "programhc1_tu_1_start": {
         "name": "HC1 Program Tuesday 2 Start"
       },
       "programhc1_tu_1_end": {
         "name": "HC1 Program Tuesday 2 End"
-      },
-      "programhc1_tu_2": {
-        "name": "HC1 Program Tuesday 3"
       },
       "programhc1_tu_2_start": {
         "name": "HC1 Program Tuesday 3 Start"
@@ -2285,17 +1994,11 @@
       "programhc1_tu_2_end": {
         "name": "HC1 Program Tuesday 3 End"
       },
-      "programhc1_we_0": {
-        "name": "HC1 Program Wednesday 1"
-      },
       "programhc1_we_0_start": {
         "name": "HC1 Program Wednesday 1 Start"
       },
       "programhc1_we_0_end": {
         "name": "HC1 Program Wednesday 1 End"
-      },
-      "programhc1_we_1": {
-        "name": "HC1 Program Wednesday 2"
       },
       "programhc1_we_1_start": {
         "name": "HC1 Program Wednesday 2 Start"
@@ -2303,17 +2006,11 @@
       "programhc1_we_1_end": {
         "name": "HC1 Program Wednesday 2 End"
       },
-      "programhc1_we_2": {
-        "name": "HC1 Program Wednesday 3"
-      },
       "programhc1_we_2_start": {
         "name": "HC1 Program Wednesday 3 Start"
       },
       "programhc1_we_2_end": {
         "name": "HC1 Program Wednesday 3 End"
-      },
-      "programhc1_th_0": {
-        "name": "HC1 Program Thursday 1"
       },
       "programhc1_th_0_start": {
         "name": "HC1 Program Thursday 1 Start"
@@ -2321,17 +2018,11 @@
       "programhc1_th_0_end": {
         "name": "HC1 Program Thursday 1 End"
       },
-      "programhc1_th_1": {
-        "name": "HC1 Program Thursday 2"
-      },
       "programhc1_th_1_start": {
         "name": "HC1 Program Thursday 2 Start"
       },
       "programhc1_th_1_end": {
         "name": "HC1 Program Thursday 2 End"
-      },
-      "programhc1_th_2": {
-        "name": "HC1 Program Thursday 3"
       },
       "programhc1_th_2_start": {
         "name": "HC1 Program Thursday 3 Start"
@@ -2339,17 +2030,11 @@
       "programhc1_th_2_end": {
         "name": "HC1 Program Thursday 3 End"
       },
-      "programhc1_fr_0": {
-        "name": "HC1 Program Friday 1"
-      },
       "programhc1_fr_0_start": {
         "name": "HC1 Program Friday 1 Start"
       },
       "programhc1_fr_0_end": {
         "name": "HC1 Program Friday 1 End"
-      },
-      "programhc1_fr_1": {
-        "name": "HC1 Program Friday 2"
       },
       "programhc1_fr_1_start": {
         "name": "HC1 Program Friday 2 Start"
@@ -2357,17 +2042,11 @@
       "programhc1_fr_1_end": {
         "name": "HC1 Program Friday 2 End"
       },
-      "programhc1_fr_2": {
-        "name": "HC1 Program Friday 3"
-      },
       "programhc1_fr_2_start": {
         "name": "HC1 Program Friday 3 Start"
       },
       "programhc1_fr_2_end": {
         "name": "HC1 Program Friday 3 End"
-      },
-      "programhc1_sa_0": {
-        "name": "HC1 Program Saturday 1"
       },
       "programhc1_sa_0_start": {
         "name": "HC1 Program Saturday 1 Start"
@@ -2375,17 +2054,11 @@
       "programhc1_sa_0_end": {
         "name": "HC1 Program Saturday 1 End"
       },
-      "programhc1_sa_1": {
-        "name": "HC1 Program Saturday 2"
-      },
       "programhc1_sa_1_start": {
         "name": "HC1 Program Saturday 2 Start"
       },
       "programhc1_sa_1_end": {
         "name": "HC1 Program Saturday 2 End"
-      },
-      "programhc1_sa_2": {
-        "name": "HC1 Program Saturday 3"
       },
       "programhc1_sa_2_start": {
         "name": "HC1 Program Saturday 3 Start"
@@ -2393,17 +2066,11 @@
       "programhc1_sa_2_end": {
         "name": "HC1 Program Saturday 3 End"
       },
-      "programhc1_so_0": {
-        "name": "HC1 Program Sunday 1"
-      },
       "programhc1_so_0_start": {
         "name": "HC1 Program Sunday 1 Start"
       },
       "programhc1_so_0_end": {
         "name": "HC1 Program Sunday 1 End"
-      },
-      "programhc1_so_1": {
-        "name": "HC1 Program Sunday 2"
       },
       "programhc1_so_1_start": {
         "name": "HC1 Program Sunday 2 Start"
@@ -2411,17 +2078,11 @@
       "programhc1_so_1_end": {
         "name": "HC1 Program Sunday 2 End"
       },
-      "programhc1_so_2": {
-        "name": "HC1 Program Sunday 3"
-      },
       "programhc1_so_2_start": {
         "name": "HC1 Program Sunday 3 Start"
       },
       "programhc1_so_2_end": {
         "name": "HC1 Program Sunday 3 End"
-      },
-      "programhc1_mo_fr_0": {
-        "name": "HC1 Program Mon-Fri 1"
       },
       "programhc1_mo_fr_0_start": {
         "name": "HC1 Program Mon-Fri 1 Start"
@@ -2429,17 +2090,11 @@
       "programhc1_mo_fr_0_end": {
         "name": "HC1 Program Mon-Fri 1 End"
       },
-      "programhc1_mo_fr_1": {
-        "name": "HC1 Program Mon-Fri 2"
-      },
       "programhc1_mo_fr_1_start": {
         "name": "HC1 Program Mon-Fri 2 Start"
       },
       "programhc1_mo_fr_1_end": {
         "name": "HC1 Program Mon-Fri 2 End"
-      },
-      "programhc1_mo_fr_2": {
-        "name": "HC1 Program Mon-Fri 3"
       },
       "programhc1_mo_fr_2_start": {
         "name": "HC1 Program Mon-Fri 3 Start"
@@ -2447,17 +2102,11 @@
       "programhc1_mo_fr_2_end": {
         "name": "HC1 Program Mon-Fri 3 End"
       },
-      "programhc1_sa_so_0": {
-        "name": "HC1 Program Sat-Sun 1"
-      },
       "programhc1_sa_so_0_start": {
         "name": "HC1 Program Sat-Sun 1 Start"
       },
       "programhc1_sa_so_0_end": {
         "name": "HC1 Program Sat-Sun 1 End"
-      },
-      "programhc1_sa_so_1": {
-        "name": "HC1 Program Sat-Sun 2"
       },
       "programhc1_sa_so_1_start": {
         "name": "HC1 Program Sat-Sun 2 Start"
@@ -2465,17 +2114,11 @@
       "programhc1_sa_so_1_end": {
         "name": "HC1 Program Sat-Sun 2 End"
       },
-      "programhc1_sa_so_2": {
-        "name": "HC1 Program Sat-Sun 3"
-      },
       "programhc1_sa_so_2_start": {
         "name": "HC1 Program Sat-Sun 3 Start"
       },
       "programhc1_sa_so_2_end": {
         "name": "HC1 Program Sat-Sun 3 End"
-      },
-      "programhc1_mo_so_0": {
-        "name": "HC1 Program All Week 1"
       },
       "programhc1_mo_so_0_start": {
         "name": "HC1 Program All Week 1 Start"
@@ -2483,17 +2126,11 @@
       "programhc1_mo_so_0_end": {
         "name": "HC1 Program All Week 1 End"
       },
-      "programhc1_mo_so_1": {
-        "name": "HC1 Program All Week 2"
-      },
       "programhc1_mo_so_1_start": {
         "name": "HC1 Program All Week 2 Start"
       },
       "programhc1_mo_so_1_end": {
         "name": "HC1 Program All Week 2 End"
-      },
-      "programhc1_mo_so_2": {
-        "name": "HC1 Program All Week 3"
       },
       "programhc1_mo_so_2_start": {
         "name": "HC1 Program All Week 3 Start"
@@ -2501,17 +2138,11 @@
       "programhc1_mo_so_2_end": {
         "name": "HC1 Program All Week 3 End"
       },
-      "programhc2_mo_0": {
-        "name": "HC2 Program Monday 1"
-      },
       "programhc2_mo_0_start": {
         "name": "HC2 Program Monday 1 Start"
       },
       "programhc2_mo_0_end": {
         "name": "HC2 Program Monday 1 End"
-      },
-      "programhc2_mo_1": {
-        "name": "HC2 Program Monday 2"
       },
       "programhc2_mo_1_start": {
         "name": "HC2 Program Monday 2 Start"
@@ -2519,17 +2150,11 @@
       "programhc2_mo_1_end": {
         "name": "HC2 Program Monday 2 End"
       },
-      "programhc2_mo_2": {
-        "name": "HC2 Program Monday 3"
-      },
       "programhc2_mo_2_start": {
         "name": "HC2 Program Monday 3 Start"
       },
       "programhc2_mo_2_end": {
         "name": "HC2 Program Monday 3 End"
-      },
-      "programhc2_tu_0": {
-        "name": "HC2 Program Tuesday 1"
       },
       "programhc2_tu_0_start": {
         "name": "HC2 Program Tuesday 1 Start"
@@ -2537,17 +2162,11 @@
       "programhc2_tu_0_end": {
         "name": "HC2 Program Tuesday 1 End"
       },
-      "programhc2_tu_1": {
-        "name": "HC2 Program Tuesday 2"
-      },
       "programhc2_tu_1_start": {
         "name": "HC2 Program Tuesday 2 Start"
       },
       "programhc2_tu_1_end": {
         "name": "HC2 Program Tuesday 2 End"
-      },
-      "programhc2_tu_2": {
-        "name": "HC2 Program Tuesday 3"
       },
       "programhc2_tu_2_start": {
         "name": "HC2 Program Tuesday 3 Start"
@@ -2555,17 +2174,11 @@
       "programhc2_tu_2_end": {
         "name": "HC2 Program Tuesday 3 End"
       },
-      "programhc2_we_0": {
-        "name": "HC2 Program Wednesday 1"
-      },
       "programhc2_we_0_start": {
         "name": "HC2 Program Wednesday 1 Start"
       },
       "programhc2_we_0_end": {
         "name": "HC2 Program Wednesday 1 End"
-      },
-      "programhc2_we_1": {
-        "name": "HC2 Program Wednesday 2"
       },
       "programhc2_we_1_start": {
         "name": "HC2 Program Wednesday 2 Start"
@@ -2573,17 +2186,11 @@
       "programhc2_we_1_end": {
         "name": "HC2 Program Wednesday 2 End"
       },
-      "programhc2_we_2": {
-        "name": "HC2 Program Wednesday 3"
-      },
       "programhc2_we_2_start": {
         "name": "HC2 Program Wednesday 3 Start"
       },
       "programhc2_we_2_end": {
         "name": "HC2 Program Wednesday 3 End"
-      },
-      "programhc2_th_0": {
-        "name": "HC2 Program Thursday 1"
       },
       "programhc2_th_0_start": {
         "name": "HC2 Program Thursday 1 Start"
@@ -2591,17 +2198,11 @@
       "programhc2_th_0_end": {
         "name": "HC2 Program Thursday 1 End"
       },
-      "programhc2_th_1": {
-        "name": "HC2 Program Thursday 2"
-      },
       "programhc2_th_1_start": {
         "name": "HC2 Program Thursday 2 Start"
       },
       "programhc2_th_1_end": {
         "name": "HC2 Program Thursday 2 End"
-      },
-      "programhc2_th_2": {
-        "name": "HC2 Program Thursday 3"
       },
       "programhc2_th_2_start": {
         "name": "HC2 Program Thursday 3 Start"
@@ -2609,17 +2210,11 @@
       "programhc2_th_2_end": {
         "name": "HC2 Program Thursday 3 End"
       },
-      "programhc2_fr_0": {
-        "name": "HC2 Program Friday 1"
-      },
       "programhc2_fr_0_start": {
         "name": "HC2 Program Friday 1 Start"
       },
       "programhc2_fr_0_end": {
         "name": "HC2 Program Friday 1 End"
-      },
-      "programhc2_fr_1": {
-        "name": "HC2 Program Friday 2"
       },
       "programhc2_fr_1_start": {
         "name": "HC2 Program Friday 2 Start"
@@ -2627,17 +2222,11 @@
       "programhc2_fr_1_end": {
         "name": "HC2 Program Friday 2 End"
       },
-      "programhc2_fr_2": {
-        "name": "HC2 Program Friday 3"
-      },
       "programhc2_fr_2_start": {
         "name": "HC2 Program Friday 3 Start"
       },
       "programhc2_fr_2_end": {
         "name": "HC2 Program Friday 3 End"
-      },
-      "programhc2_sa_0": {
-        "name": "HC2 Program Saturday 1"
       },
       "programhc2_sa_0_start": {
         "name": "HC2 Program Saturday 1 Start"
@@ -2645,17 +2234,11 @@
       "programhc2_sa_0_end": {
         "name": "HC2 Program Saturday 1 End"
       },
-      "programhc2_sa_1": {
-        "name": "HC2 Program Saturday 2"
-      },
       "programhc2_sa_1_start": {
         "name": "HC2 Program Saturday 2 Start"
       },
       "programhc2_sa_1_end": {
         "name": "HC2 Program Saturday 2 End"
-      },
-      "programhc2_sa_2": {
-        "name": "HC2 Program Saturday 3"
       },
       "programhc2_sa_2_start": {
         "name": "HC2 Program Saturday 3 Start"
@@ -2663,17 +2246,11 @@
       "programhc2_sa_2_end": {
         "name": "HC2 Program Saturday 3 End"
       },
-      "programhc2_so_0": {
-        "name": "HC2 Program Sunday 1"
-      },
       "programhc2_so_0_start": {
         "name": "HC2 Program Sunday 1 Start"
       },
       "programhc2_so_0_end": {
         "name": "HC2 Program Sunday 1 End"
-      },
-      "programhc2_so_1": {
-        "name": "HC2 Program Sunday 2"
       },
       "programhc2_so_1_start": {
         "name": "HC2 Program Sunday 2 Start"
@@ -2681,17 +2258,11 @@
       "programhc2_so_1_end": {
         "name": "HC2 Program Sunday 2 End"
       },
-      "programhc2_so_2": {
-        "name": "HC2 Program Sunday 3"
-      },
       "programhc2_so_2_start": {
         "name": "HC2 Program Sunday 3 Start"
       },
       "programhc2_so_2_end": {
         "name": "HC2 Program Sunday 3 End"
-      },
-      "programhc2_mo_fr_0": {
-        "name": "HC2 Program Mon-Fri 1"
       },
       "programhc2_mo_fr_0_start": {
         "name": "HC2 Program Mon-Fri 1 Start"
@@ -2699,17 +2270,11 @@
       "programhc2_mo_fr_0_end": {
         "name": "HC2 Program Mon-Fri 1 End"
       },
-      "programhc2_mo_fr_1": {
-        "name": "HC2 Program Mon-Fri 2"
-      },
       "programhc2_mo_fr_1_start": {
         "name": "HC2 Program Mon-Fri 2 Start"
       },
       "programhc2_mo_fr_1_end": {
         "name": "HC2 Program Mon-Fri 2 End"
-      },
-      "programhc2_mo_fr_2": {
-        "name": "HC2 Program Mon-Fri 3"
       },
       "programhc2_mo_fr_2_start": {
         "name": "HC2 Program Mon-Fri 3 Start"
@@ -2717,17 +2282,11 @@
       "programhc2_mo_fr_2_end": {
         "name": "HC2 Program Mon-Fri 3 End"
       },
-      "programhc2_sa_so_0": {
-        "name": "HC2 Program Sat-Sun 1"
-      },
       "programhc2_sa_so_0_start": {
         "name": "HC2 Program Sat-Sun 1 Start"
       },
       "programhc2_sa_so_0_end": {
         "name": "HC2 Program Sat-Sun 1 End"
-      },
-      "programhc2_sa_so_1": {
-        "name": "HC2 Program Sat-Sun 2"
       },
       "programhc2_sa_so_1_start": {
         "name": "HC2 Program Sat-Sun 2 Start"
@@ -2735,17 +2294,11 @@
       "programhc2_sa_so_1_end": {
         "name": "HC2 Program Sat-Sun 2 End"
       },
-      "programhc2_sa_so_2": {
-        "name": "HC2 Program Sat-Sun 3"
-      },
       "programhc2_sa_so_2_start": {
         "name": "HC2 Program Sat-Sun 3 Start"
       },
       "programhc2_sa_so_2_end": {
         "name": "HC2 Program Sat-Sun 3 End"
-      },
-      "programhc2_mo_so_0": {
-        "name": "HC2 Program All Week 1"
       },
       "programhc2_mo_so_0_start": {
         "name": "HC2 Program All Week 1 Start"
@@ -2753,17 +2306,11 @@
       "programhc2_mo_so_0_end": {
         "name": "HC2 Program All Week 1 End"
       },
-      "programhc2_mo_so_1": {
-        "name": "HC2 Program All Week 2"
-      },
       "programhc2_mo_so_1_start": {
         "name": "HC2 Program All Week 2 Start"
       },
       "programhc2_mo_so_1_end": {
         "name": "HC2 Program All Week 2 End"
-      },
-      "programhc2_mo_so_2": {
-        "name": "HC2 Program All Week 3"
       },
       "programhc2_mo_so_2_start": {
         "name": "HC2 Program All Week 3 Start"
@@ -2771,17 +2318,11 @@
       "programhc2_mo_so_2_end": {
         "name": "HC2 Program All Week 3 End"
       },
-      "programdhw_mo_0": {
-        "name": "DHW Program Monday 1"
-      },
       "programdhw_mo_0_start": {
         "name": "DHW Program Monday 1 Start"
       },
       "programdhw_mo_0_end": {
         "name": "DHW Program Monday 1 End"
-      },
-      "programdhw_mo_1": {
-        "name": "DHW Program Monday 2"
       },
       "programdhw_mo_1_start": {
         "name": "DHW Program Monday 2 Start"
@@ -2789,17 +2330,11 @@
       "programdhw_mo_1_end": {
         "name": "DHW Program Monday 2 End"
       },
-      "programdhw_mo_2": {
-        "name": "DHW Program Monday 3"
-      },
       "programdhw_mo_2_start": {
         "name": "DHW Program Monday 3 Start"
       },
       "programdhw_mo_2_end": {
         "name": "DHW Program Monday 3 End"
-      },
-      "programdhw_tu_0": {
-        "name": "DHW Program Tuesday 1"
       },
       "programdhw_tu_0_start": {
         "name": "DHW Program Tuesday 1 Start"
@@ -2807,17 +2342,11 @@
       "programdhw_tu_0_end": {
         "name": "DHW Program Tuesday 1 End"
       },
-      "programdhw_tu_1": {
-        "name": "DHW Program Tuesday 2"
-      },
       "programdhw_tu_1_start": {
         "name": "DHW Program Tuesday 2 Start"
       },
       "programdhw_tu_1_end": {
         "name": "DHW Program Tuesday 2 End"
-      },
-      "programdhw_tu_2": {
-        "name": "DHW Program Tuesday 3"
       },
       "programdhw_tu_2_start": {
         "name": "DHW Program Tuesday 3 Start"
@@ -2825,17 +2354,11 @@
       "programdhw_tu_2_end": {
         "name": "DHW Program Tuesday 3 End"
       },
-      "programdhw_we_0": {
-        "name": "DHW Program Wednesday 1"
-      },
       "programdhw_we_0_start": {
         "name": "DHW Program Wednesday 1 Start"
       },
       "programdhw_we_0_end": {
         "name": "DHW Program Wednesday 1 End"
-      },
-      "programdhw_we_1": {
-        "name": "DHW Program Wednesday 2"
       },
       "programdhw_we_1_start": {
         "name": "DHW Program Wednesday 2 Start"
@@ -2843,17 +2366,11 @@
       "programdhw_we_1_end": {
         "name": "DHW Program Wednesday 2 End"
       },
-      "programdhw_we_2": {
-        "name": "DHW Program Wednesday 3"
-      },
       "programdhw_we_2_start": {
         "name": "DHW Program Wednesday 3 Start"
       },
       "programdhw_we_2_end": {
         "name": "DHW Program Wednesday 3 End"
-      },
-      "programdhw_th_0": {
-        "name": "DHW Program Thursday 1"
       },
       "programdhw_th_0_start": {
         "name": "DHW Program Thursday 1 Start"
@@ -2861,17 +2378,11 @@
       "programdhw_th_0_end": {
         "name": "DHW Program Thursday 1 End"
       },
-      "programdhw_th_1": {
-        "name": "DHW Program Thursday 2"
-      },
       "programdhw_th_1_start": {
         "name": "DHW Program Thursday 2 Start"
       },
       "programdhw_th_1_end": {
         "name": "DHW Program Thursday 2 End"
-      },
-      "programdhw_th_2": {
-        "name": "DHW Program Thursday 3"
       },
       "programdhw_th_2_start": {
         "name": "DHW Program Thursday 3 Start"
@@ -2879,17 +2390,11 @@
       "programdhw_th_2_end": {
         "name": "DHW Program Thursday 3 End"
       },
-      "programdhw_fr_0": {
-        "name": "DHW Program Friday 1"
-      },
       "programdhw_fr_0_start": {
         "name": "DHW Program Friday 1 Start"
       },
       "programdhw_fr_0_end": {
         "name": "DHW Program Friday 1 End"
-      },
-      "programdhw_fr_1": {
-        "name": "DHW Program Friday 2"
       },
       "programdhw_fr_1_start": {
         "name": "DHW Program Friday 2 Start"
@@ -2897,17 +2402,11 @@
       "programdhw_fr_1_end": {
         "name": "DHW Program Friday 2 End"
       },
-      "programdhw_fr_2": {
-        "name": "DHW Program Friday 3"
-      },
       "programdhw_fr_2_start": {
         "name": "DHW Program Friday 3 Start"
       },
       "programdhw_fr_2_end": {
         "name": "DHW Program Friday 3 End"
-      },
-      "programdhw_sa_0": {
-        "name": "DHW Program Saturday 1"
       },
       "programdhw_sa_0_start": {
         "name": "DHW Program Saturday 1 Start"
@@ -2915,17 +2414,11 @@
       "programdhw_sa_0_end": {
         "name": "DHW Program Saturday 1 End"
       },
-      "programdhw_sa_1": {
-        "name": "DHW Program Saturday 2"
-      },
       "programdhw_sa_1_start": {
         "name": "DHW Program Saturday 2 Start"
       },
       "programdhw_sa_1_end": {
         "name": "DHW Program Saturday 2 End"
-      },
-      "programdhw_sa_2": {
-        "name": "DHW Program Saturday 3"
       },
       "programdhw_sa_2_start": {
         "name": "DHW Program Saturday 3 Start"
@@ -2933,17 +2426,11 @@
       "programdhw_sa_2_end": {
         "name": "DHW Program Saturday 3 End"
       },
-      "programdhw_so_0": {
-        "name": "DHW Program Sunday 1"
-      },
       "programdhw_so_0_start": {
         "name": "DHW Program Sunday 1 Start"
       },
       "programdhw_so_0_end": {
         "name": "DHW Program Sunday 1 End"
-      },
-      "programdhw_so_1": {
-        "name": "DHW Program Sunday 2"
       },
       "programdhw_so_1_start": {
         "name": "DHW Program Sunday 2 Start"
@@ -2951,17 +2438,11 @@
       "programdhw_so_1_end": {
         "name": "DHW Program Sunday 2 End"
       },
-      "programdhw_so_2": {
-        "name": "DHW Program Sunday 3"
-      },
       "programdhw_so_2_start": {
         "name": "DHW Program Sunday 3 Start"
       },
       "programdhw_so_2_end": {
         "name": "DHW Program Sunday 3 End"
-      },
-      "programdhw_mo_fr_0": {
-        "name": "DHW Program Mon-Fri 1"
       },
       "programdhw_mo_fr_0_start": {
         "name": "DHW Program Mon-Fri 1 Start"
@@ -2969,17 +2450,11 @@
       "programdhw_mo_fr_0_end": {
         "name": "DHW Program Mon-Fri 1 End"
       },
-      "programdhw_mo_fr_1": {
-        "name": "DHW Program Mon-Fri 2"
-      },
       "programdhw_mo_fr_1_start": {
         "name": "DHW Program Mon-Fri 2 Start"
       },
       "programdhw_mo_fr_1_end": {
         "name": "DHW Program Mon-Fri 2 End"
-      },
-      "programdhw_mo_fr_2": {
-        "name": "DHW Program Mon-Fri 3"
       },
       "programdhw_mo_fr_2_start": {
         "name": "DHW Program Mon-Fri 3 Start"
@@ -2987,17 +2462,11 @@
       "programdhw_mo_fr_2_end": {
         "name": "DHW Program Mon-Fri 3 End"
       },
-      "programdhw_sa_so_0": {
-        "name": "DHW Program Sat-Sun 1"
-      },
       "programdhw_sa_so_0_start": {
         "name": "DHW Program Sat-Sun 1 Start"
       },
       "programdhw_sa_so_0_end": {
         "name": "DHW Program Sat-Sun 1 End"
-      },
-      "programdhw_sa_so_1": {
-        "name": "DHW Program Sat-Sun 2"
       },
       "programdhw_sa_so_1_start": {
         "name": "DHW Program Sat-Sun 2 Start"
@@ -3005,17 +2474,11 @@
       "programdhw_sa_so_1_end": {
         "name": "DHW Program Sat-Sun 2 End"
       },
-      "programdhw_sa_so_2": {
-        "name": "DHW Program Sat-Sun 3"
-      },
       "programdhw_sa_so_2_start": {
         "name": "DHW Program Sat-Sun 3 Start"
       },
       "programdhw_sa_so_2_end": {
         "name": "DHW Program Sat-Sun 3 End"
-      },
-      "programdhw_mo_so_0": {
-        "name": "DHW Program All Week 1"
       },
       "programdhw_mo_so_0_start": {
         "name": "DHW Program All Week 1 Start"
@@ -3023,17 +2486,11 @@
       "programdhw_mo_so_0_end": {
         "name": "DHW Program All Week 1 End"
       },
-      "programdhw_mo_so_1": {
-        "name": "DHW Program All Week 2"
-      },
       "programdhw_mo_so_1_start": {
         "name": "DHW Program All Week 2 Start"
       },
       "programdhw_mo_so_1_end": {
         "name": "DHW Program All Week 2 End"
-      },
-      "programdhw_mo_so_2": {
-        "name": "DHW Program All Week 3"
       },
       "programdhw_mo_so_2_start": {
         "name": "DHW Program All Week 3 Start"
@@ -3041,17 +2498,11 @@
       "programdhw_mo_so_2_end": {
         "name": "DHW Program All Week 3 End"
       },
-      "programfan_mo_0": {
-        "name": "Fan Program Monday 1"
-      },
       "programfan_mo_0_start": {
         "name": "Fan Program Monday 1 Start"
       },
       "programfan_mo_0_end": {
         "name": "Fan Program Monday 1 End"
-      },
-      "programfan_mo_1": {
-        "name": "Fan Program Monday 2"
       },
       "programfan_mo_1_start": {
         "name": "Fan Program Monday 2 Start"
@@ -3059,17 +2510,11 @@
       "programfan_mo_1_end": {
         "name": "Fan Program Monday 2 End"
       },
-      "programfan_mo_2": {
-        "name": "Fan Program Monday 3"
-      },
       "programfan_mo_2_start": {
         "name": "Fan Program Monday 3 Start"
       },
       "programfan_mo_2_end": {
         "name": "Fan Program Monday 3 End"
-      },
-      "programfan_tu_0": {
-        "name": "Fan Program Tuesday 1"
       },
       "programfan_tu_0_start": {
         "name": "Fan Program Tuesday 1 Start"
@@ -3077,17 +2522,11 @@
       "programfan_tu_0_end": {
         "name": "Fan Program Tuesday 1 End"
       },
-      "programfan_tu_1": {
-        "name": "Fan Program Tuesday 2"
-      },
       "programfan_tu_1_start": {
         "name": "Fan Program Tuesday 2 Start"
       },
       "programfan_tu_1_end": {
         "name": "Fan Program Tuesday 2 End"
-      },
-      "programfan_tu_2": {
-        "name": "Fan Program Tuesday 3"
       },
       "programfan_tu_2_start": {
         "name": "Fan Program Tuesday 3 Start"
@@ -3095,17 +2534,11 @@
       "programfan_tu_2_end": {
         "name": "Fan Program Tuesday 3 End"
       },
-      "programfan_we_0": {
-        "name": "Fan Program Wednesday 1"
-      },
       "programfan_we_0_start": {
         "name": "Fan Program Wednesday 1 Start"
       },
       "programfan_we_0_end": {
         "name": "Fan Program Wednesday 1 End"
-      },
-      "programfan_we_1": {
-        "name": "Fan Program Wednesday 2"
       },
       "programfan_we_1_start": {
         "name": "Fan Program Wednesday 2 Start"
@@ -3113,17 +2546,11 @@
       "programfan_we_1_end": {
         "name": "Fan Program Wednesday 2 End"
       },
-      "programfan_we_2": {
-        "name": "Fan Program Wednesday 3"
-      },
       "programfan_we_2_start": {
         "name": "Fan Program Wednesday 3 Start"
       },
       "programfan_we_2_end": {
         "name": "Fan Program Wednesday 3 End"
-      },
-      "programfan_th_0": {
-        "name": "Fan Program Thursday 1"
       },
       "programfan_th_0_start": {
         "name": "Fan Program Thursday 1 Start"
@@ -3131,17 +2558,11 @@
       "programfan_th_0_end": {
         "name": "Fan Program Thursday 1 End"
       },
-      "programfan_th_1": {
-        "name": "Fan Program Thursday 2"
-      },
       "programfan_th_1_start": {
         "name": "Fan Program Thursday 2 Start"
       },
       "programfan_th_1_end": {
         "name": "Fan Program Thursday 2 End"
-      },
-      "programfan_th_2": {
-        "name": "Fan Program Thursday 3"
       },
       "programfan_th_2_start": {
         "name": "Fan Program Thursday 3 Start"
@@ -3149,17 +2570,11 @@
       "programfan_th_2_end": {
         "name": "Fan Program Thursday 3 End"
       },
-      "programfan_fr_0": {
-        "name": "Fan Program Friday 1"
-      },
       "programfan_fr_0_start": {
         "name": "Fan Program Friday 1 Start"
       },
       "programfan_fr_0_end": {
         "name": "Fan Program Friday 1 End"
-      },
-      "programfan_fr_1": {
-        "name": "Fan Program Friday 2"
       },
       "programfan_fr_1_start": {
         "name": "Fan Program Friday 2 Start"
@@ -3167,17 +2582,11 @@
       "programfan_fr_1_end": {
         "name": "Fan Program Friday 2 End"
       },
-      "programfan_fr_2": {
-        "name": "Fan Program Friday 3"
-      },
       "programfan_fr_2_start": {
         "name": "Fan Program Friday 3 Start"
       },
       "programfan_fr_2_end": {
         "name": "Fan Program Friday 3 End"
-      },
-      "programfan_sa_0": {
-        "name": "Fan Program Saturday 1"
       },
       "programfan_sa_0_start": {
         "name": "Fan Program Saturday 1 Start"
@@ -3185,17 +2594,11 @@
       "programfan_sa_0_end": {
         "name": "Fan Program Saturday 1 End"
       },
-      "programfan_sa_1": {
-        "name": "Fan Program Saturday 2"
-      },
       "programfan_sa_1_start": {
         "name": "Fan Program Saturday 2 Start"
       },
       "programfan_sa_1_end": {
         "name": "Fan Program Saturday 2 End"
-      },
-      "programfan_sa_2": {
-        "name": "Fan Program Saturday 3"
       },
       "programfan_sa_2_start": {
         "name": "Fan Program Saturday 3 Start"
@@ -3203,17 +2606,11 @@
       "programfan_sa_2_end": {
         "name": "Fan Program Saturday 3 End"
       },
-      "programfan_so_0": {
-        "name": "Fan Program Sunday 1"
-      },
       "programfan_so_0_start": {
         "name": "Fan Program Sunday 1 Start"
       },
       "programfan_so_0_end": {
         "name": "Fan Program Sunday 1 End"
-      },
-      "programfan_so_1": {
-        "name": "Fan Program Sunday 2"
       },
       "programfan_so_1_start": {
         "name": "Fan Program Sunday 2 Start"
@@ -3221,17 +2618,11 @@
       "programfan_so_1_end": {
         "name": "Fan Program Sunday 2 End"
       },
-      "programfan_so_2": {
-        "name": "Fan Program Sunday 3"
-      },
       "programfan_so_2_start": {
         "name": "Fan Program Sunday 3 Start"
       },
       "programfan_so_2_end": {
         "name": "Fan Program Sunday 3 End"
-      },
-      "programfan_mo_fr_0": {
-        "name": "Fan Program Mon-Fri 1"
       },
       "programfan_mo_fr_0_start": {
         "name": "Fan Program Mon-Fri 1 Start"
@@ -3239,17 +2630,11 @@
       "programfan_mo_fr_0_end": {
         "name": "Fan Program Mon-Fri 1 End"
       },
-      "programfan_mo_fr_1": {
-        "name": "Fan Program Mon-Fri 2"
-      },
       "programfan_mo_fr_1_start": {
         "name": "Fan Program Mon-Fri 2 Start"
       },
       "programfan_mo_fr_1_end": {
         "name": "Fan Program Mon-Fri 2 End"
-      },
-      "programfan_mo_fr_2": {
-        "name": "Fan Program Mon-Fri 3"
       },
       "programfan_mo_fr_2_start": {
         "name": "Fan Program Mon-Fri 3 Start"
@@ -3257,17 +2642,11 @@
       "programfan_mo_fr_2_end": {
         "name": "Fan Program Mon-Fri 3 End"
       },
-      "programfan_sa_so_0": {
-        "name": "Fan Program Sat-Sun 1"
-      },
       "programfan_sa_so_0_start": {
         "name": "Fan Program Sat-Sun 1 Start"
       },
       "programfan_sa_so_0_end": {
         "name": "Fan Program Sat-Sun 1 End"
-      },
-      "programfan_sa_so_1": {
-        "name": "Fan Program Sat-Sun 2"
       },
       "programfan_sa_so_1_start": {
         "name": "Fan Program Sat-Sun 2 Start"
@@ -3275,17 +2654,11 @@
       "programfan_sa_so_1_end": {
         "name": "Fan Program Sat-Sun 2 End"
       },
-      "programfan_sa_so_2": {
-        "name": "Fan Program Sat-Sun 3"
-      },
       "programfan_sa_so_2_start": {
         "name": "Fan Program Sat-Sun 3 Start"
       },
       "programfan_sa_so_2_end": {
         "name": "Fan Program Sat-Sun 3 End"
-      },
-      "programfan_mo_so_0": {
-        "name": "Fan Program All Week 1"
       },
       "programfan_mo_so_0_start": {
         "name": "Fan Program All Week 1 Start"
@@ -3293,17 +2666,11 @@
       "programfan_mo_so_0_end": {
         "name": "Fan Program All Week 1 End"
       },
-      "programfan_mo_so_1": {
-        "name": "Fan Program All Week 2"
-      },
       "programfan_mo_so_1_start": {
         "name": "Fan Program All Week 2 Start"
       },
       "programfan_mo_so_1_end": {
         "name": "Fan Program All Week 2 End"
-      },
-      "programfan_mo_so_2": {
-        "name": "Fan Program All Week 3"
       },
       "programfan_mo_so_2_start": {
         "name": "Fan Program All Week 3 Start"

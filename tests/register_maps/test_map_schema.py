@@ -113,7 +113,8 @@ def test_field_names_are_unique_per_block(firmware, cooling):
 def test_read_translation_keys_exist(firmware, cooling):
     for block, read_field in _fields(firmware, cooling):
         key = read_field.translation_key
-        if key is None:
+        # Placeholders ("n.a.", "disabled") get no entity, so no name.
+        if key is None or read_field.decode_type in _SKIPPED_READ_TYPES:
             continue
         platform = "binary_sensor" if read_field.is_bit else "sensor"
         assert key in _STRINGS[platform], f"{firmware} {block} {read_field.name}"
@@ -165,3 +166,58 @@ def test_2xx_block_params_have_a_layout(firmware, cooling):
         assert entry["offset"] >= 2, where
         assert entry["length"] >= 1, where
         assert entry.get("bit", 0) in range(8), where
+
+
+def _translation_keys_in_use() -> dict[str, set[str]]:
+    """Entity translation keys any firmware profile's maps can produce."""
+    from custom_components.thz.entity_translations import get_translation_key
+
+    used: dict[str, set[str]] = {}
+    for firmware in FIRMWARE_MAPS:
+        for cooling in (True, False):
+            registers = RegisterMapManagerWrite(firmware, has_cooling=cooling)
+            for name, param in registers.params().items():
+                key = get_translation_key(name)
+                if key is None:
+                    continue
+                if param.type == "schedule":
+                    used.setdefault("time", set()).update(
+                        {f"{key}_start", f"{key}_end"}
+                    )
+                    continue
+                used.setdefault(param.type, set()).add(key)
+                if param.decode_type == "8party":
+                    used.setdefault("time", set()).add(f"{key}_end")
+            for _block, read_field in _fields(firmware, cooling):
+                if read_field.decode_type in _SKIPPED_READ_TYPES:
+                    continue
+                if read_field.translation_key is not None:
+                    platform = "binary_sensor" if read_field.is_bit else "sensor"
+                    used.setdefault(platform, set()).add(read_field.translation_key)
+    return used
+
+
+def test_every_entity_translation_is_used():
+    """strings.json names no entity that no firmware profile creates.
+
+    A key counts as used if a register map produces it, a fault sensor
+    class has it, or the code names it (climate and COP entities set
+    theirs directly).
+    """
+    from custom_components.thz.fault_sensor import _THZFaultSensor
+
+    used = _translation_keys_in_use()
+    used.setdefault("sensor", set()).update(
+        f"fault_{cls.KEY}" for cls in _THZFaultSensor.__subclasses__()
+    )
+    source = "\n".join(
+        path.read_text()
+        for path in (Path(__file__).parents[2] / "custom_components/thz").rglob("*.py")
+    )
+    unused = [
+        f"{platform}.{key}"
+        for platform, keys in _STRINGS.items()
+        for key in keys
+        if key not in used.get(platform, set()) and f'"{key}"' not in source
+    ]
+    assert unused == []
