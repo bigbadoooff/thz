@@ -241,13 +241,13 @@ class TestNumberReadsFromBlockCoordinator:
         device.sent.clear()
         number = self._number(write_map_206["p02RoomTempNight"], device, coordinator)
 
-        await number.async_update()
+        number._handle_block_update()
 
         assert number.native_value == pytest.approx(18.0)
         assert device.sent == []
 
     @pytest.mark.asyncio
-    async def test_falls_back_to_device_when_coordinator_failed(self, write_map_206):
+    async def test_update_entity_reads_the_device(self, write_map_206):
         device = Simulated2xxDevice({b"\x17": _block_17()})
         coordinator = self._coordinator(b"stale", success=False)
         number = self._number(write_map_206["p02RoomTempNight"], device, coordinator)

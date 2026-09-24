@@ -10,10 +10,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .base_entity import THZBaseEntity
+from .base_entity import THZParameterEntity
 from .entity_translations import get_translation_key
 from .exceptions import DEVICE_ERRORS
-from .parameter_io import async_read_parameter, async_write_parameter
+from .parameter_io import async_write_parameter
 from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
 from .thz_device import THZDevice
@@ -21,8 +21,8 @@ from .value_codec import THZValueCodec
 
 _LOGGER = logging.getLogger(__name__)
 
-# Each entity polls and writes to the device directly (no coordinator);
-# limit to one in-flight update/service call at a time.
+# Values come from the parameter poller or a block coordinator; writes go
+# to the device directly, one at a time.
 PARALLEL_UPDATES = 1
 
 
@@ -37,7 +37,7 @@ async def async_setup_entry(
     )
 
 
-class THZSwitch(THZBaseEntity, SwitchEntity):
+class THZSwitch(THZParameterEntity, SwitchEntity):
     """Representation of a THZ Switch entity."""
 
     def __init__(
@@ -46,7 +46,6 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
         entry: WriteParam,
         device: THZDevice,
         device_id: str,
-        scan_interval: int | None = None,
         entity_id_style: str = "default",
         entity_visibility: str = "default",
         entity_id_prefix: str | None = None,
@@ -58,7 +57,6 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             entry: The write-map parameter.
             device: The device instance this switch is associated with.
             device_id: The device identifier for linking to device.
-            scan_interval: The scan interval in seconds for polling updates.
             entity_id_style: "default" or "fhem" (see base_entity.py).
             entity_visibility: "default"/"extended"/"all" (see base_entity.py).
             entity_id_prefix: Optional device alias prefix for "fhem"-style
@@ -71,7 +69,6 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
             device=device,
             device_id=device_id,
             icon=entry.icon,
-            scan_interval=scan_interval,
             translation_key=get_translation_key(name),
             entity_id_style=entity_id_style,
             entity_visibility=entity_visibility,
@@ -88,25 +85,15 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
         """Return whether the switch is currently on."""
         return self._is_on
 
-    async def async_update(self) -> None:
-        """Update the switch state by reading the current value from the device."""
-        _LOGGER.debug("Updating switch %s with command %s", self.name, self._command)
-
-        value_bytes = await self._async_guarded_read(
-            async_read_parameter(self.hass, self._device, self._entry)
-        )
-        if value_bytes is None:
-            return
-
+    def _apply_value(self, value_bytes: bytes) -> None:
+        """Decode the parameter's bytes into the switch state."""
         _LOGGER.debug("Received bytes for %s: %s", self.name, value_bytes.hex())
-
         try:
-            # Use centralized codec for decoding
             self._is_on = THZValueCodec.decode_switch(value_bytes)
-            _LOGGER.debug("Decoded switch state for %s: %s", self.name, self._is_on)
         except (ValueError, IndexError, TypeError) as err:
             _LOGGER.error("Error decoding switch %s: %s", self.name, err, exc_info=True)
-            # Keep previous value on error
+            return  # keep the previous value
+        _LOGGER.debug("Decoded switch state for %s: %s", self.name, self._is_on)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the switch by sending a command to the device."""
@@ -122,6 +109,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
 
             self._is_on = True
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+            await self._async_after_write()
         except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error encoding switch %s to turn on: %s", self.name, err, exc_info=True
@@ -141,6 +129,7 @@ class THZSwitch(THZBaseEntity, SwitchEntity):
 
             self._is_on = False
             self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+            await self._async_after_write()
         except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error(
                 "Error encoding switch %s to turn off: %s",

@@ -28,6 +28,7 @@ from .const import (
     CONF_FIRMWARE_OVERRIDE,
     CONF_SPLIT_DEVICES,
     DEFAULT_UPDATE_INTERVAL,
+    DEFAULT_WRITE_INTERVAL,
     DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_ALL,
@@ -43,6 +44,7 @@ from .devices import (
     main_device_name,
 )
 from .exceptions import DEVICE_ERRORS, THZNotSupportedError
+from .parameter_poller import ParameterPoller
 from .runtime_data import THZRuntimeData, loaded_runtime_data
 from .services import async_refresh_block as async_refresh_block, async_setup_services
 from .thz_device import THZDevice
@@ -147,6 +149,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             translation_domain=DOMAIN, translation_key="no_block_readable"
         )
 
+    poller = ParameterPoller(
+        hass, device, data.get("write_interval", DEFAULT_WRITE_INTERVAL)
+    )
+    poller.async_start()
+    config_entry.async_on_unload(poller.async_shutdown)
+
     # Store per-entry runtime state on the config entry itself (not hass.data),
     # per HA's recommended runtime-data pattern.
     entry_data = THZRuntimeData(
@@ -154,6 +162,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         device_id=unique_id,
         write_manager=write_manager,
         register_manager=register_manager,
+        poller=poller,
         coordinators=coordinators,
         unsupported_blocks=unsupported_blocks,
         entity_id_style=entity_id_style,

@@ -58,7 +58,6 @@ class THZButton(THZBaseEntity, ButtonEntity):
         entry: WriteParam,
         device: THZDevice,
         device_id: str,
-        scan_interval: int | None = None,
         entity_id_style: str = "default",
         entity_visibility: str = "default",
         entity_id_prefix: str | None = None,
@@ -70,7 +69,6 @@ class THZButton(THZBaseEntity, ButtonEntity):
             entry: The write-map parameter.
             device: The device instance this button communicates with.
             device_id: The device identifier for registry linking.
-            scan_interval: Not used for buttons; accepted for API compatibility.
             entity_id_style: "default" or "fhem" (see base_entity.py).
             entity_visibility: "default"/"extended"/"all" (see base_entity.py).
             entity_id_prefix: Optional device alias prefix for "fhem"-style
@@ -82,7 +80,6 @@ class THZButton(THZBaseEntity, ButtonEntity):
             device=device,
             device_id=device_id,
             icon=entry.icon or "mdi:gesture-tap-button",
-            scan_interval=scan_interval,
             translation_key=get_translation_key(name),
             entity_id_style=entity_id_style,
             entity_visibility=entity_visibility,
@@ -91,15 +88,8 @@ class THZButton(THZBaseEntity, ButtonEntity):
         )
         self._entry = entry
 
-    async def async_added_to_hass(self) -> None:
-        """Skip base periodic polling setup for stateless buttons."""
-        # Intentionally do not call super().async_added_to_hass() here because
-        # THZBaseEntity schedules a periodic update timer that is not needed
-        # for write-only button entities without readable state.
-        return
-
     async def async_update(self) -> None:
-        """Buttons have no readable state; override to suppress polling."""
+        """Buttons have no readable state (and no _poll_key: nothing is polled)."""
         return
 
     async def async_press(self) -> None:

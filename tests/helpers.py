@@ -226,6 +226,7 @@ def make_runtime_data(**fields):
     fields.setdefault("device_id", "test_device")
     fields.setdefault("write_manager", None)
     fields.setdefault("register_manager", None)
+    fields.setdefault("poller", MagicMock())
     return THZRuntimeData(**fields)
 
 

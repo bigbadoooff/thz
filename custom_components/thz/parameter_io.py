@@ -25,6 +25,7 @@ from .const import WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
+    from .parameter_poller import ReadKey
     from .register_maps.model import WriteParam
     from .thz_device import THZDevice
 
@@ -62,11 +63,22 @@ def parameter_from_block(param: WriteParam, block_data: bytes) -> bytes | None:
     raw = block_data[offset : offset + length]
     if len(raw) < length:
         return None
-    return _apply_bit(param, raw)
+    return parameter_from_read(param, raw)
 
 
-def _apply_bit(param: WriteParam, raw: bytes) -> bytes:
-    """Reduce a single-bit flag's byte to 0/1; other values pass through."""
+def parameter_read_key(param: WriteParam) -> ReadKey:
+    """Return the register read that holds the parameter: (command, offset, length).
+
+    Bit flags sharing a byte share the key; parameter_from_read picks
+    each flag's bit out of the bytes read.
+    """
+    if param.block is not None:
+        return param.command, param.block.offset, param.block.length
+    return param.command, WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH
+
+
+def parameter_from_read(param: WriteParam, raw: bytes) -> bytes:
+    """Return the parameter's value bytes from a read of its read key."""
     bit = param.block.bit if param.block is not None else None
     if bit is not None and raw:
         return bytes([(raw[0] >> bit) & 0x01])
@@ -77,19 +89,16 @@ async def async_read_parameter(
     hass: HomeAssistant, device: THZDevice, param: WriteParam
 ) -> bytes:
     """Read the raw value bytes of a write-map parameter."""
-    if param.block is not None:
-        offset, length = param.block.offset, param.block.length
-    else:
-        offset, length = WRITE_REGISTER_OFFSET, WRITE_REGISTER_LENGTH
+    command, offset, length = parameter_read_key(param)
     result: bytes = await device.async_execute(
         hass,
         device.read_value,
-        bytes.fromhex(param.command),
+        bytes.fromhex(command),
         "get",
         offset,
         length,
     )
-    return _apply_bit(param, result)
+    return parameter_from_read(param, result)
 
 
 async def async_write_parameter(
