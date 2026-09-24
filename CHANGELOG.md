@@ -6,6 +6,19 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **Hot water is a `water_heater` entity** instead of a climate entity.
+  The old `climate` hot water entity is removed from the entity registry on
+  update; automations and dashboards that used it need the new
+  `water_heater` entity. Its state is `performance` (day setpoint),
+  `eco` (setback, night setpoint) or `off` (standby); setting a temperature
+  writes the setpoint of the current state (`p04` or `p05`).
+- **Ventilation is a `fan` entity** and the heating circuit climate entity
+  no longer has a fan mode. The fan's speed is the ventilation stage
+  (`p07FanStageDay`, 0–3); the `boost` preset starts unscheduled
+  ventilation at stage 3 (`p99startUnschedVent`).
+
 ### Changed
 
 - **The connection runs on asyncio** (#185): serial port and ser2net TCP

@@ -2683,9 +2683,23 @@
       },
       "heating_circuit_2": {
         "name": "Heizkreis 2"
-      },
-      "dhw_heating": {
+      }
+    },
+    "water_heater": {
+      "dhw": {
         "name": "Warmwasser"
+      }
+    },
+    "fan": {
+      "ventilation": {
+        "name": "Lüftung",
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "boost": "Stoßlüften"
+            }
+          }
+        }
       }
     },
     "binary_sensor": {

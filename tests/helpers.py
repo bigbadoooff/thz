@@ -205,11 +205,9 @@ def make_climate(**kwargs):
         op_mode=position("op_mode"),
         heat_setpoint=param("heat_setpoint_entry"),
         night_setpoint=param("night_setpoint_entry"),
-        manual_setpoint=param("manual_setpoint_entry"),
         cool_switch=param("cool_switch_entry"),
         cool_setpoint=param("cool_setpoint_entry"),
         opmode=param("opmode_entry"),
-        fan_stage=param("fan_stage_entry"),
         status=status,
     )
     coordinator = kwargs.pop("coordinator")

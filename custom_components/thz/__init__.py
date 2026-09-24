@@ -59,6 +59,8 @@ PLATFORMS = [
     "time",
     "button",
     "climate",
+    "water_heater",
+    "fan",
 ]
 
 

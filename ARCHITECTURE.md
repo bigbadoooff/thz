@@ -14,7 +14,8 @@ Integration setup           __init__.py, config_flow.py, platform_setup.py
   │  one config entry = one heat pump = one THZDevice
   ▼
 Entities                    sensor, binary_sensor, cop_sensor, fault_sensor,
-  │                         climate, number, select, switch, time, button
+  │                         climate, water_heater, fan, number, select,
+  │                         switch, time, button
   │  read:  coordinator data (read map) or parameter_io (write map)
   │  write: parameter_io only
   ▼
