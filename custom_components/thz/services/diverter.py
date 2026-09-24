@@ -56,22 +56,28 @@ def _diverter_bit_position(register_manager: Any) -> tuple[int, int] | None:
     return read_field.byte_offset, read_field.bit
 
 
-def _diverter_points_to_dhw(entry_data: THZRuntimeData) -> bool:
-    """Return the diverterValve flag from the polled pxxF2 block.
+async def _async_diverter_points_to_dhw(entry_data: THZRuntimeData) -> bool:
+    """Return the diverterValve flag from a fresh read of the pxxF2 block.
 
+    The block is read again first: its polled data can be one poll
+    interval old, too old to decide which circuit is under pressure.
     Raises HomeAssistantError if the flag cannot be determined.
     """
     coordinator = entry_data.coordinators.get(_DIVERTER_BLOCK)
-    if coordinator is None or coordinator.data is None:
+    if coordinator is None:
         raise HomeAssistantError(
-            f"Cannot verify valve state: {_DIVERTER_BLOCK} coordinator "
-            "data not available"
+            f"Cannot verify valve state: {_DIVERTER_BLOCK} is not polled"
         )
     flag = _diverter_bit_position(entry_data.register_manager)
     if flag is None:
         raise HomeAssistantError(
             f"Cannot verify valve state: no {_DIVERTER_FIELD} flag in "
             f"the {_DIVERTER_BLOCK} register map of this firmware"
+        )
+    await coordinator.async_refresh()
+    if not coordinator.last_update_success or coordinator.data is None:
+        raise HomeAssistantError(
+            f"Cannot verify valve state: {_DIVERTER_BLOCK} could not be read"
         )
     diverter_byte, diverter_bit = flag
     data: bytes = coordinator.data
@@ -80,13 +86,15 @@ def _diverter_points_to_dhw(entry_data: THZRuntimeData) -> bool:
     return bool((data[diverter_byte] >> diverter_bit) & 0x01)
 
 
-def _check_valve_direction(entry_data: THZRuntimeData, position: str) -> None:
+async def _async_check_valve_direction(
+    entry_data: THZRuntimeData, position: str
+) -> None:
     """Refuse moving the valve against the active flow direction.
 
     diverterValve bit = 1 → flow is to DHW; bit = 0 → flow is to the heating
     circuit. Moving the valve against it would do so under pressure.
     """
-    to_dhw = _diverter_points_to_dhw(entry_data)
+    to_dhw = await _async_diverter_points_to_dhw(entry_data)
     if position == "dhw" and not to_dhw:
         raise HomeAssistantError(
             "Heat pump is not in DHW mode (diverterValve bit = 0 in "
@@ -153,9 +161,9 @@ async def async_handle_set_diverter_valve(
     Moves the 3-way diverter valve motor toward the requested position and
     stops it again after a few seconds; position="off" only stops it.
 
-    For "dhw" and "heating" the diverterValve bit in pxxF2 is checked first:
-    moving the valve against the direction the heat pump is currently
-    directing the flow is refused.
+    For "dhw" and "heating" the diverterValve bit in pxxF2 is read and
+    checked first: moving the valve against the direction the heat pump is
+    currently directing the flow is refused.
     """
     position: str = call.data["position"]
     _, entry_data = _require_target_entry_data(hass, call.data.get("entry_id"))
@@ -164,7 +172,7 @@ async def async_handle_set_diverter_valve(
     # still have started the motor.
     motor_may_run = position in ("heating", "dhw")
     if motor_may_run:
-        _check_valve_direction(entry_data, position)
+        await _async_check_valve_direction(entry_data, position)
 
     device: THZDevice = entry_data.device
     try:

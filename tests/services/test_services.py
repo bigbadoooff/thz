@@ -324,9 +324,17 @@ class TestRefreshBlockService:
 
 class TestSetDiverterValveService:
     @staticmethod
-    def _coordinator(data: bytes):
+    def _coordinator(data: bytes, fresh: bytes | None = None, success=True):
+        """A pxxF2 coordinator whose refresh loads ``fresh`` (else ``data``)."""
         coord = MagicMock()
         coord.data = data
+        coord.last_update_success = True
+
+        async def _refresh():
+            coord.data = data if fresh is None else fresh
+            coord.last_update_success = success
+
+        coord.async_refresh = AsyncMock(side_effect=_refresh)
         return coord
 
     @pytest.mark.asyncio
@@ -396,6 +404,47 @@ class TestSetDiverterValveService:
         call = MagicMock()
         call.data = {"position": "dhw"}
         with pytest.raises(HomeAssistantError, match="refused"):
+            await handler(call)
+        device.async_execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_check_uses_a_fresh_read_of_the_block(self):
+        hass = _mock_hass()
+        device = _mock_device()
+        # Polled data says DHW (bit set), the fresh read says heating.
+        dhw = bytearray(12)
+        dhw[11] = 0x04  # diverterValve: byte 11, bit 2 on 4.39
+        coordinator = self._coordinator(bytes(dhw), fresh=bytes(12))
+        hass.data[DOMAIN]["entry1"] = {
+            "device": device,
+            "coordinators": {"pxxF2": coordinator},
+        }
+
+        async_setup_services(hass)
+        handler = _handler_for(hass, "set_diverter_valve")
+
+        call = MagicMock()
+        call.data = {"position": "dhw"}
+        with pytest.raises(HomeAssistantError, match="refused"):
+            await handler(call)
+        coordinator.async_refresh.assert_awaited_once()
+        device.async_execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_failed_read_of_the_block_refuses(self):
+        hass = _mock_hass()
+        device = _mock_device()
+        hass.data[DOMAIN]["entry1"] = {
+            "device": device,
+            "coordinators": {"pxxF2": self._coordinator(bytes(12), success=False)},
+        }
+
+        async_setup_services(hass)
+        handler = _handler_for(hass, "set_diverter_valve")
+
+        call = MagicMock()
+        call.data = {"position": "heating"}
+        with pytest.raises(HomeAssistantError, match="could not be read"):
             await handler(call)
         device.async_execute.assert_not_awaited()
 

@@ -4,14 +4,16 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.util import dt as dt_util
 import pytest
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.thz.const import DOMAIN
+from custom_components.thz.services.diverter import _diverter_bit_position
 
-from .common import setup_entry
+from .common import BLOCKS, setup_entry
+from .conftest import BLOCK_SIZE
 
 
 async def test_unknown_entry_id_is_a_validation_error(hass, fake_device):
@@ -77,4 +79,28 @@ async def test_backup_and_dry_run_restore(hass, fake_device, tmp_path):
     assert restore["success"] is True
     # A dry run never writes to the device.
     assert [t for t in device.sent if t[:2] == b"\x01\x80"] == sets_before
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_diverter_check_reads_the_valve_state_again(hass, fake_device):
+    """A valve that switched to DHW since the last poll blocks "heating"."""
+    entry = await setup_entry(hass, refresh_intervals={**BLOCKS, "pxxF2": 600})
+    device = fake_device.instances[-1]
+    runtime = entry.runtime_data
+    assert runtime.coordinators["pxxF2"].data is not None  # polled: heating
+    byte, bit = _diverter_bit_position(runtime.register_manager)
+    # The decoded block starts with the checksum and the address echo.
+    block = bytearray(device.registers.get(b"\xf2", bytes(BLOCK_SIZE)))
+    block[byte - 2] |= 1 << bit
+    device.registers[b"\xf2"] = bytes(block)
+
+    with pytest.raises(HomeAssistantError, match="refused"):
+        await hass.services.async_call(
+            DOMAIN,
+            "set_diverter_valve",
+            {"position": "heating"},
+            blocking=True,
+        )
+    assert not device.sets_for("0A0652")
+    assert not device.sets_for("0A0653")
     assert await hass.config_entries.async_unload(entry.entry_id)
