@@ -74,7 +74,7 @@ data:
 ```
 
 #### `thz.set_diverter_valve`
-Manual control of the 3-way diverter valve motor. Both `heating` and `dhw` directions are guarded by the `diverterValve` status bit in `pxxF2` — the command is refused if the heat pump is currently pressurising the opposite circuit. After 3 seconds the motor is automatically stopped and the stop is verified by reading back both motor registers.
+Manual control of the 3-way diverter valve motor. Both `heating` and `dhw` directions are guarded by the `diverterValve` status bit in `pxxF2`, read from the heat pump right before the move — the command is refused if the heat pump is currently pressurising the opposite circuit, or if `pxxF2` cannot be read. After 3 seconds the motor is automatically stopped and the stop is verified by reading back both motor registers.
 
 ```yaml
 service: thz.set_diverter_valve
