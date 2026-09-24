@@ -69,7 +69,7 @@ read-only mode — ``target_temperature`` is still shown but
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any, cast
@@ -186,7 +186,7 @@ def _get_step(entry: WriteParam) -> float:
 
 
 def _find_entry(
-    write_registers: Mapping[str, WriteParam], names: list[str]
+    write_registers: Mapping[str, WriteParam], names: Iterable[str]
 ) -> WriteParam | None:
     """Return the first of ``names`` that the write map has, with a command.
 
@@ -349,7 +349,7 @@ def _resolve(
             circuit.translation_key,
         )
 
-    heat = _find_entry(write_registers, list(circuit.heat_setpoint_names))
+    heat = _find_entry(write_registers, circuit.heat_setpoint_names)
     if heat is None and circuit.heat_setpoint_required:
         return None
     cool_switch = _command_entry(write_registers, circuit.cool_switch_name)
@@ -362,10 +362,8 @@ def _resolve(
         current=current,
         op_mode=op_mode,
         heat_setpoint=heat,
-        night_setpoint=_find_entry(write_registers, list(circuit.night_setpoint_names)),
-        manual_setpoint=_find_entry(
-            write_registers, list(circuit.manual_setpoint_names)
-        ),
+        night_setpoint=_find_entry(write_registers, circuit.night_setpoint_names),
+        manual_setpoint=_find_entry(write_registers, circuit.manual_setpoint_names),
         cool_switch=cool_switch,
         cool_setpoint=cool_setpoint,
         opmode=(
@@ -587,37 +585,29 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             enabled_default: Whether the entity is enabled when first added to
                 the entity registry (``False`` for HC2 unless ``enable_hc2``).
         """
-        status = config.status or StatusBits(coordinator=None)
-        cooling_coordinator = status.coordinator
-        current_temp_offset, current_temp_length = config.current or (None, None)
-        target_temp_offset, target_temp_length = config.target
-        op_mode_offset, op_mode_length = config.op_mode or (None, None)
-        heat_setpoint_entry = config.heat_setpoint
-        cool_switch_entry = config.cool_switch
-        cool_setpoint_entry = config.cool_setpoint
-        opmode_entry = config.opmode
-        fan_stage_entry = config.fan_stage
-
         super().__init__(coordinator)
         if not enabled_default:
             self._attr_entity_registry_enabled_default = False
 
-        self._cooling_coordinator = cooling_coordinator
+        status = config.status or StatusBits(coordinator=None)
+        self._cooling_coordinator = status.coordinator
         self._device = device
         self._device_id = device_id
 
-        self._current_temp_offset = current_temp_offset
-        self._current_temp_length = current_temp_length
-        self._target_temp_offset = target_temp_offset
-        self._target_temp_length = target_temp_length
-        self._op_mode_offset = op_mode_offset
-        self._op_mode_length = op_mode_length
+        # (byte offset, byte length) in the block; HC2 has no current
+        # temperature and may have no operating mode.
+        current, op_mode = config.current, config.op_mode
+        self._current_temp_offset: int | None = current[0] if current else None
+        self._current_temp_length: int | None = current[1] if current else None
+        self._target_temp_offset, self._target_temp_length = config.target
+        self._op_mode_offset: int | None = op_mode[0] if op_mode else None
+        self._op_mode_length: int | None = op_mode[1] if op_mode else None
 
-        self._heat_setpoint_entry = heat_setpoint_entry
+        self._heat_setpoint_entry = config.heat_setpoint
         self._night_setpoint_entry = config.night_setpoint
         self._manual_setpoint_entry = config.manual_setpoint
-        self._cool_switch_entry = cool_switch_entry
-        self._cool_setpoint_entry = cool_setpoint_entry
+        self._cool_switch_entry = config.cool_switch
+        self._cool_setpoint_entry = config.cool_setpoint
         self._cooling_byte = status.byte
         self._cooling_bit = status.cooling_bit
         self._compressor_bit = status.compressor_bit
@@ -626,8 +616,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         self._cooling_target_temp: float | None = None
 
         # Optional write entries for preset mode and fan mode
-        self._opmode_entry = opmode_entry
-        self._fan_stage_entry = fan_stage_entry
+        self._opmode_entry = config.opmode
+        self._fan_stage_entry = config.fan_stage
         self._fan_stage_cache: int | None = None
         self._op_mode_cache: str | None = None
 
@@ -659,7 +649,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         # The device's real "off" is the global pOpMode standby state, which
         # is exposed via preset_mode instead.
         self._supports_cooling = (
-            cool_switch_entry is not None and cool_setpoint_entry is not None
+            self._cool_switch_entry is not None
+            and self._cool_setpoint_entry is not None
         )
         # HVACMode/ClimateEntityFeature members are mistyped as plain `str`/
         # `int` in some older homeassistant-stubs snapshots; not real type
@@ -672,12 +663,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         # TARGET_TEMPERATURE feature is available whenever we have a heat
         # setpoint command OR cooling is supported (then both heat/cool temps
         # are settable depending on the current mode)
-        if heat_setpoint_entry is not None or self._supports_cooling:
+        if self._heat_setpoint_entry is not None or self._supports_cooling:
             self._attr_supported_features = ClimateEntityFeature.TARGET_TEMPERATURE
         else:
             self._attr_supported_features = ClimateEntityFeature(0)
 
-        if opmode_entry is not None:
+        if self._opmode_entry is not None:
             self._attr_supported_features |= ClimateEntityFeature.PRESET_MODE
             # Use the device's own mode names directly (sorted the same way
             # FHEM's setList did: case-insensitively) instead of mapping onto
@@ -686,14 +677,18 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 SELECT_MAP[_OPMODE_DECODE_TYPE].values(), key=str.lower
             )
 
-        if fan_stage_entry is not None:
+        if self._fan_stage_entry is not None:
             self._attr_supported_features |= ClimateEntityFeature.FAN_MODE
             self._attr_fan_modes = list(_FAN_MODES)
 
         # Temperature bounds from heat setpoint entry
-        if heat_setpoint_entry is not None:
-            self._attr_min_temp = float(heat_setpoint_entry.min or _DEFAULT_MIN_TEMP)
-            self._attr_max_temp = float(heat_setpoint_entry.max or _DEFAULT_MAX_TEMP)
+        if self._heat_setpoint_entry is not None:
+            self._attr_min_temp = float(
+                self._heat_setpoint_entry.min or _DEFAULT_MIN_TEMP
+            )
+            self._attr_max_temp = float(
+                self._heat_setpoint_entry.max or _DEFAULT_MAX_TEMP
+            )
         else:
             self._attr_min_temp = _DEFAULT_MIN_TEMP
             self._attr_max_temp = _DEFAULT_MAX_TEMP
