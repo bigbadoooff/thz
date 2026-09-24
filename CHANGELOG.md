@@ -46,6 +46,12 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Three entities had no name of their own**: the pump settings of the
+  technician maps (`zPumpHC`, `zPumpDHW`, numbers) and the 2.14 error reset
+  (`ResetErrors`, a button) had their translations only under `select`, so
+  Home Assistant showed them as "Heating Circuit 1 Number", "Hot Water
+  Number" or just the device name. Existing entity IDs stay as they are.
+
 - **Sensors and selects showed English protocol names instead of translated
   values** (e.g. *Wochentag* reading `Monday`): the weekday, season mode,
   heating/DHW operating mode, program state and fault code sensors (plus the

@@ -69,6 +69,9 @@
       }
     },
     "button": {
+      "reset_errors": {
+        "default": "mdi:trash-can-outline"
+      },
       "z_reset_last10errors": {
         "default": "mdi:trash-can-outline"
       }
@@ -502,6 +505,12 @@
       },
       "unsched_vent_3": {
         "default": "mdi:air-filter"
+      },
+      "z_pump_dhw": {
+        "default": "mdi:pump"
+      },
+      "z_pump_hc": {
+        "default": "mdi:pump"
       }
     },
     "select": {
