@@ -357,6 +357,9 @@
   },
   "entity": {
     "button": {
+      "reset_errors": {
+        "name": "Fehler zurücksetzen"
+      },
       "z_reset_last10errors": {
         "name": "Fehlerprotokoll zurücksetzen"
       }
@@ -2110,6 +2113,12 @@
       },
       "party_time": {
         "name": "Party-Zeit"
+      },
+      "z_pump_hc": {
+        "name": "Pumpe Heizkreis"
+      },
+      "z_pump_dhw": {
+        "name": "Pumpe Warmwasser"
       }
     },
     "select": {

@@ -2151,6 +2151,12 @@
       },
       "party_time": {
         "name": "Party Time"
+      },
+      "z_pump_hc": {
+        "name": "Circulation Pump"
+      },
+      "z_pump_dhw": {
+        "name": "Pump DHW"
       }
     },
     "select": {
@@ -3506,6 +3512,9 @@
       }
     },
     "button": {
+      "reset_errors": {
+        "name": "Reset Errors"
+      },
       "z_reset_last10errors": {
         "name": "Reset Fault Log"
       }
