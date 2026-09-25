@@ -318,3 +318,17 @@ async def test_hc2_entities_added_later_follow_enable_hc2(hass, fake_device):
     assert hc2
     assert [e.entity_id for e in hc2 if e.disabled_by is not None] == []
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_each_block_is_read_once_at_startup(hass, fake_device):
+    await setup_entry(hass)
+    device = fake_device.instances[-1]
+
+    reads = [
+        telegram
+        for telegram in device.sent
+        if telegram[:2] == b"\x01\x00"
+        and device.unescape(telegram[2:-2])[1:] in (b"\xfb", b"\xf3", b"\xf4")
+    ]
+
+    assert len(reads) == 3

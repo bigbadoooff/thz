@@ -155,7 +155,7 @@ async def async_setup_entry(
 
     _LOGGER.debug("Created %d binary sensor entities", len(entities))
     assign_subdevices(entities, config_entry.data)
-    async_add_entities(entities, True)
+    async_add_entities(entities)
 
 
 class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):

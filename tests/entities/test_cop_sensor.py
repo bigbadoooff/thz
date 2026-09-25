@@ -175,8 +175,10 @@ class TestAsyncSetupCopSensors:
         await async_setup_cop_sensors(hass, config_entry, async_add_entities)
 
         async_add_entities.assert_called_once()
-        entities, should_refresh = async_add_entities.call_args[0]
-        assert should_refresh is True
+        (entities,) = async_add_entities.call_args[0]
+        # Added without update_before_add: the coordinator has just read the block.
+        assert len(async_add_entities.call_args.args) == 1
+        assert not async_add_entities.call_args.kwargs
         assert len(entities) == 1
         assert isinstance(entities[0], THZCurrentCOPSensor)
         assert entities[0].coordinator is coord
@@ -203,7 +205,7 @@ class TestAsyncSetupCopSensors:
         await async_setup_cop_sensors(hass, config_entry, async_add_entities)
 
         async_add_entities.assert_called_once()
-        entities, _ = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         assert len(entities) == 6
         daily = [e for e in entities if isinstance(e, THZDailyCOPSensor)]
         lifetime = [e for e in entities if isinstance(e, THZLifetimeCOPSensor)]
@@ -223,7 +225,7 @@ class TestAsyncSetupCopSensors:
 
         await async_setup_cop_sensors(hass, config_entry, async_add_entities)
 
-        entities, _ = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         assert len(entities) == 7
 
 

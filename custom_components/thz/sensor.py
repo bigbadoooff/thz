@@ -193,7 +193,7 @@ async def async_setup_entry(
                 )
             )
     assign_subdevices(sensors, config_entry.data)
-    async_add_entities(sensors, True)
+    async_add_entities(sensors)
     _async_remove_placeholder_sensors(
         hass,
         config_entry,

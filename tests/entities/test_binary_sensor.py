@@ -48,8 +48,10 @@ class TestAsyncSetupEntry:
         await async_setup_entry(hass, config_entry, async_add_entities)
 
         async_add_entities.assert_called_once()
-        entities, should_refresh = async_add_entities.call_args[0]
-        assert should_refresh is True
+        (entities,) = async_add_entities.call_args[0]
+        # Added without update_before_add: the coordinator has just read the block.
+        assert len(async_add_entities.call_args.args) == 1
+        assert not async_add_entities.call_args.kwargs
         assert len(entities) == 2
         names = {e._entity_name for e in entities}
         assert names == {"compressor", "filterAlarm"}
@@ -67,7 +69,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        entities, _ = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         assert len(entities) == 1
         assert entities[0]._entity_name == "compressor"
 
@@ -86,7 +88,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        entities, _ = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         assert len(entities) == 1
 
     @pytest.mark.asyncio
@@ -99,7 +101,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        entities, _ = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         assert entities[0]._entity_name == "compressor"
 
     @pytest.mark.asyncio
@@ -113,7 +115,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        entities, _ = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         entity = entities[0]
         # translation_key is set -> icon comes from icons.json instead of
         # the hardcoded "icon" metadata field.
@@ -132,7 +134,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        entities, _ = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         entity = entities[0]
         assert entity._decode_type == "bit7"
         assert entity.is_on is True
@@ -148,7 +150,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        entities, _ = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         entity = entities[0]
         assert entity._decode_type == "nbit5"
         # bit5 is 0 in 0x00, nbit inverts -> True
@@ -165,7 +167,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        entities, _ = async_add_entities.call_args[0]
+        (entities,) = async_add_entities.call_args[0]
         assert entities[0]._decode_type == "bit2"
 
 
