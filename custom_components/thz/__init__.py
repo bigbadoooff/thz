@@ -40,6 +40,7 @@ from .const import (
 )
 from .coordinator_log import coordinator_logger
 from .devices import (
+    area_name,
     async_release_subdevices,
     async_remove_empty_subdevices,
     entry_unique_id,
@@ -198,6 +199,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         entity_id_style=entity_id_style,
         entity_visibility=entity_visibility,
         entity_id_prefix=entity_id_prefix,
+        area_name=area_name(hass, data),
     )
     config_entry.runtime_data = entry_data
 
@@ -280,8 +282,8 @@ def _register_heat_pump(
         "model": f"LWZ/THZ (FW: {device.firmware_version})",
         "sw_version": device.firmware_version,
     }
-    if data.get("area"):
-        kwargs["suggested_area"] = data["area"]
+    if area := area_name(hass, data):
+        kwargs["suggested_area"] = area
     device_entry = dr.async_get(hass).async_get_or_create(**kwargs)
     _LOGGER.debug("Device registry entry created/updated: %s", device_entry.id)
     return device_entry

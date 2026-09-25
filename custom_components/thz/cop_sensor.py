@@ -147,7 +147,7 @@ async def async_setup_cop_sensors(
         )
 
     if cop_sensors:
-        assign_subdevices(cop_sensors, config_entry.data)
+        assign_subdevices(cop_sensors, config_entry)
         async_add_entities(cop_sensors)
         _LOGGER.debug("Created %d COP sensors", len(cop_sensors))
     else:

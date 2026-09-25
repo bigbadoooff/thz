@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+)
 
 from custom_components.thz.const import CONF_SPLIT_DEVICES, DOMAIN
 
@@ -28,8 +32,9 @@ async def test_entries_without_the_option_keep_one_device(hass, fake_device):
 
 
 async def test_split_creates_linked_subdevices(hass, fake_device):
+    area = ar.async_get(hass).async_create("Living Room")
     entry = await setup_entry(
-        hass, alias="lwz", area="Basement", **{CONF_SPLIT_DEVICES: True}
+        hass, alias="lwz", area=area.id, **{CONF_SPLIT_DEVICES: True}
     )
     found = _devices(hass, entry)
     main = found[MAIN]
@@ -38,8 +43,9 @@ async def test_split_creates_linked_subdevices(hass, fake_device):
     dhw = found[f"{MAIN}_dhw"]
     assert dhw.via_device_id == main.id
     assert dhw.name == "lwz Hot water"
-    # Sub-devices start in the heat pump's area.
-    assert dhw.area_id == main.area_id is not None
+    # Sub-devices start in the heat pump's area, and no area is added.
+    assert dhw.area_id == main.area_id == area.id
+    assert len(ar.async_get(hass).async_list_areas()) == 1
 
     registry = er.async_get(hass)
     water_heater = registry.async_get(

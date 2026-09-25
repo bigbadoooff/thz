@@ -75,7 +75,7 @@ async def async_setup_entry(
     if filter_coordinator is not None and filters:
         entities.append(THZFilterEvent(filter_coordinator, device_id, filters))
 
-    assign_subdevices(entities, config_entry.data)
+    assign_subdevices(entities, config_entry)
     async_add_entities(entities)
 
 

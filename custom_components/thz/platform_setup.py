@@ -86,7 +86,7 @@ async def async_setup_write_platform(
             entities.append(entity)
 
     _LOGGER.debug("Created %d %s entities", len(entities), platform_type)
-    assign_subdevices(entities, config_entry.data)
+    assign_subdevices(entities, config_entry)
     # Values arrive from the poller or the block coordinators; reading
     # every entity before adding it would put hundreds of reads on the line
     # at once.
