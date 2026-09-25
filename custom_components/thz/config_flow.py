@@ -135,6 +135,10 @@ def _available_read_blocks(entry: config_entries.ConfigEntry) -> list[str]:
     runtime_data = loaded_runtime_data(entry)
     if runtime_data is not None:
         return list(runtime_data.register_manager.get_all_registers())
+    if "refresh_intervals" not in entry.data:
+        # Every block is polled and the cooling blocks are unknown: offering
+        # an incomplete list would drop blocks once the form is saved.
+        return []
     override = entry.data.get(CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO)
     firmware = (
         entry.data.get("firmware") if override == FIRMWARE_OVERRIDE_AUTO else override

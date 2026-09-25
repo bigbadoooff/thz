@@ -744,13 +744,17 @@ class TestAvailableReadBlocks:
 
     def test_unloaded_entry_uses_the_stored_firmware(self):
         entry = MagicMock(spec=["data"])
-        entry.data = {"firmware": "439"}
+        entry.data = {"firmware": "439", "refresh_intervals": {}}
         blocks = config_flow_module._available_read_blocks(entry)
         assert "pxxFB" in blocks and "pxxF3" in blocks
 
     def test_forced_profile_wins_over_the_stored_firmware(self):
         entry = MagicMock(spec=["data"])
-        entry.data = {"firmware": "439", "firmware_override": "206"}
+        entry.data = {
+            "firmware": "439",
+            "firmware_override": "206",
+            "refresh_intervals": {},
+        }
         assert "pxx17" in config_flow_module._available_read_blocks(entry)
 
     def test_nothing_known_offers_nothing_extra(self):
@@ -760,7 +764,12 @@ class TestAvailableReadBlocks:
 
     def test_unloaded_entry_leaves_out_the_cooling_blocks(self):
         entry = MagicMock(spec=["data"])
-        entry.data = {"firmware": "539"}
+        entry.data = {"firmware": "539", "refresh_intervals": {}}
         blocks = config_flow_module._available_read_blocks(entry)
         assert "pxxFB" in blocks
         assert "pxx0A0648" not in blocks
+
+    def test_unloaded_entry_without_intervals_offers_nothing_extra(self):
+        entry = MagicMock(spec=["data"])
+        entry.data = {"firmware": "539"}
+        assert config_flow_module._available_read_blocks(entry) == []
