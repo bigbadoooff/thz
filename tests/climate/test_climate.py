@@ -712,6 +712,30 @@ class TestTHZClimateServiceCalls:
         return TestTHZClimateEntity._make_hc1_entity(**kwargs)
 
     @pytest.mark.asyncio
+    async def test_heat_setpoint_write_reads_it_again(self):
+        device = MagicMock()
+        device.async_execute = AsyncMock(return_value=None)
+        entity = self._entity(heat_entry=HEAT_ENTRY, device=device)
+        entity.hass = MagicMock()
+        entity._poller = poller = MagicMock()
+        await entity.async_set_temperature(temperature=21.0)
+        poller.async_refresh.assert_called_once_with(("0B0005", 4, 2))
+
+    @pytest.mark.asyncio
+    async def test_cooling_switch_write_reads_it_again(self):
+        device = MagicMock()
+        device.async_execute = AsyncMock(return_value=None)
+        entity = self._entity(
+            cool_switch_entry={"command": "0B0287", "decode_type": "1clean"},
+            cool_setpoint_entry=COOL_SETPOINT_ENTRY,
+            device=device,
+        )
+        entity.hass = MagicMock()
+        entity._poller = poller = MagicMock()
+        await entity._async_set_cooling_switch(enabled=True)
+        poller.async_refresh.assert_called_once_with(("0B0287", 4, 2))
+
+    @pytest.mark.asyncio
     async def test_set_temperature_no_value_is_noop(self):
         entity = self._entity(heat_entry=HEAT_ENTRY)
         entity.hass = MagicMock()

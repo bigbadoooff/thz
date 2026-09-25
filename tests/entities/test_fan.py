@@ -80,10 +80,14 @@ class FakePoller:
     def __init__(self, device):
         self.data = _PolledData(device)
         self.subscribed = []
+        self.refreshed = []
 
     def async_subscribe(self, key, handler):
         self.subscribed.append((key, handler))
         return MagicMock()
+
+    def async_refresh(self, key):
+        self.refreshed.append(key)
 
 
 class _PolledData(dict):
@@ -368,6 +372,7 @@ class TestWrites:
         assert device.writes == [("0A05DD", _word(stage))]
         assert fan._stage == stage
         fan.async_write_ha_state.assert_called_once()
+        assert fan._poller.refreshed == [("0A05DD", 4, 2)]
 
     @pytest.mark.asyncio
     async def test_program_settings_are_not_written(self, now):

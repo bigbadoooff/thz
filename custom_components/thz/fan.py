@@ -499,6 +499,8 @@ class THZFan(THZBaseEntity, FanEntity):
                 parameter_length(param),
             )
             await async_write_parameter(self.hass, self._device, param, value_bytes)
+        if self._poller is not None:
+            self._poller.async_refresh(parameter_read_key(param))
         duration = self._params.durations[stage]
         minutes = (
             self._number(

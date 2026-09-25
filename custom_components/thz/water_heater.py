@@ -42,6 +42,7 @@ from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
     parameter_length,
+    parameter_read_key,
 )
 from .register_maps.model import WriteParam
 from .value_codec import THZValueCodec
@@ -49,6 +50,7 @@ from .write_errors import raise_write_errors
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
+    from .parameter_poller import ParameterPoller
     from .runtime_data import THZConfigEntry
     from .thz_device import THZDevice
 
@@ -103,6 +105,7 @@ async def async_setup_entry(
         day_setpoint=_find_entry(write_registers, _DAY_SETPOINT_NAMES),
         night_setpoint=_find_entry(write_registers, _NIGHT_SETPOINT_NAMES),
         manual_setpoint=_find_entry(write_registers, _MANUAL_SETPOINT_NAMES),
+        poller=entry_data.poller,
         entity_id_style=entry_data.entity_id_style,
         entity_id_prefix=entry_data.entity_id_prefix,
     )
@@ -136,10 +139,13 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         manual_setpoint: WriteParam | None,
         entity_id_style: str,
         entity_id_prefix: str | None,
+        poller: ParameterPoller | None = None,
     ) -> None:
         """Initialize the water heater from the resolved block layout."""
         super().__init__(coordinator)
         self._device = device
+        # Read again after a write, for the setpoint's number entity.
+        self._poller = poller
         self._device_id = device_id
         self._current = current
         self._target = target
@@ -249,4 +255,6 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                 parameter_length(entry),
             )
             await async_write_parameter(self.hass, self._device, entry, value_bytes)
+        if self._poller is not None:
+            self._poller.async_refresh(parameter_read_key(entry))
         await self.coordinator.async_request_refresh()

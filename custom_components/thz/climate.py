@@ -1051,6 +1051,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             await async_write_parameter(
                 self.hass, self._device, target_entry, value_bytes
             )
+        self._refresh_parameter(target_entry)
         await self.coordinator.async_request_refresh()
 
     async def _async_write_cool_setpoint(self, temperature: float) -> None:
@@ -1108,6 +1109,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 self._cool_switch_entry,
                 THZValueCodec.encode_switch(enabled),
             )
+        self._refresh_parameter(self._cool_switch_entry)
 
     def _apply_cooling_setpoint(self, value_bytes: bytes) -> None:
         """Decode the cooling setpoint register into the cached target."""
