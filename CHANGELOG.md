@@ -128,6 +128,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Daily and lifetime COP followed an unrelated block.** They updated,
+  and became unavailable, with whatever block came first in the list, not
+  with the energy blocks they are computed from. They now update when any
+  of their energy blocks is read, and are unavailable only when one of them
+  failed.
 - **A block deselected once could not be selected again.** Reconfigure
   only offered the blocks being polled, so a block unticked there (or at
   setup) needed the integration to be removed and added again. Reconfigure

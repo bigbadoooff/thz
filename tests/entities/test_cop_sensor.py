@@ -314,38 +314,38 @@ class TestTHZBaseCOPSensorGetSensorValue:
     def test_unknown_sensor_name_returns_none(self):
         coord = MagicMock()
         coord.data = bytes(10)
-        base = THZBaseCOPSensor({"a": coord}, "dev1")
+        base = THZBaseCOPSensor({"a": coord}, "dev1", ())
         assert base._get_sensor_value("notASensor") is None
 
     def test_missing_coordinator_returns_none(self):
         coord = MagicMock()
         coord.data = bytes(10)
-        base = THZBaseCOPSensor({"a": coord}, "dev1")
+        base = THZBaseCOPSensor({"a": coord}, "dev1", ())
         # sHeatDHWDay maps to block "pxx0A092A" which is not in coordinators.
         assert base._get_sensor_value("sHeatDHWDay") is None
 
     def test_coordinator_none_data_returns_none(self):
         coord = MagicMock()
         coord.data = None
-        base = THZBaseCOPSensor({"pxx0A092A": coord}, "dev1")
+        base = THZBaseCOPSensor({"pxx0A092A": coord}, "dev1", ())
         assert base._get_sensor_value("sHeatDHWDay") is None
 
     def test_payload_too_short_returns_none(self):
         coord = MagicMock()
         coord.data = bytes(2)
-        base = THZBaseCOPSensor({"pxx0A092A": coord}, "dev1")
+        base = THZBaseCOPSensor({"pxx0A092A": coord}, "dev1", ())
         assert base._get_sensor_value("sHeatDHWDay") is None
 
     def test_successful_decode(self):
         coordinators = _make_energy_coordinators({"sHeatDHWDay": 1234})
-        base = THZBaseCOPSensor(coordinators, "dev1")
+        base = THZBaseCOPSensor(coordinators, "dev1", ())
         assert base._get_sensor_value("sHeatDHWDay") == 1234.0
 
     def test_decode_exception_returns_none(self, monkeypatch):
         import custom_components.thz.cop_sensor as cop_sensor_mod
 
         coordinators = _make_energy_coordinators({"sHeatDHWDay": 1234})
-        base = THZBaseCOPSensor(coordinators, "dev1")
+        base = THZBaseCOPSensor(coordinators, "dev1", ())
 
         def _raise(*args, **kwargs):
             raise ValueError("boom")
@@ -356,7 +356,7 @@ class TestTHZBaseCOPSensorGetSensorValue:
     def test_device_info(self):
         coord = MagicMock()
         coord.data = None
-        base = THZBaseCOPSensor({"a": coord}, "my_device")
+        base = THZBaseCOPSensor({"a": coord}, "my_device", ())
         info = base.device_info
         assert (DOMAIN, "my_device") in info["identifiers"]
 
@@ -505,3 +505,46 @@ class TestTHZLifetimeCOPSensor:
             coordinators, "dev1", "lifetime_cop_total", "Total"
         )
         assert sensor.native_value is None
+
+
+class TestCOPFollowsItsEnergyBlocks:
+    """A COP listens to and depends on the blocks of its energy inputs."""
+
+    @staticmethod
+    def _coordinators():
+        blocks = ["pxxFB", "pxx0A092A", "pxx0A091A", "pxx0A092E", "pxx0A091E"]
+        coordinators = {}
+        for block in blocks:
+            coordinator = MagicMock(last_update_success=True, data=bytes(8))
+            coordinator.async_add_listener = MagicMock(return_value=MagicMock())
+            coordinators[block] = coordinator
+        return coordinators
+
+    def test_primary_coordinator_is_an_energy_block(self):
+        coordinators = self._coordinators()
+        sensor = THZDailyCOPSensor(coordinators, "dev1", "daily_cop_dhw", "DHW")
+        assert sensor.coordinator is coordinators["pxx0A092A"]
+
+    @pytest.mark.asyncio
+    async def test_listens_to_every_input_block(self):
+        coordinators = self._coordinators()
+        sensor = THZDailyCOPSensor(coordinators, "dev1", "daily_cop_total", "Total")
+        sensor.hass = MagicMock()
+        sensor.async_on_remove = MagicMock()
+
+        await sensor.async_added_to_hass()
+
+        for block in ("pxx0A091A", "pxx0A092E", "pxx0A091E"):
+            coordinators[block].async_add_listener.assert_called()
+        coordinators["pxxFB"].async_add_listener.assert_not_called()
+
+    def test_unavailable_when_an_input_block_failed(self):
+        coordinators = self._coordinators()
+        sensor = THZDailyCOPSensor(coordinators, "dev1", "daily_cop_dhw", "DHW")
+        assert sensor.available is True
+        coordinators["pxx0A091A"].last_update_success = False
+        assert sensor.available is False
+        # A failing unrelated block does not matter.
+        coordinators["pxx0A091A"].last_update_success = True
+        coordinators["pxxFB"].last_update_success = False
+        assert sensor.available is True
