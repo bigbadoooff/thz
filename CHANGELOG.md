@@ -44,6 +44,9 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **Faster start: every block is read once.** Adding the sensors made each
+  block be read a second time right after its first read; that second read
+  per block is gone.
 - **Changing single bytes of a 2.x block parameter is one block write**
   instead of one per byte, and an index outside the parameter is refused
   instead of writing into its neighbour.

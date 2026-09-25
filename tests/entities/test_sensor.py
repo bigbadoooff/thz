@@ -86,8 +86,10 @@ class TestAsyncSetupEntry:
         await async_setup_entry(hass, config_entry, async_add_entities)
 
         async_add_entities.assert_called_once()
-        sensors, should_refresh = async_add_entities.call_args[0]
-        assert should_refresh is True
+        (sensors,) = async_add_entities.call_args[0]
+        # Added without update_before_add: the coordinator has just read the block.
+        assert len(async_add_entities.call_args.args) == 1
+        assert not async_add_entities.call_args.kwargs
         assert len(sensors) == 1
         assert sensors[0]._entity_name == "outsideTemp"
 
@@ -104,7 +106,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        sensors, _ = async_add_entities.call_args[0]
+        (sensors,) = async_add_entities.call_args[0]
         assert len(sensors) == 1
         assert sensors[0]._entity_name == "outsideTemp"
 
@@ -125,7 +127,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        sensors, _ = async_add_entities.call_args[0]
+        (sensors,) = async_add_entities.call_args[0]
         assert len(sensors) == 1
         assert sensors[0]._entity_name == "outsideTemp"
 
@@ -144,7 +146,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        sensors, _ = async_add_entities.call_args[0]
+        (sensors,) = async_add_entities.call_args[0]
         assert len(sensors) == 1
 
     @pytest.mark.asyncio
@@ -157,7 +159,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        sensors, _ = async_add_entities.call_args[0]
+        (sensors,) = async_add_entities.call_args[0]
         assert sensors[0]._entity_name == "outsideTemp"
 
     @pytest.mark.asyncio
@@ -177,7 +179,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        sensors, _ = async_add_entities.call_args[0]
+        (sensors,) = async_add_entities.call_args[0]
         sensor = sensors[0]
         assert sensor.native_unit_of_measurement == "°C"
         assert sensor.device_class == "temperature"
@@ -199,7 +201,7 @@ class TestAsyncSetupEntry:
 
         await async_setup_entry(hass, config_entry, async_add_entities)
 
-        sensors, _ = async_add_entities.call_args[0]
+        (sensors,) = async_add_entities.call_args[0]
         assert len(sensors) == 1
         assert sensors[0]._decode_type == "weekday"
 

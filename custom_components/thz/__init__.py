@@ -231,6 +231,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     if split_devices:
         async_remove_empty_subdevices(hass, config_entry, unique_id)
 
+    # A block whose first read failed is tried again right away, not only
+    # after its poll interval, so its entities recover quickly.
+    for block in failed_blocks:
+        config_entry.async_create_background_task(
+            hass, coordinators[block].async_refresh(), f"thz retry {block}"
+        )
+
     # Apply the configured entity_visibility tier (default/extended/all) to
     # the entity registry. Re-runs (and retroactively bulk enables/disables
     # entities) whenever the configured tier differs from the tier last

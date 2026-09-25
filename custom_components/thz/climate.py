@@ -404,7 +404,7 @@ async def async_setup_entry(
 
     if entities:
         assign_subdevices(entities, config_entry.data)
-        async_add_entities(entities, True)
+        async_add_entities(entities)
         _LOGGER.debug("Created %d climate entities", len(entities))
     _async_remove_dhw_climate(hass, config_entry)
 
