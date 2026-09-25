@@ -128,6 +128,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **A block deselected once could not be selected again.** Reconfigure
+  only offered the blocks being polled, so a block unticked there (or at
+  setup) needed the integration to be removed and added again. Reconfigure
+  now offers every block of the firmware; unpolled ones start unticked with
+  the default interval.
 - **Changing the write interval under Reconfigure had no effect.** The
   form's `write_interval` field was taken for a write group, so the new
   interval was never saved. It is now.

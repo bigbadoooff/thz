@@ -15,6 +15,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.thz.const import (
     CONF_DEVICE_IDENTIFIER,
     CONF_ENTITY_VISIBILITY,
+    DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
 )
 from custom_components.thz.exceptions import THZConnectionError
@@ -134,6 +135,29 @@ async def test_reconfigure_saves_the_write_interval(hass, fake_device):
     assert entry.data["write_interval"] == 900
     assert "interval" not in entry.data["selected_write_groups"]
     assert entry.runtime_data.poller._interval.total_seconds() == 900
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_deselected_block_can_be_selected_again(hass, fake_device):
+    entry = await setup_entry(hass)
+    result = await entry.start_reconfigure_flow(hass)
+    await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"read_pxxF3": False}
+    )
+    await hass.async_block_till_done()
+    assert "pxxF3" not in entry.data["refresh_intervals"]
+
+    result = await entry.start_reconfigure_flow(hass)
+    fields = {str(key) for key in result["data_schema"].schema}
+    assert {"read_pxxF3", "refresh_pxxF3"} <= fields
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"read_pxxF3": True}
+    )
+    await hass.async_block_till_done()
+
+    assert result["reason"] == "reconfigured"
+    assert entry.data["refresh_intervals"]["pxxF3"] == DEFAULT_UPDATE_INTERVAL
+    assert "pxxF3" in entry.runtime_data.coordinators
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 

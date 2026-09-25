@@ -49,6 +49,7 @@ from .const import (
 )
 from .devices import entry_unique_id
 from .exceptions import DEVICE_ERRORS
+from .runtime_data import loaded_runtime_data
 from .thz_device import THZDevice
 
 if TYPE_CHECKING:
@@ -311,15 +312,30 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 entry, unique_id=unique_id, data=updated_data, reason="reconfigured"
             )
 
+        runtime_data = loaded_runtime_data(entry)
+        available_blocks = (
+            list(runtime_data.register_manager.get_all_registers())
+            if runtime_data is not None
+            else []
+        )
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=await self.reconfigure_schema(dict(entry.data)),
+            data_schema=await self.reconfigure_schema(
+                dict(entry.data), available_blocks
+            ),
         )
 
     async def reconfigure_schema(
-        self, defaults: dict[str, Any] | None = None
+        self,
+        defaults: dict[str, Any] | None = None,
+        available_blocks: list[str] | None = None,
     ) -> vol.Schema:
-        """Generate form schema with defaults."""
+        """Generate form schema with defaults.
+
+        ``available_blocks`` are the read blocks of the firmware; blocks not
+        polled now are offered unticked, so a block deselected earlier can
+        be selected again.
+        """
         defaults = defaults or {}
 
         area_registry = ar.async_get(self.hass)
@@ -431,10 +447,13 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Refresh intervals for each block
         refresh_intervals = defaults.get("refresh_intervals", {})
-        all_read_blocks = list(refresh_intervals.keys())
+        polled_blocks = list(refresh_intervals.keys())
+        all_read_blocks = polled_blocks + [
+            block for block in available_blocks or [] if block not in refresh_intervals
+        ]
         if selected_read_blocks is None:
             # No selection stored: every polled block counts as selected.
-            selected_read_blocks = all_read_blocks
+            selected_read_blocks = polled_blocks
 
         for block in all_read_blocks:
             schema_dict[
@@ -460,11 +479,11 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ] = bool
 
         # Refresh intervals for each block
-        for block, interval in refresh_intervals.items():
+        for block in all_read_blocks:
             schema_dict[
                 vol.Optional(
                     f"refresh_{block}",
-                    default=interval,
+                    default=refresh_intervals.get(block, DEFAULT_UPDATE_INTERVAL),
                 )
             ] = vol.All(int, vol.Range(min=5, max=86400))
 
