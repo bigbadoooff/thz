@@ -632,7 +632,7 @@ class THZDevice:
         offset: int,
         length: int,
         value: bytes,
-        mask: int | None = None,
+        mask: int | bytes | None = None,
     ) -> None:
         r"""Write a value inside a register block using read-modify-write (2xx).
 
@@ -651,9 +651,10 @@ class THZDevice:
                     echoed block address.
             length: Number of bytes occupied by the parameter value.
             value: Encoded bytes to write (must be exactly ``length`` bytes).
-            mask: Optional bit mask applied to every target byte; only the
-                masked bits are taken from ``value``, the others are kept
-                (used for single-bit flags that share a byte).
+            mask: Optional bit mask: only the masked bits are taken from
+                ``value``, the others are kept. An int applies to every
+                target byte (single-bit flags that share a byte); bytes give
+                one mask per target byte (single bytes of a longer value).
 
         Raises:
             ValueError: If ``value`` is not ``length`` bytes, or if the offset/length
@@ -693,8 +694,9 @@ class THZDevice:
             payload[payload_offset : payload_offset + length] = value
         else:
             for i, byte in enumerate(value):
+                bits = mask if isinstance(mask, int) else mask[i]
                 old = payload[payload_offset + i]
-                payload[payload_offset + i] = (old & ~mask & 0xFF) | (byte & mask)
+                payload[payload_offset + i] = (old & ~bits & 0xFF) | (byte & bits)
 
         # Write the modified payload back to the device.
         await self.read_write_register(block_addr, "set", bytes(payload))

@@ -253,6 +253,19 @@ class TestWriteBlockValue:
         assert written_payload == bytes(expected)
 
     @pytest.mark.asyncio
+    async def test_per_byte_mask_changes_only_the_masked_bytes(self):
+        block_data = bytes(range(20))
+        device, call_log = self._make_device_with_block(b"\x17", block_data)
+
+        await device.write_block_value(
+            b"\x17", offset=2, length=2, value=b"\x00\xbb", mask=b"\x00\xff"
+        )
+
+        expected = bytearray(block_data)
+        expected[1] = 0xBB
+        assert call_log[1][2] == bytes(expected)
+
+    @pytest.mark.asyncio
     async def test_write_block_value_preserves_other_bytes(self):
         """Test that write_block_value does not disturb other bytes in the block."""
         block_data = b"\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a"

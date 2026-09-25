@@ -107,20 +107,39 @@ async def async_update_parameter(
 
     ``updates`` maps a byte index of the value to its new byte. A direct
     parameter's ``length`` value bytes are read and written back in one
-    device call.
-    A block parameter changes each byte by a read-modify-write of its block.
+    device call, a block parameter's bytes in one read-modify-write of its
+    block (``length`` is the layout's length then).
+
+    Raises:
+        ValueError: If an index lies outside the parameter's value.
     """
     command = bytes.fromhex(param.command)
     block = param.block
+    if block is not None:
+        length = block.length
+    if any(not 0 <= index < length for index in updates):
+        raise ValueError(
+            f"byte index {sorted(updates)} outside the {length}-byte value "
+            f"of {param.name}"
+        )
     if block is None:
         await device.async_execute(
             device.update_value, command, WRITE_REGISTER_OFFSET, length, dict(updates)
         )
         return
-    for index, value in updates.items():
-        await device.async_execute(
-            device.write_block_value, command, block.offset + index, 1, bytes([value])
-        )
+    value = bytearray(length)
+    mask = bytearray(length)
+    for index, byte in updates.items():
+        value[index] = byte
+        mask[index] = 0xFF
+    await device.async_execute(
+        device.write_block_value,
+        command,
+        block.offset,
+        length,
+        bytes(value),
+        bytes(mask),
+    )
 
 
 async def async_write_parameter(
