@@ -284,19 +284,27 @@ class THZFan(THZBaseEntity, FanEntity):
     async def async_added_to_hass(self) -> None:
         """Subscribe the registers and blocks the stage is computed from."""
         await super().async_added_to_hass()
-        coordinators: dict[int, Any] = {}
-        for block in (_AIRFLOW_BLOCK, _STATUS_BLOCK, _PROGRAM_BLOCK):
+        # Only the blocks the stage is computed from decide availability.
+        used_blocks = [_AIRFLOW_BLOCK] if self._airflow is not None else []
+        if self._status is not None:
+            used_blocks += [_STATUS_BLOCK, _PROGRAM_BLOCK]
+        sources: dict[int, Any] = {}
+        for block in used_blocks:
             if (coordinator := self._coordinators.get(block)) is not None:
-                coordinators[id(coordinator)] = coordinator
+                sources[id(coordinator)] = coordinator
         keys = set()
         for param in self._watched_params():
             if (coordinator := self._param_coordinator(param)) is not None:
-                coordinators[id(coordinator)] = coordinator
+                sources[id(coordinator)] = coordinator
             else:
                 keys.add(parameter_read_key(param))
-        self._sources = list(coordinators.values())
+        self._sources = list(sources.values())
         self._source_keys = keys
-        for coordinator in self._sources:
+        coordinators = dict(sources)
+        for block in (_AIRFLOW_BLOCK, _STATUS_BLOCK, _PROGRAM_BLOCK):
+            if (coordinator := self._coordinators.get(block)) is not None:
+                coordinators[id(coordinator)] = coordinator
+        for coordinator in coordinators.values():
             self.async_on_remove(coordinator.async_add_listener(self._handle_change))
         if self._poller is not None:
             for key in sorted(keys):

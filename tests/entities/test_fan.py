@@ -624,6 +624,23 @@ class TestPolling:
         assert all(key[0] != "17" for key, _ in fan._poller.subscribed)
         assert fan._stage == 2
 
+    @pytest.mark.asyncio
+    async def test_an_unused_block_does_not_decide_availability(self, now, monkeypatch):
+        monkeypatch.setattr(
+            fan_module, "async_track_time_interval", lambda *a: MagicMock()
+        )
+        f6 = MagicMock(last_update_success=False, data=b"")
+        fan = _fan(FakeDevice({"0A1D10": _window(6, 9)}), airflow=None)
+        fan._coordinators = {"pxxF6": f6}
+        fan.async_on_remove = MagicMock()
+
+        await fan.async_added_to_hass()
+
+        # Polled for sensors, but the stage of this firmware is not read from it.
+        f6.async_add_listener.assert_called_once_with(fan._handle_change)
+        assert fan._sources == []
+        assert fan._attr_available is True
+
     def test_handlers_recompute_and_write(self, now):
         values = {"0A1D10": _window(6, 9), "0A056C": _word(2)}
         fan = _fan(FakeDevice(values), airflow=None)
