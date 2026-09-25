@@ -79,6 +79,9 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **Firmware 7.59 uses the 5.39 register maps** instead of the 4.39 maps
+  that unknown firmware falls back to. Devices with 7.59 (e.g. LWZ 5) get the
+  5.39 entities after the update, including the cooling check at setup.
 - **Faster start: every block is read once.** Adding the sensors made each
   block be read a second time right after its first read; that second read
   per block is gone.

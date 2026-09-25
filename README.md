@@ -261,6 +261,7 @@ than a minute:
 | 4.39     | Full support including energy sensors, COP, runtime hours, and passive cooling |
 | 5.09 / 7.09 | 4.39-based profile with the 5.09 extras (7.09 uses the 5.09 maps) |
 | 5.39     | Full support including passive cooling energy sensor (`sCoolHCTotal`) |
+| 7.59     | Uses the 5.39 maps |
 | Other    | Falls back to a 4.39-like configuration (like the reference FHEM module) — may work partially |
 
 ### How Firmware Versions Are Loaded
@@ -296,12 +297,13 @@ register block):
 | `439` | `write_map_439_539`, `write_map_439` | `readings_map_439`, `register_map_439` |
 | `439technician` | `write_map_439_539`, `write_map_439`, `write_map_X39tech` | `readings_map_439`, `register_map_439` |
 | `509` / `709` | `write_map_439_539`, `write_map_539` | `readings_map_439`, `readings_map_509` |
-| `539` | `write_map_439_539`, `write_map_539` | `readings_map_439`, `readings_map_539` |
+| `539` / `759` | `write_map_439_539`, `write_map_539` | `readings_map_439`, `readings_map_539` |
 | `539technician` | `write_map_439_539`, `write_map_539`, `write_map_X39tech` | `readings_map_439`, `readings_map_539` |
 | anything else | `write_map_439_539`, `write_map_439` | `readings_map_439` (`default`, treated as 4.39-like) |
 
 `709` is intentionally identical to `509` — the 7.09 firmware has no register
-differences from 5.09 that this integration is aware of. An unrecognized
+differences from 5.09 that this integration is aware of, and `759` likewise
+uses the 5.39 maps. An unrecognized
 `firmware` string falls back to `default`, which mirrors the reference FHEM
 module's own behaviour of assuming 4.39 rather than guessing at 5.39-like
 registers that may not exist on the device (e.g. cooling-only blocks).
@@ -330,7 +332,7 @@ registers that may not exist on the device (e.g. cooling-only blocks).
   on 2xx firmware — those registers were only added starting with 4.39 (see
   below).
 
-#### The 4.39 / 5.39 family (439 / 509 / 709 / 539)
+#### The 4.39 / 5.39 family (439 / 509 / 709 / 539 / 759)
 
 - `readings_map_439.py` is the common base for this family (energy/COP
   sensors, compressor & booster runtime hours, fault log, solar circuit,
@@ -414,7 +416,7 @@ serial/network connection to the heat pump is released.
   shows up after the next write interval (1 hour by default), unless you
   refresh the entity (see How Data Is Updated).
 - **Firmware coverage.** The register maps cover 2.06, 2.14, 2.14j, 4.19,
-  4.39, 5.09, 5.39 and 7.09. Any other firmware uses the 4.39 maps; some
+  4.39, 5.09, 5.39, 7.09 and 7.59. Any other firmware uses the 4.39 maps; some
   values may then be missing or wrong. A firmware override is available
   under Reconfigure.
 - **2.x firmware:** no fault memory sensors or fault events (different
