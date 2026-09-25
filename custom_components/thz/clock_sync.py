@@ -32,6 +32,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .exceptions import DEVICE_ERRORS
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
@@ -86,7 +87,7 @@ async def _read_clock_parts(
         for attempt in range(1, CLOCK_READ_ATTEMPTS + 1):
             try:
                 value_bytes = await async_read_parameter(device, entry)
-            except Exception as err:  # noqa: BLE001
+            except DEVICE_ERRORS as err:
                 _LOGGER.debug(
                     "clock_sync: failed to read %s (attempt %d/%d): %s",
                     name,
@@ -271,7 +272,7 @@ def async_setup_clock_check(
             await async_check_and_maybe_sync_clock(
                 hass, config_entry, device, write_manager
             )
-        except Exception as err:  # noqa: BLE001
+        except (*DEVICE_ERRORS, ValueError, OverflowError) as err:
             # A lost connection is logged by the device once.
             _LOGGER.debug("THZ periodic clock check failed: %s", err)
 
