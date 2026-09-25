@@ -557,10 +557,14 @@ async def async_handle_restore_parameters(
     clock_synced = False
     if not dry_run:
         try:
-            await async_write_device_clock(hass, device, write_manager, local_now)
-            clock_synced = True
+            clock_synced = await async_write_device_clock(
+                hass, device, write_manager, local_now
+            )
         except DEVICE_ERRORS as err:
             failed.append(f"<device clock>: {err}")
+        else:
+            if not clock_synced:
+                failed.append("<device clock>: read-back does not match")
 
     _LOGGER.info(
         "THZ restore_parameters: %s%d restored, %d skipped (missing), "
