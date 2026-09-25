@@ -13,6 +13,7 @@ import pytest
 from custom_components.thz import thz_device as device_mod
 from custom_components.thz.exceptions import (
     THZConnectionError,
+    THZGarbledAnswerError,
     THZNotSupportedError,
     THZProtocolError,
     THZWriteRejectedError,
@@ -361,8 +362,7 @@ class TestRegisterAccess:
         device, _ = _device()
         with (
             patch.object(device, "send_request", return_value=b"raw"),
-            patch.object(device, "decode_response", return_value=None),
-            pytest.raises(THZProtocolError, match="Failed to decode"),
+            pytest.raises(THZGarbledAnswerError, match="Response too short"),
         ):
             await device.read_write_register(b"\xfb", "get")
 
@@ -643,10 +643,22 @@ class TestUndecodableAnswer:
         send = AsyncMock(return_value=bad)
         with (
             patch.object(device, "send_request", send),
-            pytest.raises(THZProtocolError, match="Failed to decode"),
+            pytest.raises(THZGarbledAnswerError, match="CRC error in response"),
         ):
             await device.read_write_register(b"\xfb", "get")
         assert send.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_unknown_command_is_not_asked_again(self):
+        device, _ = _device()
+        send = AsyncMock(return_value=b"\x01\x03\x00\x10\x03\x00")
+        with (
+            patch.object(device, "send_request", send),
+            pytest.raises(THZProtocolError, match="command not known") as err,
+        ):
+            await device.read_write_register(b"\xfb", "get")
+        assert not isinstance(err.value, THZGarbledAnswerError)
+        send.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_a_set_is_sent_once(self):

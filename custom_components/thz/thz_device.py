@@ -14,6 +14,7 @@ from . import const, protocol
 from .exceptions import (
     DEVICE_ERRORS,
     THZConnectionError,
+    THZGarbledAnswerError,
     THZNotInitializedError,
     THZNotSupportedError,
     THZProtocolError,
@@ -32,7 +33,7 @@ _T = TypeVar("_T")
 # How long async_execute waits for the device lock before giving up, so
 # coordinators cannot queue up indefinitely when many blocks fire at once.
 _LOCK_WAIT_TIMEOUT = 20.0
-# Tries of a GET whose answer cannot be decoded (CRC error, timing issue).
+# Tries of a GET whose answer arrives damaged (THZGarbledAnswerError).
 _DECODE_ATTEMPTS = 2
 # Hard limit for async_initialize: connecting, the firmware read and the
 # cooling probe, each read with its one retry.
@@ -517,21 +518,19 @@ class THZDevice:
         if get_or_set != "get":
             await self.send_request(telegram, get_or_set)
             return b""
-        # An answer with a CRC error or a "timing issue" header is a
-        # transient line problem: a GET is asked once more. The exchange
-        # itself completed, so the line is in step for the next one.
-        for attempt in range(1, _DECODE_ATTEMPTS + 1):
+        # A damaged answer (THZGarbledAnswerError) is a transient line
+        # problem: a GET is asked once more. The exchange itself completed,
+        # so the line is in step for the next one.
+        attempt = 1
+        while True:
             raw_response = await self.send_request(telegram, get_or_set)
-            decoded = self.decode_response(raw_response)
-            if decoded is not None:
-                return decoded
-            _LOGGER.debug(
-                "Undecodable answer to %s (attempt %d/%d)",
-                addr_bytes.hex(),
-                attempt,
-                _DECODE_ATTEMPTS,
-            )
-        raise THZProtocolError("Failed to decode device response")
+            try:
+                return protocol.decode_answer(raw_response)
+            except THZGarbledAnswerError as err:
+                if attempt >= _DECODE_ATTEMPTS:
+                    raise
+                _LOGGER.debug("Asking %s again: %s", addr_bytes.hex(), err)
+                attempt += 1
 
     async def read_firmware_version(self) -> str:
         """Reads the firmware version from the THZ device.

@@ -11,7 +11,12 @@ from __future__ import annotations
 import logging
 
 from . import const
-from .exceptions import THZNotSupportedError, THZWriteRejectedError
+from .exceptions import (
+    THZGarbledAnswerError,
+    THZNotSupportedError,
+    THZProtocolError,
+    THZWriteRejectedError,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -103,17 +108,20 @@ def frame_complete(
     return run % 2 == 1
 
 
-def decode_response(data: bytes) -> bytes | None:
+# Error headers that mean the exchange went wrong, not the request.
+_TRANSIENT_HEADERS = (b"\x01\x01", b"\x01\x02")
+
+
+def decode_answer(data: bytes) -> bytes:
     """Decode an answer telegram to checksum + payload.
 
-    Returns None (and logs why at debug level; the caller retries and
-    reports the failure) for a short answer, a checksum error or an
-    error header; raises THZNotSupportedError for ``01 04`` (unknown
-    register), which is a permanent property of the firmware.
+    Raises THZGarbledAnswerError for a short answer, a checksum error or a
+    "timing issue" / "CRC error in request" header (asking again may work),
+    THZNotSupportedError for ``01 04`` (unknown register, a permanent
+    property of the firmware) and THZProtocolError for any other answer.
     """
     if len(data) < 6:
-        _LOGGER.debug("Response too short: %s", data.hex())
-        return None
+        raise THZGarbledAnswerError(f"Response too short: {data.hex()}")
 
     data = unescape(data)
     header = data[0:2]
@@ -122,22 +130,35 @@ def decode_response(data: bytes) -> bytes | None:
         payload = data[3:-2]
         calculated = checksum(data[:2] + b"\x00" + payload)
         if calculated[0] != crc:
-            _LOGGER.debug(
-                "CRC error in response. Expected %02X, calculated %02X",
-                crc,
-                calculated[0],
+            raise THZGarbledAnswerError(
+                f"CRC error in response: expected {crc:02X}, "
+                f"calculated {calculated[0]:02X}"
             )
-            return None
         return calculated + payload
 
     if header == b"\x01\x04":
         raise THZNotSupportedError("Register not supported by device firmware")
     reason = _ERROR_HEADERS.get(header)
-    if reason is not None:
-        _LOGGER.debug("Device answered: %s", reason)
-    else:
-        _LOGGER.debug("Unknown response: %s", data.hex())
-    return None
+    if reason is None:
+        raise THZGarbledAnswerError(f"Unknown response: {data.hex()}")
+    if header in _TRANSIENT_HEADERS:
+        raise THZGarbledAnswerError(f"Device answered: {reason}")
+    raise THZProtocolError(f"Device answered: {reason}")
+
+
+def decode_response(data: bytes) -> bytes | None:
+    """Decode an answer telegram like decode_answer, but return None on errors.
+
+    The reason is logged at debug level. THZNotSupportedError (``01 04``)
+    is still raised.
+    """
+    try:
+        return decode_answer(data)
+    except THZNotSupportedError:
+        raise
+    except THZProtocolError as err:
+        _LOGGER.debug("%s", err)
+        return None
 
 
 def check_set_answer(raw: bytes) -> None:
