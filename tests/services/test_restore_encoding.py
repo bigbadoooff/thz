@@ -21,8 +21,7 @@ def test_single_time_is_written_whole():
 
 
 def test_party_restores_start_and_end():
-    value = {"start": "18:00", "end": "00:00"}
-    assert _encode_restore_value(_entry("time", "8party"), value) == {
+    assert _encode_restore_value(_entry("time", "8party"), "18:00", "00:00") == {
         1: time_to_quarters(time(18, 0)),
         0: 96,  # 00:00 as the end means 24:00
     }
@@ -68,13 +67,27 @@ async def test_party_backup_holds_start_and_end():
 
 
 @pytest.mark.asyncio
+async def test_party_record_keeps_the_start_as_its_plain_value():
+    from custom_components.thz.services.backup import _read_all_parameters
+
+    entry = _entry("time", "8party")
+    parameters, errors = await _read_all_parameters(
+        None, RegisterDevice(bytes([92, 72])), {"party-time": entry}
+    )
+    assert errors == []
+    assert parameters["party-time"]["value"] == "18:00"
+    assert parameters["party-time"]["end"] == "23:00"
+
+
+@pytest.mark.asyncio
 async def test_party_round_trip_restores_both_times():
     from custom_components.thz.services.backup import _read_backup_value
 
     entry = _entry("time", "8party")
     saved = await _read_backup_value(None, RegisterDevice(bytes([92, 72])), entry)
     device = RegisterDevice(bytes([0x80, 0x80]))
+    value = _encode_restore_value(entry, saved["start"], saved["end"])
 
-    await _async_restore(device, entry, _encode_restore_value(entry, saved))
+    await _async_restore(device, entry, value)
 
     assert device.value == bytes([92, 72])
