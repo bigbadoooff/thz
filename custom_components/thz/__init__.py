@@ -47,7 +47,7 @@ from .devices import (
 )
 from .exceptions import DEVICE_ERRORS, THZNotSupportedError
 from .parameter_poller import ParameterPoller
-from .runtime_data import THZRuntimeData, loaded_runtime_data
+from .runtime_data import THZRuntimeData
 from .services import async_refresh_block as async_refresh_block, async_setup_services
 from .thz_device import THZDevice
 
@@ -145,6 +145,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             translation_key="cannot_connect",
             translation_placeholders={"error": str(err)},
         ) from err
+    # Closes the connection however setup ends from here on, and on unload.
+    config_entry.async_on_unload(device.close)
     _LOGGER.info("Connected to the heat pump (firmware %s)", device.firmware_version)
 
     unique_id = data[CONF_DEVICE_IDENTIFIER]
@@ -153,7 +155,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     write_manager = device.write_register_map_manager
     register_manager = device.register_map_manager
     if write_manager is None or register_manager is None:
-        device.close()
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN, translation_key="register_maps_missing"
         )
@@ -173,7 +174,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         # Not a single block answered: the device is not really reachable,
         # so let Home Assistant retry the whole entry instead of setting up
         # an integration without any data.
-        device.close()
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN, translation_key="no_block_readable"
         )
@@ -204,8 +204,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # individual pClock* registers — see clock_sync.py). Always runs so
     # drift is logged; only writes a correction back to the device when the
     # "auto_sync_clock" option is enabled.
-    entry_data.unsub_clock_check = async_setup_clock_check(
-        hass, config_entry, device, write_manager
+    config_entry.async_on_unload(
+        async_setup_clock_check(hass, config_entry, device, write_manager)
     )
 
     split_devices = data.get(CONF_SPLIT_DEVICES, False)
@@ -624,16 +624,9 @@ async def _async_update_block(
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Remove Config Entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        # Clean up device connection
-        entry_data = loaded_runtime_data(entry)
-        if entry_data is not None:
-            if entry_data.unsub_clock_check:
-                entry_data.unsub_clock_check()
-            entry_data.device.close()
-
-    return unload_ok
+    # The poller, the clock check and the connection stop through the
+    # entry's async_on_unload callbacks.
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
 async def async_remove_config_entry_device(

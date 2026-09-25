@@ -121,6 +121,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **A setup that failed late kept the connection open.** When setting up
+  the platforms failed after the heat pump was connected, the serial port
+  or ser2net connection and the clock check stayed active; ser2net often
+  allows one client only, so the retry could not connect. Both now stop
+  however setup ends.
 - **A backup from another firmware was restored without a question.**
   Parameters are matched by name, and the same name can have another range
   or meaning on another firmware. `thz.restore_parameters` now refuses such

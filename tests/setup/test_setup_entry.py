@@ -187,7 +187,8 @@ class TestAsyncSetupEntry:
             with pytest.raises(thz_module.ConfigEntryNotReady):
                 await thz_module.async_setup_entry(hass, entry)
 
-        device.close.assert_called_once_with()
+        # Home Assistant runs the on-unload callbacks of a failed setup.
+        entry.async_on_unload.assert_any_call(device.close)
         assert entry.runtime_data is None
 
     @pytest.mark.asyncio
@@ -303,7 +304,7 @@ class TestAsyncSetupEntry:
             with pytest.raises(thz_module.ConfigEntryNotReady):
                 await thz_module.async_setup_entry(hass, entry)
 
-        device.close.assert_called_with()
+        entry.async_on_unload.assert_any_call(device.close)
         hass.config_entries.async_forward_entry_setups.assert_not_awaited()
 
     @pytest.mark.asyncio
@@ -359,7 +360,7 @@ class TestAsyncSetupEntry:
 
 class TestAsyncUnloadEntry:
     @pytest.mark.asyncio
-    async def test_unload_closes_device_and_keeps_services_when_last_entry(self):
+    async def test_unload_keeps_services_when_last_entry(self):
         hass = _mock_hass()
         entry = _mock_config_entry()
         device = _fake_device()
@@ -369,7 +370,6 @@ class TestAsyncUnloadEntry:
         result = await thz_module.async_unload_entry(hass, entry)
 
         assert result is True
-        device.close.assert_called_once_with()
         # Services are registered in async_setup and outlive every entry.
         hass.services.async_remove.assert_not_called()
 
@@ -399,7 +399,6 @@ class TestAsyncUnloadEntry:
 
         assert result is False
         assert entry.runtime_data.device is device
-        assert entry.runtime_data.unsub_clock_check is None
         device.close.assert_not_called()
 
     @pytest.mark.asyncio

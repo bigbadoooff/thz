@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import patch
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import ConfigEntryNotReady, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 import pytest
@@ -256,3 +257,18 @@ async def test_party_sensor_shows_start_and_end(hass, fake_device):
     assert state.state == "07:00--22:30"
     assert "unit_of_measurement" not in state.attributes
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_failed_setup_closes_the_connection(hass, fake_device):
+    entry = make_entry()
+    entry.add_to_hass(hass)
+    with patch.object(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        side_effect=ConfigEntryNotReady("platforms failed"),
+    ):
+        assert not await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert fake_device.instances[-1].closed
