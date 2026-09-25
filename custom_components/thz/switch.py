@@ -12,12 +12,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZParameterEntity
 from .entity_translations import get_translation_key
-from .exceptions import DEVICE_ERRORS
 from .parameter_io import async_write_parameter
 from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
 from .thz_device import THZDevice
 from .value_codec import THZValueCodec
+from .write_errors import raise_write_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,43 +97,23 @@ class THZSwitch(THZParameterEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the switch by sending a command to the device."""
-        _LOGGER.debug("Turning on switch %s", self.name)
-
-        try:
-            # Use centralized codec for encoding
-            value_bytes = THZValueCodec.encode_switch(True)
-
-            await async_write_parameter(
-                self.hass, self._device, self._entry, value_bytes
-            )
-
-            self._is_on = True
-            self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-            await self._async_after_write()
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error(
-                "Error encoding switch %s to turn on: %s", self.name, err, exc_info=True
-            )
+        await self._async_set(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the switch by sending a command to the device."""
-        _LOGGER.debug("Turning off switch %s", self.name)
+        await self._async_set(False)
 
-        try:
-            # Use centralized codec for encoding
-            value_bytes = THZValueCodec.encode_switch(False)
-
+    async def _async_set(self, is_on: bool) -> None:
+        """Write the switch state; raise HomeAssistantError if that fails."""
+        _LOGGER.debug("Turning %s switch %s", "on" if is_on else "off", self.name)
+        with raise_write_errors(self.name):
             await async_write_parameter(
-                self.hass, self._device, self._entry, value_bytes
+                self.hass,
+                self._device,
+                self._entry,
+                THZValueCodec.encode_switch(is_on),
             )
 
-            self._is_on = False
-            self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-            await self._async_after_write()
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error(
-                "Error encoding switch %s to turn off: %s",
-                self.name,
-                err,
-                exc_info=True,
-            )
+        self._is_on = is_on
+        self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+        await self._async_after_write()

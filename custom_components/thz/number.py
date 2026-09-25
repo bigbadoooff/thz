@@ -16,12 +16,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZParameterEntity
 from .entity_translations import get_translation_key
-from .exceptions import DEVICE_ERRORS
 from .parameter_io import async_write_parameter, parameter_length
 from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
 from .thz_device import THZDevice
 from .value_codec import THZValueCodec
+from .write_errors import raise_write_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -123,28 +123,19 @@ class THZNumber(THZParameterEntity, NumberEntity):
         """Set new value for the number."""
         _LOGGER.debug("Setting value for %s to %s", self.name, value)
 
-        try:
-            # Use centralized codec for encoding; pass the register length so 2xx
-            # firmware block parameters (which may be 4 bytes) are encoded correctly.
+        with raise_write_errors(self.name):
+            # Pass the register length so 2xx block parameters (which may be
+            # 1 or 4 bytes) are encoded correctly.
             value_bytes = THZValueCodec.encode_number(
                 value,
                 self._attr_native_step,
                 self._decode_type,
                 self._read_length,
             )
-
             await async_write_parameter(
                 self.hass, self._device, self._entry, value_bytes
             )
 
-            self._attr_native_value = value
-            self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-            await self._async_after_write()
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error(
-                "Error encoding number %s value %s: %s",
-                self.name,
-                value,
-                err,
-                exc_info=True,
-            )
+        self._attr_native_value = value
+        self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+        await self._async_after_write()

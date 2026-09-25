@@ -46,7 +46,6 @@ from homeassistant.util.percentage import (
 
 from .base_entity import THZBaseEntity
 from .devices import assign_subdevices
-from .exceptions import DEVICE_ERRORS
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
@@ -58,6 +57,7 @@ from .parameter_io import (
 )
 from .register_maps.model import ReadField, WriteParam
 from .value_codec import THZValueCodec, decode_raw_value
+from .write_errors import raise_write_errors
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
@@ -491,7 +491,7 @@ class THZFan(THZBaseEntity, FanEntity):
         param = self._start_param
         if param is None:
             return
-        try:
+        with raise_write_errors(self.name):
             value_bytes = THZValueCodec.encode_number(
                 float(stage),
                 param.step or 1.0,
@@ -499,9 +499,6 @@ class THZFan(THZBaseEntity, FanEntity):
                 parameter_length(param),
             )
             await async_write_parameter(self.hass, self._device, param, value_bytes)
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error("Error starting ventilation stage %s: %s", stage, err)
-            return
         duration = self._params.durations[stage]
         minutes = (
             self._number(

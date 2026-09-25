@@ -3,6 +3,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.thz.exceptions import THZProtocolError
@@ -195,24 +196,25 @@ class TestTHZSelectSelectOption:
         assert write_call[0] == device.write_value
 
     @pytest.mark.asyncio
-    async def test_async_select_option_invalid_option_logged(self):
+    async def test_async_select_option_invalid_option_raises(self):
         entity = _make_entity(entry=_select_entry(decode_type="2opmode"))
         entity.hass = MagicMock()
         entity.async_write_ha_state = MagicMock()
 
-        # Should not raise - encode_select raises ValueError internally, caught.
-        await entity.async_select_option("not_a_real_option")
+        with pytest.raises(HomeAssistantError):
+            await entity.async_select_option("not_a_real_option")
 
         entity._device.async_execute.assert_not_awaited()
         entity.async_write_ha_state.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_async_select_option_unknown_decode_type_logged(self):
+    async def test_async_select_option_unknown_decode_type_raises(self):
         entity = _make_entity(entry=_select_entry(decode_type="totallyUnknownType"))
         entity.hass = MagicMock()
         entity.async_write_ha_state = MagicMock()
 
-        await entity.async_select_option("automatic")
+        with pytest.raises(HomeAssistantError):
+            await entity.async_select_option("automatic")
 
         entity._device.async_execute.assert_not_awaited()
         entity.async_write_ha_state.assert_not_called()

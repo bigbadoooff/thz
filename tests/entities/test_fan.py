@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.thz import fan as fan_module
@@ -407,9 +408,10 @@ class TestWrites:
         assert device.writes == [("0A05DD", _word(3))]
 
     @pytest.mark.asyncio
-    async def test_write_error_keeps_state(self, now):
+    async def test_write_error_raises_and_keeps_state(self, now):
         fan = _fan(FakeDevice(fail=True))
-        await fan.async_set_percentage(100)
+        with pytest.raises(HomeAssistantError):
+            await fan.async_set_percentage(100)
         assert fan._stage is None
         fan.async_write_ha_state.assert_not_called()
 

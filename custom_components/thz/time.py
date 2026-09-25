@@ -16,13 +16,13 @@ from .const import (
 )
 from .devices import assign_subdevices
 from .entity_translations import get_translation_key
-from .exceptions import DEVICE_ERRORS
 from .parameter_io import async_read_parameter, async_write_parameter
 from .parameter_poller import ReadKey
 from .register_maps.model import WriteParam
 from .register_maps.register_map_manager import RegisterMapManagerWrite
 from .runtime_data import THZConfigEntry
 from .thz_device import THZDevice
+from .write_errors import raise_write_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -369,11 +369,8 @@ class THZTime(THZParameterEntity, TimeEntity):
         num = time_to_quarters(t_value, is_end_time=self._end)
         _LOGGER.debug("Setting time %s to %s (%s quarters)", self.name, t_value, num)
 
-        try:
+        with raise_write_errors(self.name):
             await self._async_write_quarters(num)
-        except DEVICE_ERRORS as err:
-            _LOGGER.error("Error writing time %s: %s", self.name, err, exc_info=True)
-            return
 
         # Reflect what was actually written (quantized to a 15-minute
         # "quarter"), not the raw value passed in -- the device can only
@@ -415,7 +412,8 @@ class THZTime(THZParameterEntity, TimeEntity):
 
         # Same payload shape as async_set_value, with the sentinel value in
         # place of a real quarters count.
-        await self._async_write_quarters(TIME_VALUE_UNSET)
+        with raise_write_errors(self.name):
+            await self._async_write_quarters(TIME_VALUE_UNSET)
 
         self._attr_native_value = None
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
@@ -554,7 +552,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             new_num,
         )
 
-        try:
+        with raise_write_errors(self.name):
             # Read the current schedule data (4 bytes total)
             current_bytes = await self._device.async_execute(
                 self._device.read_value,
@@ -577,15 +575,6 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
                 bytes.fromhex(self._command),
                 bytes(schedule_bytes),
             )
-        except DEVICE_ERRORS as err:
-            _LOGGER.error(
-                "Error writing schedule time %s (%s): %s",
-                self.name,
-                self._time_type,
-                err,
-                exc_info=True,
-            )
-            return
 
         # Reflect what was actually written (quantized to a 15-minute
         # "quarter", with the same end-of-day 96 -> 00:00 handling
@@ -607,25 +596,26 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
 
         # Read the current schedule data (4 bytes total) so only the
         # relevant byte (start or end) is touched, same as async_set_value.
-        current_bytes = await self._device.async_execute(
-            self._device.read_value,
-            bytes.fromhex(self._command),
-            "get",
-            SCHEDULE_OFFSET,
-            SCHEDULE_LENGTH,
-        )
+        with raise_write_errors(self.name):
+            current_bytes = await self._device.async_execute(
+                self._device.read_value,
+                bytes.fromhex(self._command),
+                "get",
+                SCHEDULE_OFFSET,
+                SCHEDULE_LENGTH,
+            )
 
-        schedule_bytes = bytearray(current_bytes)
-        if self._time_type == "start":
-            schedule_bytes[0] = TIME_VALUE_UNSET
-        else:  # "end"
-            schedule_bytes[1] = TIME_VALUE_UNSET
+            schedule_bytes = bytearray(current_bytes)
+            if self._time_type == "start":
+                schedule_bytes[0] = TIME_VALUE_UNSET
+            else:  # "end"
+                schedule_bytes[1] = TIME_VALUE_UNSET
 
-        await self._device.async_execute(
-            self._device.write_value,
-            bytes.fromhex(self._command),
-            bytes(schedule_bytes),
-        )
+            await self._device.async_execute(
+                self._device.write_value,
+                bytes.fromhex(self._command),
+                bytes(schedule_bytes),
+            )
 
         self._attr_native_value = None
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms

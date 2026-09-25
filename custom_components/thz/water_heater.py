@@ -45,6 +45,7 @@ from .parameter_io import (
 )
 from .register_maps.model import WriteParam
 from .value_codec import THZValueCodec
+from .write_errors import raise_write_errors
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
@@ -240,7 +241,7 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         entry = await self._async_setpoint_to_write()
         if entry is None:
             return
-        try:
+        with raise_write_errors(self.name):
             value_bytes = THZValueCodec.encode_number(
                 temperature,
                 entry.step or 1.0,
@@ -248,9 +249,4 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                 parameter_length(entry),
             )
             await async_write_parameter(self.hass, self._device, entry, value_bytes)
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error(
-                "Error writing %s for %s: %s", entry.name, self.name, err, exc_info=True
-            )
-            return
         await self.coordinator.async_request_refresh()

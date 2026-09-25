@@ -2,6 +2,7 @@
 
 from unittest.mock import AsyncMock, MagicMock
 
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.thz.water_heater import THZWaterHeater, async_setup_entry
@@ -214,11 +215,12 @@ class TestSetTemperature:
         heater._device.async_execute.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_device_error_is_logged(self):
+    async def test_device_error_is_raised(self):
         device = _device()
         device.async_execute.side_effect = OSError("boom")
         heater = _heater(_block(), device=device)
-        await heater.async_set_temperature(temperature=50.0)
+        with pytest.raises(HomeAssistantError):
+            await heater.async_set_temperature(temperature=50.0)
         heater.coordinator.async_request_refresh.assert_not_awaited()
 
 

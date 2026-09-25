@@ -3,6 +3,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.thz.number import THZNumber, async_setup_entry
@@ -224,9 +225,7 @@ class TestTHZNumberSetNativeValue:
         assert write_call[2] == bytes([3, 0])
 
     @pytest.mark.asyncio
-    async def test_async_set_native_value_encode_error_logged_not_raised(
-        self, monkeypatch
-    ):
+    async def test_async_set_native_value_encode_error_raised(self, monkeypatch):
         entity = _make_entity()
         entity.hass = MagicMock()
         entity.async_write_ha_state = MagicMock()
@@ -238,7 +237,8 @@ class TestTHZNumberSetNativeValue:
 
         monkeypatch.setattr(number_mod.THZValueCodec, "encode_number", _raise)
 
-        await entity.async_set_native_value(10.0)
+        with pytest.raises(HomeAssistantError):
+            await entity.async_set_native_value(10.0)
 
         entity._device.async_execute.assert_not_awaited()
         entity.async_write_ha_state.assert_not_called()

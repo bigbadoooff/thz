@@ -3,6 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock
 
 from homeassistant.components.climate import HVACAction, HVACMode
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.thz.exceptions import THZProtocolError
@@ -753,7 +754,7 @@ class TestTHZClimateServiceCalls:
         assert device.async_execute.await_count == 2  # write + re-read
 
     @pytest.mark.asyncio
-    async def test_write_heat_setpoint_handles_device_error(self):
+    async def test_write_heat_setpoint_raises_device_error(self):
         device = MagicMock()
         device.async_execute = AsyncMock(side_effect=ConnectionError("boom"))
         entity = self._entity(
@@ -761,8 +762,8 @@ class TestTHZClimateServiceCalls:
             device=device,
         )
         entity.hass = MagicMock()
-        # Should not raise.
-        await entity.async_set_temperature(temperature=21.0)
+        with pytest.raises(HomeAssistantError):
+            await entity.async_set_temperature(temperature=21.0)
 
     @pytest.mark.asyncio
     async def test_set_hvac_mode_cool_enables_switch_and_refreshes(self):
@@ -837,12 +838,13 @@ class TestTHZClimateServiceCalls:
         entity._device.async_execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_set_preset_mode_handles_device_error(self):
+    async def test_set_preset_mode_raises_device_error(self):
         device = MagicMock()
         device.async_execute = AsyncMock(side_effect=THZProtocolError("boom"))
         entity = self._entity(opmode_entry={"command": "0A0001"}, device=device)
         entity.hass = MagicMock()
-        await entity.async_set_preset_mode("standby")  # Should not raise.
+        with pytest.raises(HomeAssistantError):
+            await entity.async_set_preset_mode("standby")
 
     @pytest.mark.asyncio
     async def test_set_cooling_switch_no_entry_is_noop(self):

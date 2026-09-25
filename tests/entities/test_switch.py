@@ -3,6 +3,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
+from homeassistant.exceptions import HomeAssistantError
 import pytest
 
 from custom_components.thz.switch import THZSwitch, async_setup_entry
@@ -189,7 +190,7 @@ class TestTHZSwitchTurnOnOff:
         assert write_call[2] == bytes([0, 0])
 
     @pytest.mark.asyncio
-    async def test_async_turn_on_encode_error_logged_not_raised(self, monkeypatch):
+    async def test_async_turn_on_encode_error_raised(self, monkeypatch):
         entity = _make_entity()
         entity.hass = MagicMock()
         entity.async_write_ha_state = MagicMock()
@@ -201,14 +202,14 @@ class TestTHZSwitchTurnOnOff:
 
         monkeypatch.setattr(switch_mod.THZValueCodec, "encode_switch", _raise)
 
-        # Should not raise; error is caught and logged.
-        await entity.async_turn_on()
+        with pytest.raises(HomeAssistantError):
+            await entity.async_turn_on()
 
         entity._device.async_execute.assert_not_awaited()
         entity.async_write_ha_state.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_async_turn_off_encode_error_logged_not_raised(self, monkeypatch):
+    async def test_async_turn_off_encode_error_raised(self, monkeypatch):
         entity = _make_entity()
         entity.hass = MagicMock()
         entity.async_write_ha_state = MagicMock()
@@ -220,7 +221,8 @@ class TestTHZSwitchTurnOnOff:
 
         monkeypatch.setattr(switch_mod.THZValueCodec, "encode_switch", _raise)
 
-        await entity.async_turn_off()
+        with pytest.raises(HomeAssistantError):
+            await entity.async_turn_off()
 
         entity._device.async_execute.assert_not_awaited()
         entity.async_write_ha_state.assert_not_called()

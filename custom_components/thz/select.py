@@ -11,13 +11,13 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .base_entity import THZParameterEntity
 from .entity_translations import get_translation_key
-from .exceptions import DEVICE_ERRORS
 from .parameter_io import async_write_parameter
 from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
 from .thz_device import THZDevice
 from .value_codec import THZValueCodec
 from .value_maps import SELECT_MAP, select_slugs, state_slug
+from .write_errors import raise_write_errors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -148,25 +148,15 @@ class THZSelect(THZParameterEntity, SelectEntity):
         """Set the selected option."""
         _LOGGER.debug("Setting %s to option %s", self.name, option)
 
-        try:
-            # Use centralized codec for encoding
+        with raise_write_errors(self.name):
             value_bytes = THZValueCodec.encode_select(
                 self._table_values.get(option, option), self._decode_type
             )
             _LOGGER.debug("Encoded value bytes: %s", value_bytes.hex())
-
             await async_write_parameter(
                 self.hass, self._device, self._entry, value_bytes
             )
 
-            self._attr_current_option = option
-            self.async_write_ha_state()  # Optimistically update UI; next poll confirms
-            await self._async_after_write()
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error(
-                "Error setting select %s to option %s: %s",
-                self.name,
-                option,
-                err,
-                exc_info=True,
-            )
+        self._attr_current_option = option
+        self.async_write_ha_state()  # Optimistically update UI; next poll confirms
+        await self._async_after_write()

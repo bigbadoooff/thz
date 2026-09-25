@@ -3069,6 +3069,9 @@
     },
     "button_press_failed": {
       "message": "Unable to execute THZ button {name}"
+    },
+    "write_failed": {
+      "message": "Writing {name} failed: {error}"
     }
   },
   "issues": {
