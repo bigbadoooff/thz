@@ -798,19 +798,27 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         """
         if self._supports_cooling and self._cooling_switch_on is not None:
             return HVACMode.COOL if self._cooling_switch_on else HVACMode.HEAT
-        # Check cooling-active bit first (only when cooling entries are present)
-        if self._supports_cooling and self._cooling_coordinator is not None:
-            # The cooling coordinator's DataUpdateCoordinator is untyped
-            # generic; its .data is always bytes at runtime for this entity.
-            cool_data = cast("bytes | None", self._cooling_coordinator.data)
-            if (
-                cool_data is not None
-                and self._cooling_byte is not None
-                and self._cooling_bit is not None
-                and _bit_active(cool_data, self._cooling_byte, self._cooling_bit)
-            ):
-                return HVACMode.COOL
+        if self._supports_cooling and self._status_bit(self._cooling_bit):
+            return HVACMode.COOL
         return HVACMode.HEAT
+
+    def _status_data(self) -> bytes | None:
+        """Return the pxx0A0176 status block, or None if there is none yet."""
+        if self._cooling_coordinator is None:
+            return None
+        # The cooling coordinator's DataUpdateCoordinator is untyped
+        # generic; its .data is always bytes at runtime for this entity.
+        return cast("bytes | None", self._cooling_coordinator.data)
+
+    def _status_bit(self, bit: int | None) -> bool:
+        """Return whether ``bit`` of the status byte is set."""
+        data = self._status_data()
+        return (
+            data is not None
+            and self._cooling_byte is not None
+            and bit is not None
+            and _bit_active(data, self._cooling_byte, bit)
+        )
 
     def _circuit_in_standby(self) -> bool:
         """Return whether the circuit's hcOpMode is standby (HC2 has none)."""
@@ -837,25 +845,11 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         """
         if self._circuit_in_standby():
             return HVACAction.OFF
-        if self._cooling_coordinator is None:
+        if self._status_data() is None:
             return None
-        # The cooling coordinator's DataUpdateCoordinator is untyped
-        # generic; its .data is always bytes at runtime for this entity.
-        cool_data = cast("bytes | None", self._cooling_coordinator.data)
-        if cool_data is None:
-            return None
-        if (
-            self._supports_cooling
-            and self._cooling_byte is not None
-            and self._cooling_bit is not None
-            and _bit_active(cool_data, self._cooling_byte, self._cooling_bit)
-        ):
+        if self._supports_cooling and self._status_bit(self._cooling_bit):
             return HVACAction.COOLING
-        if (
-            self._cooling_byte is not None
-            and self._compressor_bit is not None
-            and _bit_active(cool_data, self._cooling_byte, self._compressor_bit)
-        ):
+        if self._status_bit(self._compressor_bit):
             return HVACAction.HEATING
         return HVACAction.IDLE
 
