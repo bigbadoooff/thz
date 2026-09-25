@@ -408,12 +408,16 @@ class TestAsyncStepDetectBlocks:
             return_value=[existing_entry]
         )
 
-        with patch.object(config_flow_module, "THZDevice", return_value=mock_device):
+        with patch.object(
+            config_flow_module, "THZDevice", return_value=mock_device
+        ) as device_class:
             with pytest.raises(AbortFlow) as exc_info:
                 await flow.async_step_detect_blocks()
 
         assert exc_info.value.result["reason"] == "already_configured"
-        mock_device.close.assert_called_once()
+        # The port of a heat pump that is already set up is never opened.
+        device_class.assert_not_called()
+        mock_device.async_initialize.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_oserror_aborts(self, flow):

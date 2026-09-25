@@ -117,6 +117,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Adding a heat pump that is already set up opened its port first.**
+  The flow connected and read the firmware before it noticed the
+  duplicate; on a serial port that talked next to the running
+  integration. It now refuses the duplicate before connecting.
 - **The climate preset and cooling setpoint went stale.** They were read
   once at startup, so a mode changed at the heat pump, through the
   operating-mode select or through the other heating circuit did not show

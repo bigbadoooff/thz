@@ -80,12 +80,15 @@ async def test_unreachable_device_aborts(hass, fake_device):
 
 async def test_same_device_cannot_be_added_twice(hass, fake_device):
     entry = await setup_entry(hass)
+    devices = len(fake_device.instances)
     result = await _start(hass, "ip")
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"host": HOST, "port": 2323, "connection_type": "ip"}
     )
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
+    # No probe connection next to the running entry's.
+    assert len(fake_device.instances) == devices
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
