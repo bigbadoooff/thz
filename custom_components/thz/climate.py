@@ -41,7 +41,8 @@ a ``fan`` entity (fan.py).
 
 All HC entities expose:
 
-- ``hvac_action`` (HEATING / COOLING / IDLE) when ``pxx0A0176`` is available.
+- ``hvac_action``: OFF while the circuit is in standby, otherwise HEATING /
+  COOLING / IDLE when ``pxx0A0176`` is available.
 - ``preset_mode`` when ``pOpMode`` is writable, using the device's own
   operating-mode names (``automatic``/``DAYmode``/``DHWmode``/``emergency``/
   ``manual``/``setback``/``standby`` -- see ``SELECT_MAP["2opmode"]`` in
