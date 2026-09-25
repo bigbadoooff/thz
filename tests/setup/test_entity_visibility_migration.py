@@ -408,3 +408,39 @@ class TestApplyEntityVisibilityTier:
         ent_reg.async_update_entity.assert_called_once_with(
             "time.programhc1_mo_0_start", disabled_by=None
         )
+
+
+class TestNewEntitiesOfAnUnchangedTier:
+    """New entities are enabled if the tier shows them; nothing is disabled."""
+
+    @pytest.mark.asyncio
+    async def test_new_hc2_entity_is_enabled_and_nothing_else_changes(self):
+        hass = _make_hass()
+        config_entry = _make_config_entry(
+            {
+                "entity_visibility": "default",
+                "enable_hc2": True,
+                "_entity_visibility_applied": "default",
+                "_entity_hc2_applied": True,
+            }
+        )
+        integration = er.RegistryEntryDisabler.INTEGRATION
+        entries = [
+            _entity("number.hc2_old", "uid_old", "HC2 Old", disabled_by=integration),
+            _entity("number.hc2_new", "uid_new", "HC2 New", disabled_by=integration),
+            # Restored with the user's choice to show a schedule: kept.
+            _entity("time.programhc1_mo_0", "uid_prog", "programHC1_Mo_0"),
+        ]
+        fake_ent_reg = MagicMock()
+        with (
+            patch.object(er, "async_get", return_value=fake_ent_reg),
+            patch.object(er, "async_entries_for_config_entry", return_value=entries),
+        ):
+            await thz_module._async_apply_entity_visibility_tier(
+                hass, config_entry, known_unique_ids={"uid_old"}
+            )
+
+        fake_ent_reg.async_update_entity.assert_called_once_with(
+            "number.hc2_new", disabled_by=None
+        )
+        hass.config_entries.async_update_entry.assert_not_called()

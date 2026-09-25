@@ -438,9 +438,9 @@ async def _async_apply_entity_visibility_tier(
     An entity the user disabled themselves (disabled_by == USER) is never
     touched.
 
-    Entities registered by this setup (not in ``known_unique_ids``) always
-    get the tier: their enabled default knows the tier but not enable_hc2,
-    and no user choice exists for them yet.
+    Entities registered by this setup (not in ``known_unique_ids``) are
+    enabled if the tier shows them, even when nothing changed: their
+    enabled default knows the tier but not enable_hc2.
 
     Args:
         hass: The Home Assistant instance.
@@ -490,7 +490,10 @@ async def _async_apply_entity_visibility_tier(
         name = (entity_entry.original_name or entity_entry.name or "").lower()
         should_hide = _entity_should_be_hidden(uid, name, visibility, enable_hc2)
 
-        if should_hide and entity_entry.disabled_by is None:
+        # A new entity's own default already hides what the tier hides; only
+        # enabling is left (an HC2 entity with enable_hc2). A restored row
+        # may carry the user's own choice, which is never overridden.
+        if should_hide and entity_entry.disabled_by is None and not unchanged:
             disabler: er.RegistryEntryDisabler = er.RegistryEntryDisabler.INTEGRATION
             ent_reg.async_update_entity(
                 entity_entry.entity_id,
