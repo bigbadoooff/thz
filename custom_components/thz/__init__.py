@@ -165,6 +165,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     coordinators, unsupported_blocks, failed_blocks = await _async_create_coordinators(
         hass,
+        config_entry,
         device,
         _refresh_intervals(data, device),
         paired_blocks,
@@ -302,6 +303,7 @@ def _refresh_intervals(data: Mapping[str, Any], device: THZDevice) -> dict[str, 
 
 async def _async_create_coordinators(
     hass: HomeAssistant,
+    config_entry: ConfigEntry,
     device: THZDevice,
     refresh_intervals: Mapping[str, Any],
     paired_blocks: dict[str, str],
@@ -334,9 +336,12 @@ async def _async_create_coordinators(
         # that all coordinators do not fire at the same wall-clock second after
         # the first period expires, avoiding lock contention thundering herds.
         jitter = random.uniform(0, max(int(interval) * 0.10, 5))
+        # Every poll notifies the entities, also with unchanged data: the fan
+        # derives its stage from the time program and the current time.
         coordinator = DataUpdateCoordinator(
             hass,
             logger,
+            config_entry=config_entry,
             name=f"THZ {block}",
             update_interval=timedelta(seconds=int(interval) + jitter),
             update_method=_make_update_method(block),
