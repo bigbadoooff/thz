@@ -497,11 +497,11 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         return self._attr_native_value
 
     def _poll_key(self) -> ReadKey:
-        """Return the schedule's four data bytes; start and end share them.
+        """Return the schedule's data bytes; start and end share them.
 
-        Schedules exist only as 4.x/5.x registers whose data bytes hold
-        start and end together, so they are read and written whole here
-        rather than as one parameter through parameter_io.
+        The start entity and the end entity share this key, so the poller
+        reads the register once for both. Writes change one of the two bytes
+        (see _async_write_quarters).
         """
         return self._command, SCHEDULE_OFFSET, SCHEDULE_LENGTH
 
