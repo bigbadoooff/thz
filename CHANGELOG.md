@@ -131,6 +131,9 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **A temperature sensor that is not connected logged a warning.** The heat
+  pump reports -60.0 °C for it, which was logged as a corrupted response
+  after every start. It still reads as unknown, now without the warning.
 - **The climate entity fell back to HEAT right after selecting COOL.** Its
   mode followed the "cooling active" status bit, which is only set once the
   heat pump actually cools, so a temperature set in the meantime went to the
