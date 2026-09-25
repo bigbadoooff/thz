@@ -362,7 +362,6 @@ async def async_setup_entry(
         async_add_entities: Callback to register new entities.
     """
     entry_data = config_entry.runtime_data
-    coordinators: dict[str, DataUpdateCoordinator] = entry_data.coordinators
     register_manager = entry_data.register_manager
     write_registers = entry_data.write_manager.params()
 
@@ -370,7 +369,7 @@ async def async_setup_entry(
     cooling = _bit_field_layout(register_manager, "pxx0A0176", "cooling")
     compressor = _bit_field_layout(register_manager, "pxx0A0176", "compressor")
     status = StatusBits(
-        coordinator=coordinators.get("pxx0A0176"),
+        coordinator=entry_data.polled_coordinator("pxx0A0176"),
         byte=cooling[0] if cooling else None,
         cooling_bit=cooling[1] if cooling else None,
         compressor_bit=compressor[1] if compressor else None,
@@ -378,7 +377,7 @@ async def async_setup_entry(
 
     entities: list[THZClimate] = []
     for circuit in _CIRCUITS:
-        coordinator = coordinators.get(circuit.block)
+        coordinator = entry_data.polled_coordinator(circuit.block)
         if coordinator is None:
             continue
         config = _resolve(circuit, register_manager, write_registers, status)

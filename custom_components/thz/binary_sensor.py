@@ -97,7 +97,6 @@ async def async_setup_entry(
     """
     entry_data = config_entry.runtime_data
     register_manager: RegisterMapManager = entry_data.register_manager
-    coordinators = entry_data.coordinators
     device_id = entry_data.device_id
     entity_id_style = entry_data.entity_id_style
     entity_visibility = entry_data.entity_visibility
@@ -106,7 +105,7 @@ async def async_setup_entry(
     entities: list[THZBinarySensor] = []
     seen_sensor_names: set[str] = set()
     for block, fields in register_manager.fields().items():
-        coordinator = coordinators.get(block)
+        coordinator = entry_data.polled_coordinator(block)
         if coordinator is None:
             _LOGGER.debug(
                 "No coordinator found for block %s, skipping binary sensors", block

@@ -627,3 +627,15 @@ class TestAsyncMigrateEntry:
     @pytest.mark.asyncio
     async def test_newer_entry_is_refused(self):
         assert not await thz_module.async_migrate_entry(_mock_hass(), self._entry(2, 1))
+
+
+class TestPolledCoordinator:
+    def test_unsupported_and_unpolled_blocks_have_none(self):
+        polled = MagicMock()
+        data = make_runtime_data(
+            coordinators={"pxxFB": polled, "pxxF3": MagicMock()},
+            unsupported_blocks={"pxxF3"},
+        )
+        assert data.polled_coordinator("pxxFB") is polled
+        assert data.polled_coordinator("pxxF3") is None
+        assert data.polled_coordinator("pxxF4") is None

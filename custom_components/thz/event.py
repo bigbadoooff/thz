@@ -62,11 +62,11 @@ async def async_setup_entry(
     device_id = entry_data.device_id
     entities: list[_THZEvent] = []
 
-    fault_coordinator = entry_data.coordinators.get(D1_BLOCK)
+    fault_coordinator = entry_data.polled_coordinator(D1_BLOCK)
     if fault_coordinator is not None and supports_fault_memory(register_manager):
         entities.append(THZFaultEvent(fault_coordinator, device_id))
 
-    filter_coordinator = entry_data.coordinators.get(FILTER_BLOCK)
+    filter_coordinator = entry_data.polled_coordinator(FILTER_BLOCK)
     filters = {
         event_type: read_field
         for name, event_type in FILTER_FIELDS.items()

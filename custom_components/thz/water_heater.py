@@ -85,7 +85,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up the hot water heater if the firmware has its fields."""
     entry_data = config_entry.runtime_data
-    coordinator = entry_data.coordinators.get(_BLOCK)
+    coordinator = entry_data.polled_coordinator(_BLOCK)
     if coordinator is None:
         return
     register_manager = entry_data.register_manager
