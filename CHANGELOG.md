@@ -121,6 +121,9 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **2.x settings could stay unavailable for good** when their block failed
+  to read at startup and later turned out to be one the firmware does not
+  have. They now fall back to being read on their own.
 - **A setup that failed late kept the connection open.** When setting up
   the platforms failed after the heat pump was connected, the serial port
   or ser2net connection and the clock check stayed active; ser2net often
