@@ -45,6 +45,26 @@ async def async_setup_entry(
     )
 
 
+# Byte of FHEM's "<command>0000" set message that the parsing rule of a
+# button's type sets to the value: the rule's nibble offset without the
+# checksum (THZ_Set and %parsinghash in docs/legacy/00_THZ.pm). A rule
+# beyond the message extends it with zeros.
+_FHEM_VALUE_BYTE = {"0clean": 3, "D1last": 1}
+
+
+def button_payload(entry: WriteParam) -> bytes:
+    """Return the data bytes FHEM sends for a button's command with value 0.
+
+    A button inside a 2.x block zeroes its own slot of the block.
+    """
+    if entry.block is not None:
+        return bytes(entry.block.length)
+    command_length = len(bytes.fromhex(entry.command))
+    index = _FHEM_VALUE_BYTE.get(entry.decode_type or "", command_length)
+    message = bytes(max(command_length + 2, index + 1))
+    return message[command_length:]
+
+
 class THZButton(THZBaseEntity, ButtonEntity):
     """Representation of a THZ Button entity.
 
@@ -95,13 +115,15 @@ class THZButton(THZBaseEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Handle the button press by sending the write command to the device.
 
-        Sends the configured command with a zero-value payload.  The device
-        interprets such commands as a one-shot trigger (e.g. clearing the
-        fault log).
+        Sends the configured command with a zero value, byte for byte as
+        FHEM does (see button_payload). The device interprets such commands
+        as a one-shot trigger (e.g. clearing the fault log).
         """
         _LOGGER.debug("Pressing button %s (command: %s)", self.name, self._command)
         try:
-            await async_write_parameter(self._device, self._entry, b"\x00")
+            await async_write_parameter(
+                self._device, self._entry, button_payload(self._entry)
+            )
             _LOGGER.debug("Button %s pressed successfully", self.name)
         except (ValueError, TypeError, *DEVICE_ERRORS) as err:
             _LOGGER.error("Error pressing button %s: %s", self.name, err, exc_info=True)
