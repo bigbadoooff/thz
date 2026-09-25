@@ -133,7 +133,9 @@ All notable changes to the THZ integration are documented here.
 
 - **The fan stayed unavailable after one failed read.** A read error while
   switching the fan or on `update_entity` marked it unavailable, and new
-  polled data did not make it available again.
+  polled data did not make it available again. The fan now follows the
+  data its stage is computed from, and no longer shows a stage from a
+  block whose last refresh failed.
 - **The configured area could create a duplicate area.** The heat pump and
   its sub-devices were suggested the area's id instead of its name, so an
   area like "Living Room" was not matched and a new area "living_room" was

@@ -61,7 +61,6 @@ from .write_errors import raise_write_errors
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
-    from .parameter_poller import ReadKey
     from .runtime_data import THZConfigEntry
     from .thz_device import THZDevice
 
@@ -234,9 +233,7 @@ class THZFan(THZBaseEntity, FanEntity):
         self._stage: int | None = None
         # Stage and end of an unscheduled ventilation started here.
         self._unscheduled: tuple[int, datetime] | None = None
-        # What the stage is computed from, set when added to Home Assistant.
-        self._sources: list[Any] = []
-        self._source_keys: set[ReadKey] = set()
+        self._read_failed = False
         # Last stage above 0, used by turn_on without a speed.
         self._last_on_stage = 1
 
@@ -284,26 +281,16 @@ class THZFan(THZBaseEntity, FanEntity):
     async def async_added_to_hass(self) -> None:
         """Subscribe the registers and blocks the stage is computed from."""
         await super().async_added_to_hass()
-        # Only the blocks the stage is computed from decide availability.
-        used_blocks = [_AIRFLOW_BLOCK] if self._airflow is not None else []
-        if self._status is not None:
-            used_blocks += [_STATUS_BLOCK, _PROGRAM_BLOCK]
-        sources: dict[int, Any] = {}
-        for block in used_blocks:
-            if (coordinator := self._coordinators.get(block)) is not None:
-                sources[id(coordinator)] = coordinator
-        keys = set()
-        for param in self._watched_params():
-            if (coordinator := self._param_coordinator(param)) is not None:
-                sources[id(coordinator)] = coordinator
-            else:
-                keys.add(parameter_read_key(param))
-        self._sources = list(sources.values())
-        self._source_keys = keys
-        coordinators = dict(sources)
+        coordinators: dict[int, Any] = {}
         for block in (_AIRFLOW_BLOCK, _STATUS_BLOCK, _PROGRAM_BLOCK):
             if (coordinator := self._coordinators.get(block)) is not None:
                 coordinators[id(coordinator)] = coordinator
+        keys = set()
+        for param in self._watched_params():
+            if (coordinator := self._param_coordinator(param)) is not None:
+                coordinators[id(coordinator)] = coordinator
+            else:
+                keys.add(parameter_read_key(param))
         for coordinator in coordinators.values():
             self.async_on_remove(coordinator.async_add_listener(self._handle_change))
         if self._poller is not None:
@@ -331,40 +318,40 @@ class THZFan(THZBaseEntity, FanEntity):
         self.async_write_ha_state()
 
     def _recompute(self) -> None:
-        self._attr_available = self._sources_ok()
+        # Only the data the stage computation consults decides availability;
+        # a failed refresh counts as no data, not as the stale last value.
+        self._read_failed = False
         stage = self._compute_stage(self._live_raw, self._live_block)
         if stage is not None:
             self._set_stage(stage)
+            self._attr_available = True
+        elif self._read_failed:
+            self._set_unavailable("read failed", logging.DEBUG)
 
-    def _sources_ok(self) -> bool:
-        """Return False while a block or register the stage uses failed.
-
-        A coordinator keeps its last data after a failed refresh, and the
-        poller keeps None for a failed read.
-        """
-        if not all(coordinator.last_update_success for coordinator in self._sources):
-            return False
-        if self._poller is None:
-            return True
-        return all(
-            self._poller.data.get(key, b"") is not None for key in self._source_keys
-        )
+    def _coordinator_data(self, coordinator: Any) -> bytes | None:
+        if not coordinator.last_update_success:
+            self._read_failed = True
+            return None
+        data: bytes | None = coordinator.data
+        return data
 
     def _live_raw(self, param: WriteParam) -> bytes | None:
         """Return a parameter's value bytes from the polled data."""
         coordinator = self._param_coordinator(param)
         if coordinator is not None:
-            data = coordinator.data
+            data = self._coordinator_data(coordinator)
             return parameter_from_block(param, data) if data else None
         if self._poller is None:
             return None
-        raw = self._poller.data.get(parameter_read_key(param))
+        key = parameter_read_key(param)
+        raw = self._poller.data.get(key)
+        if raw is None and key in self._poller.data:
+            self._read_failed = True
         return parameter_from_read(param, raw) if raw else None
 
     def _live_block(self, block: str) -> bytes | None:
         coordinator = self._coordinators.get(block)
-        data: bytes | None = coordinator.data if coordinator is not None else None
-        return data
+        return self._coordinator_data(coordinator) if coordinator is not None else None
 
     async def async_update(self) -> None:
         """Read everything the stage depends on now (update_entity)."""

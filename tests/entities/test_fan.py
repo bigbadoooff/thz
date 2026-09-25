@@ -94,9 +94,16 @@ class _PolledData(dict):
     def __init__(self, device):
         super().__init__()
         self._device = device
+        # Commands whose last read failed.
+        self.failed = set()
+
+    def __contains__(self, key):
+        return (
+            self._device.fail or key[0] in self.failed or key[0] in self._device.values
+        )
 
     def get(self, key, default=None):
-        if self._device.fail:
+        if self._device.fail or key[0] in self.failed:
             return None
         return self._device.values.get(key[0], default)
 
@@ -358,22 +365,35 @@ class TestState:
         assert fan._attr_available is True
 
     @pytest.mark.asyncio
-    async def test_a_failed_block_or_register_makes_it_unavailable(self, now):
-        values = {"0A1D10": _window(6, 9), "0A056C": _word(2)}
-        fan = _fan(FakeDevice(values), airflow=None)
-        coordinator = MagicMock(last_update_success=False, data=b"stale")
-        fan._sources = [coordinator]
+    async def test_stale_block_data_makes_it_unavailable(self, now):
+        e8 = MagicMock(last_update_success=False, data=_e8(0))
+        fan = _fan(FakeDevice(_AIRFLOWS), e8=_e8(0))
+        fan._coordinators = {"pxxE8": e8}
         fan._recompute()
+        assert fan._stage is None
         assert fan._attr_available is False
 
-        coordinator.last_update_success = True
+        e8.last_update_success = True
         fan._recompute()
+        assert fan._stage == 0
         assert fan._attr_available is True
 
-        key = ("0A056C", 0, 2)
-        fan._source_keys = {key}
-        fan._poller.data = {key: None}
+    @pytest.mark.asyncio
+    async def test_a_source_the_stage_does_not_use_is_ignored(self, now):
+        values = {"0A1D10": _window(6, 9), "0A056C": _word(2)}
+        fan = _fan(FakeDevice(values), airflow=None)
+        # Polled for sensors; this firmware's stage is not read from it.
+        fan._coordinators = {"pxxF6": MagicMock(last_update_success=False)}
         fan._recompute()
+        assert fan._stage == 2
+        assert fan._attr_available is True
+
+    @pytest.mark.asyncio
+    async def test_a_failed_register_without_a_stage_is_unavailable(self, now):
+        fan = _fan(FakeDevice({"0A056C": _word(2)}), airflow=None)
+        fan._poller.data.failed = {"0A1D10"}
+        fan._recompute()
+        assert fan._stage is None
         assert fan._attr_available is False
 
     @pytest.mark.asyncio
@@ -623,23 +643,6 @@ class TestPolling:
         pxx17.async_add_listener.assert_called_once()
         assert all(key[0] != "17" for key, _ in fan._poller.subscribed)
         assert fan._stage == 2
-
-    @pytest.mark.asyncio
-    async def test_an_unused_block_does_not_decide_availability(self, now, monkeypatch):
-        monkeypatch.setattr(
-            fan_module, "async_track_time_interval", lambda *a: MagicMock()
-        )
-        f6 = MagicMock(last_update_success=False, data=b"")
-        fan = _fan(FakeDevice({"0A1D10": _window(6, 9)}), airflow=None)
-        fan._coordinators = {"pxxF6": f6}
-        fan.async_on_remove = MagicMock()
-
-        await fan.async_added_to_hass()
-
-        # Polled for sensors, but the stage of this firmware is not read from it.
-        f6.async_add_listener.assert_called_once_with(fan._handle_change)
-        assert fan._sources == []
-        assert fan._attr_available is True
 
     def test_handlers_recompute_and_write(self, now):
         values = {"0A1D10": _window(6, 9), "0A056C": _word(2)}
