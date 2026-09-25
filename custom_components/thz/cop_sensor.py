@@ -25,7 +25,7 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorStateClass,
 )
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -203,6 +203,16 @@ def _has_energy_sensors(coordinators: dict[str, Any]) -> bool:
     return any("0A09" in block_name for block_name in coordinators)
 
 
+def _cop_inputs(cop_type: str, period: str) -> tuple[str, ...]:
+    """Return the energy sensors of a COP: "Day" or "Total" heat and power."""
+    circuits = ("DHW", "HC") if cop_type == "Total" else (cop_type,)
+    return tuple(
+        f"s{kind}{circuit}{period}"
+        for circuit in circuits
+        for kind in ("Heat", "Electr")
+    )
+
+
 class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
     """Sensor for current/instantaneous COP based on power values.
 
@@ -308,15 +318,31 @@ class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
     name/unique_id/translation_key and ``native_value`` logic.
     """
 
-    def __init__(self, coordinators: dict[str, Any], device_id: str) -> None:
+    def __init__(
+        self, coordinators: dict[str, Any], device_id: str, inputs: tuple[str, ...]
+    ) -> None:
         """Initialize common COP sensor state.
 
         Args:
             coordinators: Dictionary of coordinators by block.
             device_id: The unique device identifier.
+            inputs: The energy sensors the COP is computed from; the entity
+                follows the coordinators of their blocks.
         """
         self._coordinators = coordinators
-        primary_coordinator = next(iter(coordinators.values()))
+        blocks = dict.fromkeys(
+            _ENERGY_SENSOR_BLOCKS[name][0]
+            for name in inputs
+            if name in _ENERGY_SENSOR_BLOCKS
+        )
+        self._input_coordinators = [
+            coordinators[block] for block in blocks if block in coordinators
+        ]
+        primary_coordinator = (
+            self._input_coordinators[0]
+            if self._input_coordinators
+            else next(iter(coordinators.values()))
+        )
         super().__init__(primary_coordinator)
 
         self._device_id = device_id
@@ -327,6 +353,26 @@ class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
         self._attr_native_unit_of_measurement = None  # COP is dimensionless
         self._attr_suggested_display_precision = 2
         self._attr_has_entity_name = True
+
+    async def async_added_to_hass(self) -> None:
+        """Also follow the other energy blocks the COP is computed from."""
+        await super().async_added_to_hass()
+        for coordinator in self._input_coordinators:
+            if coordinator is not self.coordinator:
+                self.async_on_remove(
+                    coordinator.async_add_listener(self._handle_input_update)
+                )
+
+    @callback
+    def _handle_input_update(self) -> None:
+        """Write the state when another energy block was read."""
+        self.async_write_ha_state()
+
+    @property
+    def available(self) -> bool:
+        """Return whether every energy block the COP needs was read."""
+        coordinators = self._input_coordinators or [self.coordinator]
+        return all(c.last_update_success for c in coordinators)
 
     def _get_sensor_value(self, sensor_name: str) -> float | None:
         """Get the current value of an energy sensor directly from coordinator data.
@@ -394,7 +440,7 @@ class THZDailyCOPSensor(THZBaseCOPSensor):
             name: Internal name for the sensor.
             cop_type: Type of COP calculation ("DHW", "HC", or "Total").
         """
-        super().__init__(coordinators, device_id)
+        super().__init__(coordinators, device_id, _cop_inputs(cop_type, "Day"))
 
         self._cop_type = cop_type
         self._heat_sensor: str | None
@@ -476,7 +522,7 @@ class THZLifetimeCOPSensor(THZBaseCOPSensor):
             name: Internal name for the sensor.
             cop_type: Type of COP calculation ("DHW", "HC", or "Total").
         """
-        super().__init__(coordinators, device_id)
+        super().__init__(coordinators, device_id, _cop_inputs(cop_type, "Total"))
 
         self._cop_type = cop_type
         self._heat_sensor: str | None
