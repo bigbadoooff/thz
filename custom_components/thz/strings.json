@@ -3091,7 +3091,8 @@
           }
         },
         "error": {
-          "cannot_connect": "The heat pump did not answer. Try again later."
+          "cannot_connect": "The heat pump did not answer. Try again later.",
+          "not_confirmed": "The heat pump took the new time but reads a different one back. Try again later."
         },
         "abort": {
           "not_loaded": "The heat pump is not loaded."

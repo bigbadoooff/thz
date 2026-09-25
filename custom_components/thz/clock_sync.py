@@ -208,8 +208,11 @@ async def async_check_and_maybe_sync_clock(
     if abs(drift) <= CLOCK_DRIFT_WARN_SECONDS:
         ir.async_delete_issue(hass, DOMAIN, issue_id)
         return
-    if config_entry.data.get("auto_sync_clock", False):
-        await async_write_device_clock(hass, device, write_manager, local_now)
+    # A correction the read-back does not confirm (logged by
+    # async_write_device_clock) is reported like the drift without auto sync.
+    if config_entry.data.get(
+        "auto_sync_clock", False
+    ) and await async_write_device_clock(hass, device, write_manager, local_now):
         ir.async_delete_issue(hass, DOMAIN, issue_id)
         _LOGGER.info(
             "Corrected the heat pump clock by %.0f minute(s) (it read %s)",

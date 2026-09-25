@@ -47,7 +47,7 @@ class ClockDriftRepairFlow(RepairsFlow):
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
-                await async_write_device_clock(
+                confirmed = await async_write_device_clock(
                     self.hass,
                     entry_data.device,
                     entry_data.write_manager,
@@ -56,6 +56,9 @@ class ClockDriftRepairFlow(RepairsFlow):
             except DEVICE_ERRORS:
                 errors["base"] = "cannot_connect"
             else:
+                if not confirmed:
+                    errors["base"] = "not_confirmed"
+            if not errors:
                 if user_input.get(CONF_AUTO_SYNC_CLOCK):
                     self.hass.config_entries.async_update_entry(
                         entry, data={**entry.data, CONF_AUTO_SYNC_CLOCK: True}
