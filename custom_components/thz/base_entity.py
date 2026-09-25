@@ -260,6 +260,10 @@ class THZBaseEntity(Entity):
             self._unsub_poll = coordinator.async_add_listener(self._handle_block_update)
             self._update_from_block(coordinator)
             return
+        self._subscribe_poller()
+
+    def _subscribe_poller(self) -> None:
+        """Have the poller read _poll_key for this entity."""
         key = self._poll_key()
         if key is None or self._poller is None:
             return
@@ -290,8 +294,16 @@ class THZBaseEntity(Entity):
     def _handle_block_update(self) -> None:
         """Take new block data and write the state."""
         coordinator = self._block_coordinator()
-        if coordinator is not None:
-            self._update_from_block(coordinator)
+        if coordinator is None:
+            # The block failed at startup and has now turned out to be one
+            # the firmware does not have: poll the parameter on its own.
+            if self._unsub_poll is not None:
+                self._unsub_poll()
+                self._unsub_poll = None
+            self._subscribe_poller()
+            self.async_write_ha_state()
+            return
+        self._update_from_block(coordinator)
         self.async_write_ha_state()
 
     def _update_from_poll(self, raw: bytes | None) -> None:

@@ -381,9 +381,28 @@ class TestParameterEntity:
             ("0B", 6, 1), entity._handle_poll
         )
 
-    def test_block_listener_after_the_block_is_gone(self):
+    @pytest.mark.asyncio
+    async def test_block_found_unsupported_later_switches_to_the_poller(self):
+        # The first read failed, so the entity listens to the block ...
         entity = _ParamEntity(_flag_param())
+        coordinator = MagicMock(last_update_success=False, data=None)
+        unsub_listener = MagicMock()
+        coordinator.async_add_listener = MagicMock(return_value=unsub_listener)
+        entity._coordinators = {"pxx0B": coordinator}
+        entity._poller = poller = _poller({("0B", 6, 1): b"\x08"})
+        await entity.async_added_to_hass()
+        poller.async_subscribe.assert_not_called()
+
+        # ... which then turns out to be one the firmware lacks.
+        coordinator.last_update_success = True
         entity._handle_block_update()
+
+        unsub_listener.assert_called_once_with()
+        poller.async_subscribe.assert_called_once_with(
+            ("0B", 6, 1), entity._handle_poll
+        )
+        assert entity.applied == [b"\x01"]
+        assert entity.available is True
         entity.async_write_ha_state.assert_called_once()
 
 
