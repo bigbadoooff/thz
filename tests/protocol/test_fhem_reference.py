@@ -26,6 +26,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from custom_components.thz.button import THZButton
 from custom_components.thz.exceptions import THZWriteRejectedError
 from custom_components.thz.number import THZNumber
 from custom_components.thz.parameter_io import (
@@ -552,3 +553,49 @@ def test_party_sensor_reads_match_fhem():
         if fhem != ours:
             mismatches.append(f"{data}: fhem={fhem} ours={ours}")
     assert not mismatches, "\n".join(mismatches)
+
+
+class _RecordingDevice(THZDevice):
+    """Real telegram building; the telegrams are recorded instead of sent."""
+
+    def __init__(self) -> None:
+        super().__init__(connection="usb", port="/dev/null")
+        self.sent: list[bytes] = []
+
+    async def send_request(self, telegram: bytes, get_or_set: str) -> bytes:
+        self.sent.append(telegram)
+        return b""
+
+
+_BUTTON_FIRMWARES = {"214": "2.14", "439technician": "4.39", "539technician": "5.39"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("firmware", sorted(_BUTTON_FIRMWARES))
+async def test_buttons_match_fhem(firmware):
+    buttons = {
+        name: entry
+        for name, entry in RegisterMapManagerWrite(firmware).params().items()
+        if entry.type == "button"
+    }
+    assert buttons
+    reference = _fhem(
+        _BUTTON_FIRMWARES[firmware],
+        cases=[(name, "0") for name in buttons],
+        sets={
+            name: {
+                "cmd2": entry.command.upper(),
+                "argMin": "0",
+                "argMax": "0",
+                "type": entry.decode_type,
+            }
+            for name, entry in buttons.items()
+        },
+    )["sets"]
+
+    for name, entry in buttons.items():
+        device = _RecordingDevice()
+        button = THZButton(name, entry, device, "dev")
+        button.hass = MagicMock()
+        await button.async_press()
+        assert [device.sent[-1].hex().upper()] == reference[f"{name} 0"]["telegrams"]

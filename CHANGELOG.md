@@ -128,6 +128,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **The reset buttons sent a different telegram than FHEM.** "Reset last
+  10 errors" (technician firmware) and "Reset errors" (2.14) sent a single
+  zero byte; FHEM, which is known to work on the heat pumps, sends `D1 00 00`
+  and `F8 00 00 00`. The buttons now send FHEM's telegrams byte for byte.
 - **Daily and lifetime COP followed an unrelated block.** They updated,
   and became unavailable, with whatever block came first in the list, not
   with the energy blocks they are computed from. They now update when any

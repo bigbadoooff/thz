@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.thz.button import THZButton, async_setup_entry
+from custom_components.thz.button import THZButton, async_setup_entry, button_payload
 from custom_components.thz.exceptions import THZProtocolError
 from tests.helpers import FakeWriteManager, make_runtime_data, write_param
 
@@ -129,7 +129,7 @@ class TestTHZButtonPress:
 
         write_call = device.async_execute.call_args[0]
         assert write_call[0] == device.write_value
-        assert write_call[2] == b"\x00"
+        assert write_call[2] == button_payload(entity._entry)
 
     @pytest.mark.asyncio
     async def test_async_press_error_raises_home_assistant_error(self):
@@ -165,3 +165,28 @@ class TestTHZButtonPress:
 
         with pytest.raises(HomeAssistantError):
             await entity.async_press()
+
+
+class TestButtonPayload:
+    """The data bytes follow FHEM's set message for the button's type."""
+
+    @pytest.mark.parametrize(
+        ("command", "decode_type", "payload"),
+        [
+            ("D1", "D1last", b"\x00\x00"),  # FHEM: D1 0000
+            ("F8", "0clean", b"\x00\x00\x00"),  # FHEM: F8 000000
+            ("0A0005", "0clean", b"\x00\x00"),
+            ("0A0005", None, b"\x00\x00"),
+        ],
+    )
+    def test_direct_button(self, command, decode_type, payload):
+        entry = write_param({"command": command, "decode_type": decode_type})
+        assert button_payload(entry) == payload
+
+    def test_block_button_zeroes_its_slot(self):
+        entry = write_param(
+            {"command": "17", "type": "button", "write_mode": "block"},
+            offset=5,
+            length=1,
+        )
+        assert button_payload(entry) == b"\x00"
