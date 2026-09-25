@@ -105,6 +105,7 @@ SERVICES: dict[str, tuple[_Handler, vol.Schema]] = {
                 vol.Optional("filename"): cv.string,
                 vol.Optional("dry_run", default=False): cv.boolean,
                 vol.Optional("only"): [cv.string],
+                vol.Optional("allow_other_firmware", default=False): cv.boolean,
             }
         ),
     ),

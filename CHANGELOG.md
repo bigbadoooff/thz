@@ -117,6 +117,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **A backup from another firmware was restored without a question.**
+  Parameters are matched by name, and the same name can have another range
+  or meaning on another firmware. `thz.restore_parameters` now refuses such
+  a backup unless `allow_other_firmware` is set; a dry run shows it
+  (`firmware_matches`, `backup_firmware`).
 - **Writing a time could overwrite the time next to it.** Schedule start
   and end times and the party start and end share a register; a write read
   it and wrote it back in two separate steps, and an empty answer made it

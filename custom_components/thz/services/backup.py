@@ -17,7 +17,7 @@ import os
 from typing import Any, cast
 
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.util import dt as dt_util
 
 from ..clock_sync import (
@@ -246,6 +246,9 @@ async def async_handle_backup_parameters(
         "device_id": entry_data.device_id,
         "entry_id": entry_id,
         "firmware_version": getattr(device, "firmware_version", None),
+        # The profile that chose the register maps (a forced override or the
+        # reported firmware); restore compares it.
+        "firmware_profile": getattr(device, "firmware_profile", None),
         "parameter_count": len(parameters),
         "parameters": parameters,
     }
@@ -357,6 +360,22 @@ def _encode_restore_value(entry: WriteParam, value: Any) -> bytes | dict[int, in
     }
 
 
+def _firmwares_to_compare(
+    backup_doc: dict[str, Any], device: THZDevice
+) -> tuple[str | None, str]:
+    """Return the backup's and the heat pump's firmware, as restore compares them.
+
+    The register maps follow the firmware profile (a forced override or the
+    reported firmware), so that is compared when the backup has it; older
+    backups only have the reported firmware.
+    """
+    profile = backup_doc.get("firmware_profile")
+    if profile is not None:
+        return str(profile), device.firmware_profile
+    reported = backup_doc.get("firmware_version")
+    return (None if reported is None else str(reported)), device.firmware_version
+
+
 async def _async_restore(
     device: THZDevice, entry: WriteParam, value: bytes | dict[int, int]
 ) -> None:
@@ -430,6 +449,7 @@ async def async_handle_restore_parameters(
     """
     requested_filename: str | None = call.data.get("filename")
     dry_run: bool = bool(call.data.get("dry_run", False))
+    allow_other_firmware = bool(call.data.get("allow_other_firmware", False))
     only: list[str] | None = call.data.get("only")
     only_set = set(only) if only else None
 
@@ -448,6 +468,20 @@ async def async_handle_restore_parameters(
             translation_key="backup_read_failed",
             translation_placeholders={"path": str(path), "error": str(err)},
         ) from err
+
+    backup_firmware, device_firmware = _firmwares_to_compare(backup_doc, device)
+    firmware_matches = backup_firmware in (None, device_firmware)
+    if not (firmware_matches or dry_run or allow_other_firmware):
+        # The same parameter name can have another range or meaning on
+        # another firmware; values are only re-resolved by name.
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="backup_firmware_mismatch",
+            translation_placeholders={
+                "backup": str(backup_firmware),
+                "device": device_firmware,
+            },
+        )
 
     saved_parameters: dict[str, dict[str, Any]] = backup_doc.get("parameters", {})
     restored = 0
@@ -518,6 +552,8 @@ async def async_handle_restore_parameters(
             "dry_run": dry_run,
             "file": os.path.basename(path),
             "backup_created": backup_doc.get("created"),
+            "backup_firmware": backup_firmware,
+            "firmware_matches": firmware_matches,
             "total_in_backup": len(saved_parameters),
             "restored": restored,
             "skipped_missing": skipped_missing[:20],

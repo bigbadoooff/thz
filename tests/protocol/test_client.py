@@ -483,6 +483,7 @@ class TestAsyncInitialize:
             await device.async_initialize()
         probe.assert_awaited_once()
         assert device.firmware_version == "439"
+        assert device.firmware_profile == "539"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("firmware", [None, ""])

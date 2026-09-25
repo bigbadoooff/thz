@@ -296,6 +296,15 @@ restore_parameters:
       selector:
         text:
           multiple: true
+    allow_other_firmware:
+      name: Allow other firmware
+      description: >
+        Restore a backup taken from a heat pump with a different firmware.
+        Parameters of the same name can have other ranges or meanings on
+        another firmware, so such a restore is refused unless this is on.
+      required: false
+      selector:
+        boolean:
     entry_id:
       name: Entry ID
       description: Config entry ID. Only required when multiple THZ devices are configured.
