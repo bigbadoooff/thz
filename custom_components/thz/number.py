@@ -132,9 +132,7 @@ class THZNumber(THZParameterEntity, NumberEntity):
                 self._decode_type,
                 self._read_length,
             )
-            await async_write_parameter(
-                self.hass, self._device, self._entry, value_bytes
-            )
+            await async_write_parameter(self._device, self._entry, value_bytes)
 
         self._attr_native_value = value
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms

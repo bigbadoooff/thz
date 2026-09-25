@@ -217,7 +217,7 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
 
     async def _async_read_setpoint(self, entry: WriteParam) -> float | None:
         try:
-            value_bytes = await async_read_parameter(self.hass, self._device, entry)
+            value_bytes = await async_read_parameter(self._device, entry)
             if not value_bytes:
                 return None
             return THZValueCodec.decode_number(
@@ -258,6 +258,6 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                 entry.decode_type,
                 parameter_length(entry),
             )
-            await async_write_parameter(self.hass, self._device, entry, value_bytes)
+            await async_write_parameter(self._device, entry, value_bytes)
         await async_refresh_parameter(entry, self._coordinators, self._poller)
         await self.coordinator.async_request_refresh()

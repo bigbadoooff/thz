@@ -342,7 +342,7 @@ class THZFan(THZBaseEntity, FanEntity):
         raws: dict[str, bytes | None] = {}
         for param in self._watched_params():
             raws[param.name] = await self._async_guarded_read(
-                async_read_parameter(self.hass, self._device, param)
+                async_read_parameter(self._device, param)
             )
         blocks: dict[str, bytes | None] = {}
         for block in (_AIRFLOW_BLOCK, _STATUS_BLOCK, _PROGRAM_BLOCK):
@@ -498,13 +498,13 @@ class THZFan(THZBaseEntity, FanEntity):
                 param.decode_type,
                 parameter_length(param),
             )
-            await async_write_parameter(self.hass, self._device, param, value_bytes)
+            await async_write_parameter(self._device, param, value_bytes)
         await async_refresh_parameter(param, self._coordinators, self._poller)
         duration = self._params.durations[stage]
         minutes = (
             self._number(
                 await self._async_guarded_read(
-                    async_read_parameter(self.hass, self._device, duration)
+                    async_read_parameter(self._device, duration)
                 ),
                 duration,
             )

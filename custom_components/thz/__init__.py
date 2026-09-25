@@ -138,7 +138,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     device = _create_device(data)
     try:
-        await device.async_initialize(hass)
+        await device.async_initialize()
     except OSError as err:
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN,

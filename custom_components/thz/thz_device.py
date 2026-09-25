@@ -10,8 +10,6 @@ from collections.abc import Awaitable, Callable
 import logging
 from typing import Any, TypeVar
 
-from homeassistant.core import HomeAssistant
-
 from . import const, protocol
 from .exceptions import (
     DEVICE_ERRORS,
@@ -34,6 +32,9 @@ _T = TypeVar("_T")
 # How long async_execute waits for the device lock before giving up, so
 # coordinators cannot queue up indefinitely when many blocks fire at once.
 _LOCK_WAIT_TIMEOUT = 20.0
+# Hard limit for async_initialize: connecting, the firmware read and the
+# cooling probe, each read with its one retry.
+_INITIALIZE_TIMEOUT = 30.0
 
 
 class THZDevice:
@@ -99,24 +100,31 @@ class THZDevice:
         """Close without raising; the next call reconnects."""
         self._transport.close()
 
-    async def async_initialize(self, hass: HomeAssistant) -> None:
-        """Open connection and initialize firmware-dependent data structures."""
+    async def async_initialize(self) -> None:
+        """Connect, read the firmware version and load its register maps.
+
+        Runs under the device lock and a hard timeout like every device
+        call. A failure closes the connection; it is not logged as a lost
+        connection, because none was established yet (setup reports it).
+        """
         _LOGGER.debug("Initializing THZ device (%s)", self.connection)
         if self.connection not in ("usb", "ip"):
             raise ValueError(f"Unknown connection type: {self.connection}")
 
         self._closed = False
-        try:
-            await self._connect()
-            self._firmware_version = await self.read_firmware_version()
-            if not self._firmware_version:
-                # Never guess a profile: an unanswered FD request would
-                # otherwise fall through to the 4.39 default maps, including
-                # their write commands.
-                raise THZConnectionError("Firmware version could not be read")
-        except BaseException:
-            self._force_close()
-            raise
+        await self._async_call(
+            self._initialize, (), _INITIALIZE_TIMEOUT, note_link=False
+        )
+
+    async def _initialize(self) -> None:
+        """Do the work of async_initialize; the caller holds the lock."""
+        await self._connect()
+        self._firmware_version = await self.read_firmware_version()
+        if not self._firmware_version:
+            # Never guess a profile: an unanswered FD request would
+            # otherwise fall through to the 4.39 default maps, including
+            # their write commands.
+            raise THZConnectionError("Firmware version could not be read")
         _LOGGER.debug("Firmware version detected: %s", self._firmware_version)
 
         effective_firmware = self._resolve_effective_firmware()
@@ -413,6 +421,22 @@ class THZDevice:
         On any failure except a "register not supported" answer the
         connection is closed, so the next call starts on a fresh one.
         """
+        return await self._async_call(fn, args, timeout, note_link=True)
+
+    async def _async_call(
+        self,
+        fn: Callable[..., Awaitable[_T]],
+        args: tuple[Any, ...],
+        timeout: float,  # noqa: ASYNC109 - bounds the whole device call
+        *,
+        note_link: bool,
+    ) -> _T:
+        """Run ``fn(*args)`` as async_execute describes.
+
+        ``note_link`` records whether the heat pump answered (see
+        _note_link); async_initialize skips that.
+        """
+        note = self._note_link if note_link else _ignore_link
         try:
             async with asyncio.timeout(_LOCK_WAIT_TIMEOUT):
                 await self.lock.acquire()
@@ -427,22 +451,22 @@ class THZDevice:
         except TimeoutError:
             self._force_close()
             err = THZConnectionError(f"Device communication timed out after {timeout}s")
-            self._note_link(err)
+            note(err)
             raise err from None
         except THZNotSupportedError:
             # The device said "not supported": the connection is fine, keep it.
-            self._note_link(None)
+            note(None)
             raise
         except BaseException as err:
             self._force_close()
             if isinstance(err, THZWriteRejectedError):
-                self._note_link(None)  # rejected, but the device answered
+                note(None)  # rejected, but the device answered
             elif isinstance(err, DEVICE_ERRORS):
-                self._note_link(err)
+                note(err)
             raise
         finally:
             self.lock.release()
-        self._note_link(None)
+        note(None)
         return result
 
     @property
@@ -678,3 +702,7 @@ class THZDevice:
         if self.register_map_manager:
             return list(self.register_map_manager.get_all_registers().keys())
         return []
+
+
+def _ignore_link(err: BaseException | None) -> None:
+    """Stand in for THZDevice._note_link where the link is not tracked."""

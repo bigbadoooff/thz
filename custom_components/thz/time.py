@@ -392,13 +392,11 @@ class THZTime(THZParameterEntity, TimeEntity):
         if self._byte_index == 0 and not self._keep_other_byte:
             payload = bytearray([num, 0])
         else:
-            current = await async_read_parameter(self.hass, self._device, self._entry)
+            current = await async_read_parameter(self._device, self._entry)
             payload = bytearray(current or b"") + bytearray(2)
             payload = payload[:2]
             payload[self._byte_index] = num
-        await async_write_parameter(
-            self.hass, self._device, self._entry, bytes(payload)
-        )
+        await async_write_parameter(self._device, self._entry, bytes(payload))
 
     async def async_clear_value(self) -> None:
         """Clear this time back to the device's own "unset" state.

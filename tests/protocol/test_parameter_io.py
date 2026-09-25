@@ -62,7 +62,7 @@ class TestHelpers:
         device = MagicMock()
         device.async_execute = AsyncMock()
         await async_write_parameter(
-            None, device, write_param({"command": "0A0005"}), b"\x00\x01"
+            device, write_param({"command": "0A0005"}), b"\x00\x01"
         )
         device.async_execute.assert_awaited_once_with(
             device.write_value, bytes.fromhex("0A0005"), b"\x00\x01"
@@ -73,7 +73,7 @@ class TestHelpers:
         device = MagicMock()
         device.async_execute = AsyncMock()
         entry = write_map_206["p02RoomTempNight"]
-        await async_write_parameter(None, device, entry, b"\x00\xaa")
+        await async_write_parameter(device, entry, b"\x00\xaa")
         device.async_execute.assert_awaited_once_with(
             device.write_block_value,
             b"\x17",
@@ -87,10 +87,8 @@ class TestSimulated2xxDevice:
     @pytest.mark.asyncio
     async def test_read_returns_the_parameter_not_the_block_start(self, write_map_206):
         device = Simulated2xxDevice({b"\x17": _block_17()})
-        day = await async_read_parameter(None, device, write_map_206["p01RoomTempDay"])
-        night = await async_read_parameter(
-            None, device, write_map_206["p02RoomTempNight"]
-        )
+        day = await async_read_parameter(device, write_map_206["p01RoomTempDay"])
+        night = await async_read_parameter(device, write_map_206["p02RoomTempNight"])
         assert day == bytes.fromhex("00D2")
         assert night == bytes.fromhex("00B4")
 
@@ -103,7 +101,7 @@ class TestSimulated2xxDevice:
             18.5, float(entry.step), entry.decode_type, parameter_length(entry)
         )
 
-        await async_write_parameter(None, device, entry, value)
+        await async_write_parameter(device, entry, value)
 
         after = device.blocks[b"\x17"]
         assert after[2:4] == bytes.fromhex("00B9")
@@ -123,8 +121,8 @@ class TestSimulated2xxDevice:
         device = Simulated2xxDevice(blocks)
         for entry in numbers.values():
             raw = bytes([0x01] * parameter_length(entry))
-            await async_write_parameter(None, device, entry, raw)
-            assert await async_read_parameter(None, device, entry) == raw
+            await async_write_parameter(device, entry, raw)
+            assert await async_read_parameter(device, entry) == raw
 
 
 class TestClockSyncOn2xx:
@@ -152,14 +150,14 @@ class TestBitFlagsOn2xx:
         data[tuesday.block.offset - 2] = 0b1111_0001  # Monday on, high nibble set
         device = Simulated2xxDevice({b"\x0b": bytes(data)})
 
-        await async_write_parameter(None, device, tuesday, b"\x01")
+        await async_write_parameter(device, tuesday, b"\x01")
 
         byte = device.blocks[b"\x0b"][tuesday.block.offset - 2]
         assert byte == 0b1111_0011
-        assert await async_read_parameter(None, device, tuesday) == b"\x01"
-        assert await async_read_parameter(None, device, monday) == b"\x01"
+        assert await async_read_parameter(device, tuesday) == b"\x01"
+        assert await async_read_parameter(device, monday) == b"\x01"
 
-        await async_write_parameter(None, device, monday, b"\x00")
+        await async_write_parameter(device, monday, b"\x00")
         assert device.blocks[b"\x0b"][tuesday.block.offset - 2] == 0b1111_0010
 
     def test_high_nibble_flags_are_shifted(self, write_map_206):
@@ -280,7 +278,7 @@ class TestNumberReadsFromBlockCoordinator:
         response = await device.read_write_register(addr, "get")
 
         from_block = parameter_from_block(entry, response)
-        from_device = await async_read_parameter(None, device, entry)
+        from_device = await async_read_parameter(device, entry)
         assert from_block == from_device
 
 

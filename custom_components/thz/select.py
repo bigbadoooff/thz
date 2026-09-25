@@ -153,9 +153,7 @@ class THZSelect(THZParameterEntity, SelectEntity):
                 self._table_values.get(option, option), self._decode_type
             )
             _LOGGER.debug("Encoded value bytes: %s", value_bytes.hex())
-            await async_write_parameter(
-                self.hass, self._device, self._entry, value_bytes
-            )
+            await async_write_parameter(self._device, self._entry, value_bytes)
 
         self._attr_current_option = option
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
