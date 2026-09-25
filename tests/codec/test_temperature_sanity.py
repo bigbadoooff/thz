@@ -81,3 +81,21 @@ class TestLogging:
             assert sensor.native_value is None
         warnings = [r for r in caplog.records if "implausible" in r.message]
         assert len(warnings) == 2
+
+
+class TestSensorNotConnected:
+    """-60.0 degC (raw fda8) is how the heat pump reports a missing sensor."""
+
+    def test_reads_as_unknown_without_a_warning(self, caplog):
+        sensor = _sensor(-600)
+        with caplog.at_level(logging.DEBUG):
+            for _ in range(3):
+                assert sensor.native_value is None
+        assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+        assert len([r for r in caplog.records if "not connected" in r.message]) == 1
+
+    def test_a_wide_range_sensor_also_reads_as_unknown(self, caplog):
+        sensor = _sensor(-600, translation_key="collector_temp")
+        with caplog.at_level(logging.WARNING):
+            assert sensor.native_value is None
+        assert not caplog.records

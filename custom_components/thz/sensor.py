@@ -78,6 +78,10 @@ _WIDE_TEMPERATURE_RANGES: dict[str, tuple[float, float]] = {
     "hotgas_temp": (-50.0, 200.0),
 }
 
+# The heat pump reports -60.0 degC for a temperature sensor that is not
+# connected (raw -600, fda8). It reads as unknown without a warning.
+_SENSOR_NOT_CONNECTED = -60.0
+
 # Decode types marking a field that does not exist on this firmware. FHEM's
 # own maps use "n.a." and (once, a typo kept for fidelity) "n.a" for fields
 # whose nibble was repurposed; creating sensors for them only shows raw hex.
@@ -518,9 +522,11 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
     ) -> int | float | bool | str | None:
         """Return None instead of a temperature outside its plausible range.
 
-        Only numeric temperature sensors are checked. The warning is logged
-        once per episode (until a plausible value is read again) so a
-        permanently faulty sensor does not flood the log on every poll.
+        Only numeric temperature sensors are checked. The value the heat pump
+        reports for a sensor that is not connected is not logged as corrupt.
+        The warning is logged once per episode (until a plausible value is
+        read again) so a permanently faulty sensor does not flood the log on
+        every poll.
         """
         if self._device_class != "temperature" or isinstance(value, (bool, str)):
             return value
@@ -533,6 +539,11 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         if low <= value <= high:
             self._implausible_logged = False
             return value
+        if value == _SENSOR_NOT_CONNECTED:
+            if not self._implausible_logged:
+                self._implausible_logged = True
+                _LOGGER.debug("Sensor %s is not connected", self._entity_name)
+            return None
         if not self._implausible_logged:
             self._implausible_logged = True
             _LOGGER.warning(
