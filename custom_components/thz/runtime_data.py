@@ -6,7 +6,6 @@ platforms, the services and diagnostics.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -44,8 +43,7 @@ class THZRuntimeData:
     entity_id_style: str = ENTITY_ID_STYLE_DEFAULT
     entity_visibility: str = ENTITY_VISIBILITY_DEFAULT
     entity_id_prefix: str | None = None
-    # Set up after the platforms: clock-drift check, fault memory tracking.
-    unsub_clock_check: Callable[[], None] | None = None
+    # Set up by the platforms: fault memory tracking.
     fault_tracker: THZFaultTracker | None = None
     fault_source: DataUpdateCoordinator[Any] | None = None
 
