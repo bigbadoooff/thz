@@ -131,6 +131,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **The configured area could create a duplicate area.** The heat pump and
+  its sub-devices were suggested the area's id instead of its name, so an
+  area like "Living Room" was not matched and a new area "living_room" was
+  created.
 - **Setup showed English labels and a wrong default port.** The connection
   type choice is now translated, the area in Reconfigure is picked with the
   Home Assistant area selector and can be cleared, and the network step

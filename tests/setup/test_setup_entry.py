@@ -346,16 +346,21 @@ class TestAsyncSetupEntry:
         device = _fake_device()
         dev_reg = _default_dev_reg()
 
-        with _patched_setup(
-            device=device,
-            coordinator_factory=lambda *a, **kw: _fake_coordinator(),
-            dev_reg=dev_reg,
+        with (
+            _patched_setup(
+                device=device,
+                coordinator_factory=lambda *a, **kw: _fake_coordinator(),
+                dev_reg=dev_reg,
+            ),
+            patch.object(thz_module, "area_name", return_value="Basement") as name,
         ):
             await thz_module.async_setup_entry(hass, entry)
 
+        name.assert_called_with(hass, entry.data)
         _, kwargs = dev_reg.async_get_or_create.call_args
         assert kwargs["name"] == "Basement THZ"
         assert kwargs["suggested_area"] == "Basement"
+        assert entry.runtime_data.area_name == "Basement"
 
     @pytest.mark.asyncio
     async def test_log_level_left_to_home_assistant(self):

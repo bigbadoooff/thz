@@ -43,6 +43,8 @@ class THZRuntimeData:
     entity_id_style: str = ENTITY_ID_STYLE_DEFAULT
     entity_visibility: str = ENTITY_VISIBILITY_DEFAULT
     entity_id_prefix: str | None = None
+    # Name of the configured area, suggested for the sub-devices.
+    area_name: str | None = None
     # Set up by the platforms: fault memory tracking.
     fault_tracker: THZFaultTracker | None = None
     fault_source: DataUpdateCoordinator[Any] | None = None

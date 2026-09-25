@@ -184,7 +184,7 @@ async def async_setup_entry(
     )
     entity._coordinators = entry_data.coordinators
     entity._poller = entry_data.poller
-    assign_subdevices([entity], config_entry.data)
+    assign_subdevices([entity], config_entry)
     async_add_entities([entity])
 
 

@@ -18,7 +18,11 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_DEVICE, CONF_HOST
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+)
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import CONF_SPLIT_DEVICES, DOMAIN
@@ -164,16 +168,31 @@ def subdevice_identifier(device_id: str, subdevice: str) -> str:
     return f"{device_id}_{subdevice}"
 
 
-def assign_subdevices(entities: Iterable[Any], data: Mapping[str, Any]) -> None:
+def area_name(hass: HomeAssistant, data: Mapping[str, Any]) -> str | None:
+    """Return the name of the configured area, or None.
+
+    The entry stores the area id, but Home Assistant looks a suggested area
+    up by name.
+    """
+    stored = data.get("area")
+    if not stored:
+        return None
+    registry = ar.async_get(hass)
+    area = registry.async_get_area(stored) or registry.async_get_area_by_name(stored)
+    return area.name if area else None
+
+
+def assign_subdevices(entities: Iterable[Any], config_entry: ConfigEntry) -> None:
     """Assign each entity its sub-device if the config entry enables the split.
 
     Must run before the entities are added, since Home Assistant reads
     ``device_info`` when it registers an entity.
     """
+    data = config_entry.data
     if not data.get(CONF_SPLIT_DEVICES, False):
         return
     name = main_device_name(data)
-    area = data.get("area") or None
+    area = config_entry.runtime_data.area_name
     for entity in entities:
         unique_id = getattr(entity, "unique_id", None) or ""
         entity._subdevice = subdevice_for(unique_id, entity._device_id)

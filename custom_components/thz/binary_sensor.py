@@ -154,7 +154,7 @@ async def async_setup_entry(
             )
 
     _LOGGER.debug("Created %d binary sensor entities", len(entities))
-    assign_subdevices(entities, config_entry.data)
+    assign_subdevices(entities, config_entry)
     async_add_entities(entities)
 
 

@@ -111,7 +111,7 @@ async def async_setup_entry(
         entity_id_style=entry_data.entity_id_style,
         entity_id_prefix=entry_data.entity_id_prefix,
     )
-    assign_subdevices([entity], config_entry.data)
+    assign_subdevices([entity], config_entry)
     async_add_entities([entity])
 
 

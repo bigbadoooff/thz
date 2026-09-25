@@ -85,12 +85,13 @@ def _entity(unique_id):
 
 def test_assign_subdevices_only_when_enabled():
     entity = _entity("set_0a0140_p32hystdhw")
-    assign_subdevices([entity], {"alias": "lwz"})
+    runtime_data = SimpleNamespace(area_name="Basement")
+    entry = SimpleNamespace(data={"alias": "lwz"}, runtime_data=runtime_data)
+    assign_subdevices([entity], entry)
     assert not hasattr(entity, "_subdevice")
 
-    assign_subdevices(
-        [entity], {"alias": "lwz", "area": "Basement", CONF_SPLIT_DEVICES: True}
-    )
+    entry.data = {"alias": "lwz", "area": "basement", CONF_SPLIT_DEVICES: True}
+    assign_subdevices([entity], entry)
     assert entity._subdevice == "dhw"
     assert entity._subdevice_device_name == "lwz"
     assert entity._subdevice_area == "Basement"
@@ -146,3 +147,23 @@ def test_only_empty_subdevices_are_removed():
         async_remove_empty_subdevices(None, entry, DEVICE)
 
     device_reg.async_remove_device.assert_called_once_with("solar")
+
+
+def _areas(*areas):
+    registry = MagicMock()
+    by_id = {area.id: area for area in areas}
+    by_name = {area.name: area for area in areas}
+    registry.async_get_area.side_effect = by_id.get
+    registry.async_get_area_by_name.side_effect = by_name.get
+    return patch.object(devices.ar, "async_get", return_value=registry)
+
+
+def test_area_name_resolves_the_stored_id():
+    living_room = SimpleNamespace(id="living_room", name="Living Room")
+    with _areas(living_room):
+        assert devices.area_name(MagicMock(), {"area": "living_room"}) == "Living Room"
+        # An entry that stored the name keeps working.
+        assert devices.area_name(MagicMock(), {"area": "Living Room"}) == "Living Room"
+        # A deleted area is not created again.
+        assert devices.area_name(MagicMock(), {"area": "attic"}) is None
+    assert devices.area_name(MagicMock(), {"area": ""}) is None
