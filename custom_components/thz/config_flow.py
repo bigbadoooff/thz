@@ -123,8 +123,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Config flow for Stiebel Eltron THZ (LAN or USB)."""
 
     VERSION = 1
-    # 1.2: CONF_DEVICE_IDENTIFIER in the entry data (async_migrate_entry).
-    MINOR_VERSION = 3
+    # 1.2: CONF_DEVICE_IDENTIFIER in the entry data; 1.4: unique_ids carry
+    # it (async_migrate_entry).
+    MINOR_VERSION = 4
 
     def __init__(self) -> None:
         """Initialize the config flow."""

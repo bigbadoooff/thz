@@ -142,7 +142,7 @@ async def async_setup_entry(
             if read_field.decode_type in _SKIPPED_DECODE_TYPES:
                 placeholder_ids.add(
                     sensor_unique_id(
-                        block_bytes, read_field.byte_offset, read_field.name
+                        device_id, block_bytes, read_field.byte_offset, read_field.name
                     )
                 )
                 continue
@@ -205,7 +205,7 @@ async def async_setup_entry(
     await async_setup_fault_sensors(hass, config_entry, async_add_entities)
 
 
-def sensor_unique_id(block: bytes, byte_offset: int, name: str) -> str:
+def sensor_unique_id(device_id: str, block: bytes, byte_offset: int, name: str) -> str:
     """Return the unique id of the sensor for a read-map field.
 
     ``block`` is formatted as its bytes repr (as Python prints the bytes of
@@ -213,7 +213,7 @@ def sensor_unique_id(block: bytes, byte_offset: int, name: str) -> str:
     sensor.
     """
     name_slug = name.lower().replace(" ", "_")
-    return f"thz_{block!r}_{byte_offset}_{name_slug}"
+    return f"thz_{device_id}_{block!r}_{byte_offset}_{name_slug}"
 
 
 @callback
@@ -592,7 +592,9 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         Returns:
             A string representing the unique ID of the sensor.
         """
-        return sensor_unique_id(self._block, self._offset, self._entity_name)
+        return sensor_unique_id(
+            self._device_id, self._block, self._offset, self._entity_name
+        )
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

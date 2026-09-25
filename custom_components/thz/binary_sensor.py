@@ -295,7 +295,9 @@ class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
     def unique_id(self) -> str | None:
         """Return a unique identifier for this entity."""
         name_slug = self._entity_name.lower().replace(" ", "_")
-        return f"thz_bin_{self._block.hex()}_{self._offset}_{name_slug}"
+        return (
+            f"thz_{self._device_id}_bin_{self._block.hex()}_{self._offset}_{name_slug}"
+        )
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

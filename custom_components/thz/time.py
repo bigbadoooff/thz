@@ -489,7 +489,8 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         # Override unique_id to include time_type
         normalized_name = name.lower().replace(" ", "_")
         self._attr_unique_id = (
-            f"thz_schedule_time_{self._command.lower()}_{normalized_name}_{time_type}"
+            f"thz_{device_id}_schedule_time_{self._command.lower()}_"
+            f"{normalized_name}_{time_type}"
         )
 
     @property

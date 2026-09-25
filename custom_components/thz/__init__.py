@@ -9,7 +9,7 @@ import random
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import (
     config_validation as cv,
@@ -83,7 +83,7 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
     if config_entry.version > 1:
         return False  # created by a newer version
     minor_version = config_entry.minor_version
-    if minor_version >= 3:
+    if minor_version >= 4:
         return True
     data = {**config_entry.data}
     if minor_version < 2:
@@ -93,9 +93,30 @@ async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) ->
     # Old entries fixed the integration's log level; Home Assistant's
     # `logger:` configuration controls it now.
     data.pop("log_level", None)
-    hass.config_entries.async_update_entry(config_entry, data=data, minor_version=3)
-    _LOGGER.debug("Migrated entry from 1.%d to 1.3", minor_version)
+    await _async_scope_unique_ids(hass, config_entry, data[CONF_DEVICE_IDENTIFIER])
+    hass.config_entries.async_update_entry(config_entry, data=data, minor_version=4)
+    _LOGGER.debug("Migrated entry from 1.%d to 1.4", minor_version)
     return True
+
+
+async def _async_scope_unique_ids(
+    hass: HomeAssistant, config_entry: ConfigEntry, device_id: str
+) -> None:
+    """Put the heat pump's identifier into every unique_id of the entry.
+
+    Unique ids without it would be the same for two heat pumps. Only the
+    identifier is added, so each entity keeps its entity_id and history.
+    """
+    scoped = f"thz_{device_id}_"
+
+    @callback
+    def _scope(entity_entry: er.RegistryEntry) -> dict[str, Any] | None:
+        unique_id = entity_entry.unique_id
+        if not unique_id.startswith("thz_") or unique_id.startswith(scoped):
+            return None
+        return {"new_unique_id": scoped + unique_id.removeprefix("thz_")}
+
+    await er.async_migrate_entries(hass, config_entry.entry_id, _scope)
 
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
@@ -441,8 +462,11 @@ async def _async_apply_entity_visibility_tier(
     enabled_count = 0
     disabled_count = 0
 
+    # The heat pump's identifier (host or serial path) is part of every
+    # unique_id; it must not match a visibility keyword.
+    device_id = config_entry.data.get(CONF_DEVICE_IDENTIFIER, "")
     for entity_entry in entries:
-        uid = (entity_entry.unique_id or "").lower()
+        uid = (entity_entry.unique_id or "").replace(device_id, "").lower()
         name = (entity_entry.original_name or entity_entry.name or "").lower()
         should_hide = _entity_should_be_hidden(uid, name, visibility, enable_hc2)
 

@@ -133,7 +133,7 @@ async def test_new_entry_stores_its_device_identifier(hass, fake_device):
 
     entry = result["result"]
     assert entry.data[CONF_DEVICE_IDENTIFIER] == f"usb-{SERIAL}"
-    assert (entry.version, entry.minor_version) == (1, 3)
+    assert (entry.version, entry.minor_version) == (1, 4)
     await hass.async_block_till_done()
     assert await hass.config_entries.async_unload(entry.entry_id)
 
@@ -141,7 +141,7 @@ async def test_new_entry_stores_its_device_identifier(hass, fake_device):
 async def test_old_entry_is_migrated_to_its_current_identifier(hass, fake_device):
     entry = await setup_entry(hass)  # MockConfigEntry defaults to 1.1
 
-    assert entry.minor_version == 3
+    assert entry.minor_version == 4
     assert entry.data[CONF_DEVICE_IDENTIFIER] == f"ip-{HOST}"
     registry = dr.async_get(hass)
     assert registry.async_get_device(identifiers={(DOMAIN, f"ip-{HOST}")})

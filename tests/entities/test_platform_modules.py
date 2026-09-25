@@ -663,7 +663,7 @@ class TestBinarySensorModule:
             block=bytes.fromhex("FB"),
             device_id="test_device",
         )
-        assert entity.unique_id == "thz_bin_fb_5_testsensor"
+        assert entity.unique_id == "thz_test_device_bin_fb_5_testsensor"
 
     def test_binary_sensor_device_info(self):
         """Test that device_info links entity to correct device."""

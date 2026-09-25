@@ -60,7 +60,7 @@ class TestInit:
 
     def test_auto_generated_unique_id(self):
         entity = _make_entity(name="pTestEntity", command="0A0100")
-        assert entity._attr_unique_id == "thz_set_0a0100_ptestentity"
+        assert entity._attr_unique_id == "thz_dev1_set_0a0100_ptestentity"
 
     def test_not_listening_initially(self):
         entity = _make_entity()
@@ -108,7 +108,7 @@ class TestGenerateUniqueId:
     def test_generate_unique_id_lowercases_and_replaces_spaces(self):
         entity = _make_entity()
         result = entity._generate_unique_id("0A0100", "My Test Name")
-        assert result == "thz_set_0a0100_my_test_name"
+        assert result == "thz_dev1_set_0a0100_my_test_name"
 
 
 class TestExtraStateAttributes:

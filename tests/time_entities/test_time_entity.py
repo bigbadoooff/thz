@@ -486,9 +486,9 @@ class TestPartyStartAndEnd:
 
     def test_two_entities_the_start_keeps_its_identity(self):
         start, end, _ = self._pair(b"")
-        assert start._attr_unique_id == "thz_set_0a05d1_party-time"
+        assert start._attr_unique_id == "thz_dev1_set_0a05d1_party-time"
         assert start._attr_translation_key == "party_time"
-        assert end._attr_unique_id == "thz_set_0a05d1_party-time_end"
+        assert end._attr_unique_id == "thz_dev1_set_0a05d1_party-time_end"
         assert end._attr_translation_key == "party_time_end"
 
     @pytest.mark.asyncio

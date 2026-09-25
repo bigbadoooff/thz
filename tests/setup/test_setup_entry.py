@@ -552,6 +552,13 @@ class TestAsyncMigrateEntry:
         entry.data = {"connection_type": "ip", "host": "192.0.2.1", **data}
         return entry
 
+    @pytest.fixture(autouse=True)
+    def _migrate_entries(self):
+        with patch.object(
+            thz_module.er, "async_migrate_entries", new_callable=AsyncMock
+        ) as migrate:
+            yield migrate
+
     @pytest.mark.asyncio
     async def test_stores_the_identifier_of_the_connection(self):
         hass = _mock_hass()
@@ -562,7 +569,7 @@ class TestAsyncMigrateEntry:
         hass.config_entries.async_update_entry.assert_called_once_with(
             entry,
             data={**entry.data, "device_identifier": "ip-192.0.2.1"},
-            minor_version=3,
+            minor_version=4,
         )
 
     @pytest.mark.asyncio
@@ -579,14 +586,28 @@ class TestAsyncMigrateEntry:
                 "host": "192.0.2.1",
                 "device_identifier": "ip-192.0.2.1",
             },
-            minor_version=3,
+            minor_version=4,
         )
 
     @pytest.mark.asyncio
     async def test_current_entry_is_left_alone(self):
         hass = _mock_hass()
-        assert await thz_module.async_migrate_entry(hass, self._entry(1, 3))
+        assert await thz_module.async_migrate_entry(hass, self._entry(1, 4))
         hass.config_entries.async_update_entry.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_scopes_the_unique_ids_by_the_heat_pump(self, _migrate_entries):
+        hass = _mock_hass()
+        entry = self._entry(1, 3, device_identifier="ip-192.0.2.1")
+
+        assert await thz_module.async_migrate_entry(hass, entry)
+
+        scope = _migrate_entries.await_args.args[2]
+        assert scope(MagicMock(unique_id="thz_set_0a0105_p01")) == {
+            "new_unique_id": "thz_ip-192.0.2.1_set_0a0105_p01"
+        }
+        assert scope(MagicMock(unique_id="thz_ip-192.0.2.1_fan_ventilation")) is None
+        assert scope(MagicMock(unique_id="other")) is None
 
     @pytest.mark.asyncio
     async def test_newer_entry_is_refused(self):
