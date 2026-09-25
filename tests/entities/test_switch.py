@@ -1,7 +1,7 @@
 """Tests for switch.py (THZSwitch entity and async_setup_entry)."""
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.exceptions import HomeAssistantError
 import pytest
@@ -65,6 +65,31 @@ class TestAsyncSetupEntry:
         assert isinstance(entities[0], THZSwitch)
         # Values come from the poller, not a read before adding.
         assert entities[0]._poller is config_entry.runtime_data.poller
+
+    @pytest.mark.asyncio
+    async def test_only_selected_write_groups_get_entities(self):
+        write_manager = FakeWriteManager(
+            {
+                "pSwitchOne": _switch_entry("0A0701"),
+                "pSwitchTwo": _switch_entry("0A0703"),
+            }
+        )
+        config_entry = MagicMock()
+        config_entry.data = {"selected_write_groups": ["heating"]}
+        config_entry.runtime_data = make_runtime_data(
+            write_manager=write_manager, device=_make_device(), device_id="dev1"
+        )
+        groups = {"pSwitchOne": "heating", "pSwitchTwo": "advanced"}
+        async_add_entities = MagicMock()
+
+        with patch(
+            "custom_components.thz.platform_setup.get_write_group_for_key",
+            side_effect=groups.get,
+        ):
+            await async_setup_entry(MagicMock(), config_entry, async_add_entities)
+
+        (entities,) = async_add_entities.call_args[0]
+        assert [entity._command for entity in entities] == ["0A0701"]
 
 
 class TestTHZSwitchInit:
