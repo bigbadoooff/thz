@@ -1237,3 +1237,26 @@ class TestGrossClockCorrection:
 
         assert drift == -6 * 3600
         assert corrected is False
+
+    @pytest.mark.asyncio
+    async def test_unconfirmed_correction_is_not_reported(self, monkeypatch):
+        from custom_components.thz.services import backup
+
+        fake_dt_util = MagicMock()
+        fake_dt_util.now = MagicMock(return_value=datetime(2026, 8, 25, 10, 0))
+        monkeypatch.setattr(backup, "dt_util", fake_dt_util)
+        monkeypatch.setattr(
+            backup,
+            "async_read_device_clock",
+            AsyncMock(return_value=datetime(2026, 8, 25, 4, 0)),
+        )
+        # The writes went out, but the clock read back differently.
+        monkeypatch.setattr(
+            backup, "async_write_device_clock", AsyncMock(return_value=False)
+        )
+
+        _, corrected = await backup._correct_gross_clock_drift(
+            MagicMock(), MagicMock(), MagicMock()
+        )
+
+        assert corrected is False
