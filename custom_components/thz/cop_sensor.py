@@ -83,7 +83,12 @@ async def async_setup_cop_sensors(
         None
     """
     entry_data = config_entry.runtime_data
-    coordinators = entry_data.coordinators
+    # Blocks the firmware does not have never deliver energy values.
+    coordinators = {
+        block: coordinator
+        for block, coordinator in entry_data.coordinators.items()
+        if block not in entry_data.unsupported_blocks
+    }
     device_id = entry_data.device_id
     device = entry_data.device
     firmware_version = device.firmware_version
@@ -101,7 +106,7 @@ async def async_setup_cop_sensors(
 
     # Current COP from the instantaneous power readings in pxxFB, located via
     # the active firmware's register map rather than guessed.
-    power_coordinator = coordinators.get(_POWER_BLOCK)
+    power_coordinator = entry_data.polled_coordinator(_POWER_BLOCK)
     register_manager = entry_data.register_manager
     if power_coordinator is not None and register_manager is not None:
         qc = _power_field_layout(register_manager, "actualPower_Qc")

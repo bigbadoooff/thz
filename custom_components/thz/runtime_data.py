@@ -47,6 +47,16 @@ class THZRuntimeData:
     fault_tracker: THZFaultTracker | None = None
     fault_source: DataUpdateCoordinator[Any] | None = None
 
+    def polled_coordinator(self, block: str) -> DataUpdateCoordinator[Any] | None:
+        """Return the coordinator of a polled block the firmware has.
+
+        None for a block that is not polled or that the firmware does not
+        have (it never delivers data, so no entity should show it).
+        """
+        if block in self.unsupported_blocks:
+            return None
+        return self.coordinators.get(block)
+
 
 THZConfigEntry = ConfigEntry[THZRuntimeData]
 

@@ -128,6 +128,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Blocks the firmware lacks still got some entities.** Sensors skipped
+  such blocks, but binary sensors, the hot water heater, the heating circuit
+  climate, the fault sensors and events, and the current COP were created
+  for them and stayed unknown or unavailable for good. They are no longer
+  created.
 - **The reset buttons sent a different telegram than FHEM.** "Reset last
   10 errors" (technician firmware) and "Reset errors" (2.14) sent a single
   zero byte; FHEM, which is known to work on the heat pumps, sends `D1 00 00`

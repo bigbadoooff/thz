@@ -272,3 +272,28 @@ async def test_failed_setup_closes_the_connection(hass, fake_device):
 
     assert entry.state is ConfigEntryState.SETUP_RETRY
     assert fake_device.instances[-1].closed
+
+
+async def test_unsupported_block_creates_no_entities(hass, fake_device):
+    real_send = fake_device.send_request
+
+    async def send_request(self, telegram, get_or_set):
+        body = self.unescape(telegram[2:-2])[1:]
+        if get_or_set == "get" and body == b"\xf3":
+            return b"\x01\x04\x05\x10\x03"  # unknown register
+        return await real_send(self, telegram, get_or_set)
+
+    with patch.object(fake_device, "send_request", send_request):
+        entry = await setup_entry(hass)
+
+    assert "pxxF3" in entry.runtime_data.unsupported_blocks
+    registry = er.async_get(hass)
+    from_f3 = [
+        e.entity_id
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if "b'\\xf3'" in e.unique_id
+        or "_bin_f3_" in e.unique_id
+        or e.domain == "water_heater"
+    ]
+    assert from_f3 == []
+    assert await hass.config_entries.async_unload(entry.entry_id)

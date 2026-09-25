@@ -54,7 +54,7 @@ async def async_setup_fault_sensors(
 ) -> None:
     """Create the fault-memory sensors and store the tracker for services."""
     entry_data = config_entry.runtime_data
-    coordinator = entry_data.coordinators.get(D1_BLOCK)
+    coordinator = entry_data.polled_coordinator(D1_BLOCK)
     if coordinator is None:
         return
     if not supports_fault_memory(entry_data.register_manager):
