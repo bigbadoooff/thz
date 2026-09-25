@@ -20,6 +20,7 @@ import pytest
 
 from custom_components.thz.const import DOMAIN
 from custom_components.thz.exceptions import THZProtocolError
+from tests.helpers import make_runtime_data
 
 # ---------------------------------------------------------------------------
 # Module-level setup, mirroring tests/setup/test_config_flow_ports.py's approach:
@@ -727,3 +728,58 @@ class TestReconfigureSchema:
         assert "write_interval" in optional_names
         assert "alias" in optional_names
         assert "area" in optional_names
+
+
+class TestAvailableReadBlocks:
+    """Reconfigure offers the firmware's blocks, loaded or not."""
+
+    def test_loaded_entry_uses_its_register_maps(self):
+        entry = MagicMock()
+        entry.runtime_data = make_runtime_data(register_manager=MagicMock())
+        entry.runtime_data.register_manager.get_all_registers.return_value = {
+            "pxxFB": [],
+            "pxxF3": [],
+        }
+        assert config_flow_module._available_read_blocks(entry) == ["pxxFB", "pxxF3"]
+
+    def test_unloaded_entry_uses_the_stored_firmware(self):
+        entry = MagicMock(spec=["data"])
+        entry.data = {"firmware": "439", "refresh_intervals": {}}
+        blocks = config_flow_module._available_read_blocks(entry)
+        assert "pxxFB" in blocks and "pxxF3" in blocks
+
+    def test_forced_profile_wins_over_the_stored_firmware(self):
+        entry = MagicMock(spec=["data"])
+        entry.data = {
+            "firmware": "439",
+            "firmware_override": "206",
+            "refresh_intervals": {},
+        }
+        assert "pxx17" in config_flow_module._available_read_blocks(entry)
+
+    def test_nothing_known_offers_nothing_extra(self):
+        entry = MagicMock(spec=["data"])
+        entry.data = {}
+        assert config_flow_module._available_read_blocks(entry) == []
+
+    def test_unloaded_entry_leaves_out_the_cooling_blocks(self):
+        entry = MagicMock(spec=["data"])
+        entry.data = {"firmware": "539", "refresh_intervals": {}}
+        blocks = config_flow_module._available_read_blocks(entry)
+        assert "pxxFB" in blocks
+        assert "pxx0A0648" not in blocks
+
+    def test_unloaded_entry_without_intervals_offers_nothing_extra(self):
+        entry = MagicMock(spec=["data"])
+        entry.data = {"firmware": "539"}
+        assert config_flow_module._available_read_blocks(entry) == []
+
+
+class TestReconfigureBlockSelection:
+    """Saving Reconfigure never drops polled blocks by accident."""
+
+    def test_form_without_block_checkboxes_keeps_the_selection(self):
+        data = {"selected_read_blocks": ["pxxFB"], "alias": "old"}
+        updated = config_flow_module.merge_reconfigure_input(data, {"alias": "new"})
+        assert updated["selected_read_blocks"] == ["pxxFB"]
+        assert "refresh_intervals" not in updated
