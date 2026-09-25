@@ -626,6 +626,56 @@ class TestBackupParametersService:
         # (2 param reads + 5 clock reads for the drift sanity check).
         assert device.async_execute.await_count == 7
 
+    async def _backup(self, mock_hass, fail_command=None, open_error=None):
+        entry_data = self._entry_data()
+        mock_hass.data[DOMAIN]["entry_1"] = entry_data
+        device = entry_data["device"]
+
+        async def fake_execute(fn, *args, **kwargs):
+            if args[0].hex().upper() == fail_command:
+                raise OSError("no answer")
+            return bytes([0, 1])
+
+        device.async_execute = AsyncMock(side_effect=fake_execute)
+
+        async def fake_executor_job(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        mock_hass.async_add_executor_job = AsyncMock(side_effect=fake_executor_job)
+
+        def fake_open(path, mode="r", encoding=None):
+            from io import StringIO
+
+            if open_error is not None:
+                raise open_error
+            return StringIO()
+
+        fake_dt_util = MagicMock()
+        fake_dt_util.now = MagicMock(return_value=datetime(2026, 8, 25, 10, 0))
+        fake_dt_util.utcnow = MagicMock(return_value=datetime(2026, 8, 25, 10, 0))
+        with (
+            patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
+            patch("custom_components.thz.clock_sync.dt_util", fake_dt_util),
+            patch("os.makedirs"),
+            patch("builtins.open", side_effect=fake_open),
+        ):
+            handler = await _get_handler(mock_hass, "backup_parameters")
+            call = MagicMock()
+            call.data = {}
+            return await handler(call)
+
+    @pytest.mark.asyncio
+    async def test_a_failing_register_does_not_stop_the_backup(self, mock_hass):
+        result = await self._backup(mock_hass, fail_command="0A0300")
+        assert result["parameter_count"] == 1
+        assert result["read_errors"] == ["SomeSwitch: no answer"]
+
+    @pytest.mark.asyncio
+    async def test_a_file_that_cannot_be_written_is_an_error(self, mock_hass):
+        with pytest.raises(HomeAssistantError) as err:
+            await self._backup(mock_hass, open_error=OSError("disk full"))
+        assert err.value.translation_key == "backup_write_failed"
+
     @pytest.mark.asyncio
     async def test_backup_no_device_returns_error(self, mock_hass):
         mock_hass.async_add_executor_job = AsyncMock()
@@ -707,6 +757,28 @@ class TestListParameterBackupsService:
         ]
         assert result["backups"][0]["parameter_count"] == 5
         assert result["backups"][0]["device_id"] == "thz-1234"
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_backup_is_listed_without_details(self, mock_hass):
+        from io import StringIO
+
+        async def fake_executor_job(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        mock_hass.async_add_executor_job = AsyncMock(side_effect=fake_executor_job)
+
+        with (
+            patch("os.path.isdir", return_value=True),
+            patch("os.listdir", return_value=["thz_backup_1.json"]),
+            patch("os.path.getsize", return_value=1),
+            patch("builtins.open", return_value=StringIO("{")),
+        ):
+            handler = await _get_handler(mock_hass, "list_parameter_backups")
+            call = MagicMock()
+            call.data = {}
+            result = await handler(call)
+
+        assert result["backups"] == [{"filename": "thz_backup_1.json", "size_bytes": 1}]
 
     @pytest.mark.asyncio
     async def test_no_backups_dir_returns_empty(self, mock_hass):
@@ -834,13 +906,24 @@ class TestRestoreParametersService:
         ]
         assert write_calls == []
 
-    async def _restore(self, mock_hass, backup_doc, profile="539", **data):
+    async def _restore(
+        self, mock_hass, backup_doc, profile="539", fail_write=None, **data
+    ):
         entry_data = self._entry_data()
         entry_data["device"].firmware_version = "539"
         entry_data["device"].firmware_profile = profile
         mock_hass.data[DOMAIN]["entry_1"] = entry_data
         device = entry_data["device"]
         fake_dt_util, fake_open = self._patch_common(mock_hass, backup_doc, device)
+        if fail_write is not None:
+            stored = device.async_execute.side_effect
+
+            async def execute(fn, *args, **kwargs):
+                if fn is device.write_value and args[0].hex().upper() in fail_write:
+                    raise OSError("no answer")
+                return await stored(fn, *args, **kwargs)
+
+            device.async_execute = AsyncMock(side_effect=execute)
         with (
             patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
             patch("os.path.isfile", return_value=True),
@@ -850,6 +933,52 @@ class TestRestoreParametersService:
             call = MagicMock()
             call.data = {"filename": "thz_backup_x.json", **data}
             return await handler(call), device
+
+    @pytest.mark.asyncio
+    async def test_a_failed_write_is_reported_and_the_rest_restored(self, mock_hass):
+        result, _ = await self._restore(
+            mock_hass, self._backup_doc(), fail_write={"0A0200"}
+        )
+        assert result["restored"] == 1
+        assert "HeatingCurve: no answer" in result["failed"]
+
+    @pytest.mark.asyncio
+    async def test_an_unencodable_value_is_reported(self, mock_hass):
+        doc = self._backup_doc()
+        doc["parameters"]["HeatingCurve"]["value"] = "steep"
+        result, _ = await self._restore(mock_hass, doc)
+        assert result["restored"] == 1
+        assert any(f.startswith("HeatingCurve: ") for f in result["failed"])
+
+    @pytest.mark.asyncio
+    async def test_a_clock_that_cannot_be_written_is_reported(self, mock_hass):
+        result, _ = await self._restore(
+            mock_hass, self._backup_doc(), fail_write={"0A0104"}
+        )
+        assert result["clock_synced"] is False
+        assert "<device clock>: no answer" in result["failed"]
+
+    @pytest.mark.asyncio
+    async def test_an_unreadable_backup_file_is_an_error(self, mock_hass):
+        from io import StringIO
+
+        entry_data = self._entry_data()
+        mock_hass.data[DOMAIN]["entry_1"] = entry_data
+
+        async def fake_executor_job(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        mock_hass.async_add_executor_job = AsyncMock(side_effect=fake_executor_job)
+        with (
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", return_value=StringIO("{")),
+        ):
+            handler = await _get_handler(mock_hass, "restore_parameters")
+            call = MagicMock()
+            call.data = {"filename": "thz_backup_x.json"}
+            with pytest.raises(HomeAssistantError) as err:
+                await handler(call)
+        assert err.value.translation_key == "backup_read_failed"
 
     @pytest.mark.asyncio
     async def test_backup_of_another_firmware_is_refused(self, mock_hass):

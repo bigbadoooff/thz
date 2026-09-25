@@ -86,6 +86,44 @@ async def test_backup_and_dry_run_restore(hass, fake_device, tmp_path):
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
+async def test_restore_writes_the_backed_up_value_back(hass, fake_device, tmp_path):
+    hass.config.config_dir = str(tmp_path)
+    day_temp = bytes.fromhex("0A0013")  # p04DHWsetDayTemp
+    fake_device.initial_registers = {day_temp: (480).to_bytes(2, "big")}
+    entry = await setup_entry(hass)
+    await hass.services.async_call(
+        DOMAIN, "backup_parameters", {}, blocking=True, return_response=True
+    )
+
+    # Changed at the heat pump after the backup.
+    device = fake_device.instances[-1]
+    device.registers[day_temp] = (400).to_bytes(2, "big")
+    restore = await hass.services.async_call(
+        DOMAIN,
+        "restore_parameters",
+        {"only": ["p04DHWsetDayTemp"]},
+        blocking=True,
+        return_response=True,
+    )
+
+    assert restore["restored"] == 1
+    assert device.sets_for("0A0013") == [(480).to_bytes(2, "big")]
+    assert device.registers[day_temp] == (480).to_bytes(2, "big")
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_restore_of_a_missing_backup_is_an_error(hass, fake_device, tmp_path):
+    hass.config.config_dir = str(tmp_path)
+    entry = await setup_entry(hass)
+    for data, key in (({}, "no_backups"), ({"filename": "x.json"}, "backup_not_found")):
+        with pytest.raises(HomeAssistantError) as err:
+            await hass.services.async_call(
+                DOMAIN, "restore_parameters", data, blocking=True, return_response=True
+            )
+        assert err.value.translation_key == key
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 async def test_diverter_check_reads_the_valve_state_again(hass, fake_device):
     """A valve that switched to DHW since the last poll blocks "heating"."""
     entry = await setup_entry(hass, refresh_intervals={**BLOCKS, "pxxF2": 600})
