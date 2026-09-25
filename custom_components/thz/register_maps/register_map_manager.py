@@ -445,17 +445,18 @@ class RegisterMapManagerWrite(BaseRegisterMapManager):
                 )
                 continue
 
-            entry["command"] = block_addr
             layout = own_layouts.get((name, block_addr.upper()))
             if layout is None:
                 layout = fallback_layouts.get(name)
-            if layout is not None:
-                _apply_block_layout(entry, layout)
-            else:
-                _LOGGER.debug(
-                    "No register map entry found for 2xx write parameter '%s'",
-                    name,
+            if layout is None:
+                # Without its place in the block, a write would be a plain SET
+                # to the block register and overwrite its first bytes.
+                _LOGGER.warning(
+                    "No block layout for 2xx write parameter '%s'; skipping", name
                 )
+                continue
+            entry["command"] = block_addr
+            _apply_block_layout(entry, layout)
 
             # Promote "pclean" to the standard "number" HA entity type.
             # "ptime" entries are left unchanged for now (different encoding needed).
