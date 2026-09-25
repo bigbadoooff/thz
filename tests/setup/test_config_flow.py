@@ -773,3 +773,13 @@ class TestAvailableReadBlocks:
         entry = MagicMock(spec=["data"])
         entry.data = {"firmware": "539"}
         assert config_flow_module._available_read_blocks(entry) == []
+
+
+class TestReconfigureBlockSelection:
+    """Saving Reconfigure never drops polled blocks by accident."""
+
+    def test_form_without_block_checkboxes_keeps_the_selection(self):
+        data = {"selected_read_blocks": ["pxxFB"], "alias": "old"}
+        updated = config_flow_module.merge_reconfigure_input(data, {"alias": "new"})
+        assert updated["selected_read_blocks"] == ["pxxFB"]
+        assert "refresh_intervals" not in updated

@@ -175,6 +175,22 @@ async def test_entry_without_intervals_keeps_polling_every_block(hass, fake_devi
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
+async def test_entry_without_intervals_ticks_every_block(hass, fake_device):
+    # A stale empty selection from an earlier save must not untick them.
+    entry = await setup_entry(hass, refresh_intervals=None, selected_read_blocks=[])
+
+    result = await entry.start_reconfigure_flow(hass)
+    ticked = {
+        str(key): key.default()
+        for key in result["data_schema"].schema
+        if str(key).startswith("read_")
+    }
+
+    assert ticked
+    assert all(ticked.values())
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 async def test_new_entry_stores_its_device_identifier(hass, fake_device):
     with patch(
         "custom_components.thz.config_flow.THZConfigFlow.get_ports",

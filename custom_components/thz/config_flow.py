@@ -118,7 +118,9 @@ def merge_reconfigure_input(
             for block, interval in updated["refresh_intervals"].items()
             if block in read_blocks
         }
-    updated["selected_read_blocks"] = read_blocks
+    if any(key.startswith("read_") for key in user_input):
+        # A form without block checkboxes leaves the selection as it is.
+        updated["selected_read_blocks"] = read_blocks
     updated["selected_write_groups"] = write_groups
     updated.update(fields)
     return updated
@@ -470,10 +472,12 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         refresh_intervals = defaults.get("refresh_intervals")
         if refresh_intervals is None:
             # Entries without stored intervals poll every block (see
-            # _refresh_intervals in __init__.py); show them all as polled.
+            # _refresh_intervals in __init__.py); show them all as polled,
+            # whatever selection is stored.
             refresh_intervals = dict.fromkeys(
                 available_blocks or [], DEFAULT_UPDATE_INTERVAL
             )
+            selected_read_blocks = None
         polled_blocks = list(refresh_intervals.keys())
         all_read_blocks = polled_blocks + [
             block for block in available_blocks or [] if block not in refresh_intervals
