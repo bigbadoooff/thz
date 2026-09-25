@@ -189,7 +189,8 @@ class THZBaseEntity(Entity):
         Returns:
             A unique identifier string.
         """
-        return f"thz_set_{command.lower()}_{name.lower().replace(' ', '_')}"
+        name_slug = name.lower().replace(" ", "_")
+        return f"thz_{self._device_id}_set_{command.lower()}_{name_slug}"
 
     # Where the entity's value comes from: a 2.x parameter inside a polled
     # block listens to the block's coordinator; any other entity with a

@@ -218,7 +218,7 @@ async def test_placeholder_sensors_of_old_versions_are_removed(hass, fake_device
     stale = registry.async_get_or_create(
         "sensor",
         DOMAIN,
-        sensor_unique_id(fb, 2, "dewPoint"),
+        sensor_unique_id(f"ip-{HOST}", fb, 2, "dewPoint"),
         config_entry=entry,
     )
     # The same unique id under another integration entry stays untouched.
@@ -227,7 +227,7 @@ async def test_placeholder_sensors_of_old_versions_are_removed(hass, fake_device
     foreign = registry.async_get_or_create(
         "sensor",
         DOMAIN,
-        sensor_unique_id(fb, 35, "relHumidity"),
+        sensor_unique_id(f"ip-{HOST}", fb, 35, "relHumidity"),
         config_entry=other_entry,
     )
 

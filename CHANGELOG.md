@@ -117,6 +117,12 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **A second heat pump got almost no entities.** Sensors, binary sensors,
+  numbers, selects, switches, buttons and schedule times had unique IDs made
+  of the register alone, so Home Assistant dropped the second heat pump's
+  entities as duplicates. Every unique ID now contains the heat pump's
+  identifier; existing entities are migrated on update and keep their
+  entity IDs and history.
 - **The party-time sensor showed a meaningless number of minutes** (4.x/5.x,
   #185): the register holds the party start and end as quarter hours, and
   the sensor now shows them as FHEM does, e.g. `07:00--22:30`. It is no

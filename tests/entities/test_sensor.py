@@ -356,7 +356,7 @@ class TestTHZGenericSensor:
         entry = self._make_entry(name="Outside Temp")
         block = bytes.fromhex("FB")
         sensor = THZGenericSensor(coord, entry=entry, block=block, device_id="dev1")
-        assert sensor.unique_id == f"thz_{block}_0_outside_temp"
+        assert sensor.unique_id == f"thz_dev1_{block}_0_outside_temp"
         assert sensor.unique_id.endswith("_0_outside_temp")
 
     def test_extra_state_attributes(self):
@@ -466,4 +466,7 @@ class TestPlaceholderSensorCleanup:
     def test_unique_id_formula(self):
         from custom_components.thz.sensor import sensor_unique_id
 
-        assert sensor_unique_id(b"\xfb", 2, "dewPoint") == "thz_b'\\xfb'_2_dewpoint"
+        assert (
+            sensor_unique_id("dev1", b"\xfb", 2, "dewPoint")
+            == "thz_dev1_b'\\xfb'_2_dewpoint"
+        )
