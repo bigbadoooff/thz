@@ -6,7 +6,7 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
-## [0.7.0] – 2026-09-26
+## [0.7.0] – 2026-09-25
 
 ### Breaking changes
 
