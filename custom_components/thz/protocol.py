@@ -106,12 +106,13 @@ def frame_complete(
 def decode_response(data: bytes) -> bytes | None:
     """Decode an answer telegram to checksum + payload.
 
-    Returns None (and logs why) for a short answer, a checksum error or an
+    Returns None (and logs why at debug level; the caller retries and
+    reports the failure) for a short answer, a checksum error or an
     error header; raises THZNotSupportedError for ``01 04`` (unknown
     register), which is a permanent property of the firmware.
     """
     if len(data) < 6:
-        _LOGGER.error("Response too short: %s", data.hex())
+        _LOGGER.debug("Response too short: %s", data.hex())
         return None
 
     data = unescape(data)
@@ -121,7 +122,7 @@ def decode_response(data: bytes) -> bytes | None:
         payload = data[3:-2]
         calculated = checksum(data[:2] + b"\x00" + payload)
         if calculated[0] != crc:
-            _LOGGER.error(
+            _LOGGER.debug(
                 "CRC error in response. Expected %02X, calculated %02X",
                 crc,
                 calculated[0],
@@ -133,9 +134,9 @@ def decode_response(data: bytes) -> bytes | None:
         raise THZNotSupportedError("Register not supported by device firmware")
     reason = _ERROR_HEADERS.get(header)
     if reason is not None:
-        _LOGGER.error("Device answered: %s", reason)
+        _LOGGER.debug("Device answered: %s", reason)
     else:
-        _LOGGER.error("Unknown response: %s", data.hex())
+        _LOGGER.debug("Unknown response: %s", data.hex())
     return None
 
 

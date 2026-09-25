@@ -32,6 +32,8 @@ _T = TypeVar("_T")
 # How long async_execute waits for the device lock before giving up, so
 # coordinators cannot queue up indefinitely when many blocks fire at once.
 _LOCK_WAIT_TIMEOUT = 20.0
+# Tries of a GET whose answer cannot be decoded (CRC error, timing issue).
+_DECODE_ATTEMPTS = 2
 # Hard limit for async_initialize: connecting, the firmware read and the
 # cooling probe, each read with its one retry.
 _INITIALIZE_TIMEOUT = 30.0
@@ -512,14 +514,24 @@ class THZDevice:
                 not supported
         """
         telegram = protocol.build_telegram(get_or_set, addr_bytes + payload_to_deliver)
-        raw_response = await self.send_request(telegram, get_or_set)
-        if get_or_set == "get":
+        if get_or_set != "get":
+            await self.send_request(telegram, get_or_set)
+            return b""
+        # An answer with a CRC error or a "timing issue" header is a
+        # transient line problem: a GET is asked once more. The exchange
+        # itself completed, so the line is in step for the next one.
+        for attempt in range(1, _DECODE_ATTEMPTS + 1):
+            raw_response = await self.send_request(telegram, get_or_set)
             decoded = self.decode_response(raw_response)
-            if decoded is None:
-                raise THZProtocolError("Failed to decode device response")
-            return decoded
-
-        return b""
+            if decoded is not None:
+                return decoded
+            _LOGGER.debug(
+                "Undecodable answer to %s (attempt %d/%d)",
+                addr_bytes.hex(),
+                attempt,
+                _DECODE_ATTEMPTS,
+            )
+        raise THZProtocolError("Failed to decode device response")
 
     async def read_firmware_version(self) -> str:
         """Reads the firmware version from the THZ device.
