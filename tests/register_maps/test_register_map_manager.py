@@ -214,6 +214,19 @@ class TestRegisterMapManagerWrite:
         assert "command" not in manager._merged_map["pUnknownParent"]
 
 
+def test_759_uses_the_539_maps():
+    assert FIRMWARE_MAPS["759"] == FIRMWARE_MAPS["539"]
+    for has_cooling in (True, False):
+        assert (
+            RegisterMapManager("759", has_cooling=has_cooling).get_all_registers()
+            == RegisterMapManager("539", has_cooling=has_cooling).get_all_registers()
+        )
+        assert (
+            RegisterMapManagerWrite("759", has_cooling=has_cooling).params().keys()
+            == RegisterMapManagerWrite("539", has_cooling=has_cooling).params().keys()
+        )
+
+
 class TestBaseRegisterMapManager:
     """Test BaseRegisterMapManager internals."""
 

@@ -96,6 +96,11 @@ FIRMWARE_MAPS = {
         "write": ["write_map_439_539", "write_map_539"],
         "read": ["readings_map_439", "readings_map_539"],
     },
+    # 7.59 (e.g. LWZ 5) uses the 5.39 maps.
+    "759": {
+        "write": ["write_map_439_539", "write_map_539"],
+        "read": ["readings_map_439", "readings_map_539"],
+    },
     # Fallback for any firmware string not listed above (e.g. "438", "437",
     # "440" — off-by-a-point-release 4.3x builds we don't have a dedicated
     # entry for). This mirrors the reference FHEM 00_THZ.pm module's own

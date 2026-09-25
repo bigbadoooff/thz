@@ -50,6 +50,7 @@ MATRIX = {
     "539": (539, None, _COOLING),
     "539_no_cooling": (539, None, {}),
     "539technician": (539, "539technician", _COOLING),
+    "759": (759, None, _COOLING),
 }
 
 
