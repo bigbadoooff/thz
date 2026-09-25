@@ -14,7 +14,7 @@
 [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bigbadoooff&repository=thz&category=integration)
 [![Open your Home Assistant instance and start setting up this integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=thz)
 
-> **Version 0.6.0** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
+> **Version 0.7.0** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
 > features and breaking changes in this release.
 
 ## Introduction
@@ -27,8 +27,6 @@ Parts of this software have been developed by the help of AI.
 
 **Origin**: This integration is based on the FHEM-Module developed by Immi, adapted for Home Assistant with modern async architecture and full UI configuration support.
 
-**v0.4** adds climate entities (HC1, HC2, DHW), diverter valve motor control, compressor/booster runtime sensors, a block-refresh service, and a range of reliability and correctness improvements. See [CHANGELOG.md](CHANGELOG.md) for details.
-
 ## Features
 
 ### Currently Implemented
@@ -36,18 +34,22 @@ Parts of this software have been developed by the help of AI.
 - ✅ **Full UI Configuration**: Easy setup through Home Assistant's integration interface — no YAML configuration required
 - ✅ **Connection Options**: Support for both USB serial and network (ser2net) connections
 - ✅ **Sensor Platform**: Monitor temperatures, pressures, operating states, runtime hours, and more
+- ✅ **Binary Sensor Platform**: Status flags such as compressor, pumps, valves and filter alarms
 - ✅ **Switch Platform**: Control heat pump functions on/off
 - ✅ **Number Platform**: Adjust numeric settings and parameters
 - ✅ **Select Platform**: Choose between predefined options — including **passive cooling mode** (firmware 4.39/5.39)
 - ✅ **Time Platform**: Set time-based parameters, schedules and programmes
+- ✅ **Button Platform**: One-shot commands, e.g. resetting the error list (depending on the firmware)
 - ✅ **Climate Platform**: Climate entities for Heating Circuit 1 and Heating Circuit 2 — with temperature control, HVAC mode and preset support
 - ✅ **Water Heater Platform**: Hot water as a water heater entity — temperature, setpoint and eco (setback) / performance / off state
 - ✅ **Fan Platform**: Ventilation as a fan entity — shows the current stage and starts unscheduled ventilation at stage 0–3
+- ✅ **Event Platform**: Events for a new fault and a requested filter change
+- ✅ **Repairs**: A drifted heat pump clock raises a fixable repair issue
 - ✅ **Diagnostics**: Download a diagnostics report for troubleshooting (via Settings → Devices & Services)
 - ✅ **Device Registry Integration**: Proper device identification in Home Assistant
 - ✅ **Per-Block Polling Intervals**: Each register block has its own configurable poll interval
 - ✅ **Smart Entity Management**: Non-essential entities are hidden by default to reduce clutter
-- ✅ **Services**: `thz.read_raw_register`, `thz.refresh_block`, `thz.set_diverter_valve`, parameter backup/restore, and fault memory (`thz.probe_fault_memory`, `thz.acknowledge_faults`, `thz.clear_fault_memory`)
+- ✅ **Services**: `thz.read_raw_register`, `thz.refresh_block`, `thz.set_diverter_valve`, parameter backup/restore (`thz.backup_parameters`, `thz.restore_parameters`, `thz.list_parameter_backups`), and fault memory (`thz.probe_fault_memory`, `thz.acknowledge_faults`, `thz.clear_fault_memory`)
 
 ### Climate Entities
 
@@ -55,12 +57,12 @@ These entities are created when the required data blocks and parameters are avai
 
 | Entity | Source | Supports |
 |--------|-------------|---------|
-| Heating Circuit 1 (climate) | `pxxF4` | Temperature setpoint, HVAC mode (heat, cool with cooling support), preset (operating mode); a circuit in standby shows the action `off` |
+| Heating Circuit 1 (climate) | `pxxF4` | Temperature setpoint, HVAC mode (heat, or cool with cooling support: follows the cooling switch, and in cool mode the temperature is the cooling setpoint), preset (operating mode); a circuit in standby shows the action `off` |
 | Heating Circuit 2 (climate) | `pxxF5` | Temperature setpoint, HVAC mode, preset — created only when HC2 is configured |
-| Hot Water (water heater) | `pxxF3` | Temperature and setpoint in effect; state `performance` (day), `eco` (setback, night setpoint) or `off` (standby). Setting a temperature writes the day setpoint (`p04`), or the night setpoint (`p05`) while in eco. |
+| Hot Water (water heater) | `pxxF3` | Temperature and setpoint in effect; state `performance` (day), `eco` (setback, night setpoint) or `off` (standby). Setting a temperature writes the day setpoint (`p04`), the night setpoint (`p05`) while in eco, or the manual setpoint (`p11`) when that one is in effect. |
 | Ventilation (fan) | `p99startUnschedVent` (4.x/5.x), `pxxF6`/`pxxEE` (2.x) | The time programs set the ventilation stage; the fan controls *unscheduled ventilation*. A speed of 33/66/100 % starts it at stage 1/2/3, off starts it at stage 0, each for the time set in `p43`–`p46`; then the program takes over again. The program's stage settings (`p07` etc.) are not changed. Shown is the stage the ventilation runs at, also as the `stage` attribute: from the supply airflow of the current stage (`pxxE8`, when polled) compared with `p37`–`p39`, otherwise from today's fan time program (day stage `p07` inside a window, night stage `p08` outside). On 2.x firmware, which has no command to start ventilation, the fan only shows the stage (from the polled blocks `pxxF6` and `pxxEE`): the one set at the device while its time runs, otherwise the stage of the fan program state (day, night or standby). The fan reads its registers through the same parameter poller as the other settings, so it adds no extra requests for registers that are polled anyway. |
 
-HC1 also exposes **HVAC action** (heating / cooling / idle) and optional **cooling mode** when the device supports active cooling.
+HC1 also exposes **HVAC action** (heating / cooling / idle / off) and optional **cooling mode** when the device supports active cooling. The HVAC mode is what is selected (the cooling switch); the action shows whether the heat pump is cooling right now.
 
 ### Services
 
@@ -257,13 +259,15 @@ than a minute:
 | 2.14 / 2.14j | Sensor read support; write support via block read-modify-write |
 | 4.19     | 4.39-like profile for the THZ 303 SOL; a few `pxxFB` sensors the shorter payload cannot supply are disabled. Fault memory clear verified on this firmware |
 | 4.39     | Full support including energy sensors, COP, runtime hours, and passive cooling |
+| 5.09 / 7.09 | 4.39-based profile with the 5.09 extras (7.09 uses the 5.09 maps) |
 | 5.39     | Full support including passive cooling energy sensor (`sCoolHCTotal`) |
 | Other    | Falls back to a 4.39-like configuration (like the reference FHEM module) — may work partially |
 
 ### How Firmware Versions Are Loaded
 
-The `firmware` option you pick during setup selects which register map modules
-the integration merges together. This determines both which sensors/entities
+The firmware the heat pump reports at setup (or a firmware override chosen
+at setup or under Reconfigure) selects which register map modules the
+integration merges together. This determines both which sensors/entities
 get created and how their raw bytes are decoded — picking the wrong firmware
 typically produces missing entities or garbled values, not errors.
 
@@ -355,7 +359,8 @@ registers that may not exist on the device (e.g. cooling-only blocks).
 
 ### Prerequisites
 
-- Home Assistant (version 2021.12 or newer recommended)
+- A current Home Assistant release (tested with 2026.2; releases before
+  2024.11 are not supported)
 - USB-to-serial adapter or ser2net server for network connection
 - Physical access to your heat pump's serial interface
 
