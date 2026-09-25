@@ -49,6 +49,7 @@ from .const import (
 )
 from .devices import entry_unique_id
 from .exceptions import DEVICE_ERRORS
+from .register_maps.register_map_manager import RegisterMapManager
 from .runtime_data import loaded_runtime_data
 from .thz_device import THZDevice
 
@@ -121,6 +122,25 @@ def merge_reconfigure_input(
     updated["selected_write_groups"] = write_groups
     updated.update(fields)
     return updated
+
+
+def _available_read_blocks(entry: config_entries.ConfigEntry) -> list[str]:
+    """Return the read blocks of the entry's firmware, loaded or not.
+
+    A loaded entry knows its register maps; otherwise (setup failed or is
+    retrying) the maps of the firmware stored at setup, or of the forced
+    profile, are used. No device access either way.
+    """
+    runtime_data = loaded_runtime_data(entry)
+    if runtime_data is not None:
+        return list(runtime_data.register_manager.get_all_registers())
+    override = entry.data.get(CONF_FIRMWARE_OVERRIDE, FIRMWARE_OVERRIDE_AUTO)
+    firmware = (
+        entry.data.get("firmware") if override == FIRMWARE_OVERRIDE_AUTO else override
+    )
+    if not firmware:
+        return []
+    return list(RegisterMapManager(str(firmware)).get_all_registers())
 
 
 class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -312,16 +332,10 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 entry, unique_id=unique_id, data=updated_data, reason="reconfigured"
             )
 
-        runtime_data = loaded_runtime_data(entry)
-        available_blocks = (
-            list(runtime_data.register_manager.get_all_registers())
-            if runtime_data is not None
-            else []
-        )
         return self.async_show_form(
             step_id="reconfigure",
             data_schema=await self.reconfigure_schema(
-                dict(entry.data), available_blocks
+                dict(entry.data), _available_read_blocks(entry)
             ),
         )
 

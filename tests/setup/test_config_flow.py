@@ -20,6 +20,7 @@ import pytest
 
 from custom_components.thz.const import DOMAIN
 from custom_components.thz.exceptions import THZProtocolError
+from tests.helpers import make_runtime_data
 
 # ---------------------------------------------------------------------------
 # Module-level setup, mirroring tests/setup/test_config_flow_ports.py's approach:
@@ -727,3 +728,32 @@ class TestReconfigureSchema:
         assert "write_interval" in optional_names
         assert "alias" in optional_names
         assert "area" in optional_names
+
+
+class TestAvailableReadBlocks:
+    """Reconfigure offers the firmware's blocks, loaded or not."""
+
+    def test_loaded_entry_uses_its_register_maps(self):
+        entry = MagicMock()
+        entry.runtime_data = make_runtime_data(register_manager=MagicMock())
+        entry.runtime_data.register_manager.get_all_registers.return_value = {
+            "pxxFB": [],
+            "pxxF3": [],
+        }
+        assert config_flow_module._available_read_blocks(entry) == ["pxxFB", "pxxF3"]
+
+    def test_unloaded_entry_uses_the_stored_firmware(self):
+        entry = MagicMock(spec=["data"])
+        entry.data = {"firmware": "439"}
+        blocks = config_flow_module._available_read_blocks(entry)
+        assert "pxxFB" in blocks and "pxxF3" in blocks
+
+    def test_forced_profile_wins_over_the_stored_firmware(self):
+        entry = MagicMock(spec=["data"])
+        entry.data = {"firmware": "439", "firmware_override": "206"}
+        assert "pxx17" in config_flow_module._available_read_blocks(entry)
+
+    def test_nothing_known_offers_nothing_extra(self):
+        entry = MagicMock(spec=["data"])
+        entry.data = {}
+        assert config_flow_module._available_read_blocks(entry) == []
