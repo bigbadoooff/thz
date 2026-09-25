@@ -8,5 +8,5 @@
   "issue_tracker": "https://github.com/bigbadoooff/thz/issues",
   "loggers": ["serial", "serial_asyncio_fast"],
   "requirements": ["pyserial", "pyserial-asyncio-fast>=0.16"],
-  "version": "0.6.0"
+  "version": "0.7.0"
 }

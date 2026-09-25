@@ -6,23 +6,7 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
-### Added
-
-- **Strict typing:** mypy checks the whole integration in strict mode.
-- **Documentation:** use cases and example automations
-  (`docs/automations.md`: fault notification, filter reminder, hot water
-  from PV surplus, ventilation boost, weekly backup), and README sections on
-  how data is updated and on known limitations.
-- **Event entities for a new fault and a filter change.** "Fault" fires
-  `fault` for every record that appears in the fault memory, with its code,
-  name, time and date; "Filter change" fires `filter_both`, `filter_up` or
-  `filter_down` when the heat pump starts asking for that filter change.
-  Both read data that is polled anyway.
-- **Repair issue for a drifted device clock.** Without automatic clock
-  sync, a heat pump clock that is off by more than a minute raises a repair
-  issue instead of a daily persistent notification. Its fix sets the clock
-  to Home Assistant's time and can turn on automatic sync; the issue goes
-  away by itself once the clock is right again.
+## [0.7.0] – 2026-09-26
 
 ### Breaking changes
 
@@ -41,6 +25,57 @@ All notable changes to the THZ integration are documented here.
   ventilation runs at, from the supply airflow (`pxxE8`) or else from the
   fan time program. On 2.x firmware the fan only shows the stage (set at
   the device, or of the fan program state).
+- **Text sensors and selects have translated states with new keys.** They
+  showed English protocol names (e.g. *Wochentag* reading `Monday`): the weekday, season mode,
+  heating/DHW operating mode, program state and fault code sensors (plus the
+  new *Latest fault* sensor) are now enum sensors with translated states in
+  English and German, and the *Operating mode* and *Control valve DHW*
+  selects have translated options. The 2.xx *Last errors* list is translated
+  into the configured language when the value is built (restart or reload
+  after changing the language). State and option values change to lowercase
+  keys (`monday`, `setback`, `daymode`, `f05_outletfanfault`, `none` for "no
+  fault"); update automations or templates that compared against the old
+  text or call `select.select_option` with the old option names. A value that
+  is not in the table reads `unknown`, with the raw bytes in the
+  `register_raw` attribute.
+
+### Added
+
+- **Strict typing:** mypy checks the whole integration in strict mode.
+- **Documentation:** use cases and example automations
+  (`docs/automations.md`: fault notification, filter reminder, hot water
+  from PV surplus, ventilation boost, weekly backup), and README sections on
+  how data is updated and on known limitations.
+- **Event entities for a new fault and a filter change.** "Fault" fires
+  `fault` for every record that appears in the fault memory, with its code,
+  name, time and date; "Filter change" fires `filter_both`, `filter_up` or
+  `filter_down` when the heat pump starts asking for that filter change.
+  Both read data that is polled anyway.
+- **Repair issue for a drifted device clock.** Without automatic clock
+  sync, a heat pump clock that is off by more than a minute raises a repair
+  issue instead of a daily persistent notification. Its fix sets the clock
+  to Home Assistant's time and can turn on automatic sync; the issue goes
+  away by itself once the clock is right again.
+
+- **Party end time** (4.x/5.x, #185): the party register holds the start
+  and the end of the party; besides the start (now named *Party Start*) a
+  new *Party End* time entity shows and sets the end. Setting 00:00 as the
+  end means 24:00, as for the schedules. Writes match FHEM's
+  `set party-time HH:MM--HH:MM` byte for byte.
+
+- **Optional sub-devices** (#186): a new setting, *Split into sub-devices*,
+  groups the entities into sub-devices linked to the heat pump:
+  - heating circuit 1,
+  - heating circuit 2,
+  - hot water,
+  - ventilation,
+  - compressor,
+  - solar,
+  - cooling.
+
+  New setups have it on. Existing setups keep the single device until it is
+  switched on via Configure. Entity IDs stay the same, but displayed names
+  change, and automations that pick a device must be updated.
 
 ### Changed
 
@@ -106,28 +141,6 @@ All notable changes to the THZ integration are documented here.
 - **Reconfigure keeps the entry's unique id current** (#179): changing the
   host or serial device updates it, and a host or device that another THZ
   entry already uses is refused.
-
-### Added
-
-- **Party end time** (4.x/5.x, #185): the party register holds the start
-  and the end of the party; besides the start (now named *Party Start*) a
-  new *Party End* time entity shows and sets the end. Setting 00:00 as the
-  end means 24:00, as for the schedules. Writes match FHEM's
-  `set party-time HH:MM--HH:MM` byte for byte.
-
-- **Optional sub-devices** (#186): a new setting, *Split into sub-devices*,
-  groups the entities into sub-devices linked to the heat pump:
-  - heating circuit 1,
-  - heating circuit 2,
-  - hot water,
-  - ventilation,
-  - compressor,
-  - solar,
-  - cooling.
-
-  New setups have it on. Existing setups keep the single device until it is
-  switched on via Configure. Entity IDs stay the same, but displayed names
-  change, and automations that pick a device must be updated.
 
 ### Bug Fixes
 
@@ -289,20 +302,6 @@ All notable changes to the THZ integration are documented here.
   (`ResetErrors`, a button) had their translations only under `select`, so
   Home Assistant showed them as "Heating Circuit 1 Number", "Hot Water
   Number" or just the device name. Existing entity IDs stay as they are.
-
-- **Sensors and selects showed English protocol names instead of translated
-  values** (e.g. *Wochentag* reading `Monday`): the weekday, season mode,
-  heating/DHW operating mode, program state and fault code sensors (plus the
-  new *Latest fault* sensor) are now enum sensors with translated states in
-  English and German, and the *Operating mode* and *Control valve DHW*
-  selects have translated options. The 2.xx *Last errors* list is translated
-  into the configured language when the value is built (restart or reload
-  after changing the language). State and option values change to lowercase
-  keys (`monday`, `setback`, `daymode`, `f05_outletfanfault`, `none` for "no
-  fault"); update automations or templates that compared against the old
-  text or call `select.select_option` with the old option names. A value that
-  is not in the table reads `unknown`, with the raw bytes in the
-  `register_raw` attribute.
 
 ## [0.6.0] – 2026-09-19
 
