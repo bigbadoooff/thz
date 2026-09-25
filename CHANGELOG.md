@@ -117,6 +117,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **A failed write looked like a success.** Setting a number, select,
+  switch, time, climate, hot water or fan entity while the heat pump did not
+  answer only logged an error; the action succeeded and the frontend showed
+  the new value. The action now fails with an error message, and the entity
+  keeps its value.
 - **A second heat pump got almost no entities.** Sensors, binary sensors,
   numbers, selects, switches, buttons and schedule times had unique IDs made
   of the register alone, so Home Assistant dropped the second heat pump's

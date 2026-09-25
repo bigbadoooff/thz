@@ -97,6 +97,7 @@ from .parameter_io import (
 from .register_maps.model import WriteParam
 from .value_codec import THZValueCodec, decode_raw_value
 from .value_maps import SELECT_MAP
+from .write_errors import raise_write_errors
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
@@ -926,18 +927,14 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         if preset_mode not in (self._attr_preset_modes or []):
             _LOGGER.warning("Unknown preset mode '%s' for %s", preset_mode, self.name)
             return
-        try:
+        with raise_write_errors(self.name):
             value_bytes = THZValueCodec.encode_select(preset_mode, _OPMODE_DECODE_TYPE)
             await async_write_parameter(
                 self.hass, self._device, self._opmode_entry, value_bytes
             )
-            self._op_mode_cache = preset_mode
-            self.async_write_ha_state()
-            await self.coordinator.async_request_refresh()
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error(
-                "Error setting preset mode for %s: %s", self.name, err, exc_info=True
-            )
+        self._op_mode_cache = preset_mode
+        self.async_write_ha_state()
+        await self.coordinator.async_request_refresh()
 
     async def _async_read_setpoint(self, entry: WriteParam) -> float | None:
         """Read a heat-setpoint register's current value directly from the device."""
@@ -1013,18 +1010,14 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             step,
             target_label,
         )
-        try:
+        with raise_write_errors(self.name):
             value_bytes = THZValueCodec.encode_number(
                 temperature, step, decode_type, parameter_length(target_entry)
             )
             await async_write_parameter(
                 self.hass, self._device, target_entry, value_bytes
             )
-            await self.coordinator.async_request_refresh()
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error(
-                "Error writing heat setpoint for %s: %s", self.name, err, exc_info=True
-            )
+        await self.coordinator.async_request_refresh()
 
     async def _async_write_cool_setpoint(self, temperature: float) -> None:
         """Write the cooling setpoint to the device.
@@ -1050,16 +1043,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             entry.command,
             step,
         )
-        try:
+        with raise_write_errors(self.name):
             value_bytes = THZValueCodec.encode_number(
                 temperature, step, decode_type, parameter_length(entry)
             )
             await async_write_parameter(self.hass, self._device, entry, value_bytes)
-            await self._async_read_cooling_setpoint()
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error(
-                "Error writing cool setpoint for %s: %s", self.name, err, exc_info=True
-            )
+        await self._async_read_cooling_setpoint()
 
     async def _async_set_cooling_switch(self, *, enabled: bool) -> None:
         """Enable or disable the cooling switch.
@@ -1076,16 +1065,12 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             enabled,
             self._cool_switch_entry.command,
         )
-        try:
+        with raise_write_errors(self.name):
             await async_write_parameter(
                 self.hass,
                 self._device,
                 self._cool_switch_entry,
                 THZValueCodec.encode_switch(enabled),
-            )
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.error(
-                "Error setting cooling switch for %s: %s", self.name, err, exc_info=True
             )
 
     async def _async_read_cooling_setpoint(self) -> None:

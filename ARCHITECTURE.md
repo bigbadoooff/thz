@@ -156,6 +156,7 @@ contents.
 | `entity_translations.py`, `entity_id_style.py`, `const.py` | Translation keys, FHEM-style entity_ids, visibility tiers |
 | `devices.py` | Device info for all entities; optional split into functional sub-devices (by unique_id patterns) and cleanup of sub-devices |
 | `diagnostics.py` | Redacted diagnostics dump |
+| `write_errors.py` | Turns a failed write of an entity action into `HomeAssistantError` |
 | `notify.py` | Persistent notifications |
 
 ## Tests

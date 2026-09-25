@@ -26,7 +26,12 @@ rules:
   unique-config-entry: done
 
   # Silver
-  action-exceptions: done
+  action-exceptions:
+    status: done
+    comment: >
+      Services raise ServiceValidationError or HomeAssistantError; entity
+      actions that cannot write raise HomeAssistantError through
+      write_errors.raise_write_errors.
   config-entry-unloading: done
   docs-configuration-parameters: done
   docs-installation-parameters: done

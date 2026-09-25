@@ -183,10 +183,12 @@ class TestAsyncSetHvacMode:
             cool_setpoint_entry=_COOL_SETPOINT_ENTRY,
         )
         entity.hass.async_add_executor_job = AsyncMock(return_value=None)
+        entity._device.async_execute = AsyncMock(return_value=None)
         entity.coordinator.async_request_refresh = AsyncMock()
 
         await entity.async_set_hvac_mode(HVACMode.HEAT)
 
+        entity._device.async_execute.assert_awaited_once()
         entity.coordinator.async_request_refresh.assert_called_once()
 
     @pytest.mark.asyncio
