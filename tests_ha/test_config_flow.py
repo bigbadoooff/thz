@@ -121,6 +121,22 @@ async def test_reconfigure_updates_entry_and_reloads(hass, fake_device):
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
+async def test_reconfigure_saves_the_write_interval(hass, fake_device):
+    entry = await setup_entry(hass)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"write_interval": 900}
+    )
+    await hass.async_block_till_done()
+
+    assert result["reason"] == "reconfigured"
+    assert entry.data["write_interval"] == 900
+    assert "interval" not in entry.data["selected_write_groups"]
+    assert entry.runtime_data.poller._interval.total_seconds() == 900
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 async def test_new_entry_stores_its_device_identifier(hass, fake_device):
     with patch(
         "custom_components.thz.config_flow.THZConfigFlow.get_ports",

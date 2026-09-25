@@ -128,6 +128,9 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Changing the write interval under Reconfigure had no effect.** The
+  form's `write_interval` field was taken for a write group, so the new
+  interval was never saved. It is now.
 - **Parameter backups lost the party end.** The party register holds the
   party start and end, but a backup saved only the start. Backups now also
   save the end (as `end` next to the start's `value`), and a restore writes

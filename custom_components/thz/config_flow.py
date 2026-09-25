@@ -83,7 +83,8 @@ def merge_reconfigure_input(
     """Merge the reconfigure form into the entry data.
 
     The form carries one ``read_<block>`` checkbox and ``refresh_<block>``
-    interval per block and one ``write_<group>`` checkbox per write group;
+    interval per block and one ``write_<group>`` checkbox per write group
+    (``write_interval`` is a plain field, not a group);
     they become ``selected_read_blocks``, ``refresh_intervals`` (only for
     selected blocks) and ``selected_write_groups``. Every other field
     replaces the entry value of the same name.
@@ -99,7 +100,9 @@ def merge_reconfigure_input(
         elif key.startswith("read_"):
             if value:
                 read_blocks.append(key.removeprefix("read_"))
-        elif key.startswith("write_"):
+        elif key.startswith("write_") and key.removeprefix("write_") in (
+            WRITE_GROUP_LABELS
+        ):
             if value:
                 write_groups.append(key.removeprefix("write_"))
         else:
