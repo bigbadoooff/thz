@@ -362,6 +362,8 @@ class THZFan(THZBaseEntity, FanEntity):
         )
 
     def _set_stage(self, stage: int) -> None:
+        # A known stage means the data it came from was read.
+        self._attr_available = True
         self._stage = stage
         if stage > 0:
             self._last_on_stage = stage

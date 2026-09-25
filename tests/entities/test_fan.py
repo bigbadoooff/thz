@@ -345,6 +345,19 @@ class TestState:
         assert fan._attr_available is False
 
     @pytest.mark.asyncio
+    async def test_polled_data_makes_it_available_again(self, now):
+        values = {"0A1D10": _window(6, 9), "0A056C": _word(2)}
+        device = FakeDevice(values, fail=True)
+        fan = _fan(device, airflow=None)
+        await fan.async_update()
+        assert fan._attr_available is False
+
+        device.fail = False
+        fan._recompute()
+        assert fan._stage == 2
+        assert fan._attr_available is True
+
+    @pytest.mark.asyncio
     async def test_decode_error_leaves_state(self, now, monkeypatch):
         monkeypatch.setattr(
             fan_module.THZValueCodec,
