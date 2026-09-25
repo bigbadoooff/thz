@@ -1,22 +1,13 @@
 """Tests for THZClimate's hvac_mode/preset_mode handling around pOpMode.
 
-Regression coverage for two related bugs:
+1. ``hvac_modes`` has no ``OFF``: a single heating circuit cannot be
+   turned off on this device. The device's real "off" is the global
+   ``pOpMode`` standby state, reachable via ``preset_mode``.
 
-1. ``hvac_modes`` used to include ``OFF``, but there is no way to actually
-   turn a single heating circuit off on this device -- without cooling
-   support HEAT/OFF were both pure no-ops, and with cooling support OFF only
-   ever disabled the cooling switch (never stopped heating). ``OFF`` is no
-   longer offered; the device's real "off" is the global ``pOpMode``
-   standby state, reachable via ``preset_mode``.
-
-2. ``preset_mode`` used to be inferred from each circuit's own
-   ``hcOpMode``/``dhwOpMode`` readback, mapped onto HA's generic
-   comfort/sleep/away vocabulary -- which only covered 3 of the device's 7
-   real operating-mode states, and read from a register that doesn't
-   necessarily track what was actually written to ``pOpMode``.
-   ``preset_mode`` now reads/writes the ``pOpMode`` register (0A0112)
-   directly, using the device's own state names from
-   ``SELECT_MAP["2opmode"]``.
+2. ``preset_mode`` reads and writes the ``pOpMode`` register (0A0112)
+   with the device's own seven state names from ``SELECT_MAP["2opmode"]``,
+   not HA's generic comfort/sleep/away vocabulary or a circuit's own
+   ``hcOpMode``.
 """
 
 import asyncio
@@ -194,7 +185,7 @@ class TestAsyncSetHvacMode:
 
     @pytest.mark.asyncio
     async def test_off_is_not_a_supported_mode(self):
-        """OFF is no longer in hvac_modes; requesting it must not crash."""
+        """OFF is not in hvac_modes; requesting it must not crash."""
         from homeassistant.components.climate import HVACMode
 
         entity = _make_entity()

@@ -183,7 +183,7 @@ class TestAsyncSetupCopSensors:
 
     @pytest.mark.asyncio
     async def test_other_long_block_is_never_used_for_power(self):
-        # A long non-FB block used to be picked by the "> 100 bytes" heuristic.
+        # Only pxxFB holds the power values, however long another block is.
         coord = MagicMock()
         coord.data = bytes(150)
         hass, config_entry = self._make_hass({"pxx0B": coord})

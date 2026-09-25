@@ -361,11 +361,8 @@ class THZTime(THZParameterEntity, TimeEntity):
 
         Note: ``TimeEntity``'s override point is ``async_set_value``
         (unlike ``NumberEntity``/``SelectEntity``, which use
-        ``async_set_native_value``/``async_select_option``). A previous
-        version of this method was named ``async_set_native_value``, which
-        is not a method ``TimeEntity`` calls at all -- every write silently
-        fell through to the base class's own unimplemented ``set_value``
-        and raised ``NotImplementedError`` before ever reaching the device.
+        ``async_set_native_value``/``async_select_option``); ``TimeEntity``
+        never calls a method of another name.
         """
         t_value = value
 
@@ -534,12 +531,8 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         Home Assistant's ``time.set_value`` service already validates and
         parses its ``time`` field into a ``datetime.time`` object before
         calling this method, so ``value`` arrives ready to use -- no string
-        parsing needed. See ``THZTime.async_set_value`` above for why this
-        method must be named ``async_set_value`` (not
-        ``async_set_native_value``): that's the override point
-        ``TimeEntity`` actually calls, and the previous name was silently
-        never invoked at all, raising ``NotImplementedError`` on every
-        write attempt before ever reaching the device.
+        parsing needed. As in ``THZTime``, ``async_set_value`` is the method
+        ``TimeEntity`` calls.
         """
         t_value = value
 

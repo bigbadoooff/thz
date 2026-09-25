@@ -1,11 +1,9 @@
-"""Regression coverage for GitHub issue #155: wrong scaling on pump-cycle counts.
+"""Scaling of the pump-cycle counts (see issue #155).
 
 p54MinPumpCycles/p55MaxPumpCycles (write_map_439_539.py, firmware 439/509/539)
-had "step": 0.1 despite being whole-number cycle counts (decode_type
-"1clean", an integer decode). decode_number() always applies
-``raw_value * step``, so a device value of 48 was shown as 4.8 and a
-device value of 1 as 0.1 -- exactly the "4,8"/"0,1" instead of "48"/"1"
-reported in the issue (German locale renders "." as ",").
+are whole-number cycle counts (decode_type "1clean"), so their step is 1:
+decode_number() applies ``raw_value * step``, and a step of 0.1 would show a
+device value of 48 as 4.8.
 
 p56OutTempMaxPumpCycles/p57OutTempMinPumpCycles are genuine temperatures
 (decode_type "5temp") and correctly keep step 0.1; this only guards the
