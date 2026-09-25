@@ -1,14 +1,8 @@
 """Tests for THZTime and THZScheduleTime's async_set_value().
 
-Regression coverage for a bug where both entity classes defined
-``async_set_native_value`` (the NumberEntity/SelectEntity override point)
-instead of ``async_set_value`` (the real TimeEntity override point). Because
-neither class actually overrode ``async_set_value``, every ``time.set_value``
-service call silently fell through to the base ``TimeEntity``'s own
-unimplemented ``set_value()``, raising ``NotImplementedError`` before ever
-reaching the device -- shown to the user as
-"Failed to perform the action time/set_value. unknown error" on every
-attempted write, regardless of which entity or how many concurrent writes.
+Both entity classes must override ``async_set_value``, the method
+``TimeEntity`` calls for ``time.set_value`` (not ``async_set_native_value``,
+the NumberEntity/SelectEntity method), and write what they are given.
 
 These tests instantiate the real entity classes against a mocked device and
 hass, closely following the pattern used in

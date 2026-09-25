@@ -1,9 +1,9 @@
-"""HC2 climate entity when pxxF5 has no hcOpMode field (ported from m-l fork).
+"""HC2 climate entity when pxxF5 has no hcOpMode field.
 
-pxxF5 has never had a mapped hcOpMode on any firmware, so the HC2 climate
-entity used to be skipped everywhere. It is now created from the target
-temperature alone with a fixed HEAT hvac_mode, and (like every other HC2
-entity) is disabled by default unless enable_hc2 is set.
+pxxF5 has no mapped hcOpMode on any firmware. The HC2 climate entity is
+created from the target temperature alone with a fixed HEAT hvac_mode, and
+(like every other HC2 entity) is disabled by default unless enable_hc2 is
+set.
 """
 
 from unittest.mock import MagicMock

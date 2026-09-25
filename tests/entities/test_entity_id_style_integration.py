@@ -360,15 +360,11 @@ class TestPlatformSetupPassesEntityIdStyle:
 
     @pytest.mark.asyncio
     async def test_write_platform_creates_button_entities_without_error(self):
-        """Regression test for a TypeError that silently killed the button platform.
+        """The button platform accepts the keywords every write platform gets.
 
-        async_setup_write_platform always passes
+        async_setup_write_platform passes
         entity_id_style/entity_visibility/entity_id_prefix to every write
-        platform's entity class, including button. THZButton.__init__ once
-        lacked these kwargs, which raised a TypeError at runtime and silently
-        killed the whole button platform (caught via live HA logs, not by
-        this test suite, since no prior test exercised button through this
-        code path).
+        platform's entity class, including THZButton.
         """
         from custom_components.thz.button import THZButton
         from custom_components.thz.platform_setup import async_setup_write_platform

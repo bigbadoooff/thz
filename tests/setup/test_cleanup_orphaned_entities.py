@@ -1,13 +1,10 @@
 """Tests for _async_cleanup_orphaned_entities.
 
-Regression coverage for a real-world bug: an entity registry row survives
-"Delete integration" -> re-add cycles because Home Assistant leaves its
-config_entry_id pointing at the now-deleted entry's id instead of nulling it
-out. The original cleanup only checked for config_entry_id is None, so it
-never caught this -- the stale row (and its unique_id) got silently
-reattached on every subsequent setup, permanently freezing that entity's
-entity_id to whatever it was the very first time it was ever created,
-regardless of any later entity_id_style/alias changes.
+An entity registry row can survive "Delete integration" -> re-add cycles
+with its config_entry_id pointing at the deleted entry instead of None.
+Such a row must be removed too; otherwise the re-added entry reattaches it
+by unique_id and keeps its old entity_id, whatever entity_id_style or alias
+is configured now.
 """
 
 from unittest.mock import MagicMock, patch

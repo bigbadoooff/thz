@@ -5,10 +5,9 @@ services in custom_components/thz/services/backup.py, their small supporting
 helpers (_sanitize_label, _parse_hhmm, also in backup.py), and the
 clock-drift helpers in custom_components/thz/clock_sync.py
 (async_read_device_clock, async_write_device_clock,
-async_check_and_maybe_sync_clock): the periodic drift check must read the
-device clock via the dedicated pClock* helper rather than pulling it out of
-the "restorable parameters" dict (which filters out "pclean"-typed
-registers and would silently never see the clock at all).
+async_check_and_maybe_sync_clock). The periodic drift check reads the
+device clock through the pClock* helper; the "restorable parameters" dict
+filters out "pclean"-typed registers such as the clock.
 """
 
 from datetime import datetime, time as dt_time
@@ -245,15 +244,11 @@ class TestRequireTargetEntryData:
 
 
 class TestClockDriftCheck:
-    """Regression coverage for clock_sync.async_check_and_maybe_sync_clock.
+    """clock_sync.async_check_and_maybe_sync_clock.
 
-    The commit under test claims to fix a bug where the periodic drift check
-    read the device clock from a dict that filters out "pclean"-typed
-    registers (the pClock* registers are exactly that type), so the clock
-    value was always missing and the check silently never fired. These tests
-    prove the check now actually reads the clock (via
-    async_read_device_clock, the same helper the backup service uses) and
-    can trigger both the warning/notification path and the auto-sync path.
+    The check reads the clock through async_read_device_clock (the pClock*
+    registers are "pclean"-typed, so they are not among the restorable
+    parameters) and takes both the repair-issue path and the auto-sync path.
     """
 
     def _write_registers(self):
