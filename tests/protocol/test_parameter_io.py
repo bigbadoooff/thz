@@ -408,5 +408,23 @@ class TestAsyncUpdateParameter:
         await async_update_parameter(device, param, {1: 30})
 
         device.async_execute.assert_awaited_once_with(
-            device.write_block_value, bytes.fromhex("17"), 7, 1, bytes([30])
+            device.write_block_value,
+            bytes.fromhex("17"),
+            6,
+            2,
+            bytes([0, 30]),
+            bytes([0x00, 0xFF]),
         )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("index", [2, -1])
+    async def test_index_outside_the_value_is_refused(self, index):
+        device = MagicMock()
+        device.async_execute = AsyncMock()
+        param = write_param(
+            name="p", command="17", write_mode="block", offset=6, length=2
+        )
+
+        with pytest.raises(ValueError, match="outside"):
+            await async_update_parameter(device, param, {index: 30})
+        device.async_execute.assert_not_awaited()

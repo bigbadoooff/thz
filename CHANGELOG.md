@@ -44,6 +44,9 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **Changing single bytes of a 2.x block parameter is one block write**
+  instead of one per byte, and an index outside the parameter is refused
+  instead of writing into its neighbour.
 - **A garbled answer is asked for once more.** A read whose answer fails
   its checksum or reports a timing issue is repeated once before it counts
   as failed; the single bad answer is logged at debug level instead of as
