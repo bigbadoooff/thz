@@ -297,3 +297,24 @@ async def test_unsupported_block_creates_no_entities(hass, fake_device):
     ]
     assert from_f3 == []
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_hc2_entities_added_later_follow_enable_hc2(hass, fake_device):
+    entry = await setup_entry(hass, enable_hc2=True)
+    registry = er.async_get(hass)
+
+    # Poll the HC2 block from now on.
+    result = await entry.start_reconfigure_flow(hass)
+    await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"read_pxxF5": True}
+    )
+    await hass.async_block_till_done()
+
+    hc2 = [
+        e
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if "b'\\xf5'" in e.unique_id and "hc2" in e.unique_id.lower()
+    ]
+    assert hc2
+    assert [e.entity_id for e in hc2 if e.disabled_by is not None] == []
+    assert await hass.config_entries.async_unload(entry.entry_id)

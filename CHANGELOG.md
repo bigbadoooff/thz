@@ -128,6 +128,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Heating circuit 2 entities added later stayed disabled** although
+  *Enable heating circuit 2* was on, e.g. after selecting the HC2 block
+  under Reconfigure. Entities created by a setup now always get the
+  visibility settings.
 - **Blocks the firmware lacks still got some entities.** Sensors skipped
   such blocks, but binary sensors, the hot water heater, the heating circuit
   climate, the fault sensors and events, and the current COP were created

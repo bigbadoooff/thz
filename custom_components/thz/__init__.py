@@ -213,6 +213,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     if not split_devices:
         async_release_subdevices(hass, config_entry, unique_id, device_entry.id)
 
+    # Entities registered before this setup; the ones the platforms add now
+    # get the visibility tier below even when the tier did not change.
+    known_unique_ids = {
+        entity.unique_id
+        for entity in er.async_entries_for_config_entry(
+            er.async_get(hass), config_entry.entry_id
+        )
+    }
+
     # Forward setup to platforms
     await hass.config_entries.async_forward_entry_setups(
         config_entry,
@@ -226,7 +235,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # the entity registry. Re-runs (and retroactively bulk enables/disables
     # entities) whenever the configured tier differs from the tier last
     # applied, e.g. after the user changes this option via Reconfigure.
-    await _async_apply_entity_visibility_tier(hass, config_entry)
+    await _async_apply_entity_visibility_tier(hass, config_entry, known_unique_ids)
 
     return True
 
@@ -409,7 +418,9 @@ def _entity_should_be_hidden(
 
 
 async def _async_apply_entity_visibility_tier(
-    hass: HomeAssistant, config_entry: ConfigEntry
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    known_unique_ids: set[str] | None = None,
 ) -> None:
     """Apply the configured entity_visibility tier to the entity registry.
 
@@ -427,9 +438,14 @@ async def _async_apply_entity_visibility_tier(
     An entity the user disabled themselves (disabled_by == USER) is never
     touched.
 
+    Entities registered by this setup (not in ``known_unique_ids``) are
+    enabled if the tier shows them, even when nothing changed: their
+    enabled default knows the tier but not enable_hc2.
+
     Args:
         hass: The Home Assistant instance.
         config_entry: The config entry to reconcile entities for.
+        known_unique_ids: Unique ids registered before this setup, if known.
     """
     visibility = config_entry.data.get(
         CONF_ENTITY_VISIBILITY, ENTITY_VISIBILITY_DEFAULT
@@ -453,11 +469,15 @@ async def _async_apply_entity_visibility_tier(
             ENTITY_VISIBILITY_ALL,
         )
 
-    if last_applied == visibility and last_applied_hc2 == enable_hc2:
+    unchanged = last_applied == visibility and last_applied_hc2 == enable_hc2
+    if unchanged and known_unique_ids is None:
         return
-
     ent_reg = er.async_get(hass)
     entries = er.async_entries_for_config_entry(ent_reg, config_entry.entry_id)
+    if unchanged:
+        entries = [e for e in entries if e.unique_id not in (known_unique_ids or ())]
+        if not entries:
+            return
 
     enabled_count = 0
     disabled_count = 0
@@ -470,7 +490,10 @@ async def _async_apply_entity_visibility_tier(
         name = (entity_entry.original_name or entity_entry.name or "").lower()
         should_hide = _entity_should_be_hidden(uid, name, visibility, enable_hc2)
 
-        if should_hide and entity_entry.disabled_by is None:
+        # A new entity's own default already hides what the tier hides; only
+        # enabling is left (an HC2 entity with enable_hc2). A restored row
+        # may carry the user's own choice, which is never overridden.
+        if should_hide and entity_entry.disabled_by is None and not unchanged:
             disabler: er.RegistryEntryDisabler = er.RegistryEntryDisabler.INTEGRATION
             ent_reg.async_update_entity(
                 entity_entry.entity_id,
@@ -505,6 +528,8 @@ async def _async_apply_entity_visibility_tier(
             enabled_count,
         )
 
+    if unchanged:
+        return
     # Store the applied tier/HC2 state so this only re-runs when either changes
     hass.config_entries.async_update_entry(
         config_entry,
