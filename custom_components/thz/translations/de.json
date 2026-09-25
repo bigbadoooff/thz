@@ -3072,6 +3072,9 @@
     },
     "write_failed": {
       "message": "Schreiben von {name} fehlgeschlagen: {error}"
+    },
+    "backup_firmware_mismatch": {
+      "message": "Die Sicherung stammt von Firmware {backup}, die Wärmepumpe hat {device}. Parameter können sich zwischen Firmwares unterscheiden; mit „Andere Firmware erlauben“ wird sie trotzdem wiederhergestellt."
     }
   },
   "issues": {

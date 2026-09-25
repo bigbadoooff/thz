@@ -3072,6 +3072,9 @@
     },
     "write_failed": {
       "message": "Writing {name} failed: {error}"
+    },
+    "backup_firmware_mismatch": {
+      "message": "The backup is from firmware {backup}, the heat pump runs {device}. Parameters can differ between firmwares; turn on \"Allow other firmware\" to restore it anyway."
     }
   },
   "issues": {

@@ -17,7 +17,7 @@ import os
 from typing import Any, cast
 
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.util import dt as dt_util
 
 from ..clock_sync import (
@@ -430,6 +430,7 @@ async def async_handle_restore_parameters(
     """
     requested_filename: str | None = call.data.get("filename")
     dry_run: bool = bool(call.data.get("dry_run", False))
+    allow_other_firmware = bool(call.data.get("allow_other_firmware", False))
     only: list[str] | None = call.data.get("only")
     only_set = set(only) if only else None
 
@@ -448,6 +449,20 @@ async def async_handle_restore_parameters(
             translation_key="backup_read_failed",
             translation_placeholders={"path": str(path), "error": str(err)},
         ) from err
+
+    backup_firmware = backup_doc.get("firmware_version")
+    firmware_matches = backup_firmware in (None, device.firmware_version)
+    if not (firmware_matches or dry_run or allow_other_firmware):
+        # The same parameter name can have another range or meaning on
+        # another firmware; values are only re-resolved by name.
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="backup_firmware_mismatch",
+            translation_placeholders={
+                "backup": str(backup_firmware),
+                "device": device.firmware_version,
+            },
+        )
 
     saved_parameters: dict[str, dict[str, Any]] = backup_doc.get("parameters", {})
     restored = 0
@@ -518,6 +533,8 @@ async def async_handle_restore_parameters(
             "dry_run": dry_run,
             "file": os.path.basename(path),
             "backup_created": backup_doc.get("created"),
+            "backup_firmware": backup_firmware,
+            "firmware_matches": firmware_matches,
             "total_in_backup": len(saved_parameters),
             "restored": restored,
             "skipped_missing": skipped_missing[:20],

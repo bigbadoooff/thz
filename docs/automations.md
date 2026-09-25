@@ -127,7 +127,9 @@ automation:
 
 `thz.backup_parameters` writes all settings to a JSON file under
 `<config>/thz_backups/`; `thz.restore_parameters` writes them back (try it
-with `dry_run: true` first).
+with `dry_run: true` first). A backup taken on another firmware (for example
+before a firmware update) is only restored with `allow_other_firmware: true`,
+because a parameter of the same name can have another range there.
 
 ```yaml
 automation:

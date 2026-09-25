@@ -826,6 +826,54 @@ class TestRestoreParametersService:
         ]
         assert write_calls == []
 
+    async def _restore(self, mock_hass, backup_doc, **data):
+        entry_data = self._entry_data()
+        entry_data["device"].firmware_version = "539"
+        mock_hass.data[DOMAIN]["entry_1"] = entry_data
+        device = entry_data["device"]
+        fake_dt_util, fake_open = self._patch_common(mock_hass, backup_doc, device)
+        with (
+            patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", side_effect=fake_open),
+        ):
+            handler = await _get_handler(mock_hass, "restore_parameters")
+            call = MagicMock()
+            call.data = {"filename": "thz_backup_x.json", **data}
+            return await handler(call), device
+
+    @pytest.mark.asyncio
+    async def test_backup_of_another_firmware_is_refused(self, mock_hass):
+        with pytest.raises(ServiceValidationError) as err:
+            await self._restore(mock_hass, self._backup_doc(firmware_version="439"))
+        assert err.value.translation_key == "backup_firmware_mismatch"
+
+    @pytest.mark.asyncio
+    async def test_backup_of_another_firmware_can_be_previewed(self, mock_hass):
+        result, _ = await self._restore(
+            mock_hass, self._backup_doc(firmware_version="439"), dry_run=True
+        )
+        assert result["firmware_matches"] is False
+        assert result["backup_firmware"] == "439"
+
+    @pytest.mark.asyncio
+    async def test_backup_of_another_firmware_restores_when_allowed(self, mock_hass):
+        result, _ = await self._restore(
+            mock_hass,
+            self._backup_doc(firmware_version="439"),
+            allow_other_firmware=True,
+        )
+        assert result["restored"] == 2
+        assert result["firmware_matches"] is False
+
+    @pytest.mark.asyncio
+    async def test_backup_of_the_same_firmware_restores(self, mock_hass):
+        result, _ = await self._restore(
+            mock_hass, self._backup_doc(firmware_version="539")
+        )
+        assert result["restored"] == 2
+        assert result["firmware_matches"] is True
+
     @pytest.mark.asyncio
     async def test_only_restricts_to_subset(self, mock_hass):
         entry_data = self._entry_data()
