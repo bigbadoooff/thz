@@ -389,6 +389,28 @@ class TestState:
         assert fan._attr_available is True
 
     @pytest.mark.asyncio
+    async def test_no_fallback_stage_around_a_failed_block(self, now):
+        values = {"0A1D10": _window(6, 9), "0A056C": _word(2), **_AIRFLOWS}
+        e8 = MagicMock(last_update_success=True, data=_e8(0))
+        fan = _fan(FakeDevice(values), e8=_e8(0))
+        fan._coordinators = {"pxxE8": e8}
+        fan._recompute()
+        assert fan._stage == 0
+
+        # The program window alone would give stage 2.
+        e8.last_update_success = False
+        fan._recompute()
+        assert fan._stage == 0
+        assert fan._attr_available is False
+
+    @pytest.mark.asyncio
+    async def test_an_airflow_block_without_an_airflow_field_is_ignored(self, now):
+        fan = _fan(FakeDevice({"0A056C": _word(2)}), airflow=None)
+        fan._coordinators = {"pxxE8": MagicMock(last_update_success=False)}
+        fan._recompute()
+        assert fan._attr_available is True
+
+    @pytest.mark.asyncio
     async def test_a_failed_register_without_a_stage_is_unavailable(self, now):
         fan = _fan(FakeDevice({"0A056C": _word(2)}), airflow=None)
         fan._poller.data.failed = {"0A1D10"}

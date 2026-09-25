@@ -318,15 +318,16 @@ class THZFan(THZBaseEntity, FanEntity):
         self.async_write_ha_state()
 
     def _recompute(self) -> None:
-        # Only the data the stage computation consults decides availability;
-        # a failed refresh counts as no data, not as the stale last value.
+        # Only the data the stage computation consults decides availability.
+        # A stage computed around a failed read may come from a fallback
+        # source, so the last stage is kept and the fan is unavailable.
         self._read_failed = False
         stage = self._compute_stage(self._live_raw, self._live_block)
-        if stage is not None:
+        if self._read_failed:
+            self._set_unavailable("read failed", logging.DEBUG)
+        elif stage is not None:
             self._set_stage(stage)
             self._attr_available = True
-        elif self._read_failed:
-            self._set_unavailable("read failed", logging.DEBUG)
 
     def _coordinator_data(self, coordinator: Any) -> bytes | None:
         if not coordinator.last_update_success:
@@ -454,8 +455,10 @@ class THZFan(THZBaseEntity, FanEntity):
         block_of: Callable[[str], bytes | None],
     ) -> int | None:
         """Match the current supply airflow with the airflow of each stage."""
+        if self._airflow is None:
+            return None
         data = block_of(_AIRFLOW_BLOCK)
-        if self._airflow is None or not data:
+        if not data:
             return None
         offset, length = self._airflow
         raw = data[offset : offset + length]
