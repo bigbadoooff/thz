@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from tests.helpers import make_runtime_data, write_param
+from tests.helpers import RegisterDevice, make_runtime_data, write_param
 
 
 def _make_hass():
@@ -118,34 +118,27 @@ class TestThzScheduleTimeClearValue:
     @pytest.mark.asyncio
     async def test_clear_start_only_touches_first_byte(self):
         """Clearing the start time must preserve the existing end byte."""
-        device = _make_device(read_return=bytes([10, 20, 0, 0]))
-        device.write_value = MagicMock()
+        device = RegisterDevice(bytes([10, 20]))
         entity = self._make_entity(device, "start")
 
         await entity.async_clear_value()
 
-        device.write_value.assert_called_once_with(
-            bytes.fromhex("0B0100"), bytes([0x80, 20, 0, 0])
-        )
+        assert device.writes == [(bytes.fromhex("0B0100"), bytes([0x80, 20]))]
 
     @pytest.mark.asyncio
     async def test_clear_end_only_touches_second_byte(self):
         """Clearing the end time must preserve the existing start byte."""
-        device = _make_device(read_return=bytes([10, 20, 0, 0]))
-        device.write_value = MagicMock()
+        device = RegisterDevice(bytes([10, 20]))
         entity = self._make_entity(device, "end")
 
         await entity.async_clear_value()
 
-        device.write_value.assert_called_once_with(
-            bytes.fromhex("0B0100"), bytes([10, 0x80, 0, 0])
-        )
+        assert device.writes == [(bytes.fromhex("0B0100"), bytes([10, 0x80]))]
 
     @pytest.mark.asyncio
     async def test_clear_value_sets_native_value_none(self):
         """The schedule entity should also read back as unset after clearing."""
-        device = _make_device(read_return=bytes([10, 20, 0, 0]))
-        device.write_value = MagicMock()
+        device = RegisterDevice(bytes([10, 20]))
         entity = self._make_entity(device, "start")
 
         await entity.async_clear_value()

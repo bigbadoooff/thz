@@ -16,7 +16,10 @@ from .const import (
 )
 from .devices import assign_subdevices
 from .entity_translations import get_translation_key
-from .parameter_io import async_read_parameter, async_write_parameter
+from .parameter_io import (
+    async_update_parameter,
+    async_write_parameter,
+)
 from .parameter_poller import ReadKey
 from .register_maps.model import WriteParam
 from .register_maps.register_map_manager import RegisterMapManagerWrite
@@ -390,13 +393,11 @@ class THZTime(THZParameterEntity, TimeEntity):
         written as ``[num, 0]``.
         """
         if self._byte_index == 0 and not self._keep_other_byte:
-            payload = bytearray([num, 0])
+            await async_write_parameter(self._device, self._entry, bytes([num, 0]))
         else:
-            current = await async_read_parameter(self._device, self._entry)
-            payload = bytearray(current or b"") + bytearray(2)
-            payload = payload[:2]
-            payload[self._byte_index] = num
-        await async_write_parameter(self._device, self._entry, bytes(payload))
+            await async_update_parameter(
+                self._device, self._entry, {self._byte_index: num}
+            )
 
     async def async_clear_value(self) -> None:
         """Clear this time back to the device's own "unset" state.
@@ -479,6 +480,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             domain="time",
         )
 
+        self._entry = entry
         self._time_type = time_type
         self._attr_native_value = None
 
@@ -495,11 +497,11 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         return self._attr_native_value
 
     def _poll_key(self) -> ReadKey:
-        """Return the schedule's four data bytes; start and end share them.
+        """Return the schedule's data bytes; start and end share them.
 
-        Schedules exist only as 4.x/5.x registers whose data bytes hold
-        start and end together, so they are read and written whole here
-        rather than as one parameter through parameter_io.
+        The start entity and the end entity share this key, so the poller
+        reads the register once for both. Writes change one of the two bytes
+        (see _async_write_quarters).
         """
         return self._command, SCHEDULE_OFFSET, SCHEDULE_LENGTH
 
@@ -551,28 +553,7 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         )
 
         with raise_write_errors(self.name):
-            # Read the current schedule data (4 bytes total)
-            current_bytes = await self._device.async_execute(
-                self._device.read_value,
-                bytes.fromhex(self._command),
-                "get",
-                SCHEDULE_OFFSET,
-                SCHEDULE_LENGTH,
-            )
-
-            # Modify only the relevant byte (start or end time)
-            schedule_bytes = bytearray(current_bytes)
-            if self._time_type == "start":
-                schedule_bytes[0] = new_num
-            else:  # "end"
-                schedule_bytes[1] = new_num
-
-            # Write the modified schedule back
-            await self._device.async_execute(
-                self._device.write_value,
-                bytes.fromhex(self._command),
-                bytes(schedule_bytes),
-            )
+            await self._async_write_quarters(new_num)
 
         # Reflect what was actually written (quantized to a 15-minute
         # "quarter", with the same end-of-day 96 -> 00:00 handling
@@ -580,6 +561,17 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
         self._attr_native_value = quarters_to_time(new_num)
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms
         await self._async_after_write()
+
+    async def _async_write_quarters(self, num: int) -> None:
+        """Write ``num`` into the start or end byte, keeping the other one.
+
+        The register is read and written back in one device call, so the
+        other time of the pair is kept even if it changes meanwhile. Start
+        and end are written together, as FHEM's "7prog" type does
+        (docs/legacy/00_THZ.pm).
+        """
+        index = 0 if self._time_type == "start" else 1
+        await async_update_parameter(self._device, self._entry, {index: num})
 
     async def async_clear_value(self) -> None:
         """Clear this schedule start/end time to the device's own "unset" state.
@@ -592,28 +584,8 @@ class THZScheduleTime(THZBaseEntity, TimeEntity):
             "Clearing schedule time %s (%s) to unset", self.name, self._time_type
         )
 
-        # Read the current schedule data (4 bytes total) so only the
-        # relevant byte (start or end) is touched, same as async_set_value.
         with raise_write_errors(self.name):
-            current_bytes = await self._device.async_execute(
-                self._device.read_value,
-                bytes.fromhex(self._command),
-                "get",
-                SCHEDULE_OFFSET,
-                SCHEDULE_LENGTH,
-            )
-
-            schedule_bytes = bytearray(current_bytes)
-            if self._time_type == "start":
-                schedule_bytes[0] = TIME_VALUE_UNSET
-            else:  # "end"
-                schedule_bytes[1] = TIME_VALUE_UNSET
-
-            await self._device.async_execute(
-                self._device.write_value,
-                bytes.fromhex(self._command),
-                bytes(schedule_bytes),
-            )
+            await self._async_write_quarters(TIME_VALUE_UNSET)
 
         self._attr_native_value = None
         self.async_write_ha_state()  # Optimistically update UI; next poll confirms

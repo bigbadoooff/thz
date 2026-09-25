@@ -17,6 +17,7 @@ from custom_components.thz.clock_sync import (
 )
 from custom_components.thz.parameter_io import (
     async_read_parameter,
+    async_update_parameter,
     async_write_parameter,
     is_block_parameter,
     parameter_length,
@@ -381,3 +382,31 @@ class TestEveryWriteEntityUsesParameterIo:
         assert block[3] == 0x00
         assert block[:3] == _block_17()[:3]
         assert block[4:] == _block_17()[4:]
+
+
+class TestAsyncUpdateParameter:
+    @pytest.mark.asyncio
+    async def test_direct_parameter_is_one_device_call(self):
+        device = MagicMock()
+        device.async_execute = AsyncMock()
+        param = write_param({"command": "0A05D1"})
+
+        await async_update_parameter(device, param, {1: 30})
+
+        device.async_execute.assert_awaited_once_with(
+            device.update_value, bytes.fromhex("0A05D1"), 4, 2, {1: 30}
+        )
+
+    @pytest.mark.asyncio
+    async def test_block_parameter_writes_each_byte_in_its_block(self):
+        device = MagicMock()
+        device.async_execute = AsyncMock()
+        param = write_param(
+            name="p", command="17", write_mode="block", offset=6, length=2
+        )
+
+        await async_update_parameter(device, param, {1: 30})
+
+        device.async_execute.assert_awaited_once_with(
+            device.write_block_value, bytes.fromhex("17"), 7, 1, bytes([30])
+        )

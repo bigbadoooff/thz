@@ -578,3 +578,30 @@ class TestClose:
         with patch.object(device, "read_firmware_version", return_value="439"):
             await device.async_initialize()
         assert transport.connects == 1
+
+
+class TestUpdateValue:
+    """update_value replaces single bytes in one read and one write."""
+
+    @pytest.mark.asyncio
+    async def test_replaces_only_the_named_bytes(self):
+        device, _ = _device()
+        device.read_value = AsyncMock(return_value=bytes([1, 2, 3, 4]))
+        device.write_value = AsyncMock()
+
+        await device.update_value(b"\x0b\x14\x10", 4, 4, {1: 9})
+
+        device.read_value.assert_awaited_once_with(b"\x0b\x14\x10", "get", 4, 4)
+        device.write_value.assert_awaited_once_with(
+            b"\x0b\x14\x10", bytes([1, 9, 3, 4])
+        )
+
+    @pytest.mark.asyncio
+    async def test_short_answer_writes_nothing(self):
+        device, _ = _device()
+        device.read_value = AsyncMock(return_value=bytes([1]))
+        device.write_value = AsyncMock()
+
+        with pytest.raises(THZProtocolError, match="1 of 2 bytes"):
+            await device.update_value(b"\x0a\x05\xd1", 4, 2, {1: 9})
+        device.write_value.assert_not_awaited()

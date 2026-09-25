@@ -19,7 +19,12 @@ from custom_components.thz.time import (
     _create_time_entities,
     async_setup_entry,
 )
-from tests.helpers import FakeWriteManager, make_runtime_data, write_param
+from tests.helpers import (
+    FakeWriteManager,
+    RegisterDevice,
+    make_runtime_data,
+    write_param,
+)
 
 
 def _make_device():
@@ -434,12 +439,11 @@ class TestHolidayAndPartyTimeByte:
 
     @staticmethod
     def _entity(decode_type, read_bytes):
-        from unittest.mock import AsyncMock, MagicMock
+        from unittest.mock import MagicMock
 
         from custom_components.thz.time import THZTime
 
-        device = MagicMock()
-        device.async_execute = AsyncMock(return_value=read_bytes)
+        device = RegisterDevice(read_bytes)
         entity = THZTime(
             name="pHolidayBeginTime",
             entry=write_param({"command": "0A05D3", "decode_type": decode_type}),
@@ -464,7 +468,7 @@ class TestHolidayAndPartyTimeByte:
 
         entity, device = self._entity("8party", bytes([0x50, 0x10]))
         await entity.async_set_value(time(7, 30))
-        written = device.async_execute.await_args_list[-1].args[2]
+        written = device.writes[-1][1]
         assert written == bytes([0x50, 0x1E])
 
 
@@ -473,8 +477,7 @@ class TestPartyStartAndEnd:
 
     @staticmethod
     def _pair(read_bytes):
-        device = MagicMock()
-        device.async_execute = AsyncMock(return_value=read_bytes)
+        device = RegisterDevice(read_bytes)
         entry = write_param(
             {"command": "0A05D1", "type": "time", "decode_type": "8party"}
         )
@@ -502,13 +505,22 @@ class TestPartyStartAndEnd:
     async def test_end_write_keeps_the_start_and_writes_midnight_as_24h(self):
         _, end, device = self._pair(bytes([0x5A, 0x1C]))
         await end.async_set_value(dtime(0, 0))
-        written = device.async_execute.await_args_list[-1].args[2]
+        written = device.writes[-1][1]
         assert written == bytes([96, 0x1C])
         assert end.native_value == dtime(0, 0)
+
+    @pytest.mark.asyncio
+    async def test_short_answer_writes_nothing(self):
+        from homeassistant.exceptions import HomeAssistantError
+
+        start, _, device = self._pair(b"")
+        with pytest.raises(HomeAssistantError):
+            await start.async_set_value(dtime(7, 30))
+        assert device.writes == []
 
     @pytest.mark.asyncio
     async def test_clearing_the_end_keeps_the_start(self):
         _, end, device = self._pair(bytes([0x5A, 0x1C]))
         await end.async_clear_value()
-        written = device.async_execute.await_args_list[-1].args[2]
+        written = device.writes[-1][1]
         assert written == bytes([0x80, 0x1C])
