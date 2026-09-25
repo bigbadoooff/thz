@@ -1169,6 +1169,23 @@ class TestClockRobustness:
         assert ok is False
         assert device.writes == ["pClockHour"]
 
+    @pytest.mark.asyncio
+    async def test_a_minute_passing_during_the_write_still_counts(self):
+        from custom_components.thz.clock_sync import async_write_device_clock
+
+        class TickingDevice(_FakeClockDevice):
+            async def async_execute(self, fn, *args):
+                result = await super().async_execute(fn, *args)
+                if fn is self.write_value:
+                    self.clock["pClockMinutes"] += 1  # the clock ticks on
+                return result
+
+        device = TickingDevice(_CLOCK)
+        ok = await async_write_device_clock(
+            MagicMock(), device, _clock_write_manager(), datetime(2026, 8, 25, 10, 0)
+        )
+        assert ok is True
+
 
 class TestPeriodicClockCheck:
     """The periodic check tolerates device errors, not programming errors."""

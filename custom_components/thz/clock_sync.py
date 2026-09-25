@@ -152,9 +152,9 @@ async def async_write_device_clock(
 
     Only the components that differ from the device's current reading are
     written (all of them if the current clock cannot be read), and the result
-    is verified by reading the clock back. Returns True if the readback
-    matches ``when``; a mismatch is logged but not raised, since the write
-    itself was accepted by the device.
+    is verified by reading the clock back. Returns True if the readback is
+    within CLOCK_DRIFT_WARN_SECONDS of ``when``; a mismatch is logged but not
+    raised, since the write itself was accepted by the device.
     """
     values = {
         "pClockYear": when.year % 100,
@@ -176,7 +176,13 @@ async def async_write_device_clock(
     if readback is None:
         _LOGGER.warning("clock_sync: could not read the clock back after writing")
         return False
-    if any(readback.get(name) != value for name, value in values.items()):
+    device_time = _parts_to_datetime(readback)
+    # The clock may pass a minute boundary while the registers are written
+    # and read back; within the drift threshold counts as set.
+    if (
+        device_time is None
+        or abs((device_time - when).total_seconds()) > CLOCK_DRIFT_WARN_SECONDS
+    ):
         _LOGGER.warning(
             "clock_sync: clock readback %s does not match the written time %s",
             _parts_to_datetime(readback),

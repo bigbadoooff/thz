@@ -134,7 +134,8 @@ All notable changes to the THZ integration are documented here.
 - **A clock correction counted as done even when it did not stick.**
   Automatic clock sync and the repair's fix removed the clock issue although
   the heat pump read a different time back. Automatic sync now keeps the
-  issue, and the repair shows an error and can be tried again.
+  issue, and the repair shows an error and can be tried again. A clock that
+  moved on by a minute during the correction still counts as set.
 - **Heating circuit 2 entities added later stayed disabled** although
   *Enable heating circuit 2* was on, e.g. after selecting the HC2 block
   under Reconfigure. Entities created by a setup now always get the
