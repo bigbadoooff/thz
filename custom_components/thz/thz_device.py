@@ -6,7 +6,7 @@ All I/O runs on the event loop.
 """
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 import logging
 from typing import Any, TypeVar
 
@@ -594,6 +594,33 @@ class THZDevice:
         """
         await self.read_write_register(addr_bytes, "set", value)
         _LOGGER.debug("Value %s written to address %s", value, addr_bytes.hex())
+
+    async def update_value(
+        self,
+        addr_bytes: bytes,
+        offset: int,
+        length: int,
+        updates: Mapping[int, int],
+    ) -> None:
+        """Replace single bytes of a register value, keeping the others.
+
+        Reads ``length`` bytes at ``offset``, sets the byte at each index of
+        ``updates`` and writes the value back. Run through async_execute,
+        so no other request reaches the line between the read and the write.
+
+        Raises:
+            THZProtocolError: If the device answers fewer than ``length``
+                bytes; writing a padded value would overwrite the rest.
+        """
+        current = bytearray(await self.read_value(addr_bytes, "get", offset, length))
+        if len(current) < length:
+            raise THZProtocolError(
+                f"update_value: register {addr_bytes.hex()} answered "
+                f"{len(current)} of {length} bytes"
+            )
+        for index, value in updates.items():
+            current[index] = value
+        await self.write_value(addr_bytes, bytes(current))
 
     async def write_block_value(
         self,

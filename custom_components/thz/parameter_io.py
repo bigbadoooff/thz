@@ -18,6 +18,7 @@ helpers so that the access mode is honoured in one place.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from .const import WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
@@ -94,6 +95,32 @@ async def async_read_parameter(device: THZDevice, param: WriteParam) -> bytes:
         length,
     )
     return parameter_from_read(param, result)
+
+
+async def async_update_parameter(
+    device: THZDevice,
+    param: WriteParam,
+    updates: Mapping[int, int],
+    length: int = WRITE_REGISTER_LENGTH,
+) -> None:
+    """Replace single value bytes of a parameter, keeping the others.
+
+    ``updates`` maps a byte index of the value to its new byte. A direct
+    parameter's ``length`` value bytes are read and written back in one
+    device call.
+    A block parameter changes each byte by a read-modify-write of its block.
+    """
+    command = bytes.fromhex(param.command)
+    block = param.block
+    if block is None:
+        await device.async_execute(
+            device.update_value, command, WRITE_REGISTER_OFFSET, length, dict(updates)
+        )
+        return
+    for index, value in updates.items():
+        await device.async_execute(
+            device.write_block_value, command, block.offset + index, 1, bytes([value])
+        )
 
 
 async def async_write_parameter(

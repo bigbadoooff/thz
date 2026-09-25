@@ -117,6 +117,13 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Writing a time could overwrite the time next to it.** Schedule start
+  and end times and the party start and end share a register; a write read
+  it and wrote it back in two separate steps, and an empty answer made it
+  write zeros into the other time. The read and the write now happen in one
+  step, a short answer writes nothing, and schedules are written as start
+  and end, like FHEM does. Restoring a backup keeps the other time of the
+  party register, too.
 - **A heating circuit in standby reported the mode `off`,** which it does
   not offer (only heat and cool). It now stays `heat` and shows the
   standby as the action `off`.

@@ -31,12 +31,18 @@ from ..exceptions import DEVICE_ERRORS, THZNotSupportedError
 from ..notify import async_notify
 from ..parameter_io import (
     async_read_parameter,
+    async_update_parameter,
     async_write_parameter,
     parameter_length,
 )
 from ..register_maps.model import WriteParam
 from ..thz_device import THZDevice
-from ..time import quarters_to_time, time_byte_index, time_to_quarters
+from ..time import (
+    TWO_TIME_DECODE_TYPES,
+    quarters_to_time,
+    time_byte_index,
+    time_to_quarters,
+)
 from ..value_codec import THZValueCodec
 from .common import _require_target_entry_data
 
@@ -316,11 +322,11 @@ def _clamp_to_entry_range(value: float, entry: WriteParam) -> float:
     return value
 
 
-async def _encode_restore_value(
-    hass: HomeAssistant, device: THZDevice, entry: WriteParam, value: Any
-) -> bytes:
+def _encode_restore_value(entry: WriteParam, value: Any) -> bytes | dict[int, int]:
     """Encode a backed-up value for writing to the entry's register.
 
+    Returns the value bytes, or for a time sharing its register with another
+    value the bytes to replace by index (see async_update_parameter).
     Raises ValueError, TypeError, KeyError or IndexError for a value that
     does not fit the entry.
     """
@@ -337,18 +343,28 @@ async def _encode_restore_value(
     if reg_type == "select":
         return THZValueCodec.encode_select(value, entry.decode_type)
     if reg_type == "time":
-        payload = bytearray(2)
-        payload[time_byte_index(entry.decode_type)] = time_to_quarters(
-            _parse_hhmm(value)
-        )
-        return bytes(payload)
+        index = time_byte_index(entry.decode_type)
+        quarters = time_to_quarters(_parse_hhmm(value))
+        if index == 0 and entry.decode_type not in TWO_TIME_DECODE_TYPES:
+            return bytes([quarters, 0])
+        return {index: quarters}  # the register's other time stays
     # "schedule": keep the register's other bytes, replace start and end.
     start_value = _parse_hhmm(value.get("start")) if value else None
     end_value = _parse_hhmm(value.get("end")) if value else None
-    schedule_bytes = bytearray(await _read_schedule(hass, device, entry.command))
-    schedule_bytes[0] = time_to_quarters(start_value)
-    schedule_bytes[1] = time_to_quarters(end_value, is_end_time=True)
-    return bytes(schedule_bytes)
+    return {
+        0: time_to_quarters(start_value),
+        1: time_to_quarters(end_value, is_end_time=True),
+    }
+
+
+async def _async_restore(
+    device: THZDevice, entry: WriteParam, value: bytes | dict[int, int]
+) -> None:
+    """Write an encoded backup value (see _encode_restore_value)."""
+    if isinstance(value, bytes):
+        await async_write_parameter(device, entry, value)
+    else:
+        await async_update_parameter(device, entry, value)
 
 
 def _restore_notification(
@@ -450,15 +466,13 @@ async def async_handle_restore_parameters(
             skipped_missing.append(name)
             continue
         try:
-            value_bytes = await _encode_restore_value(
-                hass, device, entry, saved.get("value")
-            )
+            value = _encode_restore_value(entry, saved.get("value"))
         except (ValueError, TypeError, KeyError, IndexError) as err:
             failed.append(f"{name}: {err}")
             continue
         if not dry_run:
             try:
-                await async_write_parameter(device, entry, value_bytes)
+                await _async_restore(device, entry, value)
             except DEVICE_ERRORS as err:
                 failed.append(f"{name}: {err}")
                 continue

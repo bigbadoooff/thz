@@ -257,3 +257,31 @@ class FakePoller:
         self.data[key] = value
         for update_callback in list(self.callbacks.get(key, [])):
             update_callback(value)
+
+
+class RegisterDevice:
+    """THZDevice double holding one register value; async_execute runs the call.
+
+    read_value answers the value (cut to the requested length), write_value
+    records the write and keeps the new value, update_value is THZDevice's
+    own read-modify-write.
+    """
+
+    def __init__(self, value=b""):
+        self.value = value
+        self.writes = []
+
+    async def async_execute(self, fn, *args, **_kwargs):
+        return await fn(*args)
+
+    async def read_value(self, addr_bytes, get_or_set, offset, length):
+        return self.value[:length]
+
+    async def write_value(self, addr_bytes, value):
+        self.writes.append((addr_bytes, value))
+        self.value = value
+
+    async def update_value(self, *args):
+        from custom_components.thz.thz_device import THZDevice
+
+        await THZDevice.update_value(self, *args)  # type: ignore[arg-type]
