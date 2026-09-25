@@ -57,6 +57,8 @@ _RESTORABLE_REGISTER_TYPES = {"number", "switch", "select", "time", "schedule"}
 # Schedule registers hold start and end quarter-hours in their first two bytes.
 _SCHEDULE_OFFSET = 4
 _SCHEDULE_LENGTH = 4
+# Marks a backup record without a saved party end (see _encode_restore_value).
+_NO_END = object()
 
 
 def _backups_dir(hass: HomeAssistant) -> str:
@@ -142,6 +144,14 @@ async def _read_backup_value(
     if reg_type == "select":
         return THZValueCodec.decode_select(value_bytes, entry.decode_type)
     # "time"
+    if entry.decode_type in TWO_TIME_DECODE_TYPES:
+        # Party: start in the second data byte, end in the first.
+        if len(value_bytes) < 2:
+            raise ValueError("no data received")
+        return {
+            "start": _format_hhmm(quarters_to_time(value_bytes[1])),
+            "end": _format_hhmm(quarters_to_time(value_bytes[0])),
+        }
     index = time_byte_index(entry.decode_type)
     return _format_hhmm(quarters_to_time(value_bytes[index]))
 
@@ -168,11 +178,12 @@ async def _read_all_parameters(
             read_errors.append(f"{name}: {err}")
             _LOGGER.warning("backup_parameters: failed to read %s: %s", name, err)
             continue
-        parameters[name] = {
-            "type": entry.type,
-            "command": entry.command,
-            "value": value,
-        }
+        record = {"type": entry.type, "command": entry.command, "value": value}
+        if entry.type == "time" and isinstance(value, dict):
+            # The party end gets its own key; "value" stays the start as a
+            # plain time, which every version of restore understands.
+            record["value"], record["end"] = value["start"], value["end"]
+        parameters[name] = record
     return parameters, read_errors
 
 
@@ -342,11 +353,14 @@ def _clamp_to_entry_range(value: float, entry: WriteParam) -> float:
     return value
 
 
-def _encode_restore_value(entry: WriteParam, value: Any) -> bytes | dict[int, int]:
+def _encode_restore_value(
+    entry: WriteParam, value: Any, end: Any = _NO_END
+) -> bytes | dict[int, int]:
     """Encode a backed-up value for writing to the entry's register.
 
     Returns the value bytes, or for a time sharing its register with another
-    value the bytes to replace by index (see async_update_parameter).
+    value the bytes to replace by index (see async_update_parameter). ``end``
+    is the party end saved next to the start, if the backup has one.
     Raises ValueError, TypeError, KeyError or IndexError for a value that
     does not fit the entry.
     """
@@ -363,6 +377,12 @@ def _encode_restore_value(entry: WriteParam, value: Any) -> bytes | dict[int, in
     if reg_type == "select":
         return THZValueCodec.encode_select(value, entry.decode_type)
     if reg_type == "time":
+        if entry.decode_type in TWO_TIME_DECODE_TYPES and end is not _NO_END:
+            return {
+                1: time_to_quarters(_parse_hhmm(value)),
+                0: time_to_quarters(_parse_hhmm(end), is_end_time=True),
+            }
+        # A single time, or a party start saved without its end.
         index = time_byte_index(entry.decode_type)
         quarters = time_to_quarters(_parse_hhmm(value))
         if index == 0 and entry.decode_type not in TWO_TIME_DECODE_TYPES:
@@ -517,7 +537,9 @@ async def async_handle_restore_parameters(
             skipped_missing.append(name)
             continue
         try:
-            value = _encode_restore_value(entry, saved.get("value"))
+            value = _encode_restore_value(
+                entry, saved.get("value"), saved.get("end", _NO_END)
+            )
         except (ValueError, TypeError, KeyError, IndexError) as err:
             failed.append(f"{name}: {err}")
             continue
