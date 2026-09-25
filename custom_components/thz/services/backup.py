@@ -142,6 +142,14 @@ async def _read_backup_value(
     if reg_type == "select":
         return THZValueCodec.decode_select(value_bytes, entry.decode_type)
     # "time"
+    if entry.decode_type in TWO_TIME_DECODE_TYPES:
+        # Party: start in the second data byte, end in the first.
+        if len(value_bytes) < 2:
+            raise ValueError("no data received")
+        return {
+            "start": _format_hhmm(quarters_to_time(value_bytes[1])),
+            "end": _format_hhmm(quarters_to_time(value_bytes[0])),
+        }
     index = time_byte_index(entry.decode_type)
     return _format_hhmm(quarters_to_time(value_bytes[index]))
 
@@ -363,6 +371,12 @@ def _encode_restore_value(entry: WriteParam, value: Any) -> bytes | dict[int, in
     if reg_type == "select":
         return THZValueCodec.encode_select(value, entry.decode_type)
     if reg_type == "time":
+        if entry.decode_type in TWO_TIME_DECODE_TYPES and isinstance(value, dict):
+            return {
+                1: time_to_quarters(_parse_hhmm(value.get("start"))),
+                0: time_to_quarters(_parse_hhmm(value.get("end")), is_end_time=True),
+            }
+        # A single time, or a party start saved as a plain value.
         index = time_byte_index(entry.decode_type)
         quarters = time_to_quarters(_parse_hhmm(value))
         if index == 0 and entry.decode_type not in TWO_TIME_DECODE_TYPES:

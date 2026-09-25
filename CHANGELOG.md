@@ -125,6 +125,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Parameter backups lost the party end.** The party register holds the
+  party start and end, but a backup saved only the start. Backups now hold
+  both (`{"start": ..., "end": ...}`), and a restore writes both; older
+  backups still restore the start.
 - **A backup was lost when the clock correction failed.** A backup also
   corrects a heat pump clock that is more than an hour off; if that write
   failed, the parameters already read were thrown away. The backup is now
