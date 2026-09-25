@@ -540,6 +540,7 @@ class TestBackupParametersService:
     def _entry_data(self):
         device = MagicMock()
         device.firmware_version = "1.0"
+        device.firmware_profile = "1.0technician"
         write_manager = FakeWriteManager(_sample_write_registers())
         return {
             "device": device,
@@ -617,6 +618,8 @@ class TestBackupParametersService:
 
         doc = json.loads(written["content"])
         assert doc["device_id"] == "thz-1234"
+        assert doc["firmware_version"] == "1.0"
+        assert doc["firmware_profile"] == "1.0technician"
         assert doc["parameter_count"] == 2
         assert "HeatingCurve" in doc["parameters"]
         assert doc["parameters"]["HeatingCurve"]["value"] == pytest.approx(2.0)
@@ -826,9 +829,10 @@ class TestRestoreParametersService:
         ]
         assert write_calls == []
 
-    async def _restore(self, mock_hass, backup_doc, **data):
+    async def _restore(self, mock_hass, backup_doc, profile="539", **data):
         entry_data = self._entry_data()
         entry_data["device"].firmware_version = "539"
+        entry_data["device"].firmware_profile = profile
         mock_hass.data[DOMAIN]["entry_1"] = entry_data
         device = entry_data["device"]
         fake_dt_util, fake_open = self._patch_common(mock_hass, backup_doc, device)
@@ -865,6 +869,17 @@ class TestRestoreParametersService:
         )
         assert result["restored"] == 2
         assert result["firmware_matches"] is False
+
+    @pytest.mark.asyncio
+    async def test_the_firmware_profile_is_compared_when_saved(self, mock_hass):
+        # Same reported firmware, but the maps were forced to another profile.
+        backup_doc = self._backup_doc(
+            firmware_version="539", firmware_profile="539technician"
+        )
+        with pytest.raises(ServiceValidationError):
+            await self._restore(mock_hass, backup_doc)
+        result, _ = await self._restore(mock_hass, backup_doc, profile="539technician")
+        assert result["firmware_matches"] is True
 
     @pytest.mark.asyncio
     async def test_backup_of_the_same_firmware_restores(self, mock_hass):

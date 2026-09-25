@@ -246,6 +246,9 @@ async def async_handle_backup_parameters(
         "device_id": entry_data.device_id,
         "entry_id": entry_id,
         "firmware_version": getattr(device, "firmware_version", None),
+        # The profile that chose the register maps (a forced override or the
+        # reported firmware); restore compares it.
+        "firmware_profile": getattr(device, "firmware_profile", None),
         "parameter_count": len(parameters),
         "parameters": parameters,
     }
@@ -357,6 +360,22 @@ def _encode_restore_value(entry: WriteParam, value: Any) -> bytes | dict[int, in
     }
 
 
+def _firmwares_to_compare(
+    backup_doc: dict[str, Any], device: THZDevice
+) -> tuple[str | None, str]:
+    """Return the backup's and the heat pump's firmware, as restore compares them.
+
+    The register maps follow the firmware profile (a forced override or the
+    reported firmware), so that is compared when the backup has it; older
+    backups only have the reported firmware.
+    """
+    profile = backup_doc.get("firmware_profile")
+    if profile is not None:
+        return str(profile), device.firmware_profile
+    reported = backup_doc.get("firmware_version")
+    return (None if reported is None else str(reported)), device.firmware_version
+
+
 async def _async_restore(
     device: THZDevice, entry: WriteParam, value: bytes | dict[int, int]
 ) -> None:
@@ -450,8 +469,8 @@ async def async_handle_restore_parameters(
             translation_placeholders={"path": str(path), "error": str(err)},
         ) from err
 
-    backup_firmware = backup_doc.get("firmware_version")
-    firmware_matches = backup_firmware in (None, device.firmware_version)
+    backup_firmware, device_firmware = _firmwares_to_compare(backup_doc, device)
+    firmware_matches = backup_firmware in (None, device_firmware)
     if not (firmware_matches or dry_run or allow_other_firmware):
         # The same parameter name can have another range or meaning on
         # another firmware; values are only re-resolved by name.
@@ -460,7 +479,7 @@ async def async_handle_restore_parameters(
             translation_key="backup_firmware_mismatch",
             translation_placeholders={
                 "backup": str(backup_firmware),
-                "device": device.firmware_version,
+                "device": device_firmware,
             },
         )
 
