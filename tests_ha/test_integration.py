@@ -21,6 +21,7 @@ from pytest_homeassistant_custom_component.components.diagnostics import (
 )
 
 from custom_components.thz.const import DOMAIN
+from custom_components.thz.exceptions import THZConnectionError
 from custom_components.thz.parameter_poller import SUBSCRIBE_DELAY
 from custom_components.thz.register_maps.register_map_manager import (
     RegisterMapManagerWrite,
@@ -332,3 +333,22 @@ async def test_each_block_is_read_once_at_startup(hass, fake_device):
     ]
 
     assert len(reads) == 3
+
+
+async def test_block_failing_at_startup_is_retried_at_once(hass, fake_device):
+    real_send = fake_device.send_request
+    failures = {"left": 1}  # only the first read fails
+
+    async def send_request(self, telegram, get_or_set):
+        body = self.unescape(telegram[2:-2])[1:]
+        if get_or_set == "get" and body == b"\xf3" and failures["left"]:
+            failures["left"] -= 1
+            raise THZConnectionError("no answer")
+        return await real_send(self, telegram, get_or_set)
+
+    with patch.object(fake_device, "send_request", send_request):
+        entry = await setup_entry(hass)
+        await hass.async_block_till_done()
+
+    assert entry.runtime_data.coordinators["pxxF3"].last_update_success
+    assert await hass.config_entries.async_unload(entry.entry_id)
