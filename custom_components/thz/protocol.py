@@ -24,10 +24,13 @@ HEADER_GET = b"\x01\x00"
 HEADER_SET = b"\x01\x80"
 FOOTER = const.DATALINKESCAPE + const.ENDOFTEXT
 
-# Shortest data telegram accepted as complete (see frame_complete).
-DATA_TELEGRAM_MIN = 8
-# Shortest answer to a SET: header (01 xx) and the 10 03 terminator.
-SET_ANSWER_MIN = 4
+# Shortest answer accepted as complete: header (01 xx) and the 10 03
+# terminator. Error answers (01 01 .. 01 04) can be that short, for a GET
+# as for a SET (FHEM's THZ_ReadAnswer has no minimum length).
+ANSWER_MIN = 4
+# Shortest data answer that carries a payload: 01 00, checksum, the
+# command echo and 10 03.
+DATA_ANSWER_MIN = 6
 
 # Error headers of an answer, as named in FHEM's THZ_decode.
 _ERROR_HEADERS = {
@@ -85,18 +88,15 @@ def build_telegram(get_or_set: str, payload: bytes) -> bytes:
     )
 
 
-def frame_complete(
-    data: bytes | bytearray, min_length: int = DATA_TELEGRAM_MIN
-) -> bool:
+def frame_complete(data: bytes | bytearray, min_length: int = ANSWER_MIN) -> bool:
     """Return True if ``data`` ends with an unescaped 0x10 0x03 terminator.
 
     A data byte 0x10 is sent escaped as 0x10 0x10, so ``... 10 10 03`` is
     an escaped 0x10 followed by a data byte 0x03, not the end of the frame.
     The terminator's 0x10 is real only if the run of 0x10 bytes before the
-    final 0x03 has odd length. ``min_length`` is the shortest frame accepted:
-    a data telegram has at least 8 bytes, the answer to a SET only a header
-    and the terminator (FHEM's THZ_ReadAnswer reads until a message starting
-    01 ends in 10 03).
+    final 0x03 has odd length. ``min_length`` is the shortest frame
+    accepted, a header and the terminator by default: FHEM's THZ_ReadAnswer
+    reads until a message starting 01 ends in 10 03, whatever its length.
     """
     if len(data) < min_length or data[-1] != const.ENDOFTEXT[0]:
         return False
@@ -121,12 +121,14 @@ def decode_answer(data: bytes) -> bytes:
     THZNotSupportedError for ``01 04`` (unknown register, a permanent
     property of the firmware) and THZProtocolError for any other answer.
     """
-    if len(data) < 6:
-        raise THZGarbledAnswerError(f"Response too short: {data.hex()}")
-
+    raw_hex = data.hex()
     data = unescape(data)
     header = data[0:2]
+    # The header decides first, as in FHEM's THZ_decode: an error answer is
+    # shorter than any data answer.
     if header in (HEADER_SET, HEADER_GET):
+        if len(data) < DATA_ANSWER_MIN:
+            raise THZGarbledAnswerError(f"Response too short: {raw_hex}")
         crc = data[2]
         payload = data[3:-2]
         calculated = checksum(data[:2] + b"\x00" + payload)

@@ -362,7 +362,7 @@ class TestRegisterAccess:
         device, _ = _device()
         with (
             patch.object(device, "send_request", return_value=b"raw"),
-            pytest.raises(THZGarbledAnswerError, match="Response too short"),
+            pytest.raises(THZGarbledAnswerError, match="Unknown response"),
         ):
             await device.read_write_register(b"\xfb", "get")
 
@@ -667,3 +667,29 @@ class TestUndecodableAnswer:
         with patch.object(device, "send_request", send):
             await device.read_write_register(b"\x0a\x01\x12", "set", b"\x01\x00")
         send.assert_awaited_once()
+
+
+class TestShortErrorAnswers:
+    """A GET's error answer is complete at 01 xx ... 10 03, however short.
+
+    FHEM's THZ_ReadAnswer reads until a message starting with 01 ends in
+    10 03, and THZ_decode looks at the header first (docs/legacy/00_THZ.pm).
+    """
+
+    @pytest.mark.asyncio
+    async def test_unknown_register_answer_is_not_supported(self):
+        transport = ScriptedTransport(
+            responder=heat_pump_responder(b"\x01\x04\x05\x10\x03")
+        )
+        device = device_with_transport(transport)
+        with pytest.raises(THZNotSupportedError):
+            await device.read_write_register(b"\xfb", "get")
+
+    @pytest.mark.asyncio
+    async def test_command_not_known_answer_says_so(self):
+        transport = ScriptedTransport(
+            responder=heat_pump_responder(b"\x01\x03\x04\x10\x03")
+        )
+        device = device_with_transport(transport)
+        with pytest.raises(THZProtocolError, match="command not known"):
+            await device.read_write_register(b"\xfb", "get")

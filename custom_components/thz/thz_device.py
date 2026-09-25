@@ -247,13 +247,8 @@ class THZDevice:
             _LOGGER.debug(error_msg)
             raise THZProtocolError(error_msg)
 
-    async def _receive_data_telegram(
-        self, min_length: int = protocol.DATA_TELEGRAM_MIN
-    ) -> bytes:
-        """Send confirmation and read data telegram until 0x10 0x03 terminator.
-
-        Args:
-            min_length: Shortest frame accepted, see _frame_complete.
+    async def _receive_data_telegram(self) -> bytes:
+        """Send confirmation and read the answer until its 0x10 0x03 terminator.
 
         Returns:
             The raw data telegram bytes (including the 0x10 0x03 terminator),
@@ -267,7 +262,7 @@ class THZDevice:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + self.read_timeout
         data = bytearray()
-        while not (self._frame_complete(data, min_length) or data == const.NAK):
+        while not (self._frame_complete(data) or data == const.NAK):
             remaining = deadline - loop.time()
             if remaining <= 0:
                 error_msg = (
@@ -329,9 +324,7 @@ class THZDevice:
         else:
             # Like FHEM's THZ_Get_Comunication, read the device's answer to a
             # SET too and require its acknowledgement (see _check_set_answer).
-            answer = await self._receive_data_telegram(
-                min_length=protocol.SET_ANSWER_MIN
-            )
+            answer = await self._receive_data_telegram()
             self._check_set_answer(answer)
             data = b""
 

@@ -28,10 +28,11 @@ def test_escaped_bytes_in_a_telegram():
 @pytest.mark.parametrize(
     ("data", "min_length", "complete"),
     [
-        (b"\x01\x80\x10\x03", protocol.SET_ANSWER_MIN, True),
-        (b"\x01\x80\x10\x03", protocol.DATA_TELEGRAM_MIN, False),
-        (b"\x01\x00\xaa\xfb\x00\x00\x10\x03", protocol.DATA_TELEGRAM_MIN, True),
-        (b"\x01\x00\xaa\xfb\x00\x10\x10\x03", protocol.DATA_TELEGRAM_MIN, False),
+        (b"\x01\x80\x10\x03", protocol.ANSWER_MIN, True),
+        (b"\x01\x04\x05\x10\x03", protocol.ANSWER_MIN, True),
+        (b"\x01\x80\x10\x03", 5, False),
+        (b"\x01\x00\xaa\xfb\x00\x00\x10\x03", protocol.ANSWER_MIN, True),
+        (b"\x01\x00\xaa\xfb\x00\x10\x10\x03", protocol.ANSWER_MIN, False),
     ],
 )
 def test_frame_complete(data, min_length, complete):
