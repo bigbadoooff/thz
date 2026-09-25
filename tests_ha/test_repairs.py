@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from unittest.mock import patch
 
 from homeassistant.components.repairs import repairs_flow_manager
 from homeassistant.helpers import issue_registry as ir
@@ -80,3 +81,49 @@ async def test_removing_the_entry_removes_the_issue(hass, fake_device, freezer):
     assert await hass.config_entries.async_remove(entry.entry_id)
     issue_id = f"clock_drift_{entry.entry_id}"
     assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+
+
+def _ignore_clock_writes(fake_device):
+    """The heat pump acknowledges a write of the hour but keeps its value."""
+    real_send = fake_device.send_request
+
+    async def send_request(self, telegram, get_or_set):
+        body = self.unescape(telegram[2:-2])[1:]
+        if get_or_set == "set" and body[:3] == bytes.fromhex("0A0125"):
+            self.sent.append(telegram)
+            return b""
+        return await real_send(self, telegram, get_or_set)
+
+    return patch.object(fake_device, "send_request", send_request)
+
+
+async def test_unconfirmed_repair_shows_an_error(hass, fake_device, freezer):
+    freezer.move_to(datetime(2026, 9, 21, 8, 0, tzinfo=dt_util.get_default_time_zone()))
+    fake_device.initial_registers = _clock_registers()
+    assert await async_setup_component(hass, "repairs", {})
+    entry = await setup_entry(hass)
+    issue_id = f"clock_drift_{entry.entry_id}"
+    await _check(hass, entry)
+
+    manager = repairs_flow_manager(hass)
+    result = await manager.async_init(DOMAIN, data={"issue_id": issue_id})
+    with _ignore_clock_writes(fake_device):
+        result = await manager.async_configure(result["flow_id"], {})
+
+    assert result["type"] == "form"
+    assert result["errors"] == {"base": "not_confirmed"}
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is not None
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_unconfirmed_auto_sync_keeps_the_issue(hass, fake_device, freezer):
+    freezer.move_to(datetime(2026, 9, 21, 8, 0, tzinfo=dt_util.get_default_time_zone()))
+    fake_device.initial_registers = _clock_registers()
+    entry = await setup_entry(hass, auto_sync_clock=True)
+
+    with _ignore_clock_writes(fake_device):
+        await _check(hass, entry)
+
+    issue_id = f"clock_drift_{entry.entry_id}"
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is not None
+    assert await hass.config_entries.async_unload(entry.entry_id)

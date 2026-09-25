@@ -726,6 +726,23 @@ class TestListParameterBackupsService:
         assert result["backups"] == []
 
 
+def _store_writes(device, on_write=None):
+    """Registers read back what was written to them, else zero."""
+    registers = {}
+
+    async def fake_execute(fn, *args, **kwargs):
+        if fn is device.write_value:
+            registers[args[0]] = args[1]
+            if on_write is not None:
+                on_write(args)
+            return None
+        if fn is device.read_value:
+            return registers.get(args[0], bytes([0, 0]))
+        raise AssertionError(f"unexpected fn {fn}")
+
+    device.async_execute = AsyncMock(side_effect=fake_execute)
+
+
 class TestRestoreParametersService:
     """Tests for the restore_parameters service handler."""
 
@@ -773,14 +790,7 @@ class TestRestoreParametersService:
         fake_dt_util = MagicMock()
         fake_dt_util.now = MagicMock(return_value=datetime(2026, 8, 25, 10, 0))
 
-        async def fake_execute(fn, *args, **kwargs):
-            if fn is device.write_value:
-                return None
-            if fn is device.read_value:
-                return bytes([0, 0])
-            raise AssertionError(f"unexpected fn {fn}")
-
-        device.async_execute = AsyncMock(side_effect=fake_execute)
+        _store_writes(device)
 
         async def fake_executor_job(func, *args, **kwargs):
             return func(*args, **kwargs)
@@ -959,15 +969,7 @@ class TestRestoreParametersService:
 
         written_commands = []
 
-        async def fake_execute(fn, *args, **kwargs):
-            if fn is device.write_value:
-                written_commands.append(args[0])
-                return None
-            if fn is device.read_value:
-                return bytes([0, 0])
-            raise AssertionError(f"unexpected fn {fn}")
-
-        device.async_execute = AsyncMock(side_effect=fake_execute)
+        _store_writes(device, lambda args: written_commands.append(args[0]))
 
         with (
             patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
@@ -1010,6 +1012,33 @@ class TestRestoreParametersService:
                 await handler(call)
 
     @pytest.mark.asyncio
+    async def test_unconfirmed_clock_is_reported_as_failed(self, mock_hass):
+        entry_data = self._entry_data()
+        mock_hass.data[DOMAIN]["entry_1"] = entry_data
+        device = entry_data["device"]
+        backup_doc = self._backup_doc()
+        fake_dt_util, fake_open = self._patch_common(mock_hass, backup_doc, device)
+
+        async def fake_execute(fn, *args, **kwargs):
+            # Every write is acknowledged, but nothing is stored.
+            return bytes([0, 0]) if fn is device.read_value else None
+
+        device.async_execute = AsyncMock(side_effect=fake_execute)
+
+        with (
+            patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", side_effect=fake_open),
+        ):
+            handler = await _get_handler(mock_hass, "restore_parameters")
+            call = MagicMock()
+            call.data = {"filename": "thz_backup_x.json", "only": [], "dry_run": False}
+            result = await handler(call)
+
+        assert result["clock_synced"] is False
+        assert "<device clock>: read-back does not match" in result["failed"]
+
+    @pytest.mark.asyncio
     async def test_clock_never_restored_from_backup_value(self, mock_hass):
         """pClock* entries in the backup are skipped; clock is synced to local time."""
         entry_data = self._entry_data()
@@ -1020,15 +1049,7 @@ class TestRestoreParametersService:
 
         clock_writes = []
 
-        async def fake_execute(fn, *args, **kwargs):
-            if fn is device.write_value:
-                clock_writes.append(args)
-                return None
-            if fn is device.read_value:
-                return bytes([0, 0])
-            raise AssertionError(f"unexpected fn {fn}")
-
-        device.async_execute = AsyncMock(side_effect=fake_execute)
+        _store_writes(device, clock_writes.append)
 
         with (
             patch("custom_components.thz.services.backup.dt_util", fake_dt_util),
@@ -1168,6 +1189,68 @@ class TestClockRobustness:
         )
         assert ok is False
         assert device.writes == ["pClockHour"]
+
+    @pytest.mark.asyncio
+    async def test_a_minute_passing_during_the_write_still_counts(self):
+        from custom_components.thz.clock_sync import async_write_device_clock
+
+        class TickingDevice(_FakeClockDevice):
+            async def async_execute(self, fn, *args):
+                result = await super().async_execute(fn, *args)
+                if fn is self.write_value:
+                    self.clock["pClockMinutes"] += 1  # the clock ticks on
+                return result
+
+        device = TickingDevice(_CLOCK)
+        ok = await async_write_device_clock(
+            MagicMock(), device, _clock_write_manager(), datetime(2026, 8, 25, 10, 0)
+        )
+        assert ok is True
+
+    @pytest.mark.asyncio
+    async def test_a_slow_write_compares_with_the_clock_run_on(self, monkeypatch):
+        from custom_components.thz import clock_sync
+
+        now = [1000.0]
+        monkeypatch.setattr(clock_sync.time, "monotonic", lambda: now[0])
+
+        class SlowDevice(_FakeClockDevice):
+            async def async_execute(self, fn, *args):
+                result = await super().async_execute(fn, *args)
+                if fn is self.write_value:
+                    # Retries on the serial link took five minutes.
+                    now[0] += 300
+                    self.clock["pClockMinutes"] += 5
+                return result
+
+        device = SlowDevice(_CLOCK)
+        ok = await clock_sync.async_write_device_clock(
+            MagicMock(), device, _clock_write_manager(), datetime(2026, 8, 25, 10, 0)
+        )
+        assert ok is True
+
+    @pytest.mark.asyncio
+    async def test_a_read_back_across_the_hour_is_read_again(self):
+        from custom_components.thz.clock_sync import async_write_device_clock
+
+        class RollingDevice(_FakeClockDevice):
+            async def async_execute(self, fn, *args):
+                result = await super().async_execute(fn, *args)
+                name = self.COMMANDS[args[0].hex().upper()]
+                # 10:59 turns into 11:00 between reading the hour and minutes.
+                if (
+                    fn is self.read_value
+                    and name == "pClockHour"
+                    and self.clock["pClockMinutes"] == 59
+                ):
+                    self.clock.update(pClockHour=11, pClockMinutes=0)
+                return result
+
+        device = RollingDevice(_CLOCK)
+        ok = await async_write_device_clock(
+            MagicMock(), device, _clock_write_manager(), datetime(2026, 8, 25, 10, 59)
+        )
+        assert ok is True
 
 
 class TestPeriodicClockCheck:

@@ -24,6 +24,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime, timedelta
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from homeassistant.core import HomeAssistant
@@ -64,6 +65,7 @@ CLOCK_REGISTER_NAMES = (
 # only flag/act on drift beyond these thresholds.
 CLOCK_DRIFT_WARN_SECONDS = 60  # periodic check: log + optionally auto-correct
 CLOCK_DRIFT_BACKUP_SECONDS = 3600  # backup: always auto-correct past this
+_READBACK_ATTEMPTS = 2  # a read-back across an hour rollover is read again
 CLOCK_CHECK_INTERVAL = timedelta(minutes=15)
 # Attempts per clock register read before the clock is treated as unreadable.
 CLOCK_READ_ATTEMPTS = 3
@@ -152,9 +154,10 @@ async def async_write_device_clock(
 
     Only the components that differ from the device's current reading are
     written (all of them if the current clock cannot be read), and the result
-    is verified by reading the clock back. Returns True if the readback
-    matches ``when``; a mismatch is logged but not raised, since the write
-    itself was accepted by the device.
+    is verified by reading the clock back. Returns True if the readback is
+    within CLOCK_DRIFT_WARN_SECONDS of ``when`` plus the time the write took
+    (read twice at most); a mismatch is logged but not raised, since the
+    write itself was accepted by the device.
     """
     values = {
         "pClockYear": when.year % 100,
@@ -163,6 +166,7 @@ async def async_write_device_clock(
         "pClockHour": when.hour,
         "pClockMinutes": when.minute,
     }
+    started = time.monotonic()
     current = await _read_clock_parts(hass, device, write_manager) or {}
     for name, value in values.items():
         entry = write_manager.param(name)
@@ -172,18 +176,30 @@ async def async_write_device_clock(
             value, 1.0, entry.decode_type, parameter_length(entry)
         )
         await async_write_parameter(device, entry, value_bytes)
-    readback = await _read_clock_parts(hass, device, write_manager)
-    if readback is None:
-        _LOGGER.warning("clock_sync: could not read the clock back after writing")
-        return False
-    if any(readback.get(name) != value for name, value in values.items()):
-        _LOGGER.warning(
-            "clock_sync: clock readback %s does not match the written time %s",
-            _parts_to_datetime(readback),
-            when,
-        )
-        return False
-    return True
+    # The registers are read one at a time, so a read-back that straddles an
+    # hour or day rollover mixes two times; a second read settles it. Within
+    # the drift threshold counts as set, since a minute may pass meanwhile.
+    device_time: datetime | None = None
+    for _attempt in range(_READBACK_ATTEMPTS):
+        readback = await _read_clock_parts(hass, device, write_manager)
+        if readback is None:
+            _LOGGER.warning("clock_sync: could not read the clock back after writing")
+            return False
+        device_time = _parts_to_datetime(readback)
+        # Serial retries can stretch the write; the clock ran on meanwhile.
+        expected = when + timedelta(seconds=time.monotonic() - started)
+        if (
+            device_time is not None
+            and abs((device_time - expected).total_seconds())
+            <= CLOCK_DRIFT_WARN_SECONDS
+        ):
+            return True
+    _LOGGER.warning(
+        "clock_sync: clock readback %s does not match the written time %s",
+        device_time,
+        when,
+    )
+    return False
 
 
 async def async_check_and_maybe_sync_clock(
@@ -208,8 +224,11 @@ async def async_check_and_maybe_sync_clock(
     if abs(drift) <= CLOCK_DRIFT_WARN_SECONDS:
         ir.async_delete_issue(hass, DOMAIN, issue_id)
         return
-    if config_entry.data.get("auto_sync_clock", False):
-        await async_write_device_clock(hass, device, write_manager, local_now)
+    # A correction the read-back does not confirm (logged by
+    # async_write_device_clock) is reported like the drift without auto sync.
+    if config_entry.data.get(
+        "auto_sync_clock", False
+    ) and await async_write_device_clock(hass, device, write_manager, local_now):
         ir.async_delete_issue(hass, DOMAIN, issue_id)
         _LOGGER.info(
             "Corrected the heat pump clock by %.0f minute(s) (it read %s)",

@@ -471,6 +471,24 @@ async def _async_backup_path(
     return path
 
 
+async def _async_restore_clock(
+    hass: HomeAssistant,
+    device: THZDevice,
+    write_manager: Any,
+    local_now: datetime,
+    failed: list[str],
+) -> bool:
+    """Set the device clock to ``local_now``; a failure is added to ``failed``."""
+    try:
+        synced = await async_write_device_clock(hass, device, write_manager, local_now)
+    except DEVICE_ERRORS as err:
+        failed.append(f"<device clock>: {err}")
+        return False
+    if not synced:
+        failed.append("<device clock>: read-back does not match")
+    return synced
+
+
 async def async_handle_restore_parameters(
     hass: HomeAssistant, call: ServiceCall
 ) -> ServiceResponse:
@@ -556,11 +574,9 @@ async def async_handle_restore_parameters(
     local_now = dt_util.now().replace(tzinfo=None, second=0, microsecond=0)
     clock_synced = False
     if not dry_run:
-        try:
-            await async_write_device_clock(hass, device, write_manager, local_now)
-            clock_synced = True
-        except DEVICE_ERRORS as err:
-            failed.append(f"<device clock>: {err}")
+        clock_synced = await _async_restore_clock(
+            hass, device, write_manager, local_now, failed
+        )
 
     _LOGGER.info(
         "THZ restore_parameters: %s%d restored, %d skipped (missing), "

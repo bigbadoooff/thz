@@ -3091,7 +3091,8 @@
           }
         },
         "error": {
-          "cannot_connect": "Die Wärmepumpe hat nicht geantwortet. Versuche es später noch einmal."
+          "cannot_connect": "Die Wärmepumpe hat nicht geantwortet. Versuche es später noch einmal.",
+          "not_confirmed": "Die Wärmepumpe hat die neue Zeit angenommen, liest aber eine andere zurück. Bitte später erneut versuchen."
         },
         "abort": {
           "not_loaded": "Die Wärmepumpe ist nicht geladen."
