@@ -183,8 +183,6 @@ A **Passive Cooling** select entity controls the passive cooling mode:
 | `bypass` | Bypass mode |
 | `sommerkassette` | Summer cassette mode |
 
-A corresponding energy sensor `sCoolHCTotal` tracks total passive cooling energy on firmware 5.39.
-
 ### Diagnostics
 
 The integration supports Home Assistant's built-in diagnostics download:
