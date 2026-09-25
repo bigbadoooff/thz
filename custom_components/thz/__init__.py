@@ -589,13 +589,20 @@ async def _async_update_block(
         if paired_blocks and block_name in paired_blocks:
             cmd3_name = paired_blocks[block_name]
             cmd3_bytes = bytes.fromhex(cmd3_name.removeprefix("pxx"))
-            cmd3_result = await device.async_execute(
-                device.read_block, cmd3_bytes, "get"
-            )
-
             # Extract low (cmd2) and high (cmd3) values
             # Both are signed 16-bit integers at byte offset 4
             low_val = int.from_bytes(result[4:6], byteorder="big", signed=True)
+            try:
+                cmd3_result = await device.async_execute(
+                    device.read_block, cmd3_bytes, "get"
+                )
+            except THZNotSupportedError:
+                # The firmware has the low register only; its value alone
+                # is still worth showing, so the block stays supported.
+                _LOGGER.debug(
+                    "%s is not supported; using %s alone", cmd3_name, block_name
+                )
+                cmd3_result = b""
             high_val = int.from_bytes(cmd3_result[4:6], byteorder="big", signed=True)
             combined = high_val * 1000 + low_val
 

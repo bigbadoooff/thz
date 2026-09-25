@@ -537,6 +537,25 @@ class TestAsyncUpdateBlock:
         assert combined == 2 * 1000 + 100
 
     @pytest.mark.asyncio
+    async def test_paired_block_without_its_high_register_keeps_the_low(self):
+        from custom_components.thz.exceptions import THZNotSupportedError
+
+        hass = _mock_hass()
+        device = MagicMock()
+        cmd2_result = bytearray(8)
+        cmd2_result[4:6] = (100).to_bytes(2, "big", signed=True)
+        device.async_execute = AsyncMock(
+            side_effect=[bytes(cmd2_result), THZNotSupportedError("no")]
+        )
+
+        result = await thz_module._async_update_block(
+            hass, device, "pxx0A091A", paired_blocks={"pxx0A091A": "pxx0A091C"}
+        )
+
+        assert result is not None
+        assert int.from_bytes(result[4:8], "big", signed=True) == 100
+
+    @pytest.mark.asyncio
     async def test_unsupported_register_returns_none(self):
         from custom_components.thz.exceptions import THZNotSupportedError
 

@@ -125,6 +125,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Energy counters could vanish when their high register was missing.**
+  Energy values are read from a low and a high register; if the firmware
+  lacked the high one, the whole block counted as unsupported and got no
+  sensors. The low value is now shown on its own.
 - **A backup was lost when the clock correction failed.** A backup also
   corrects a heat pump clock that is more than an hour off; if that write
   failed, the parameters already read were thrown away. The backup is now
