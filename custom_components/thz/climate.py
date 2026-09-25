@@ -512,6 +512,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             or ``None`` when cooling is not available.
         _cooling_target_temp: Cached cooling setpoint in °C (populated on
             first update when cooling is supported).
+        _cooling_switch_on: Last polled state of the cooling switch.
         _opmode_entry: Write-register entry for the global operating-mode
             register (``pOpMode``), or ``None`` when not available.
     """
@@ -592,8 +593,10 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         self._cooling_bit = status.cooling_bit
         self._compressor_bit = status.compressor_bit
 
-        # Last polled cooling setpoint and preset (see async_added_to_hass).
+        # Last polled cooling setpoint, cooling switch and preset (see
+        # async_added_to_hass).
         self._cooling_target_temp: float | None = None
+        self._cooling_switch_on: bool | None = None
 
         # Optional write entry for the preset mode
         self._opmode_entry = config.opmode
@@ -691,6 +694,10 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             self._subscribe_parameter(
                 self._cool_setpoint_entry, self._apply_cooling_setpoint
             )
+        if self._supports_cooling and self._cool_switch_entry is not None:
+            self._subscribe_parameter(
+                self._cool_switch_entry, self._apply_cooling_switch
+            )
         if self._opmode_entry is not None:
             self._subscribe_parameter(self._opmode_entry, self._apply_op_mode)
 
@@ -779,14 +786,18 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
     def hvac_mode(self) -> HVACMode:
         """Return the current HVAC mode.
 
-        ``COOL`` if cooling is supported and the ``cooling`` bit in the
-        ``pxx0A0176`` coordinator is set, otherwise ``HEAT``: the only modes
-        in ``hvac_modes``. A circuit in standby shows as ``hvac_action``
-        ``OFF`` instead, since this entity cannot switch it off.
+        ``COOL`` while the cooling switch is on, otherwise ``HEAT``: the only
+        modes in ``hvac_modes``. Until the switch has been read, the
+        ``cooling`` bit in the ``pxx0A0176`` coordinator stands in for it.
+        Whether the pump actually cools is ``hvac_action``; a circuit in
+        standby shows as ``hvac_action`` ``OFF``, since this entity cannot
+        switch it off.
 
         Returns:
             Current :class:`HVACMode`.
         """
+        if self._supports_cooling and self._cooling_switch_on is not None:
+            return HVACMode.COOL if self._cooling_switch_on else HVACMode.HEAT
         # Check cooling-active bit first (only when cooling entries are present)
         if self._supports_cooling and self._cooling_coordinator is not None:
             # The cooling coordinator's DataUpdateCoordinator is untyped
@@ -1086,6 +1097,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 self._cool_switch_entry,
                 THZValueCodec.encode_switch(enabled),
             )
+        self._cooling_switch_on = enabled
         await self._async_refresh_parameter(self._cool_switch_entry)
 
     def _apply_cooling_setpoint(self, value_bytes: bytes) -> None:
@@ -1100,6 +1112,15 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         except (ValueError, TypeError) as err:
             _LOGGER.warning(
                 "Could not decode cooling setpoint for %s: %s", self.name, err
+            )
+
+    def _apply_cooling_switch(self, value_bytes: bytes) -> None:
+        """Decode the cooling switch register into the cached state."""
+        try:
+            self._cooling_switch_on = THZValueCodec.decode_switch(value_bytes)
+        except ValueError as err:
+            _LOGGER.warning(
+                "Could not decode cooling switch for %s: %s", self.name, err
             )
 
     def _apply_op_mode(self, value_bytes: bytes) -> None:

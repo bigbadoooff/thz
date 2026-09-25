@@ -131,6 +131,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **The climate entity fell back to HEAT right after selecting COOL.** Its
+  mode followed the "cooling active" status bit, which is only set once the
+  heat pump actually cools, so a temperature set in the meantime went to the
+  heating setpoint. The mode now follows the cooling switch; whether the
+  pump cools right now is the HVAC action.
 - **A 2.x parameter without a known block position is no longer created.**
   It would have been written with a plain SET to its block register,
   overwriting the block's first bytes. No current register map is affected.

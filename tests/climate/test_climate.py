@@ -692,6 +692,48 @@ class TestTHZClimateAsyncAddedToHass:
         assert entity._cooling_target_temp == pytest.approx(21.5)
         entity.async_write_ha_state.assert_called_once()
 
+    @pytest.mark.asyncio
+    async def test_hvac_mode_follows_the_polled_cooling_switch(self):
+        coordinator = MagicMock()
+        coordinator.data = None
+        coordinator.async_add_listener = MagicMock(return_value=lambda: None)
+        a176_data = bytearray(10)
+        a176_data[A176_COOLING_BYTE] = 1 << A176_COOLING_BIT
+        cooling = TestTHZClimateEntity._make_coordinator(bytes(a176_data))
+        entity = make_climate(
+            coordinator=coordinator,
+            cooling_coordinator=cooling,
+            device=MagicMock(),
+            device_id="test_device",
+            translation_key="heating_circuit",
+            current_temp_offset=F4_INSIDE_TEMP_OFFSET,
+            current_temp_length=2,
+            target_temp_offset=F4_ROOM_SET_TEMP_OFFSET,
+            target_temp_length=2,
+            op_mode_offset=F4_HC_OP_MODE_OFFSET,
+            op_mode_length=1,
+            heat_setpoint_entry=None,
+            cool_switch_entry={"command": "0B0287", "decode_type": "1clean"},
+            cool_setpoint_entry=COOL_SETPOINT_ENTRY,
+            cooling_byte=A176_COOLING_BYTE,
+            cooling_bit=A176_COOLING_BIT,
+        )
+        entity.hass = MagicMock()
+        entity.async_on_remove = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        # Until the switch is read, the cooling-active bit stands in.
+        assert entity.hvac_mode == HVACMode.COOL
+        switch_key = ("0B0287", 4, 2)
+        poller = FakePoller({switch_key: (0).to_bytes(2, "big")})
+        entity._poller = poller
+
+        await entity.async_added_to_hass()
+
+        assert entity.hvac_mode == HVACMode.HEAT
+        poller.report(switch_key, (1).to_bytes(2, "big"))
+        assert entity.hvac_mode == HVACMode.COOL
+        assert entity.hvac_action == HVACAction.COOLING
+
 
 class TestTHZClimateServiceCalls:
     """Tests for entity service-call methods (set_temperature, set_hvac_mode, ...)."""
@@ -810,6 +852,13 @@ class TestTHZClimateServiceCalls:
         device.async_execute.assert_awaited()
         cooling_coordinator.async_request_refresh.assert_awaited_once()
         entity.coordinator.async_request_refresh.assert_awaited_once()
+        # Cooling has not started yet, but the mode is COOL: a setpoint now
+        # goes to the cooling register.
+        assert entity.hvac_mode == HVACMode.COOL
+        device.async_execute.reset_mock()
+        entity.async_write_ha_state = MagicMock()
+        await entity.async_set_temperature(temperature=24.0)
+        assert device.async_execute.await_args.args[1] == bytes.fromhex("0B0582")
 
     @pytest.mark.asyncio
     async def test_set_hvac_mode_cool_unsupported_logs_and_skips(self):
