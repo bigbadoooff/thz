@@ -757,3 +757,10 @@ class TestAvailableReadBlocks:
         entry = MagicMock(spec=["data"])
         entry.data = {}
         assert config_flow_module._available_read_blocks(entry) == []
+
+    def test_unloaded_entry_leaves_out_the_cooling_blocks(self):
+        entry = MagicMock(spec=["data"])
+        entry.data = {"firmware": "539"}
+        blocks = config_flow_module._available_read_blocks(entry)
+        assert "pxxFB" in blocks
+        assert "pxx0A0648" not in blocks

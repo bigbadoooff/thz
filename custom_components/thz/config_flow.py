@@ -129,7 +129,8 @@ def _available_read_blocks(entry: config_entries.ConfigEntry) -> list[str]:
 
     A loaded entry knows its register maps; otherwise (setup failed or is
     retrying) the maps of the firmware stored at setup, or of the forced
-    profile, are used. No device access either way.
+    profile, are used, without the cooling blocks: whether the heat pump
+    has cooling is only known once it answered. No device access either way.
     """
     runtime_data = loaded_runtime_data(entry)
     if runtime_data is not None:
@@ -140,7 +141,9 @@ def _available_read_blocks(entry: config_entries.ConfigEntry) -> list[str]:
     )
     if not firmware:
         return []
-    return list(RegisterMapManager(str(firmware)).get_all_registers())
+    return list(
+        RegisterMapManager(str(firmware), has_cooling=False).get_all_registers()
+    )
 
 
 class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -460,7 +463,13 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         ] = bool
 
         # Refresh intervals for each block
-        refresh_intervals = defaults.get("refresh_intervals", {})
+        refresh_intervals = defaults.get("refresh_intervals")
+        if refresh_intervals is None:
+            # Entries without stored intervals poll every block (see
+            # _refresh_intervals in __init__.py); show them all as polled.
+            refresh_intervals = dict.fromkeys(
+                available_blocks or [], DEFAULT_UPDATE_INTERVAL
+            )
         polled_blocks = list(refresh_intervals.keys())
         all_read_blocks = polled_blocks + [
             block for block in available_blocks or [] if block not in refresh_intervals

@@ -161,6 +161,20 @@ async def test_deselected_block_can_be_selected_again(hass, fake_device):
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
+async def test_entry_without_intervals_keeps_polling_every_block(hass, fake_device):
+    entry = await setup_entry(hass, refresh_intervals=None)
+    polled = set(entry.runtime_data.coordinators)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    await hass.async_block_till_done()
+
+    assert result["reason"] == "reconfigured"
+    assert set(entry.data["refresh_intervals"]) == polled
+    assert set(entry.runtime_data.coordinators) == polled
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 async def test_new_entry_stores_its_device_identifier(hass, fake_device):
     with patch(
         "custom_components.thz.config_flow.THZConfigFlow.get_ports",
