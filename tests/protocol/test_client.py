@@ -624,7 +624,7 @@ class TestUndecodableAnswer:
         "bad",
         [
             _decode_test_answer(b"\xfb\x01\x02", crc=b"\x00"),  # checksum wrong
-            b"\x01\x01\x00\x10\x03",  # timing issue
+            b"\x01\x01\x00\x00\x10\x03",  # timing issue
         ],
     )
     async def test_second_answer_is_used(self, bad):

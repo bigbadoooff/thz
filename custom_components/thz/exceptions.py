@@ -38,9 +38,9 @@ class THZNotSupportedError(THZProtocolError):
 class THZGarbledAnswerError(THZProtocolError):
     """The answer was damaged or came at a bad moment; asking again may work.
 
-    A short answer, a checksum error, or the device's "timing issue" /
-    "CRC error in request" headers: transient line problems, unlike an
-    unknown command or register.
+    A short answer, a checksum error, the device's "timing issue" /
+    "CRC error in request" headers or an unknown header: transient line
+    problems, unlike an unknown command or register.
     """
 
 

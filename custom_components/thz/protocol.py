@@ -115,8 +115,9 @@ _TRANSIENT_HEADERS = (b"\x01\x01", b"\x01\x02")
 def decode_answer(data: bytes) -> bytes:
     """Decode an answer telegram to checksum + payload.
 
-    Raises THZGarbledAnswerError for a short answer, a checksum error or a
-    "timing issue" / "CRC error in request" header (asking again may work),
+    Raises THZGarbledAnswerError for a short answer, a checksum error, a
+    "timing issue" / "CRC error in request" header or an unknown header
+    (asking again may work),
     THZNotSupportedError for ``01 04`` (unknown register, a permanent
     property of the firmware) and THZProtocolError for any other answer.
     """
