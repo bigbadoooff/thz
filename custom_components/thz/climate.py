@@ -129,18 +129,8 @@ _OPMODE_NAME = "pOpMode"
 # used.
 _OPMODE_DECODE_TYPE = "2opmode"
 
-# OpModeHC string value → HVACMode
-# cast(): HVACMode members are mistyped as plain `str` in some older
-# homeassistant-stubs snapshots; not a real type error.
-_OP_MODE_TO_HVAC: dict[str, HVACMode] = cast(
-    "dict[str, HVACMode]",
-    {
-        "normal": HVACMode.HEAT,
-        "setback": HVACMode.HEAT,
-        "standby": HVACMode.OFF,
-        "restart": HVACMode.HEAT,
-    },
-)
+# OpModeHC value of a heating circuit that does not heat.
+_OP_MODE_STANDBY = "standby"
 
 # Default temperature bounds used when no write entry is available
 _DEFAULT_MIN_TEMP = 10.0
@@ -484,21 +474,9 @@ def _read_op_mode_raw(data: bytes, offset: int, length: int) -> str | None:
     return None
 
 
-def _read_op_mode(data: bytes, offset: int, length: int) -> HVACMode:
-    """Decode the OpModeHC value and map it to an HVACMode.
-
-    Args:
-        data: Raw bytes from the coordinator.
-        offset: Byte offset of the opmode field.
-        length: Byte length of the opmode field.
-
-    Returns:
-        The corresponding :class:`HVACMode`, defaulting to ``HEAT``.
-    """
-    mode_str = _read_op_mode_raw(data, offset, length)
-    if mode_str is not None:
-        return _OP_MODE_TO_HVAC.get(mode_str, HVACMode.HEAT)
-    return HVACMode.HEAT
+def _in_standby(data: bytes, offset: int, length: int) -> bool:
+    """Return whether the circuit's OpModeHC field reads "standby"."""
+    return _read_op_mode_raw(data, offset, length) == _OP_MODE_STANDBY
 
 
 def _bit_active(data: bytes, byte_idx: int, bit_idx: int) -> bool:
@@ -801,11 +779,10 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
     def hvac_mode(self) -> HVACMode:
         """Return the current HVAC mode.
 
-        Logic:
-        1. If cooling is supported and the ``cooling`` bit in the
-           ``pxx0A0176`` coordinator is set → ``COOL``.
-        2. Otherwise decode ``opmodehc`` from the primary coordinator block
-           and map it to ``HEAT`` or ``OFF``.
+        ``COOL`` if cooling is supported and the ``cooling`` bit in the
+        ``pxx0A0176`` coordinator is set, otherwise ``HEAT``: the only modes
+        in ``hvac_modes``. A circuit in standby shows as ``hvac_action``
+        ``OFF`` instead, since this entity cannot switch it off.
 
         Returns:
             Current :class:`HVACMode`.
@@ -822,25 +799,22 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 and _bit_active(cool_data, self._cooling_byte, self._cooling_bit)
             ):
                 return HVACMode.COOL
+        return HVACMode.HEAT
 
-        # Fall back to hcOpMode / dhwOpMode (HC2 has no such field)
-        if (
-            self.coordinator.data is None
-            or self._op_mode_offset is None
-            or self._op_mode_length is None
-        ):
-            return HVACMode.HEAT
-        return _read_op_mode(
-            self.coordinator.data,
-            self._op_mode_offset,
-            self._op_mode_length,
-        )
+    def _circuit_in_standby(self) -> bool:
+        """Return whether the circuit's hcOpMode is standby (HC2 has none)."""
+        data = self.coordinator.data
+        if data is None or self._op_mode_offset is None or self._op_mode_length is None:
+            return False
+        return _in_standby(data, self._op_mode_offset, self._op_mode_length)
 
     @property
     def hvac_action(self) -> HVACAction | None:
         """Return the current HVAC action.
 
-        Reads the compressor and cooling bits from the ``pxx0A0176``
+        - Circuit in standby (hcOpMode) → ``OFF``
+
+        Otherwise from the compressor and cooling bits of the ``pxx0A0176``
         coordinator:
 
         - Cooling bit set → ``COOLING``
@@ -850,6 +824,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         Returns:
             Current :class:`HVACAction`, or ``None`` if status is unavailable.
         """
+        if self._circuit_in_standby():
+            return HVACAction.OFF
         if self._cooling_coordinator is None:
             return None
         # The cooling coordinator's DataUpdateCoordinator is untyped

@@ -194,33 +194,20 @@ class TestClimateHelpers:
         data = (-50).to_bytes(2, byteorder="big", signed=True)
         assert _read_temp(data, 0, 2) == pytest.approx(-5.0)
 
-    def test_read_op_mode_normal(self):
-        """_read_op_mode maps opmodehc 'normal' (1) to HEAT."""
-        from custom_components.thz.climate import _read_op_mode
+    @pytest.mark.parametrize(
+        ("value", "standby"), [(0x01, False), (0x02, False), (0x03, True)]
+    )
+    def test_in_standby(self, value, standby):
+        """_in_standby is True only for opmodehc 'standby' (3)."""
+        from custom_components.thz.climate import _in_standby
 
-        # value 1 → "normal" → HEAT
-        data = bytes(24) + bytes([0x01]) + bytes(5)
-        assert _read_op_mode(data, 24, 1) == HVACMode.HEAT
+        data = bytes(24) + bytes([value]) + bytes(5)
+        assert _in_standby(data, 24, 1) is standby
 
-    def test_read_op_mode_standby(self):
-        """_read_op_mode maps opmodehc 'standby' (3) to OFF."""
-        from custom_components.thz.climate import _read_op_mode
+    def test_in_standby_too_short_is_false(self):
+        from custom_components.thz.climate import _in_standby
 
-        data = bytes(24) + bytes([0x03]) + bytes(5)
-        assert _read_op_mode(data, 24, 1) == HVACMode.OFF
-
-    def test_read_op_mode_setback_maps_to_heat(self):
-        """_read_op_mode maps 'setback' (2) to HEAT."""
-        from custom_components.thz.climate import _read_op_mode
-
-        data = bytes(24) + bytes([0x02]) + bytes(5)
-        assert _read_op_mode(data, 24, 1) == HVACMode.HEAT
-
-    def test_read_op_mode_too_short_defaults_to_heat(self):
-        """_read_op_mode defaults to HEAT when data is too short to decode."""
-        from custom_components.thz.climate import _read_op_mode
-
-        assert _read_op_mode(b"\x00", 24, 1) == HVACMode.HEAT
+        assert _in_standby(b"\x00", 24, 1) is False
 
     def test_read_op_mode_raw_too_short_returns_none(self):
         """_read_op_mode_raw returns None when data is too short."""
@@ -440,12 +427,14 @@ class TestTHZClimateEntity:
         entity = self._make_hc1_entity(coord_data=bytes(data))
         assert entity.hvac_mode == HVACMode.HEAT
 
-    def test_hvac_mode_off_from_standby_opmode(self):
-        """hvac_mode is OFF when hcOpMode is 'standby' (3)."""
+    def test_standby_opmode_is_heat_with_action_off(self):
+        """A circuit in standby keeps a valid hvac_mode; the action says OFF."""
         data = bytearray(60)
-        data[F4_HC_OP_MODE_OFFSET] = 0x03  # 3 = standby → OFF
+        data[F4_HC_OP_MODE_OFFSET] = 0x03  # 3 = standby
         entity = self._make_hc1_entity(coord_data=bytes(data))
-        assert entity.hvac_mode == HVACMode.OFF
+        assert entity.hvac_mode == HVACMode.HEAT
+        assert entity.hvac_mode in entity.hvac_modes
+        assert entity.hvac_action == HVACAction.OFF
 
     def test_hvac_mode_defaults_to_heat_without_coordinator_data(self):
         """hvac_mode falls back to HEAT when the primary coordinator has no data."""
