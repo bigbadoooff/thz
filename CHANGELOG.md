@@ -117,6 +117,9 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **A heating circuit in standby reported the mode `off`,** which it does
+  not offer (only heat and cool). It now stays `heat` and shows the
+  standby as the action `off`.
 - **Connecting at startup had no time limit.** Reading the firmware and
   probing for cooling now run under the device lock with a 30 second
   limit, like every other device call, so a line that hangs cannot stall
