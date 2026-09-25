@@ -114,17 +114,6 @@ if _serial_mock is not None and _serial_tools_mock is not None:
 if _serial_tools_mock is not None and _serial_lp_mock is not None:
     _serial_tools_mock.list_ports = _serial_lp_mock
 
-# Link the homeassistant.helpers -> homeassistant.helpers.area_registry
-# attribute chain. Without this, `from homeassistant.helpers import
-# area_registry as ar` inside config_flow.py resolves `ar` to an
-# auto-generated child attribute of the `homeassistant.helpers` MagicMock
-# instead of the dedicated sys.modules['homeassistant.helpers.area_registry']
-# mock, so patches targeting the latter would silently not apply.
-_ha_helpers_mock = sys.modules.get("homeassistant.helpers")
-_area_registry_mock = sys.modules.get("homeassistant.helpers.area_registry")
-if _ha_helpers_mock is not None and _area_registry_mock is not None:
-    _ha_helpers_mock.area_registry = _area_registry_mock
-
 # Evict any cached (possibly differently-based) import of config_flow so it's
 # re-imported fresh, bound to this file's fakes.
 for _key in list(sys.modules):
@@ -464,7 +453,7 @@ class TestAsyncStepRefreshBlocks:
         result = await flow.async_step_refresh_blocks()
         assert result["type"] == "form"
         assert result["step_id"] == "refresh_blocks"
-        assert "hint" in result["description_placeholders"]
+        assert not result.get("description_placeholders")
 
     @pytest.mark.asyncio
     async def test_create_entry_ip(self, flow):
@@ -502,12 +491,6 @@ class TestAsyncStepRefreshBlocks:
 # ---------------------------------------------------------------------------
 
 
-def _fake_area_registry(areas=None):
-    reg = MagicMock()
-    reg.async_list_areas.return_value = areas or []
-    return reg
-
-
 class TestAsyncStepReconfigure:
     @pytest.mark.asyncio
     async def test_missing_entry_id_aborts(self, flow):
@@ -535,9 +518,6 @@ class TestAsyncStepReconfigure:
         flow.hass.config_entries.async_get_entry.return_value = entry
 
         with (
-            patch.object(
-                config_flow_module.ar, "async_get", return_value=_fake_area_registry()
-            ),
             _no_serial_ports(),
         ):
             result = await flow.async_step_reconfigure()
@@ -558,14 +538,7 @@ class TestAsyncStepReconfigure:
         }
         flow.hass.config_entries.async_get_entry.return_value = entry
 
-        area = MagicMock()
-        area.id = "living_room"
-        area.name = "Living Room"
-
-        with patch.object(
-            config_flow_module.ar, "async_get", return_value=_fake_area_registry([area])
-        ):
-            result = await flow.async_step_reconfigure()
+        result = await flow.async_step_reconfigure()
 
         assert result["type"] == "form"
         assert result["step_id"] == "reconfigure"
@@ -660,9 +633,6 @@ class TestReconfigureSchema:
     @pytest.mark.asyncio
     async def test_usb_branch_builds_device_and_baudrate_fields(self, flow):
         with (
-            patch.object(
-                config_flow_module.ar, "async_get", return_value=_fake_area_registry()
-            ),
             _no_serial_ports(),
             patch.object(config_flow_module.vol, "Required") as mock_required,
         ):
@@ -677,9 +647,6 @@ class TestReconfigureSchema:
     @pytest.mark.asyncio
     async def test_ip_branch_builds_host_and_port_fields(self, flow):
         with (
-            patch.object(
-                config_flow_module.ar, "async_get", return_value=_fake_area_registry()
-            ),
             patch.object(config_flow_module.vol, "Required") as mock_required,
         ):
             await flow.reconfigure_schema(
@@ -693,9 +660,6 @@ class TestReconfigureSchema:
     @pytest.mark.asyncio
     async def test_defaults_none_falls_back_to_empty_dict(self, flow):
         with (
-            patch.object(
-                config_flow_module.ar, "async_get", return_value=_fake_area_registry()
-            ),
             _no_serial_ports(),
         ):
             schema = await flow.reconfigure_schema(None)
@@ -706,9 +670,6 @@ class TestReconfigureSchema:
     @pytest.mark.asyncio
     async def test_refresh_intervals_and_write_interval_fields_built(self, flow):
         with (
-            patch.object(
-                config_flow_module.ar, "async_get", return_value=_fake_area_registry()
-            ),
             _no_serial_ports(),
             patch.object(config_flow_module.vol, "Optional") as mock_optional,
         ):

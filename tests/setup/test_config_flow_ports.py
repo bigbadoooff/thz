@@ -474,15 +474,8 @@ class TestEntityIdStyleOption:
         flow = THZConfigFlow()
         flow.hass = MagicMock()
 
-        fake_area_registry = MagicMock()
-        fake_area_registry.async_list_areas.return_value = []
-
         vol.Optional.reset_mock()
-        with patch(
-            "custom_components.thz.config_flow.ar.async_get",
-            return_value=fake_area_registry,
-        ):
-            asyncio.run(flow.reconfigure_schema({CONF_CONNECTION_TYPE: CONNECTION_IP}))
+        asyncio.run(flow.reconfigure_schema({CONF_CONNECTION_TYPE: CONNECTION_IP}))
 
         assert any(
             call.args and call.args[0] == CONF_ENTITY_ID_STYLE
@@ -504,19 +497,12 @@ class TestEntityIdStyleOption:
         flow = THZConfigFlow()
         flow.hass = MagicMock()
 
-        fake_area_registry = MagicMock()
-        fake_area_registry.async_list_areas.return_value = []
-
         vol.Optional.reset_mock()
-        with patch(
-            "custom_components.thz.config_flow.ar.async_get",
-            return_value=fake_area_registry,
-        ):
-            asyncio.run(
-                flow.reconfigure_schema(
-                    {CONF_CONNECTION_TYPE: CONNECTION_IP, CONF_ENTITY_ID_STYLE: "fhem"}
-                )
+        asyncio.run(
+            flow.reconfigure_schema(
+                {CONF_CONNECTION_TYPE: CONNECTION_IP, CONF_ENTITY_ID_STYLE: "fhem"}
             )
+        )
 
         matching_calls = [
             call
@@ -618,15 +604,8 @@ class TestEntityVisibilityOption:
         flow = THZConfigFlow()
         flow.hass = MagicMock()
 
-        fake_area_registry = MagicMock()
-        fake_area_registry.async_list_areas.return_value = []
-
         vol.Optional.reset_mock()
-        with patch(
-            "custom_components.thz.config_flow.ar.async_get",
-            return_value=fake_area_registry,
-        ):
-            asyncio.run(flow.reconfigure_schema({CONF_CONNECTION_TYPE: CONNECTION_IP}))
+        asyncio.run(flow.reconfigure_schema({CONF_CONNECTION_TYPE: CONNECTION_IP}))
 
         assert any(
             call.args and call.args[0] == CONF_ENTITY_VISIBILITY
@@ -648,19 +627,12 @@ class TestEntityVisibilityOption:
         flow = THZConfigFlow()
         flow.hass = MagicMock()
 
-        fake_area_registry = MagicMock()
-        fake_area_registry.async_list_areas.return_value = []
-
         vol.Optional.reset_mock()
-        with patch(
-            "custom_components.thz.config_flow.ar.async_get",
-            return_value=fake_area_registry,
-        ):
-            asyncio.run(
-                flow.reconfigure_schema(
-                    {CONF_CONNECTION_TYPE: CONNECTION_IP, CONF_ENTITY_VISIBILITY: "all"}
-                )
+        asyncio.run(
+            flow.reconfigure_schema(
+                {CONF_CONNECTION_TYPE: CONNECTION_IP, CONF_ENTITY_VISIBILITY: "all"}
             )
+        )
 
         matching_calls = [
             call

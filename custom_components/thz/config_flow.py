@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_DEVICE, CONF_HOST, CONF_PORT
-from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers.selector import (
+    AreaSelector,
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
@@ -57,6 +57,12 @@ if TYPE_CHECKING:
     from ._typing_compat import ConfigFlowResult
 
 _LOGGER = logging.getLogger(__name__)
+
+
+CONNECTION_TYPE_LABELS = {
+    CONNECTION_IP: "Network (ser2net)",
+    CONNECTION_USB: "USB / Serial",
+}
 
 
 def _translated_select(labels: dict[str, str], translation_key: str) -> SelectSelector:
@@ -192,12 +198,9 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema = vol.Schema(
             {
-                vol.Required(CONF_CONNECTION_TYPE, default=CONNECTION_IP): vol.In(
-                    {
-                        CONNECTION_IP: "Network (ser.net)",
-                        CONNECTION_USB: "USB / Serial",
-                    }
-                ),
+                vol.Required(
+                    CONF_CONNECTION_TYPE, default=CONNECTION_IP
+                ): _translated_select(CONNECTION_TYPE_LABELS, CONF_CONNECTION_TYPE),
                 # Optional short device name/alias (e.g. "lwz"). Shown as the
                 # device name in HA, and -- when entity_id_style is "fhem" --
                 # prepended to every entity's technical entity_id (e.g.
@@ -329,7 +332,10 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="invalid_entry_id")
 
         if user_input is not None:
-            updated_data = merge_reconfigure_input(entry.data, user_input)
+            # A cleared area is left out of the form data.
+            updated_data = merge_reconfigure_input(
+                entry.data, {"area": "", **user_input}
+            )
             unique_id = entry_unique_id(updated_data)
             if unique_id != entry.unique_id and any(
                 other.unique_id == unique_id
@@ -360,10 +366,6 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         be selected again.
         """
         defaults = defaults or {}
-
-        area_registry = ar.async_get(self.hass)
-        areas = {area.id: area.name for area in area_registry.async_list_areas()}
-        areas[""] = "-- No Area --"
 
         conn_type = defaults.get(CONF_CONNECTION_TYPE, CONNECTION_USB)
         schema_dict: dict[vol.Marker, Any] = {}
@@ -405,12 +407,13 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 default=defaults.get("alias", ""),
             )
         ] = str
+        # A suggested value rather than a default, so the area can be cleared.
         schema_dict[
             vol.Optional(
                 "area",
-                default=defaults.get("area", ""),
+                description={"suggested_value": defaults.get("area") or None},
             )
-        ] = vol.In(areas)
+        ] = AreaSelector()
 
         # Entity group selection: read blocks
         selected_read_blocks = defaults.get("selected_read_blocks")
@@ -862,12 +865,4 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="refresh_blocks",
             data_schema=schema,
-            description_placeholders={
-                "hint": (
-                    "Update interval per block (seconds, default "
-                    f"{DEFAULT_UPDATE_INTERVAL}), write_interval for write "
-                    "entities (number/switch/select/time, default "
-                    f"{DEFAULT_WRITE_INTERVAL})"
-                ),
-            },
         )

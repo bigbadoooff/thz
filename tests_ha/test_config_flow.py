@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from unittest.mock import patch
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    area_registry as ar,
+    device_registry as dr,
+    entity_registry as er,
+)
+from homeassistant.helpers.selector import SelectSelector
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -23,6 +30,7 @@ from custom_components.thz.exceptions import THZConnectionError
 from .common import HOST, make_entry, setup_entry
 
 SERIAL = "/dev/serial/by-id/usb-THZ"
+STRINGS = Path(__file__).parents[1] / "custom_components" / "thz" / "strings.json"
 
 
 async def _start(hass: HomeAssistant, connection_type: str):
@@ -425,3 +433,37 @@ async def test_reconfigure_usb_without_ports_keeps_the_stored_device(hass, fake_
     device_field = next(k for k in schema if k == "device")
     assert "/dev/ttyUSB0" in schema[device_field].container
     assert device_field.default() == "/dev/ttyUSB7"
+
+
+async def test_connection_type_labels_are_translated(hass, fake_device):
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    field = result["data_schema"].schema["connection_type"]
+    assert isinstance(field, SelectSelector)
+    assert field.config["translation_key"] == "connection_type"
+    strings = json.loads(STRINGS.read_text(encoding="utf-8"))
+    options = strings["selector"]["connection_type"]["options"]
+    assert set(options) == set(field.config["options"])
+
+
+async def test_reconfigure_keeps_and_clears_the_area(hass, fake_device):
+    area = ar.async_get(hass).async_create("Keller")
+    entry = await setup_entry(hass, area=area.id)
+
+    result = await entry.start_reconfigure_flow(hass)
+    marker = next(key for key in result["data_schema"].schema if key == "area")
+    assert marker.description == {"suggested_value": area.id}
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"area": area.id}
+    )
+    await hass.async_block_till_done()
+    assert entry.data["area"] == area.id
+
+    # The frontend leaves a cleared area out of the submitted data.
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    await hass.async_block_till_done()
+    assert result["reason"] == "reconfigured"
+    assert entry.data["area"] == ""
+    assert await hass.config_entries.async_unload(entry.entry_id)

@@ -131,6 +131,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Setup showed English labels and a wrong default port.** The connection
+  type choice is now translated, the area in Reconfigure is picked with the
+  Home Assistant area selector and can be cleared, and the network step
+  names the actual default port 2323.
 - **A clock correction counted as done even when it did not stick.**
   Automatic clock sync and the repair's fix removed the clock issue although
   the heat pump read a different time back. Automatic sync now keeps the
