@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable, Coroutine, Mapping
 import logging
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.const import EntityCategory
 from homeassistant.core import callback
@@ -40,6 +40,43 @@ if TYPE_CHECKING:
     from .thz_device import THZDevice
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def polled_block_coordinator(
+    param: WriteParam, coordinators: Mapping[str, Any]
+) -> DataUpdateCoordinator[Any] | None:
+    """Return the coordinator polling a 2.x parameter's block, if any.
+
+    A block the firmware does not have (read fine, but no data) does not
+    count: the parameter is then polled on its own by the poller.
+    """
+    key = block_coordinator_key(param)
+    coordinator = coordinators.get(key) if key else None
+    if (
+        coordinator is not None
+        and coordinator.last_update_success
+        and coordinator.data is None
+    ):
+        return None
+    return cast("DataUpdateCoordinator[Any] | None", coordinator)
+
+
+async def async_refresh_parameter(
+    param: WriteParam,
+    coordinators: Mapping[str, Any],
+    poller: ParameterPoller | None,
+) -> None:
+    """Read a parameter again after writing it, where its entities get it.
+
+    That is the block coordinator for a 2.x parameter inside a polled
+    block, otherwise the poller; every entity showing the register then
+    gets the new value, not only the one that wrote it.
+    """
+    coordinator = polled_block_coordinator(param, coordinators)
+    if coordinator is not None:
+        await coordinator.async_request_refresh()
+    elif poller is not None:
+        poller.async_refresh(parameter_read_key(param))
 
 
 class THZBaseEntity(Entity):
@@ -415,21 +452,8 @@ class THZParameterEntity(THZBaseEntity):
         return parameter_from_read(self._entry, raw)
 
     def _block_coordinator(self) -> DataUpdateCoordinator[Any] | None:
-        """Return the coordinator polling this 2.x parameter's block, if any.
-
-        A block the firmware does not have (read fine, but no data) does not
-        count: the parameter is then polled on its own and shows the
-        device's answer.
-        """
-        key = block_coordinator_key(self._entry)
-        coordinator = self._coordinators.get(key) if key else None
-        if (
-            coordinator is not None
-            and coordinator.last_update_success
-            and coordinator.data is None
-        ):
-            return None
-        return coordinator
+        """Return the coordinator polling this 2.x parameter's block, if any."""
+        return polled_block_coordinator(self._entry, self._coordinators)
 
     def _value_from_block(self, block_data: bytes) -> bytes | None:
         """Cut the parameter out of the block data."""

@@ -81,6 +81,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from .base_entity import async_refresh_parameter
 from .const import (
     CONF_ENABLE_HC2,
     DOMAIN,
@@ -399,6 +400,7 @@ async def async_setup_entry(
                 device=entry_data.device,
                 device_id=entry_data.device_id,
                 poller=entry_data.poller,
+                coordinators=entry_data.coordinators,
                 translation_key=circuit.translation_key,
                 entity_id_style=entry_data.entity_id_style,
                 entity_id_prefix=entry_data.entity_id_prefix,
@@ -549,6 +551,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         device_id: str,
         translation_key: str,
         poller: ParameterPoller | None = None,
+        coordinators: Mapping[str, Any] | None = None,
         entity_id_style: str = ENTITY_ID_STYLE_DEFAULT,
         entity_id_prefix: str | None = None,
         enabled_default: bool = True,
@@ -565,6 +568,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             device_id: Stable device identifier for the HA device registry.
             poller: The entry's parameter poller; it keeps the preset
                 (pOpMode) and the cooling setpoint current.
+            coordinators: The entry's block coordinators, for reading a
+                2.x parameter's block again after writing it.
             translation_key: HA translation key (e.g. ``"heating_circuit"``).
             entity_id_style: One of the ``ENTITY_ID_STYLE_*`` values from
                 const.py. "fhem" sets ``self.entity_id`` directly (using
@@ -590,6 +595,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         self._device = device
         self._device_id = device_id
         self._poller = poller
+        self._coordinators: Mapping[str, Any] = coordinators or {}
 
         # (byte offset, byte length) in the block; HC2 has no current
         # temperature and may have no operating mode.
@@ -967,7 +973,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             )
         self._op_mode_cache = preset_mode
         self.async_write_ha_state()
-        self._refresh_parameter(self._opmode_entry)
+        await self._async_refresh_parameter(self._opmode_entry)
         await self.coordinator.async_request_refresh()
 
     async def _async_read_setpoint(self, entry: WriteParam) -> float | None:
@@ -1051,7 +1057,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             await async_write_parameter(
                 self.hass, self._device, target_entry, value_bytes
             )
-        self._refresh_parameter(target_entry)
+        await self._async_refresh_parameter(target_entry)
         await self.coordinator.async_request_refresh()
 
     async def _async_write_cool_setpoint(self, temperature: float) -> None:
@@ -1085,7 +1091,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             await async_write_parameter(self.hass, self._device, entry, value_bytes)
         self._apply_cooling_setpoint(value_bytes)
         self.async_write_ha_state()
-        self._refresh_parameter(entry)
+        await self._async_refresh_parameter(entry)
 
     async def _async_set_cooling_switch(self, *, enabled: bool) -> None:
         """Enable or disable the cooling switch.
@@ -1109,7 +1115,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 self._cool_switch_entry,
                 THZValueCodec.encode_switch(enabled),
             )
-        self._refresh_parameter(self._cool_switch_entry)
+        await self._async_refresh_parameter(self._cool_switch_entry)
 
     def _apply_cooling_setpoint(self, value_bytes: bytes) -> None:
         """Decode the cooling setpoint register into the cached target."""
@@ -1136,10 +1142,9 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 "Could not decode operating mode for %s: %s", self.name, err
             )
 
-    def _refresh_parameter(self, entry: WriteParam) -> None:
-        """Have the poller read ``entry`` again for all its entities."""
-        if self._poller is not None:
-            self._poller.async_refresh(parameter_read_key(entry))
+    async def _async_refresh_parameter(self, entry: WriteParam) -> None:
+        """Read ``entry`` again for all entities showing it."""
+        await async_refresh_parameter(entry, self._coordinators, self._poller)
 
     # ── Device registry ─────────────────────────────────────────────────────
 

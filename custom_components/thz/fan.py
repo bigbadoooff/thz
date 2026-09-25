@@ -44,7 +44,7 @@ from homeassistant.util.percentage import (
     ranged_value_to_percentage,
 )
 
-from .base_entity import THZBaseEntity
+from .base_entity import THZBaseEntity, async_refresh_parameter
 from .devices import assign_subdevices
 from .parameter_io import (
     async_read_parameter,
@@ -499,8 +499,7 @@ class THZFan(THZBaseEntity, FanEntity):
                 parameter_length(param),
             )
             await async_write_parameter(self.hass, self._device, param, value_bytes)
-        if self._poller is not None:
-            self._poller.async_refresh(parameter_read_key(param))
+        await async_refresh_parameter(param, self._coordinators, self._poller)
         duration = self._params.durations[stage]
         minutes = (
             self._number(

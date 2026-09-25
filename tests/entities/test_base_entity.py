@@ -346,7 +346,7 @@ class TestParameterEntity:
 
         await entity._async_after_write()
         coordinator.async_request_refresh.assert_awaited_once()
-        poller.async_invalidate.assert_not_called()
+        poller.async_refresh.assert_not_called()
 
     def test_failed_block_read_makes_unavailable(self):
         entity = _ParamEntity(_flag_param())
@@ -385,3 +385,47 @@ class TestParameterEntity:
         entity = _ParamEntity(_flag_param())
         entity._handle_block_update()
         entity.async_write_ha_state.assert_called_once()
+
+
+class TestAsyncRefreshParameter:
+    """A written parameter is read again where its entities get it from."""
+
+    @pytest.mark.asyncio
+    async def test_block_parameter_refreshes_its_block(self):
+        coordinator = MagicMock(last_update_success=True, data=bytes(8))
+        coordinator.async_request_refresh = AsyncMock()
+        poller = _poller()
+
+        await base_entity_mod.async_refresh_parameter(
+            _flag_param(), {"pxx0B": coordinator}, poller
+        )
+
+        coordinator.async_request_refresh.assert_awaited_once()
+        poller.async_refresh.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_block_the_firmware_lacks_falls_back_to_the_poller(self):
+        coordinator = MagicMock(last_update_success=True, data=None)
+        coordinator.async_request_refresh = AsyncMock()
+        poller = _poller()
+
+        await base_entity_mod.async_refresh_parameter(
+            _flag_param(), {"pxx0B": coordinator}, poller
+        )
+
+        coordinator.async_request_refresh.assert_not_awaited()
+        poller.async_refresh.assert_called_once_with(("0B", 6, 1))
+
+    @pytest.mark.asyncio
+    async def test_direct_parameter_refreshes_its_key(self):
+        poller = _poller()
+        param = write_param(name="p01", command="0A0100", type="number")
+
+        await base_entity_mod.async_refresh_parameter(param, {}, poller)
+
+        poller.async_refresh.assert_called_once_with(KEY)
+
+    @pytest.mark.asyncio
+    async def test_without_poller_nothing_happens(self):
+        param = write_param(name="p01", command="0A0100", type="number")
+        await base_entity_mod.async_refresh_parameter(param, {}, None)
