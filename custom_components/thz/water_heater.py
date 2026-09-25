@@ -17,6 +17,7 @@ setpoint, matches the setpoint in effect.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -34,6 +35,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from .base_entity import async_refresh_parameter
 from .climate import _field_layout, _find_entry, _read_op_mode_raw, _read_temp
 from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
@@ -49,6 +51,7 @@ from .write_errors import raise_write_errors
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
+    from .parameter_poller import ParameterPoller
     from .runtime_data import THZConfigEntry
     from .thz_device import THZDevice
 
@@ -103,6 +106,8 @@ async def async_setup_entry(
         day_setpoint=_find_entry(write_registers, _DAY_SETPOINT_NAMES),
         night_setpoint=_find_entry(write_registers, _NIGHT_SETPOINT_NAMES),
         manual_setpoint=_find_entry(write_registers, _MANUAL_SETPOINT_NAMES),
+        poller=entry_data.poller,
+        coordinators=entry_data.coordinators,
         entity_id_style=entry_data.entity_id_style,
         entity_id_prefix=entry_data.entity_id_prefix,
     )
@@ -136,10 +141,15 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
         manual_setpoint: WriteParam | None,
         entity_id_style: str,
         entity_id_prefix: str | None,
+        poller: ParameterPoller | None = None,
+        coordinators: Mapping[str, Any] | None = None,
     ) -> None:
         """Initialize the water heater from the resolved block layout."""
         super().__init__(coordinator)
         self._device = device
+        # Read a setpoint again after writing it, for its number entity.
+        self._poller = poller
+        self._coordinators: Mapping[str, Any] = coordinators or {}
         self._device_id = device_id
         self._current = current
         self._target = target
@@ -249,4 +259,5 @@ class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
                 parameter_length(entry),
             )
             await async_write_parameter(self.hass, self._device, entry, value_bytes)
+        await async_refresh_parameter(entry, self._coordinators, self._poller)
         await self.coordinator.async_request_refresh()

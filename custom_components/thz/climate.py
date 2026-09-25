@@ -61,7 +61,7 @@ read-only mode — ``target_temperature`` is still shown but
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any, cast
@@ -81,6 +81,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from .base_entity import async_refresh_parameter
 from .const import (
     CONF_ENABLE_HC2,
     DOMAIN,
@@ -92,7 +93,9 @@ from .exceptions import DEVICE_ERRORS
 from .parameter_io import (
     async_read_parameter,
     async_write_parameter,
+    parameter_from_read,
     parameter_length,
+    parameter_read_key,
 )
 from .register_maps.model import WriteParam
 from .value_codec import THZValueCodec, decode_raw_value
@@ -101,6 +104,7 @@ from .write_errors import raise_write_errors
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
+    from .parameter_poller import ParameterPoller
     from .register_maps.register_map_manager import RegisterMapManager
     from .runtime_data import THZConfigEntry
 
@@ -395,6 +399,8 @@ async def async_setup_entry(
                 config,
                 device=entry_data.device,
                 device_id=entry_data.device_id,
+                poller=entry_data.poller,
+                coordinators=entry_data.coordinators,
                 translation_key=circuit.translation_key,
                 entity_id_style=entry_data.entity_id_style,
                 entity_id_prefix=entry_data.entity_id_prefix,
@@ -544,6 +550,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         device: Any,
         device_id: str,
         translation_key: str,
+        poller: ParameterPoller | None = None,
+        coordinators: Mapping[str, Any] | None = None,
         entity_id_style: str = ENTITY_ID_STYLE_DEFAULT,
         entity_id_prefix: str | None = None,
         enabled_default: bool = True,
@@ -558,6 +566,10 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 pOpMode register.
             device: THZDevice instance used for write operations.
             device_id: Stable device identifier for the HA device registry.
+            poller: The entry's parameter poller; it keeps the preset
+                (pOpMode) and the cooling setpoint current.
+            coordinators: The entry's block coordinators, for reading a
+                2.x parameter's block again after writing it.
             translation_key: HA translation key (e.g. ``"heating_circuit"``).
             entity_id_style: One of the ``ENTITY_ID_STYLE_*`` values from
                 const.py. "fhem" sets ``self.entity_id`` directly (using
@@ -582,6 +594,8 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         self._cooling_coordinator = status.coordinator
         self._device = device
         self._device_id = device_id
+        self._poller = poller
+        self._coordinators: Mapping[str, Any] = coordinators or {}
 
         # (byte offset, byte length) in the block; HC2 has no current
         # temperature and may have no operating mode.
@@ -600,7 +614,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         self._cooling_bit = status.cooling_bit
         self._compressor_bit = status.compressor_bit
 
-        # Cached cooling setpoint (populated on first device read)
+        # Last polled cooling setpoint and preset (see async_added_to_hass).
         self._cooling_target_temp: float | None = None
 
         # Optional write entry for the preset mode
@@ -678,7 +692,13 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
     # ── Coordinator subscription helpers ───────────────────────────────────
 
     async def async_added_to_hass(self) -> None:
-        """Subscribe to coordinator updates and read initial cooling setpoint."""
+        """Subscribe to the coordinators and to the polled parameters.
+
+        The preset (pOpMode) and the cooling setpoint are write-map
+        parameters: the poller reads them every write interval and after a
+        write, so a change made at the heat pump or through another entity
+        (the pOpMode select, the other circuit) shows up here too.
+        """
         await super().async_added_to_hass()
 
         # Subscribe to the optional cooling-status coordinator
@@ -689,13 +709,32 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 )
             )
 
-        # Populate the cooling setpoint cache on startup
-        if self._supports_cooling:
-            await self._async_read_cooling_setpoint()
-
-        # Populate the global operating-mode (pOpMode) cache on startup
+        if self._supports_cooling and self._cool_setpoint_entry is not None:
+            self._subscribe_parameter(
+                self._cool_setpoint_entry, self._apply_cooling_setpoint
+            )
         if self._opmode_entry is not None:
-            await self._async_read_op_mode()
+            self._subscribe_parameter(self._opmode_entry, self._apply_op_mode)
+
+    def _subscribe_parameter(
+        self, entry: WriteParam, apply: Callable[[bytes], None]
+    ) -> None:
+        """Hand every poller result of ``entry`` to ``apply``."""
+        poller = self._poller
+        if poller is None:
+            return
+        key = parameter_read_key(entry)
+
+        @callback
+        def _handle(raw: bytes | None) -> None:
+            if raw:
+                apply(parameter_from_read(entry, raw))
+                self.async_write_ha_state()
+
+        self.async_on_remove(poller.async_subscribe(key, _handle))
+        raw = poller.data.get(key)
+        if raw:
+            apply(parameter_from_read(entry, raw))
 
     @callback
     def _handle_cooling_coordinator_update(self) -> None:
@@ -838,7 +877,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         """Return the current global operating mode (pOpMode).
 
         This reflects the last known value of the ``pOpMode`` register itself
-        (cached via ``_async_read_op_mode``), using the device's own mode
+        (kept current by the parameter poller), using the device's own mode
         name -- e.g. ``"DAYmode"``, ``"setback"``, ``"standby"``,
         ``"automatic"``, ``"DHWmode"``, ``"manual"``, or ``"emergency"``. Note
         this is a device-wide setting shared by HC1, HC2 and hot water alike (not
@@ -934,6 +973,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             )
         self._op_mode_cache = preset_mode
         self.async_write_ha_state()
+        await self._async_refresh_parameter(self._opmode_entry)
         await self.coordinator.async_request_refresh()
 
     async def _async_read_setpoint(self, entry: WriteParam) -> float | None:
@@ -1017,6 +1057,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             await async_write_parameter(
                 self.hass, self._device, target_entry, value_bytes
             )
+        await self._async_refresh_parameter(target_entry)
         await self.coordinator.async_request_refresh()
 
     async def _async_write_cool_setpoint(self, temperature: float) -> None:
@@ -1048,7 +1089,9 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 temperature, step, decode_type, parameter_length(entry)
             )
             await async_write_parameter(self.hass, self._device, entry, value_bytes)
-        await self._async_read_cooling_setpoint()
+        self._apply_cooling_setpoint(value_bytes)
+        self.async_write_ha_state()
+        await self._async_refresh_parameter(entry)
 
     async def _async_set_cooling_switch(self, *, enabled: bool) -> None:
         """Enable or disable the cooling switch.
@@ -1072,48 +1115,36 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
                 self._cool_switch_entry,
                 THZValueCodec.encode_switch(enabled),
             )
+        await self._async_refresh_parameter(self._cool_switch_entry)
 
-    async def _async_read_cooling_setpoint(self) -> None:
-        """Read and cache the current cooling setpoint from the device."""
-        if self._cool_setpoint_entry is None:
-            return
-
+    def _apply_cooling_setpoint(self, value_bytes: bytes) -> None:
+        """Decode the cooling setpoint register into the cached target."""
         entry = self._cool_setpoint_entry
-        step = _get_step(entry)
-        decode_type = entry.decode_type
-
+        if entry is None:
+            return
         try:
-            value_bytes = await async_read_parameter(self.hass, self._device, entry)
-            if value_bytes:
-                self._cooling_target_temp = THZValueCodec.decode_number(
-                    value_bytes, step, decode_type
-                )
-                _LOGGER.debug(
-                    "Cached cooling setpoint for %s: %.1f °C",
-                    self.name,
-                    self._cooling_target_temp,
-                )
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
+            self._cooling_target_temp = THZValueCodec.decode_number(
+                value_bytes, _get_step(entry), entry.decode_type, entry.signed
+            )
+        except (ValueError, TypeError) as err:
             _LOGGER.warning(
-                "Could not read cooling setpoint for %s: %s", self.name, err
+                "Could not decode cooling setpoint for %s: %s", self.name, err
             )
 
-    async def _async_read_op_mode(self) -> None:
-        """Read and cache the current global operating mode (pOpMode)."""
-        if self._opmode_entry is None:
-            return
-        entry = self._opmode_entry
+    def _apply_op_mode(self, value_bytes: bytes) -> None:
+        """Decode the pOpMode register into the cached preset."""
         try:
-            value_bytes = await async_read_parameter(self.hass, self._device, entry)
-            if value_bytes:
-                self._op_mode_cache = THZValueCodec.decode_select(
-                    value_bytes, _OPMODE_DECODE_TYPE
-                )
-                _LOGGER.debug(
-                    "Cached operating mode for %s: %s", self.name, self._op_mode_cache
-                )
-        except (ValueError, TypeError, *DEVICE_ERRORS) as err:
-            _LOGGER.warning("Could not read operating mode for %s: %s", self.name, err)
+            self._op_mode_cache = THZValueCodec.decode_select(
+                value_bytes, _OPMODE_DECODE_TYPE
+            )
+        except (ValueError, TypeError) as err:
+            _LOGGER.warning(
+                "Could not decode operating mode for %s: %s", self.name, err
+            )
+
+    async def _async_refresh_parameter(self, entry: WriteParam) -> None:
+        """Read ``entry`` again for all entities showing it."""
+        await async_refresh_parameter(entry, self._coordinators, self._poller)
 
     # ── Device registry ─────────────────────────────────────────────────────
 

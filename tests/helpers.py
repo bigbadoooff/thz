@@ -236,3 +236,24 @@ def as_runtime_data(value):
     if isinstance(value, dict) and value:
         return make_runtime_data(**value)
     return value
+
+
+class FakePoller:
+    """ParameterPoller stand-in: known results in ``data``, ``report`` feeds more."""
+
+    def __init__(self, data):
+        self.data = dict(data)
+        self.callbacks = {}
+        self.refreshed = []
+
+    def async_subscribe(self, key, update_callback):
+        self.callbacks.setdefault(key, []).append(update_callback)
+        return lambda: self.callbacks[key].remove(update_callback)
+
+    def async_refresh(self, key):
+        self.refreshed.append(key)
+
+    def report(self, key, value):
+        self.data[key] = value
+        for update_callback in list(self.callbacks.get(key, [])):
+            update_callback(value)

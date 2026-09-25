@@ -186,6 +186,13 @@ class TestSetTemperature:
         _, command, value = device.async_execute.await_args[0]
         assert command == bytes.fromhex("0A0013")
         assert value == (520).to_bytes(2, "big", signed=True)
+
+    @pytest.mark.asyncio
+    async def test_write_reads_the_setpoint_again(self):
+        heater = _heater(_block(op_mode=1))
+        heater._poller = poller = MagicMock()
+        await heater.async_set_temperature(temperature=52.0)
+        poller.async_refresh.assert_called_once_with(("0A0013", 4, 2))
         heater.coordinator.async_request_refresh.assert_awaited_once()
 
     @pytest.mark.asyncio

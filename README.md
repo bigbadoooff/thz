@@ -204,14 +204,15 @@ never pushes anything. Only one request is on the line at a time.
   register block has its own coordinator and interval, 600 seconds by
   default, set per block under **Reconfigure**. A block is read in one
   request, and all entities of the block update together.
-- **Settings** (number, select, switch, time, fan): one parameter poller per
+- **Settings** (number, select, switch, time, fan, and the climate preset
+  and cooling setpoint): one parameter poller per
   heat pump reads every setting once per **write interval** (3600 seconds by
   default), one after the other. A register shown by several entities is
   read once; disabled entities are not read. On 2.x firmware, settings
   inside a polled block take their value from that block.
 - **After a change from Home Assistant** the entity shows the written value
-  at once; the next read confirms it. A 2.x setting inside a polled block
-  re-reads its block right away.
+  at once, and the register (or, for a 2.x setting inside a polled block,
+  its block) is read again right away, so every entity showing it follows.
 - **Right now:** `homeassistant.update_entity` reads a setting at once;
   `thz.refresh_block` re-reads a block.
 - **Clock:** compared with Home Assistant's time every 15 minutes (see

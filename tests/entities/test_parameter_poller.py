@@ -217,15 +217,31 @@ async def test_unsubscribe_stops_reads_and_callbacks(timers):
 
 
 @pytest.mark.asyncio
-async def test_invalidate_drops_the_result(timers):
-    poller, _ = _poller({A: b"\x00\x01"})
-    poller.async_subscribe(A, MagicMock())
+async def test_refresh_reads_again_for_every_subscriber(timers):
+    poller, device = _poller({A: b"\x00\x01"})
+    writer, other = [], []
+    poller.async_subscribe(A, writer.append)
+    poller.async_subscribe(A, other.append)
     await _run_delayed(timers)
     await _drain(poller)
+    device.answers[A] = b"\x00\x02"
 
-    poller.async_invalidate(A)
+    poller.async_refresh(A)
+    await _drain(poller)
 
-    assert A not in poller.data
+    assert device.reads == [A, A]
+    assert writer == other == [b"\x00\x01", b"\x00\x02"]
+    assert poller.data[A] == b"\x00\x02"
+
+
+@pytest.mark.asyncio
+async def test_refresh_of_an_unsubscribed_key_reads_nothing(timers):
+    poller, device = _poller({A: b"\x00\x01"})
+
+    poller.async_refresh(A)
+    await _drain(poller)
+
+    assert device.reads == []
 
 
 @pytest.mark.asyncio

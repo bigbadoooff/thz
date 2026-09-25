@@ -8,6 +8,7 @@ import pytest
 
 from custom_components.thz.exceptions import THZProtocolError
 from tests.helpers import (
+    FakePoller,
     FakeRegisterManager,
     FakeWriteManager,
     as_runtime_data,
@@ -689,10 +690,18 @@ class TestTHZClimateAsyncAddedToHass:
         )
         entity.hass = MagicMock()
         entity.async_on_remove = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        poller = FakePoller({("0B0582", 4, 2): (200).to_bytes(2, "big")})
+        entity._poller = poller
 
         await entity.async_added_to_hass()
 
         assert entity._cooling_target_temp == pytest.approx(20.0)
+        device.async_execute.assert_not_called()  # the poller reads it
+        # A later poll (a change at the heat pump) updates it.
+        poller.report(("0B0582", 4, 2), (215).to_bytes(2, "big"))
+        assert entity._cooling_target_temp == pytest.approx(21.5)
+        entity.async_write_ha_state.assert_called_once()
 
 
 class TestTHZClimateServiceCalls:
@@ -701,6 +710,30 @@ class TestTHZClimateServiceCalls:
     @staticmethod
     def _entity(**kwargs):
         return TestTHZClimateEntity._make_hc1_entity(**kwargs)
+
+    @pytest.mark.asyncio
+    async def test_heat_setpoint_write_reads_it_again(self):
+        device = MagicMock()
+        device.async_execute = AsyncMock(return_value=None)
+        entity = self._entity(heat_entry=HEAT_ENTRY, device=device)
+        entity.hass = MagicMock()
+        entity._poller = poller = MagicMock()
+        await entity.async_set_temperature(temperature=21.0)
+        poller.async_refresh.assert_called_once_with(("0B0005", 4, 2))
+
+    @pytest.mark.asyncio
+    async def test_cooling_switch_write_reads_it_again(self):
+        device = MagicMock()
+        device.async_execute = AsyncMock(return_value=None)
+        entity = self._entity(
+            cool_switch_entry={"command": "0B0287", "decode_type": "1clean"},
+            cool_setpoint_entry=COOL_SETPOINT_ENTRY,
+            device=device,
+        )
+        entity.hass = MagicMock()
+        entity._poller = poller = MagicMock()
+        await entity._async_set_cooling_switch(enabled=True)
+        poller.async_refresh.assert_called_once_with(("0B0287", 4, 2))
 
     @pytest.mark.asyncio
     async def test_set_temperature_no_value_is_noop(self):
@@ -750,8 +783,12 @@ class TestTHZClimateServiceCalls:
             device=device,
         )
         entity.hass = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        entity._poller = poller = MagicMock()
         await entity.async_set_temperature(temperature=18.0)
-        assert device.async_execute.await_count == 2  # write + re-read
+        assert device.async_execute.await_count == 1
+        assert entity._cooling_target_temp == pytest.approx(18.0)
+        poller.async_refresh.assert_called_once_with(("0B0582", 4, 2))
 
     @pytest.mark.asyncio
     async def test_write_heat_setpoint_raises_device_error(self):
@@ -853,36 +890,29 @@ class TestTHZClimateServiceCalls:
         await entity._async_set_cooling_switch(enabled=True)
         entity._device.async_execute.assert_not_called()
 
-    @pytest.mark.asyncio
-    async def test_read_cooling_setpoint_no_entry_is_noop(self):
+    def test_apply_cooling_setpoint_without_entry_is_noop(self):
         entity = self._entity()
+        entity._apply_cooling_setpoint(b"\x00\xc8")
+        assert entity._cooling_target_temp is None
+
+    def test_apply_cooling_setpoint_ignores_undecodable_bytes(self):
+        entity = self._entity(cool_setpoint_entry=COOL_SETPOINT_ENTRY)
+        entity._apply_cooling_setpoint(b"")
+        assert entity._cooling_target_temp is None
+
+    @pytest.mark.asyncio
+    async def test_without_poller_nothing_is_subscribed(self):
+        entity = self._entity(
+            cool_switch_entry={"command": "0B0287", "decode_type": "1clean"},
+            cool_setpoint_entry=COOL_SETPOINT_ENTRY,
+            opmode_entry={"command": "0A0112"},
+        )
         entity.hass = MagicMock()
-        await entity._async_read_cooling_setpoint()
+        entity.async_on_remove = MagicMock()
+        await entity.async_added_to_hass()
         entity._device.async_execute.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_read_cooling_setpoint_handles_device_error(self):
-        device = MagicMock()
-        device.async_execute = AsyncMock(side_effect=ConnectionError("boom"))
-        entity = self._entity(
-            cool_setpoint_entry=COOL_SETPOINT_ENTRY,
-            device=device,
-        )
-        entity.hass = MagicMock()
-        await entity._async_read_cooling_setpoint()  # Should not raise.
         assert entity._cooling_target_temp is None
-
-    @pytest.mark.asyncio
-    async def test_read_cooling_setpoint_empty_response_leaves_cache_unset(self):
-        device = MagicMock()
-        device.async_execute = AsyncMock(return_value=b"")
-        entity = self._entity(
-            cool_setpoint_entry=COOL_SETPOINT_ENTRY,
-            device=device,
-        )
-        entity.hass = MagicMock()
-        await entity._async_read_cooling_setpoint()
-        assert entity._cooling_target_temp is None
+        assert entity._op_mode_cache is None
 
 
 class TestClimateAsyncSetupEntry:

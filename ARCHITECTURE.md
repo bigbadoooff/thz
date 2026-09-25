@@ -112,7 +112,10 @@ includes entities, climate, clock sync and backup/restore.
    - `homeassistant.update_entity` still reads an entity's register
      directly (`async_update`).
 6. After a write, an entity requests a refresh of the block coordinator
-   that shows the value, or drops the poller's last result for its key.
+   that shows the value, or has the poller read its key again
+   (`async_refresh`), so every entity showing that register gets the new
+   value. The climate entities subscribe the pOpMode and cooling setpoint
+   keys the same way.
 
 All device I/O runs on the event loop and goes through
 `THZDevice.async_execute`. It serialises access with the device lock and
