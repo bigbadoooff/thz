@@ -438,21 +438,16 @@ async def _async_apply_entity_visibility_tier(
 
     last_applied = config_entry.data.get("_entity_visibility_applied")
     if last_applied is None and config_entry.data.get("_hidden_entities_migrated"):
-        # Backward compatibility: entries set up by older versions ran a
-        # one-time migration (since removed) that enforced the "default"
-        # tier's hidden set. Treat that as having applied "default" once.
+        # An entry carrying _hidden_entities_migrated has had the "default"
+        # tier's hidden set applied.
         last_applied = ENTITY_VISIBILITY_DEFAULT
 
     last_applied_hc2 = config_entry.data.get("_entity_hc2_applied")
     if last_applied_hc2 is None:
-        # Backward compatibility: entries that predate the hc2/advanced
-        # category split had HC2 entities bundled into "advanced", so they
-        # were already enabled whenever the previously-applied tier was
-        # "extended" or "all" -- NOT hidden, despite enable_hc2 defaulting to
-        # False. Infer that effective prior state from the tier so a real
-        # change (e.g. explicitly setting enable_hc2=False on first upgrade)
-        # is correctly detected and reconciled, instead of being skipped as
-        # a false no-op.
+        # Without a stored HC2 state, HC2 entities follow the applied tier:
+        # "extended" and "all" show them. Taking that as the applied state
+        # lets a real change (e.g. enable_hc2=False) be reconciled instead
+        # of being skipped as a no-op.
         last_applied_hc2 = last_applied in (
             ENTITY_VISIBILITY_EXTENDED,
             ENTITY_VISIBILITY_ALL,

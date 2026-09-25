@@ -1,8 +1,8 @@
 """Exceptions raised by the THZ device layer.
 
 Every error the device layer raises is a THZError. The subclasses also
-derive from the built-in exception that was raised before (ConnectionError,
-RuntimeError), so code catching those still works. Callers that talk to the
+derive from the matching built-in exception (ConnectionError, RuntimeError),
+so code catching those works too. Callers that talk to the
 device catch DEVICE_ERRORS and translate them once: into UpdateFailed in the
 block coordinators, into HomeAssistantError in services and entity actions.
 """
