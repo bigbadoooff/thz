@@ -99,3 +99,11 @@ class TestSensorNotConnected:
         with caplog.at_level(logging.WARNING):
             assert sensor.native_value is None
         assert not caplog.records
+
+    def test_a_corrupt_value_after_it_is_still_warned(self, caplog):
+        sensor = _sensor(-600)
+        with caplog.at_level(logging.WARNING):
+            assert sensor.native_value is None
+            sensor.coordinator.data = (-32768).to_bytes(4, "big", signed=True)
+            assert sensor.native_value is None
+        assert len([r for r in caplog.records if "implausible" in r.message]) == 1

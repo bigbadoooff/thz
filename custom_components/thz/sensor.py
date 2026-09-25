@@ -389,6 +389,7 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         self._nibble = e.get("nibble")
         self._device_id = device_id
         self._implausible_logged = False
+        self._not_connected_logged = False
         self._raw_hex: str | None = None
         # hex2error is a list of fault names, which an enum state cannot be;
         # the names are translated when the value is built instead.
@@ -538,10 +539,11 @@ class THZGenericSensor(CoordinatorEntity, SensorEntity):
         )
         if low <= value <= high:
             self._implausible_logged = False
+            self._not_connected_logged = False
             return value
         if value == _SENSOR_NOT_CONNECTED:
-            if not self._implausible_logged:
-                self._implausible_logged = True
+            if not self._not_connected_logged:
+                self._not_connected_logged = True
                 _LOGGER.debug("Sensor %s is not connected", self._entity_name)
             return None
         if not self._implausible_logged:
