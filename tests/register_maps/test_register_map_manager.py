@@ -187,6 +187,22 @@ class TestRegisterMapManagerWrite:
         assert isinstance(map_names, list)
         assert len(map_names) > 0
 
+    def test_2xx_parameter_without_a_layout_is_skipped(self, monkeypatch):
+        """A plain SET to the block register would corrupt the block."""
+        complete = RegisterMapManagerWrite("206")
+        in_blocks = {name for name, param in complete.params().items() if param.block}
+        assert in_blocks
+        monkeypatch.setattr(
+            RegisterMapManagerWrite, "_fallback_2xx_layouts", lambda self: {}
+        )
+        monkeypatch.setattr(
+            RegisterMapManagerWrite, "_own_block_layouts", lambda self: {}
+        )
+
+        manager = RegisterMapManagerWrite("206")
+
+        assert not in_blocks & set(manager.params())
+
 
 class TestBaseRegisterMapManager:
     """Test BaseRegisterMapManager internals."""

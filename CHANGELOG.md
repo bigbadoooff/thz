@@ -131,6 +131,9 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **A 2.x parameter without a known block position is no longer created.**
+  It would have been written with a plain SET to its block register,
+  overwriting the block's first bytes. No current register map is affected.
 - **The fan stayed unavailable after one failed read.** A read error while
   switching the fan or on `update_entity` marked it unavailable, and new
   polled data did not make it available again. The fan now follows the
