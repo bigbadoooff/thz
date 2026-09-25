@@ -119,6 +119,22 @@ class TestAsyncSetupEntry:
     """Tests for async_setup_entry."""
 
     @pytest.mark.asyncio
+    async def test_coordinators_get_the_config_entry(self):
+        hass = _mock_hass()
+        entry = _mock_config_entry()
+        created = []
+
+        def factory(*args, **kwargs):
+            created.append(kwargs)
+            return _fake_coordinator()
+
+        with _patched_setup(device=_fake_device(), coordinator_factory=factory):
+            await thz_module.async_setup_entry(hass, entry)
+
+        assert created
+        assert all(kwargs["config_entry"] is entry for kwargs in created)
+
+    @pytest.mark.asyncio
     async def test_usb_setup_success(self):
         hass = _mock_hass()
         entry = _mock_config_entry()
