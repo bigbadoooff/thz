@@ -1186,6 +1186,29 @@ class TestClockRobustness:
         )
         assert ok is True
 
+    @pytest.mark.asyncio
+    async def test_a_read_back_across_the_hour_is_read_again(self):
+        from custom_components.thz.clock_sync import async_write_device_clock
+
+        class RollingDevice(_FakeClockDevice):
+            async def async_execute(self, fn, *args):
+                result = await super().async_execute(fn, *args)
+                name = self.COMMANDS[args[0].hex().upper()]
+                # 10:59 turns into 11:00 between reading the hour and minutes.
+                if (
+                    fn is self.read_value
+                    and name == "pClockHour"
+                    and self.clock["pClockMinutes"] == 59
+                ):
+                    self.clock.update(pClockHour=11, pClockMinutes=0)
+                return result
+
+        device = RollingDevice(_CLOCK)
+        ok = await async_write_device_clock(
+            MagicMock(), device, _clock_write_manager(), datetime(2026, 8, 25, 10, 59)
+        )
+        assert ok is True
+
 
 class TestPeriodicClockCheck:
     """The periodic check tolerates device errors, not programming errors."""

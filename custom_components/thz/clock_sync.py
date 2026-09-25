@@ -64,6 +64,7 @@ CLOCK_REGISTER_NAMES = (
 # only flag/act on drift beyond these thresholds.
 CLOCK_DRIFT_WARN_SECONDS = 60  # periodic check: log + optionally auto-correct
 CLOCK_DRIFT_BACKUP_SECONDS = 3600  # backup: always auto-correct past this
+_READBACK_ATTEMPTS = 2  # a read-back across an hour rollover is read again
 CLOCK_CHECK_INTERVAL = timedelta(minutes=15)
 # Attempts per clock register read before the clock is treated as unreadable.
 CLOCK_READ_ATTEMPTS = 3
@@ -153,8 +154,9 @@ async def async_write_device_clock(
     Only the components that differ from the device's current reading are
     written (all of them if the current clock cannot be read), and the result
     is verified by reading the clock back. Returns True if the readback is
-    within CLOCK_DRIFT_WARN_SECONDS of ``when``; a mismatch is logged but not
-    raised, since the write itself was accepted by the device.
+    within CLOCK_DRIFT_WARN_SECONDS of ``when`` (read twice at most); a
+    mismatch is logged but not raised, since the write itself was accepted
+    by the device.
     """
     values = {
         "pClockYear": when.year % 100,
@@ -172,24 +174,27 @@ async def async_write_device_clock(
             value, 1.0, entry.decode_type, parameter_length(entry)
         )
         await async_write_parameter(device, entry, value_bytes)
-    readback = await _read_clock_parts(hass, device, write_manager)
-    if readback is None:
-        _LOGGER.warning("clock_sync: could not read the clock back after writing")
-        return False
-    device_time = _parts_to_datetime(readback)
-    # The clock may pass a minute boundary while the registers are written
-    # and read back; within the drift threshold counts as set.
-    if (
-        device_time is None
-        or abs((device_time - when).total_seconds()) > CLOCK_DRIFT_WARN_SECONDS
-    ):
-        _LOGGER.warning(
-            "clock_sync: clock readback %s does not match the written time %s",
-            _parts_to_datetime(readback),
-            when,
-        )
-        return False
-    return True
+    # The registers are read one at a time, so a read-back that straddles an
+    # hour or day rollover mixes two times; a second read settles it. Within
+    # the drift threshold counts as set, since a minute may pass meanwhile.
+    device_time: datetime | None = None
+    for _attempt in range(_READBACK_ATTEMPTS):
+        readback = await _read_clock_parts(hass, device, write_manager)
+        if readback is None:
+            _LOGGER.warning("clock_sync: could not read the clock back after writing")
+            return False
+        device_time = _parts_to_datetime(readback)
+        if (
+            device_time is not None
+            and abs((device_time - when).total_seconds()) <= CLOCK_DRIFT_WARN_SECONDS
+        ):
+            return True
+    _LOGGER.warning(
+        "clock_sync: clock readback %s does not match the written time %s",
+        device_time,
+        when,
+    )
+    return False
 
 
 async def async_check_and_maybe_sync_clock(
