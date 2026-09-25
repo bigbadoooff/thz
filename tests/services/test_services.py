@@ -212,6 +212,26 @@ class TestScanRawRegisters:
 
 class TestWatchRawRegistersChanges:
     @pytest.mark.asyncio
+    async def test_nothing_readable_returns_at_once(self):
+        hass = _mock_hass()
+        device = _mock_device()
+        device.async_execute = AsyncMock(side_effect=THZProtocolError("gone"))
+        hass.data[DOMAIN]["entry1"] = {"device": device}
+        async_setup_services(hass)
+        handler = _handler_for(hass, "watch_raw_registers_changes")
+        call = MagicMock()
+        call.data = {
+            "pattern": "0A0176",
+            "duration_seconds": 600,
+            "interval_seconds": 0,
+        }
+
+        result = await asyncio.wait_for(handler(call), timeout=5)
+
+        assert result["summary"]["valid_count"] == 0
+        assert result["summary"]["iterations"] == 0
+
+    @pytest.mark.asyncio
     async def test_duration_must_be_at_least_one(self):
         hass = _mock_hass()
         async_setup_services(hass)

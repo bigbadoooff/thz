@@ -125,6 +125,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **`thz.watch_raw_registers_changes` could freeze Home Assistant.** With
+  no readable register (or the heat pump offline) and an interval of 0 it
+  looped without pausing for the whole duration. It now returns at once
+  when there is nothing to watch and always pauses between rounds.
 - **A short error answer to a read was taken for no answer.** A read only
   counted an answer of at least eight bytes as complete, so the heat pump's
   short "unknown register" or "command not known" answer ran into the
