@@ -117,6 +117,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **Connecting at startup had no time limit.** Reading the firmware and
+  probing for cooling now run under the device lock with a 30 second
+  limit, like every other device call, so a line that hangs cannot stall
+  setup.
 - **Adding a heat pump that is already set up opened its port first.**
   The flow connected and read the firmware before it noticed the
   duplicate; on a serial port that talked next to the running

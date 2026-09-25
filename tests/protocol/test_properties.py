@@ -165,7 +165,7 @@ def test_block_write_changes_only_its_own_parameter(name, block, raw):
     if layout.bit is not None:
         value = bytes([raw & 1])
 
-    asyncio.run(async_write_parameter(None, device, entry, value))
+    asyncio.run(async_write_parameter(device, entry, value))
     after = device.blocks[addr]
 
     start = layout.offset - 2  # CRC and address echo precede the data
@@ -180,4 +180,4 @@ def test_block_write_changes_only_its_own_parameter(name, block, raw):
     for index in range(len(block)):
         if index not in changed:
             assert after[index] == block[index], index
-    assert asyncio.run(async_read_parameter(None, device, entry)) == value
+    assert asyncio.run(async_read_parameter(device, entry)) == value

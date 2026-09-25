@@ -121,7 +121,7 @@ async def _read_backup_value(
             "end": _format_hhmm(quarters_to_time(value_bytes[1])),
         }
 
-    value_bytes = await async_read_parameter(hass, device, entry)
+    value_bytes = await async_read_parameter(device, entry)
     if not value_bytes:
         raise ValueError("no data received")
     if reg_type == "number":
@@ -458,7 +458,7 @@ async def async_handle_restore_parameters(
             continue
         if not dry_run:
             try:
-                await async_write_parameter(hass, device, entry, value_bytes)
+                await async_write_parameter(device, entry, value_bytes)
             except DEVICE_ERRORS as err:
                 failed.append(f"{name}: {err}")
                 continue

@@ -320,8 +320,8 @@ async def test_reconfigure_to_a_device_of_another_entry_is_refused(hass, fake_de
 async def test_missing_write_map_aborts(hass, fake_device, monkeypatch):
     real_initialize = fake_device.async_initialize
 
-    async def initialize_without_write_map(self, hass):
-        await real_initialize(self, hass)
+    async def initialize_without_write_map(self):
+        await real_initialize(self)
         self.write_register_map_manager = None
 
     monkeypatch.setattr(fake_device, "async_initialize", initialize_without_write_map)

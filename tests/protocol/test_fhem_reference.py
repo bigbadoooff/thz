@@ -158,7 +158,7 @@ async def _our_block_telegram(entry: dict, value: str, blocks: dict) -> str:
         entry.decode_type,
         parameter_length(entry),
     )
-    await async_write_parameter(None, device, entry, value_bytes)
+    await async_write_parameter(device, entry, value_bytes)
     sets = [t for t in device.sent if t[:2] == b"\x01\x80"]
     assert len(sets) == 1
     return sets[0].hex().upper()
@@ -211,7 +211,7 @@ async def test_block_reads_match_fhem(firmware):
     mismatches = []
     for name, entry in entries.items():
         fhem = fhem_values[(entry.command.upper(), name)]
-        raw = await async_read_parameter(None, device, entry)
+        raw = await async_read_parameter(device, entry)
         ours = THZValueCodec.decode_number(
             raw, float(entry.step), entry.decode_type, entry.signed
         )

@@ -23,8 +23,6 @@ from typing import TYPE_CHECKING
 from .const import WRITE_REGISTER_LENGTH, WRITE_REGISTER_OFFSET
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
-
     from .parameter_poller import ReadKey
     from .register_maps.model import WriteParam
     from .thz_device import THZDevice
@@ -85,9 +83,7 @@ def parameter_from_read(param: WriteParam, raw: bytes) -> bytes:
     return raw
 
 
-async def async_read_parameter(
-    hass: HomeAssistant, device: THZDevice, param: WriteParam
-) -> bytes:
+async def async_read_parameter(device: THZDevice, param: WriteParam) -> bytes:
     """Read the raw value bytes of a write-map parameter."""
     command, offset, length = parameter_read_key(param)
     result: bytes = await device.async_execute(
@@ -101,10 +97,7 @@ async def async_read_parameter(
 
 
 async def async_write_parameter(
-    hass: HomeAssistant,
-    device: THZDevice,
-    param: WriteParam,
-    value_bytes: bytes,
+    device: THZDevice, param: WriteParam, value_bytes: bytes
 ) -> None:
     """Write already-encoded value bytes to a write-map parameter.
 

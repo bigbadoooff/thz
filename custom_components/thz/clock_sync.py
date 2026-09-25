@@ -85,7 +85,7 @@ async def _read_clock_parts(
         value_bytes = None
         for attempt in range(1, CLOCK_READ_ATTEMPTS + 1):
             try:
-                value_bytes = await async_read_parameter(hass, device, entry)
+                value_bytes = await async_read_parameter(device, entry)
             except Exception as err:  # noqa: BLE001
                 _LOGGER.debug(
                     "clock_sync: failed to read %s (attempt %d/%d): %s",
@@ -170,7 +170,7 @@ async def async_write_device_clock(
         value_bytes = THZValueCodec.encode_number(
             value, 1.0, entry.decode_type, parameter_length(entry)
         )
-        await async_write_parameter(hass, device, entry, value_bytes)
+        await async_write_parameter(device, entry, value_bytes)
     readback = await _read_clock_parts(hass, device, write_manager)
     if readback is None:
         _LOGGER.warning("clock_sync: could not read the clock back after writing")

@@ -108,7 +108,6 @@ class THZSwitch(THZParameterEntity, SwitchEntity):
         _LOGGER.debug("Turning %s switch %s", "on" if is_on else "off", self.name)
         with raise_write_errors(self.name):
             await async_write_parameter(
-                self.hass,
                 self._device,
                 self._entry,
                 THZValueCodec.encode_switch(is_on),

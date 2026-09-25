@@ -676,7 +676,7 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         try:
-            await device.async_initialize(self.hass)
+            await device.async_initialize()
 
             firmware = device.firmware_version
             _LOGGER.debug("Firmware detected: %s", firmware)

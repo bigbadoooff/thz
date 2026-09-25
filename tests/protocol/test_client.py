@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from custom_components.thz import thz_device as device_mod
 from custom_components.thz.exceptions import (
     THZConnectionError,
     THZNotSupportedError,
@@ -440,7 +441,7 @@ class TestAsyncInitialize:
     async def test_unknown_connection_raises(self):
         device, _ = _device(connection="bogus")
         with pytest.raises(ValueError, match="Unknown connection type"):
-            await device.async_initialize(None)
+            await device.async_initialize()
 
     @pytest.mark.asyncio
     async def test_low_firmware_skips_the_cooling_probe(self):
@@ -449,7 +450,7 @@ class TestAsyncInitialize:
             patch.object(device, "read_firmware_version", return_value="206"),
             patch.object(device, "_probe_cooling_support") as probe,
         ):
-            await device.async_initialize(None)
+            await device.async_initialize()
 
         assert transport.connects == 1
         probe.assert_not_awaited()
@@ -468,7 +469,7 @@ class TestAsyncInitialize:
                 device, "_probe_cooling_support", return_value=has_cooling
             ) as probe,
         ):
-            await device.async_initialize(None)
+            await device.async_initialize()
         probe.assert_awaited_once()
         assert device.has_cooling is has_cooling
 
@@ -479,7 +480,7 @@ class TestAsyncInitialize:
             patch.object(device, "read_firmware_version", return_value="439"),
             patch.object(device, "_probe_cooling_support", return_value=True) as probe,
         ):
-            await device.async_initialize(None)
+            await device.async_initialize()
         probe.assert_awaited_once()
         assert device.firmware_version == "439"
 
@@ -493,7 +494,7 @@ class TestAsyncInitialize:
             patch.object(device, "read_firmware_version", return_value=firmware),
             pytest.raises(THZConnectionError, match="could not be read"),
         ):
-            await device.async_initialize(None)
+            await device.async_initialize()
 
         assert transport.closes == 1
         assert device.register_map_manager is None
@@ -507,8 +508,40 @@ class TestAsyncInitialize:
             ),
             pytest.raises(THZConnectionError, match="refused"),
         ):
-            await device.async_initialize(None)
+            await device.async_initialize()
         assert transport.closes == 1
+        # Setup reports it; no "heat pump does not answer" before first contact.
+        assert device.link_ok is True
+
+    @pytest.mark.asyncio
+    async def test_runs_under_the_device_lock(self):
+        device, _ = _device()
+        held = []
+
+        async def firmware():
+            held.append(device.lock.locked())
+            return "439"
+
+        with patch.object(device, "read_firmware_version", side_effect=firmware):
+            await device.async_initialize()
+        assert held == [True]
+        assert not device.lock.locked()
+
+    @pytest.mark.asyncio
+    async def test_hung_initialization_times_out_and_closes(self, monkeypatch):
+        monkeypatch.setattr(device_mod, "_INITIALIZE_TIMEOUT", 0.01)
+        device, transport = _device()
+
+        async def hang():
+            await asyncio.sleep(1)
+
+        with (
+            patch.object(device, "read_firmware_version", side_effect=hang),
+            pytest.raises(THZConnectionError, match="timed out"),
+        ):
+            await device.async_initialize()
+        assert transport.closes == 1
+        assert device.link_ok is True
 
 
 class TestClose:
@@ -543,5 +576,5 @@ class TestClose:
         device, transport = _device()
         device.close()
         with patch.object(device, "read_firmware_version", return_value="439"):
-            await device.async_initialize(None)
+            await device.async_initialize()
         assert transport.connects == 1

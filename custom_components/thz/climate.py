@@ -968,9 +968,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             return
         with raise_write_errors(self.name):
             value_bytes = THZValueCodec.encode_select(preset_mode, _OPMODE_DECODE_TYPE)
-            await async_write_parameter(
-                self.hass, self._device, self._opmode_entry, value_bytes
-            )
+            await async_write_parameter(self._device, self._opmode_entry, value_bytes)
         self._op_mode_cache = preset_mode
         self.async_write_ha_state()
         await self._async_refresh_parameter(self._opmode_entry)
@@ -981,7 +979,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         step = _get_step(entry)
         decode_type = entry.decode_type
         try:
-            value_bytes = await async_read_parameter(self.hass, self._device, entry)
+            value_bytes = await async_read_parameter(self._device, entry)
             if value_bytes:
                 return THZValueCodec.decode_number(
                     value_bytes, step, decode_type, entry.signed
@@ -1054,9 +1052,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             value_bytes = THZValueCodec.encode_number(
                 temperature, step, decode_type, parameter_length(target_entry)
             )
-            await async_write_parameter(
-                self.hass, self._device, target_entry, value_bytes
-            )
+            await async_write_parameter(self._device, target_entry, value_bytes)
         await self._async_refresh_parameter(target_entry)
         await self.coordinator.async_request_refresh()
 
@@ -1088,7 +1084,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             value_bytes = THZValueCodec.encode_number(
                 temperature, step, decode_type, parameter_length(entry)
             )
-            await async_write_parameter(self.hass, self._device, entry, value_bytes)
+            await async_write_parameter(self._device, entry, value_bytes)
         self._apply_cooling_setpoint(value_bytes)
         self.async_write_ha_state()
         await self._async_refresh_parameter(entry)
@@ -1110,7 +1106,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
         )
         with raise_write_errors(self.name):
             await async_write_parameter(
-                self.hass,
                 self._device,
                 self._cool_switch_entry,
                 THZValueCodec.encode_switch(enabled),
