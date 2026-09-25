@@ -61,6 +61,7 @@ from .write_errors import raise_write_errors
 
 if TYPE_CHECKING:
     from ._typing_compat import AddConfigEntryEntitiesCallback
+    from .parameter_poller import ReadKey
     from .runtime_data import THZConfigEntry
     from .thz_device import THZDevice
 
@@ -233,6 +234,9 @@ class THZFan(THZBaseEntity, FanEntity):
         self._stage: int | None = None
         # Stage and end of an unscheduled ventilation started here.
         self._unscheduled: tuple[int, datetime] | None = None
+        # What the stage is computed from, set when added to Home Assistant.
+        self._sources: list[Any] = []
+        self._source_keys: set[ReadKey] = set()
         # Last stage above 0, used by turn_on without a speed.
         self._last_on_stage = 1
 
@@ -290,7 +294,9 @@ class THZFan(THZBaseEntity, FanEntity):
                 coordinators[id(coordinator)] = coordinator
             else:
                 keys.add(parameter_read_key(param))
-        for coordinator in coordinators.values():
+        self._sources = list(coordinators.values())
+        self._source_keys = keys
+        for coordinator in self._sources:
             self.async_on_remove(coordinator.async_add_listener(self._handle_change))
         if self._poller is not None:
             for key in sorted(keys):
@@ -317,9 +323,24 @@ class THZFan(THZBaseEntity, FanEntity):
         self.async_write_ha_state()
 
     def _recompute(self) -> None:
+        self._attr_available = self._sources_ok()
         stage = self._compute_stage(self._live_raw, self._live_block)
         if stage is not None:
             self._set_stage(stage)
+
+    def _sources_ok(self) -> bool:
+        """Return False while a block or register the stage uses failed.
+
+        A coordinator keeps its last data after a failed refresh, and the
+        poller keeps None for a failed read.
+        """
+        if not all(coordinator.last_update_success for coordinator in self._sources):
+            return False
+        if self._poller is None:
+            return True
+        return all(
+            self._poller.data.get(key, b"") is not None for key in self._source_keys
+        )
 
     def _live_raw(self, param: WriteParam) -> bytes | None:
         """Return a parameter's value bytes from the polled data."""
@@ -362,8 +383,6 @@ class THZFan(THZBaseEntity, FanEntity):
         )
 
     def _set_stage(self, stage: int) -> None:
-        # A known stage means the data it came from was read.
-        self._attr_available = True
         self._stage = stage
         if stage > 0:
             self._last_on_stage = stage

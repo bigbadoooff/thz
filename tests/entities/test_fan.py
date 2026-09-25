@@ -358,6 +358,25 @@ class TestState:
         assert fan._attr_available is True
 
     @pytest.mark.asyncio
+    async def test_a_failed_block_or_register_makes_it_unavailable(self, now):
+        values = {"0A1D10": _window(6, 9), "0A056C": _word(2)}
+        fan = _fan(FakeDevice(values), airflow=None)
+        coordinator = MagicMock(last_update_success=False, data=b"stale")
+        fan._sources = [coordinator]
+        fan._recompute()
+        assert fan._attr_available is False
+
+        coordinator.last_update_success = True
+        fan._recompute()
+        assert fan._attr_available is True
+
+        key = ("0A056C", 0, 2)
+        fan._source_keys = {key}
+        fan._poller.data = {key: None}
+        fan._recompute()
+        assert fan._attr_available is False
+
+    @pytest.mark.asyncio
     async def test_decode_error_leaves_state(self, now, monkeypatch):
         monkeypatch.setattr(
             fan_module.THZValueCodec,
