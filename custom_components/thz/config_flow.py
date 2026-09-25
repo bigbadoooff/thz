@@ -655,6 +655,12 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data = self.connection_data
         conn_type = data["connection_type"]
 
+        # Refuse a heat pump that is already set up before opening its port:
+        # the running entry talks on that line, and a serial port can be
+        # opened twice, so a probe would interleave telegrams with it.
+        await self.async_set_unique_id(entry_unique_id(data))
+        self._abort_if_unique_id_configured()
+
         if conn_type == "usb":
             device = THZDevice(
                 connection="usb",
@@ -671,9 +677,6 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         try:
             await device.async_initialize(self.hass)
-
-            await self.async_set_unique_id(entry_unique_id(data))
-            self._abort_if_unique_id_configured()
 
             firmware = device.firmware_version
             _LOGGER.debug("Firmware detected: %s", firmware)
