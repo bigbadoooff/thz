@@ -432,7 +432,12 @@ async def async_handle_watch_raw_registers_changes(
     iterations = 0
 
     start_ts = asyncio.get_running_loop().time()
-    while (asyncio.get_running_loop().time() - start_ts) < duration_seconds:
+    # Without a readable register there is nothing to watch; the loop below
+    # would not await anything and block the event loop for the duration.
+    while (
+        valid_registers
+        and (asyncio.get_running_loop().time() - start_ts) < duration_seconds
+    ):
         iterations += 1
         for command_str, old_hex in list(valid_registers.items()):
             command_bytes = bytes.fromhex(command_str)
@@ -456,8 +461,8 @@ async def async_handle_watch_raw_registers_changes(
                 # Answered in the pre-scan; skip a failure now and then.
                 continue
 
-        if interval_seconds > 0:
-            await asyncio.sleep(interval_seconds)
+        # Always yield to the event loop between rounds.
+        await asyncio.sleep(max(interval_seconds, 0))
 
     _LOGGER.debug(
         "Watch raw register changes done (%s): scanned=%d, valid=%d, "
