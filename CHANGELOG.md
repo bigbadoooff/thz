@@ -125,6 +125,12 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **A short error answer to a read was taken for no answer.** A read only
+  counted an answer of at least eight bytes as complete, so the heat pump's
+  short "unknown register" or "command not known" answer ran into the
+  timeout: the block was reported as unreachable (and could make setup
+  retry) instead of unsupported. Like FHEM, an answer is now complete at its
+  terminator, and its header is checked before its length.
 - **2.x settings could stay unavailable for good** when their block failed
   to read at startup and later turned out to be one the firmware does not
   have. They now fall back to being read on their own.
