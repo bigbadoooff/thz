@@ -117,6 +117,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **The climate preset and cooling setpoint went stale.** They were read
+  once at startup, so a mode changed at the heat pump, through the
+  operating-mode select or through the other heating circuit did not show
+  until Home Assistant restarted. Both are now polled with the other
+  settings and read again right after any entity writes them.
 - **A failed write looked like a success.** Setting a number, select,
   switch, time, climate, hot water or fan entity while the heat pump did not
   answer only logged an error; the action succeeded and the frontend showed

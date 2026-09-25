@@ -234,11 +234,11 @@ class TestPollResults:
         assert entity.available is True
 
     @pytest.mark.asyncio
-    async def test_write_drops_the_polled_result(self):
+    async def test_write_reads_the_polled_key_again(self):
         entity = _PolledEntity()
         entity._poller = poller = _poller()
         await entity._async_after_write()
-        poller.async_invalidate.assert_called_once_with(KEY)
+        poller.async_refresh.assert_called_once_with(KEY)
 
     @pytest.mark.asyncio
     async def test_write_without_poller_is_a_noop(self):

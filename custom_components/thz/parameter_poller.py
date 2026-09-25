@@ -113,9 +113,16 @@ class ParameterPoller:
         return unsubscribe
 
     @callback
-    def async_invalidate(self, key: ReadKey) -> None:
-        """Forget the last result of ``key``, e.g. after writing its register."""
+    def async_refresh(self, key: ReadKey) -> None:
+        """Read ``key`` again now, e.g. after writing its register.
+
+        Every subscriber of the key gets the new value, also those that did
+        not write it (the climate presets and the pOpMode select share one
+        register).
+        """
         self.data.pop(key, None)
+        if key in self._subscribers:
+            self._async_enqueue([key], 0)
 
     @callback
     def _async_tick(self, _now: datetime) -> None:

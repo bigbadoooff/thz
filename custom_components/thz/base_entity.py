@@ -294,9 +294,8 @@ class THZBaseEntity(Entity):
     async def _async_after_write(self) -> None:
         """Keep the polled data in step with a value just written.
 
-        The block is re-read, so its other listeners do not show the old
-        value until the next poll; a polled key's last result is dropped,
-        so an entity added later does not start with the old value.
+        The block or the polled key is read again, so every entity showing
+        the register gets the new value, not only the one that wrote it.
         """
         coordinator = self._block_coordinator()
         if coordinator is not None:
@@ -304,7 +303,7 @@ class THZBaseEntity(Entity):
             return
         key = self._poll_key()
         if key is not None and self._poller is not None:
-            self._poller.async_invalidate(key)
+            self._poller.async_refresh(key)
 
     # No property overrides needed!
     # Home Assistant uses ONLY the _attr_* attributes for translation:

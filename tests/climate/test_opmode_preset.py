@@ -25,8 +25,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from custom_components.thz.climate import _OPMODE_DECODE_TYPE
+from custom_components.thz.parameter_io import parameter_read_key
 from custom_components.thz.value_maps import SELECT_MAP
-from tests.helpers import make_climate, write_param
+from tests.helpers import FakePoller, make_climate, write_param
 
 
 def _make_entity(
@@ -210,25 +211,33 @@ class TestAsyncSetHvacMode:
 
 class TestAsyncAddedToHassReadsOpMode:
     @pytest.mark.asyncio
-    async def test_reads_op_mode_on_startup_when_entry_present(self):
+    async def test_follows_the_polled_op_mode(self):
         entity = _make_entity(opmode_entry=_OPMODE_ENTRY)
-        # Goes through async_execute (lock + timeout), not a bare executor job.
-        entity._device.async_execute = AsyncMock(
-            return_value=bytes([1, 0])  # "1" -> "standby" per SELECT_MAP
-        )
+        entity._device.async_execute = AsyncMock()
         entity.async_on_remove = MagicMock()
+        entity.async_write_ha_state = MagicMock()
+        key = parameter_read_key(entity._opmode_entry)
+        # "1" -> "standby" per SELECT_MAP
+        entity._poller = poller = FakePoller({key: bytes([1, 0])})
 
-        await entity._async_read_op_mode()
+        await entity.async_added_to_hass()
 
         assert entity._op_mode_cache == "standby"
-        entity._device.async_execute.assert_awaited_once()
+        entity._device.async_execute.assert_not_called()
+        poller.report(key, bytes([3, 0]))  # changed at the heat pump
+        assert entity._op_mode_cache == "DAYmode"
+        poller.report(key, None)  # a failed read keeps the last value
+        assert entity._op_mode_cache == "DAYmode"
 
     @pytest.mark.asyncio
     async def test_noop_without_opmode_entry(self):
         entity = _make_entity()
         entity._device.async_execute = AsyncMock()
+        entity.async_on_remove = MagicMock()
+        entity._poller = poller = FakePoller({})
 
-        await entity._async_read_op_mode()
+        await entity.async_added_to_hass()
 
         entity._device.async_execute.assert_not_called()
+        assert poller.callbacks == {}
         assert entity._op_mode_cache is None
