@@ -233,6 +233,7 @@ class THZFan(THZBaseEntity, FanEntity):
         self._stage: int | None = None
         # Stage and end of an unscheduled ventilation started here.
         self._unscheduled: tuple[int, datetime] | None = None
+        self._read_failed = False
         # Last stage above 0, used by turn_on without a speed.
         self._last_on_stage = 1
 
@@ -317,25 +318,40 @@ class THZFan(THZBaseEntity, FanEntity):
         self.async_write_ha_state()
 
     def _recompute(self) -> None:
+        # Only the blocks the stage computation consults decide availability.
+        # A stage computed around a failed block may come from a fallback
+        # source, so the last stage is kept and the fan is unavailable.
+        self._read_failed = False
         stage = self._compute_stage(self._live_raw, self._live_block)
-        if stage is not None:
+        if self._read_failed:
+            self._set_unavailable("read failed", logging.DEBUG)
+        elif stage is not None:
             self._set_stage(stage)
+            self._attr_available = True
+
+    def _coordinator_data(self, coordinator: Any) -> bytes | None:
+        if not coordinator.last_update_success:
+            self._read_failed = True
+            return None
+        data: bytes | None = coordinator.data
+        return data
 
     def _live_raw(self, param: WriteParam) -> bytes | None:
         """Return a parameter's value bytes from the polled data."""
         coordinator = self._param_coordinator(param)
         if coordinator is not None:
-            data = coordinator.data
+            data = self._coordinator_data(coordinator)
             return parameter_from_block(param, data) if data else None
         if self._poller is None:
             return None
+        # A register the poller could not read is skipped, as it may be one
+        # the firmware does not have.
         raw = self._poller.data.get(parameter_read_key(param))
         return parameter_from_read(param, raw) if raw else None
 
     def _live_block(self, block: str) -> bytes | None:
         coordinator = self._coordinators.get(block)
-        data: bytes | None = coordinator.data if coordinator is not None else None
-        return data
+        return self._coordinator_data(coordinator) if coordinator is not None else None
 
     async def async_update(self) -> None:
         """Read everything the stage depends on now (update_entity)."""
@@ -438,8 +454,10 @@ class THZFan(THZBaseEntity, FanEntity):
         block_of: Callable[[str], bytes | None],
     ) -> int | None:
         """Match the current supply airflow with the airflow of each stage."""
+        if self._airflow is None:
+            return None
         data = block_of(_AIRFLOW_BLOCK)
-        if self._airflow is None or not data:
+        if not data:
             return None
         offset, length = self._airflow
         raw = data[offset : offset + length]
