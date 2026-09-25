@@ -125,6 +125,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **A backup was lost when the clock correction failed.** A backup also
+  corrects a heat pump clock that is more than an hour off; if that write
+  failed, the parameters already read were thrown away. The backup is now
+  saved and reports `clock_corrected: false`.
 - **`thz.watch_raw_registers_changes` could freeze Home Assistant.** With
   no readable register (or the heat pump offline) and an interval of 0 it
   looped without pausing for the whole duration. It now returns at once

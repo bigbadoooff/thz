@@ -1206,3 +1206,34 @@ class TestPeriodicClockCheck:
         check = self._check(monkeypatch, KeyError("bug"))
         with pytest.raises(KeyError):
             await check()
+
+
+class TestGrossClockCorrection:
+    """A backup corrects a clock that is hours off, but never fails on it."""
+
+    @pytest.mark.asyncio
+    async def test_failed_correction_keeps_the_backup_going(self, monkeypatch):
+        from custom_components.thz.exceptions import THZWriteRejectedError
+        from custom_components.thz.services import backup
+
+        now = datetime(2026, 8, 25, 10, 0)
+        fake_dt_util = MagicMock()
+        fake_dt_util.now = MagicMock(return_value=now)
+        monkeypatch.setattr(backup, "dt_util", fake_dt_util)
+        monkeypatch.setattr(
+            backup,
+            "async_read_device_clock",
+            AsyncMock(return_value=datetime(2026, 8, 25, 4, 0)),
+        )
+        monkeypatch.setattr(
+            backup,
+            "async_write_device_clock",
+            AsyncMock(side_effect=THZWriteRejectedError("NAK")),
+        )
+
+        drift, corrected = await backup._correct_gross_clock_drift(
+            MagicMock(), MagicMock(), MagicMock()
+        )
+
+        assert drift == -6 * 3600
+        assert corrected is False

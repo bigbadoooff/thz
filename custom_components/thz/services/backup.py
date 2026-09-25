@@ -201,7 +201,18 @@ async def _correct_gross_clock_drift(
     if abs(drift) <= CLOCK_DRIFT_BACKUP_SECONDS:
         return drift, False
 
-    await async_write_device_clock(hass, device, write_manager, local_now)
+    try:
+        await async_write_device_clock(hass, device, write_manager, local_now)
+    except (*DEVICE_ERRORS, ValueError, OverflowError) as err:
+        # The parameters are read already; a failed correction must not
+        # cost the backup.
+        _LOGGER.warning(
+            "backup_parameters: device clock is off by %.0f minute(s) and "
+            "could not be corrected: %s",
+            drift / 60,
+            err,
+        )
+        return drift, False
     _LOGGER.warning(
         "backup_parameters: device clock was off by %.0f minute(s) "
         "(device=%s, local=%s); corrected to local time.",
