@@ -318,8 +318,8 @@ class THZFan(THZBaseEntity, FanEntity):
         self.async_write_ha_state()
 
     def _recompute(self) -> None:
-        # Only the data the stage computation consults decides availability.
-        # A stage computed around a failed read may come from a fallback
+        # Only the blocks the stage computation consults decide availability.
+        # A stage computed around a failed block may come from a fallback
         # source, so the last stage is kept and the fan is unavailable.
         self._read_failed = False
         stage = self._compute_stage(self._live_raw, self._live_block)
@@ -344,10 +344,9 @@ class THZFan(THZBaseEntity, FanEntity):
             return parameter_from_block(param, data) if data else None
         if self._poller is None:
             return None
-        key = parameter_read_key(param)
-        raw = self._poller.data.get(key)
-        if raw is None and key in self._poller.data:
-            self._read_failed = True
+        # A register the poller could not read is skipped, as it may be one
+        # the firmware does not have.
+        raw = self._poller.data.get(parameter_read_key(param))
         return parameter_from_read(param, raw) if raw else None
 
     def _live_block(self, block: str) -> bytes | None:

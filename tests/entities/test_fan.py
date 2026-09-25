@@ -98,9 +98,7 @@ class _PolledData(dict):
         self.failed = set()
 
     def __contains__(self, key):
-        return (
-            self._device.fail or key[0] in self.failed or key[0] in self._device.values
-        )
+        return self._device.fail or key[0] in self.failed | set(self._device.values)
 
     def get(self, key, default=None):
         if self._device.fail or key[0] in self.failed:
@@ -411,12 +409,15 @@ class TestState:
         assert fan._attr_available is True
 
     @pytest.mark.asyncio
-    async def test_a_failed_register_without_a_stage_is_unavailable(self, now):
-        fan = _fan(FakeDevice({"0A056C": _word(2)}), airflow=None)
-        fan._poller.data.failed = {"0A1D10"}
+    async def test_an_unreadable_register_is_skipped(self, now):
+        e8 = MagicMock(last_update_success=True, data=_e8(150))
+        fan = _fan(FakeDevice(_AIRFLOWS), e8=_e8(150))
+        fan._coordinators = {"pxxE8": e8}
+        # The stage 3 airflow is refused; stage 2 still matches.
+        fan._poller.data.failed = {"0A0577"}
         fan._recompute()
-        assert fan._stage is None
-        assert fan._attr_available is False
+        assert fan._stage == 2
+        assert fan._attr_available is True
 
     @pytest.mark.asyncio
     async def test_decode_error_leaves_state(self, now, monkeypatch):
