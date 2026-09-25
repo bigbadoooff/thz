@@ -7,6 +7,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.thz.const import DOMAIN
+from custom_components.thz.exceptions import THZConnectionError
 from tests.helpers import as_runtime_data, make_runtime_data
 
 
@@ -234,7 +235,7 @@ class TestReadRawRegisterService:
 
         # Mock read_block to raise an error
         mock_device.async_execute = AsyncMock(
-            side_effect=RuntimeError("Communication error")
+            side_effect=THZConnectionError("Communication error")
         )
 
         async_setup_services(mock_hass)

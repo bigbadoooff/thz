@@ -15,6 +15,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
 from ..const import DOMAIN
+from ..exceptions import DEVICE_ERRORS
 from ..notify import async_notify
 from ..value_codec import decode_raw_value
 from ..value_maps import SELECT_MAP
@@ -273,7 +274,7 @@ async def async_handle_read_raw_register(
             "formatted": formatted,
         }
 
-    except Exception as err:
+    except DEVICE_ERRORS as err:
         error_msg = f"Error reading register {command_str}: {err}"
         _LOGGER.error(error_msg, exc_info=True)
         async_notify(
@@ -329,7 +330,7 @@ async def async_handle_scan_raw_registers(
                 result_item["decoded"] = _guess_decode_candidates(payload)
 
             results.append(result_item)
-        except Exception as err:  # noqa: BLE001
+        except DEVICE_ERRORS as err:
             error_count += 1
             if include_errors:
                 results.append(
@@ -423,7 +424,7 @@ async def async_handle_watch_raw_registers_changes(
         try:
             data = await device.async_execute(device.read_block, command_bytes, "get")
             valid_registers[command_str] = data.hex()
-        except Exception:  # noqa: BLE001
+        except DEVICE_ERRORS:
             continue
 
     changed_registers: list[dict[str, str | int]] = []
@@ -451,8 +452,8 @@ async def async_handle_watch_raw_registers_changes(
                         }
                     )
                     valid_registers[command_str] = new_hex
-            except Exception:  # noqa: BLE001
-                # Already validated in pre-scan; skip runtime read failures.
+            except DEVICE_ERRORS:
+                # Answered in the pre-scan; skip a failure now and then.
                 continue
 
         if interval_seconds > 0:

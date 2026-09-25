@@ -44,6 +44,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **Errors that are not device errors are no longer swallowed** by the raw
+  register services, the backup and the clock check; they show up in the
+  log with a traceback instead of being hidden (the clock check logged them
+  only at debug level).
 - **Much quieter log.** A normal start logs one line instead of about 40.
   A lost connection is logged once as a warning and once as info when it
   is back, instead of per request and per block. Problems that recur on

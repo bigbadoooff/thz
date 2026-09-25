@@ -163,7 +163,8 @@ async def _read_all_parameters(
                 "backup_parameters: skipping unsupported register %s: %s", name, err
             )
             continue
-        except Exception as err:  # noqa: BLE001 - one bad register must not abort the backup
+        except (*DEVICE_ERRORS, ValueError, IndexError, TypeError) as err:
+            # One bad register must not abort the backup.
             read_errors.append(f"{name}: {err}")
             _LOGGER.warning("backup_parameters: failed to read %s: %s", name, err)
             continue

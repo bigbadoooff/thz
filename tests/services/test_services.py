@@ -13,6 +13,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 
 from custom_components.thz.const import DOMAIN
+from custom_components.thz.exceptions import THZProtocolError
 from custom_components.thz.services import async_setup_services
 from tests.helpers import FakeRegisterManager, as_runtime_data
 
@@ -162,7 +163,7 @@ class TestScanRawRegisters:
     async def test_scan_with_range_and_errors_included(self):
         hass = _mock_hass()
         device = _mock_device()
-        device.async_execute = AsyncMock(side_effect=RuntimeError("boom"))
+        device.async_execute = AsyncMock(side_effect=THZProtocolError("boom"))
         hass.data[DOMAIN]["entry1"] = {"device": device}
 
         async_setup_services(hass)
@@ -253,13 +254,9 @@ class TestWatchRawRegistersChanges:
         device = _mock_device()
         # First read (pre-scan validation) then repeated reads inside the
         # watch loop: return a changed value on the second read onward.
+        answers = iter([bytes.fromhex("01000000")])
         device.async_execute = AsyncMock(
-            side_effect=[
-                bytes.fromhex("01000000"),
-                bytes.fromhex("01000001"),
-                bytes.fromhex("01000001"),
-                bytes.fromhex("01000001"),
-            ]
+            side_effect=lambda *_args: next(answers, bytes.fromhex("01000001"))
         )
         hass.data[DOMAIN]["entry1"] = {"device": device}
 

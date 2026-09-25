@@ -1173,3 +1173,41 @@ class TestClockRobustness:
         )
         assert ok is False
         assert device.writes == ["pClockHour"]
+
+
+class TestPeriodicClockCheck:
+    """The periodic check tolerates device errors, not programming errors."""
+
+    @staticmethod
+    def _check(monkeypatch, error):
+        from custom_components.thz import clock_sync
+
+        captured = {}
+
+        def track(hass, action, interval):
+            captured["action"] = action
+            return MagicMock()
+
+        monkeypatch.setattr(clock_sync, "async_track_time_interval", track)
+        monkeypatch.setattr(
+            clock_sync,
+            "async_check_and_maybe_sync_clock",
+            AsyncMock(side_effect=error),
+        )
+        clock_sync.async_setup_clock_check(
+            MagicMock(), MagicMock(), MagicMock(), MagicMock()
+        )
+        return captured["action"]
+
+    @pytest.mark.asyncio
+    async def test_device_error_is_logged_at_debug(self, monkeypatch):
+        from custom_components.thz.exceptions import THZConnectionError
+
+        check = self._check(monkeypatch, THZConnectionError("gone"))
+        await check()  # does not raise
+
+    @pytest.mark.asyncio
+    async def test_programming_error_propagates(self, monkeypatch):
+        check = self._check(monkeypatch, KeyError("bug"))
+        with pytest.raises(KeyError):
+            await check()
