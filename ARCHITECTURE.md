@@ -134,10 +134,13 @@ command and data, then `10 03`.
 - The device answers a SET too: `01 80` acknowledges it; NAK (`15`) and the
   error headers `01 01`..`01 04` reject it (`THZWriteRejectedError`), as in
   FHEM's `THZ_decode`. A SET is never repeated once it was sent.
+- A GET whose answer arrives damaged (short, checksum error, "timing issue"
+  or "CRC error in request" header, unknown header: `THZGarbledAnswerError`)
+  is asked once more; "command not known" and "unknown register" are not.
 
 Errors of the device layer are `THZError` subclasses (`exceptions.py`):
-`THZConnectionError`, `THZProtocolError` (with `THZNotSupportedError` and
-`THZWriteRejectedError`) and `THZNotInitializedError`. Callers catch
+`THZConnectionError`, `THZProtocolError` (with `THZNotSupportedError`,
+`THZGarbledAnswerError` and `THZWriteRejectedError`) and `THZNotInitializedError`. Callers catch
 `DEVICE_ERRORS` and translate once: into `UpdateFailed` in the block
 coordinators, into `HomeAssistantError` in services and entity actions.
 

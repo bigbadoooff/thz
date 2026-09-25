@@ -44,6 +44,10 @@ All notable changes to the THZ integration are documented here.
 
 ### Changed
 
+- **A garbled answer is asked for once more.** A read whose answer fails
+  its checksum or reports a timing issue is repeated once before it counts
+  as failed; the single bad answer is logged at debug level instead of as
+  an error.
 - **Errors that are not device errors are no longer swallowed** by the raw
   register services, the backup and the clock check; they show up in the
   log with a traceback instead of being hidden (the clock check logged them

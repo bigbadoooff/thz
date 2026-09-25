@@ -4,7 +4,9 @@ import pytest
 
 from custom_components.thz import protocol
 from custom_components.thz.exceptions import (
+    THZGarbledAnswerError,
     THZNotSupportedError,
+    THZProtocolError,
     THZWriteRejectedError,
 )
 
@@ -108,3 +110,20 @@ def test_decode_response_errors_return_none(data):
 def test_decode_response_register_not_supported_raises():
     with pytest.raises(THZNotSupportedError):
         protocol.decode_response(b"\x01\x04\x00\x00\x00\x00")
+
+
+@pytest.mark.parametrize(
+    ("data", "garbled", "reason"),
+    [
+        (b"\x01\x00", True, "too short"),
+        (b"\x01\x00\x00\xfb\x01\x10\x03", True, "CRC error in response"),
+        (b"\x01\x01\x00\x00\x10\x03", True, "timing issue"),
+        (b"\x01\x02\x00\x00\x10\x03", True, "CRC error in request"),
+        (b"\x01\x99\x00\x00\x10\x03", True, "Unknown response"),
+        (b"\x01\x03\x00\x00\x10\x03", False, "command not known"),
+    ],
+)
+def test_decode_answer_says_why_and_whether_to_ask_again(data, garbled, reason):
+    with pytest.raises(THZProtocolError, match=reason) as err:
+        protocol.decode_answer(data)
+    assert isinstance(err.value, THZGarbledAnswerError) is garbled
