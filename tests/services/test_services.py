@@ -539,6 +539,75 @@ class TestSetDiverterValveService:
 
         assert (bytes.fromhex("0A0652"), bytes.fromhex("0000")) in calls
 
+    @pytest.mark.asyncio
+    async def test_heating_refused_while_the_valve_points_to_dhw(self):
+        hass = _mock_hass()
+        device = _mock_device()
+        dhw = bytearray(12)
+        dhw[11] = 0x04  # diverterValve: byte 11, bit 2 on 4.39
+        hass.data[DOMAIN]["entry1"] = {
+            "device": device,
+            "coordinators": {"pxxF2": self._coordinator(bytes(dhw))},
+        }
+        async_setup_services(hass)
+        handler = _handler_for(hass, "set_diverter_valve")
+
+        call = MagicMock()
+        call.data = {"position": "heating"}
+        with pytest.raises(HomeAssistantError) as err:
+            await handler(call)
+        assert err.value.translation_key == "diverter_in_dhw"
+        device.async_execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("coordinators", "key"),
+        [
+            ({}, "diverter_block_not_polled"),
+            ("short", "diverter_data_short"),
+        ],
+    )
+    async def test_an_undeterminable_valve_refuses(self, coordinators, key):
+        hass = _mock_hass()
+        device = _mock_device()
+        if coordinators == "short":
+            coordinators = {"pxxF2": self._coordinator(bytes(4))}
+        hass.data[DOMAIN]["entry1"] = {"device": device, "coordinators": coordinators}
+        async_setup_services(hass)
+        handler = _handler_for(hass, "set_diverter_valve")
+
+        call = MagicMock()
+        call.data = {"position": "dhw"}
+        with pytest.raises(HomeAssistantError) as err:
+            await handler(call)
+        assert err.value.translation_key == key
+        device.async_execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_motor_still_running_is_stopped_again(self):
+        hass = _mock_hass()
+        device = _mock_device()
+        device.async_execute = AsyncMock(
+            side_effect=[
+                None,  # write heating off
+                None,  # write dhw off
+                bytes.fromhex("0001"),  # heating motor still on
+                bytes.fromhex("0000"),
+                None,  # stop heating again
+                None,  # stop dhw again
+            ]
+        )
+        hass.data[DOMAIN]["entry1"] = {"device": device, "coordinators": {}}
+        async_setup_services(hass)
+        handler = _handler_for(hass, "set_diverter_valve")
+
+        call = MagicMock()
+        call.data = {"position": "off"}
+        result = await handler(call)
+
+        assert result["confirmed_off"] is False
+        assert device.async_execute.await_count == 6
+
 
 class TestDiverterBitPosition:
     """The diverterValve flag is located through the firmware's register map."""

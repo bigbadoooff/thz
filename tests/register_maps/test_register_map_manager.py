@@ -203,6 +203,16 @@ class TestRegisterMapManagerWrite:
 
         assert not in_blocks & set(manager.params())
 
+    def test_2xx_entries_without_a_known_parent_get_no_command(self):
+        manager = RegisterMapManagerWrite("206")
+        manager._merged_map["pNoParent"] = {"type": "number"}
+        manager._merged_map["pUnknownParent"] = {"type": "number", "parent": "nope"}
+
+        manager._enrich_2xx_write_entries()
+
+        assert "command" not in manager._merged_map["pNoParent"]
+        assert "command" not in manager._merged_map["pUnknownParent"]
+
 
 class TestBaseRegisterMapManager:
     """Test BaseRegisterMapManager internals."""

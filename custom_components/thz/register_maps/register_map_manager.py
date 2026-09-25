@@ -197,12 +197,7 @@ class BaseRegisterMapManager:
     ) -> dict[str, Any]:
         """Load a register map from a module by name (module must be in package)."""
         full_module_name = f"{self._package}.{module_name}"
-        try:
-            mod = sys.modules.get(full_module_name)
-        except (AttributeError, TypeError) as exc:
-            _LOGGER.debug("Module %s not found: %s", full_module_name, exc)
-            return {}
-
+        mod = sys.modules.get(full_module_name)
         try:
             full_map = deepcopy(getattr(mod, map_attr))
         except (AttributeError, TypeError) as exc:
