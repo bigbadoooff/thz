@@ -163,7 +163,7 @@
       },
       "setup_ip": {
         "title": "Netzwerkverbindung einrichten",
-        "description": "Konfigurieren Sie die Netzwerkverbindung zu Ihrer THZ-Wärmepumpe. Geben Sie die IP-Adresse oder den Hostnamen Ihres ser2net-Servers und die Portnummer ein (Standard: 2217).",
+        "description": "Konfigurieren Sie die Netzwerkverbindung zu Ihrer THZ-Wärmepumpe. Geben Sie die IP-Adresse oder den Hostnamen Ihres ser2net-Servers und die Portnummer ein (Standard: 2323).",
         "data": {
           "host": "IP-Adresse oder Hostname",
           "port": "Port",
@@ -2967,6 +2967,12 @@
         "439technician": "4.39 Techniker",
         "539": "5.39",
         "539technician": "5.39 Techniker"
+      }
+    },
+    "connection_type": {
+      "options": {
+        "ip": "Netzwerk (ser2net)",
+        "usb": "USB / Seriell"
       }
     }
   },
