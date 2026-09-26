@@ -161,6 +161,8 @@ For firmware versions that support energy monitoring (e.g., 4.39), the integrati
 - **Daily COP DHW / Heating / Total**
 - **Lifetime COP DHW / Heating / Total**
 
+The heat pump resets only the kWh part of its daily energy counters at midnight and keeps the Wh part. The integration subtracts that kept part, so the daily counters and the daily COP start at 0 each day. The correction starts with the first midnight after installation.
+
 COP = Heat Output ÷ Electrical Input. A COP of 3.0 means 3 kW of heat for every 1 kW of electricity consumed.
 
 ### Runtime Hours (firmware 4.39 / 5.39)

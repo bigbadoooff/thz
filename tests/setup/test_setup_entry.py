@@ -7,6 +7,7 @@ returns a fully-controllable fake coordinator instance.
 """
 
 from contextlib import ExitStack, contextmanager
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -31,6 +32,7 @@ def _fake_device(firmware="539", blocks=None):
     device.write_register_map_manager = MagicMock()
     device.register_map_manager = MagicMock()
     device.register_map_manager.get_paired_blocks.return_value = {}
+    device.register_map_manager.get_daily_blocks.return_value = frozenset()
     device.unique_id = "thz-unique-1"
     device.close = MagicMock()
     return device
@@ -67,6 +69,13 @@ def _patched_setup(device=None, coordinator_factory=None, dev_reg=None):
         stack.enter_context(
             patch.object(
                 thz_module.dr, "async_get", return_value=dev_reg or _default_dev_reg()
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                thz_module,
+                "Store",
+                return_value=MagicMock(async_load=AsyncMock(return_value=None)),
             )
         )
         stack.enter_context(
@@ -461,11 +470,16 @@ class TestAsyncRemoveEntry:
                 "async_entries_for_config_entry",
                 return_value=[entity1, entity2],
             ),
+            patch.object(thz_module, "Store") as store_cls,
         ):
+            store_cls.return_value.async_remove = AsyncMock()
             await thz_module.async_remove_entry(hass, entry)
 
         mock_get.return_value.async_remove.assert_any_call("sensor.thz_a")
         mock_get.return_value.async_remove.assert_any_call("sensor.thz_b")
+        # The daily energy counter state of the entry is deleted.
+        assert store_cls.call_args.args[2] == "thz.daily_energy.entry1"
+        store_cls.return_value.async_remove.assert_awaited_once()
 
 
 class TestCleanupOrphanedEntities:
@@ -540,6 +554,37 @@ class TestAsyncUpdateBlock:
 
         combined = int.from_bytes(result[4:8], "big", signed=True)
         assert combined == 2 * 1000 + 100
+
+    @pytest.mark.asyncio
+    async def test_daily_block_is_corrected(self):
+        """The Wh part kept at the midnight reset is subtracted."""
+        from custom_components.thz.daily_energy import DailyEnergyCorrector
+
+        def reading(low, high):
+            cmd2 = bytearray(8)
+            cmd2[4:6] = low.to_bytes(2, "big", signed=True)
+            cmd3 = bytearray(8)
+            cmd3[4:6] = high.to_bytes(2, "big", signed=True)
+            return [bytes(cmd2), bytes(cmd3)]
+
+        device = MagicMock()
+        device.async_execute = AsyncMock(
+            side_effect=reading(359, 1) + reading(359, 0) + reading(500, 0)
+        )
+        corrector = DailyEnergyCorrector(MagicMock(), frozenset({"pxx0A091A"}))
+        paired = {"pxx0A091A": "pxx0A091B"}
+
+        values = []
+        with patch.object(
+            thz_module.dt_util, "now", return_value=datetime(2026, 9, 26, 23, 50)
+        ):
+            for _ in range(3):
+                result = await thz_module._async_update_block(
+                    _mock_hass(), device, "pxx0A091A", paired, corrector
+                )
+                values.append(int.from_bytes(result[4:8], "big", signed=True))
+
+        assert values == [1359, 0, 141]
 
     @pytest.mark.asyncio
     async def test_unsupported_register_returns_none(self):
