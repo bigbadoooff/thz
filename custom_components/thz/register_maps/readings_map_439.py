@@ -21,7 +21,11 @@ The cmd3 register address is always cmd2 + 1.  These sensors use length 8
 (4 bytes) to hold the combined 32-bit result.  See PAIRED_BLOCKS below.
 """
 
-_ENERGY_DAY = {"unit": "Wh", "device_class": "energy", "state_class": "total"}
+_ENERGY_DAY = {
+    "unit": "Wh",
+    "device_class": "energy",
+    "state_class": "total_increasing",
+}
 _ENERGY_TOTAL = {
     "unit": "kWh",
     "device_class": "energy",
@@ -53,6 +57,17 @@ PAIRED_BLOCKS: dict[str, str] = {
     "pxx0A091E": "pxx0A091F",  # sElectrHCDay
     "pxx0A0920": "pxx0A0921",  # sElectrHCTotal
 }
+
+# Paired blocks that the device resets every midnight (daily_energy.py).
+DAILY_BLOCKS: frozenset[str] = frozenset(
+    {
+        "pxx0A03AE",  # sHeatRecoveredDay
+        "pxx0A092A",  # sHeatDHWDay
+        "pxx0A092E",  # sHeatHCDay
+        "pxx0A091A",  # sElectrDHWDay
+        "pxx0A091E",  # sElectrHCDay
+    }
+)
 
 REGISTER_MAP = {
     "firmware": "439",

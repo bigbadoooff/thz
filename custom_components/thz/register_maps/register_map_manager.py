@@ -314,6 +314,17 @@ class BaseRegisterMapManager:
             paired = {k: v for k, v in paired.items() if k not in _COOLING_READ_BLOCKS}
         return paired
 
+    def get_daily_blocks(self) -> frozenset[str]:
+        """Return the paired blocks the device resets every midnight.
+
+        Collected from the ``DAILY_BLOCKS`` of the loaded readings modules.
+        """
+        daily: set[str] = set()
+        for m_name in self._readings_map_names:
+            mod = sys.modules.get(f"{self._package}.{m_name}")
+            daily.update(getattr(mod, "DAILY_BLOCKS", ()))
+        return frozenset(daily & self.get_paired_blocks().keys())
+
     def get_registers_for_block(self, block: str) -> Any:
         """Get registers for a specific block."""
         return self._merged_map.get(block, [])

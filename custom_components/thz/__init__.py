@@ -17,8 +17,10 @@ from homeassistant.helpers import (
     entity_registry as er,
     issue_registry as ir,
 )
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .clock_sync import async_setup_clock_check, clock_drift_issue_id
 from .const import (
@@ -39,6 +41,10 @@ from .const import (
     should_hide_entity,
 )
 from .coordinator_log import coordinator_logger
+from .daily_energy import (
+    STORAGE_VERSION as DAILY_ENERGY_STORAGE_VERSION,
+    DailyEnergyCorrector,
+)
 from .devices import (
     area_name,
     async_release_subdevices,
@@ -163,6 +169,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     paired_blocks = register_manager.get_paired_blocks()
     if paired_blocks:
         _LOGGER.debug("Paired register blocks for dual-read: %s", paired_blocks)
+    daily_energy = DailyEnergyCorrector(
+        Store(
+            hass,
+            DAILY_ENERGY_STORAGE_VERSION,
+            f"{DOMAIN}.daily_energy.{config_entry.entry_id}",
+        ),
+        register_manager.get_daily_blocks(),
+    )
+    await daily_energy.async_load()
 
     coordinators, unsupported_blocks, failed_blocks = await _async_create_coordinators(
         hass,
@@ -171,6 +186,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         _refresh_intervals(data, device),
         paired_blocks,
         coordinator_logger(config_entry.entry_id, device),
+        daily_energy,
     )
     if coordinators and len(failed_blocks) == len(coordinators):
         # Not a single block answered: the device is not really reachable,
@@ -326,6 +342,7 @@ async def _async_create_coordinators(
     refresh_intervals: Mapping[str, Any],
     paired_blocks: dict[str, str],
     logger: logging.Logger = _LOGGER,
+    daily_energy: DailyEnergyCorrector | None = None,
 ) -> tuple[dict[str, DataUpdateCoordinator[Any]], set[str], list[str]]:
     """Create and first-refresh one coordinator per block.
 
@@ -337,7 +354,9 @@ async def _async_create_coordinators(
         block_name: str,
     ) -> Callable[[], Coroutine[Any, Any, bytes | None]]:
         async def _update() -> bytes | None:
-            return await _async_update_block(hass, device, block_name, paired_blocks)
+            return await _async_update_block(
+                hass, device, block_name, paired_blocks, daily_energy
+            )
 
         return _update
 
@@ -598,6 +617,7 @@ async def _async_update_block(
     device: THZDevice,
     block_name: str,
     paired_blocks: dict[str, str] | None = None,
+    daily_energy: DailyEnergyCorrector | None = None,
 ) -> bytes | None:
     """Called by coordinator to read a data block.
 
@@ -605,7 +625,9 @@ async def _async_update_block(
     registers are read and combined following the FHEM convention:
         combined = cmd3_value * 1000 + cmd2_value
     The result is stored as a 4-byte signed integer at the sensor offset
-    so that the sensor entity can decode it transparently.
+    so that the sensor entity can decode it transparently. A daily
+    counter's value is corrected for the Wh part the device keeps across
+    its midnight reset (daily_energy.py).
     """
     block_bytes = bytes.fromhex(block_name.removeprefix("pxx"))
     try:
@@ -627,6 +649,10 @@ async def _async_update_block(
             low_val = int.from_bytes(result[4:6], byteorder="big", signed=True)
             high_val = int.from_bytes(cmd3_result[4:6], byteorder="big", signed=True)
             combined = high_val * 1000 + low_val
+            if daily_energy is not None and block_name in daily_energy.blocks:
+                combined = daily_energy.correct(
+                    block_name, low_val, high_val, dt_util.now()
+                )
 
             _LOGGER.debug(
                 "Paired read %s: low=%s, high=%s (%s), combined=%s",

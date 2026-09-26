@@ -6,6 +6,21 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Bug Fixes
+
+- **Daily energy counters kept the Wh part across midnight** (#258). The
+  heat pump resets only the kWh register of a daily counter; the Wh
+  register keeps its value and counts on, so 1359 Wh became 359 Wh instead
+  of 0 and the whole day read too high. The integration now subtracts the
+  kept Wh part until the next reset, for the daily heat, electricity and
+  recovered heat counters and the daily COP. A day that ended below 1 kWh
+  shows no visible reset and is corrected at Home Assistant's midnight. The
+  correction starts with the first reset after the update and survives a
+  restart. Devices that reset both registers are not affected.
+- **Daily energy counters have the state class `total_increasing`**, so
+  Home Assistant's statistics take the midnight reset as a reset instead of
+  a negative consumption.
+
 ## [0.7.0] – 2026-09-25
 
 ### Breaking changes
