@@ -28,7 +28,8 @@ from typing import Any, Protocol
 _LOGGER = logging.getLogger(__name__)
 
 STORAGE_VERSION = 1
-# The counters change on every poll; saving is batched.
+# The counters change on every poll; saving is batched. Store postpones a
+# pending save on every call, so a save is only requested when none is due.
 SAVE_DELAY = 60
 
 # A decrease this close before Home Assistant's midnight is the reset of the
@@ -93,6 +94,7 @@ class DailyEnergyCorrector:
         self._store = store
         self.blocks = blocks
         self._counters: dict[str, _Counter] = {}
+        self._save_due: datetime | None = None
 
     async def async_load(self) -> None:
         """Load the counter state from storage."""
@@ -118,20 +120,31 @@ class DailyEnergyCorrector:
             now: Home Assistant's local time of the reading.
         """
         raw = high * 1000 + low
+        reset = False
         counter = self._counters.get(block)
         if counter is None:
             self._counters[block] = _Counter(low, high, 0, now.date())
         else:
             if raw < counter.raw:
                 self._reset(block, counter, low, high, (now + _EARLY_RESET).date())
-            elif now.date() > counter.day and counter.high == 0 and high == 0:
+                reset = True
+            elif now.date() > counter.day and counter.high == 0:
                 # The kWh register was zero before the reset, so the reset
                 # changed nothing that can be seen.
                 self._reset(block, counter, low, high, now.date())
+                reset = True
             counter.low = low
             counter.high = high
-        self._store.async_delay_save(self._data, SAVE_DELAY)
+        self._save(now, reset)
         return max(raw - self._counters[block].offset, 0)
+
+    def _save(self, now: datetime, reset: bool) -> None:
+        """Save a reset right away, other readings once per SAVE_DELAY."""
+        if not reset and self._save_due is not None and now < self._save_due:
+            return
+        delay = 0 if reset else SAVE_DELAY
+        self._store.async_delay_save(self._data, delay)
+        self._save_due = now + timedelta(seconds=delay)
 
     @staticmethod
     def _reset(block: str, counter: _Counter, low: int, high: int, day: date) -> None:

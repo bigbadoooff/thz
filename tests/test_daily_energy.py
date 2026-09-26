@@ -69,6 +69,13 @@ class TestKeptWhRegister:
         )
         assert values == [800, 20, 100]
 
+    def test_wh_register_wrapped_across_midnight_below_one_kwh(self):
+        values = _read(
+            _corrector(),
+            [(950, 0, EVENING), (10, 1, NIGHT), (200, 1, MORNING)],
+        )
+        assert values == [950, 60, 250]
+
     def test_device_clock_ahead_is_not_reset_twice(self):
         values = _read(
             _corrector(),
@@ -121,10 +128,20 @@ class TestPersistence:
         corrector = DailyEnergyCorrector(store, frozenset({BLOCK}))
         corrector.correct(BLOCK, 359, 1, EVENING)
         corrector.correct(BLOCK, 359, 0, NIGHT)
-        assert store.saves == [SAVE_DELAY, SAVE_DELAY]
+        assert store.saves == [SAVE_DELAY, 0]
         assert store.data == {
             BLOCK: {"low": 359, "high": 0, "offset": 359, "day": "2026-09-26"}
         }
+
+    def test_readings_do_not_postpone_a_pending_save(self):
+        """Store postpones a pending save on every call."""
+        store = FakeStore()
+        corrector = DailyEnergyCorrector(store, frozenset({BLOCK}))
+        for second in range(0, SAVE_DELAY + 1, 10):
+            corrector.correct(
+                BLOCK, 100 + second, 1, MORNING + timedelta(seconds=second)
+            )
+        assert store.saves == [SAVE_DELAY, SAVE_DELAY]
 
     @pytest.mark.asyncio
     async def test_offset_survives_a_restart(self):

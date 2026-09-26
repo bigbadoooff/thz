@@ -170,12 +170,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     if paired_blocks:
         _LOGGER.debug("Paired register blocks for dual-read: %s", paired_blocks)
     daily_energy = DailyEnergyCorrector(
-        Store(
-            hass,
-            DAILY_ENERGY_STORAGE_VERSION,
-            f"{DOMAIN}.daily_energy.{config_entry.entry_id}",
-        ),
-        register_manager.get_daily_blocks(),
+        _daily_energy_store(hass, config_entry), register_manager.get_daily_blocks()
     )
     await daily_energy.async_load()
 
@@ -263,6 +258,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     await _async_apply_entity_visibility_tier(hass, config_entry, known_unique_ids)
 
     return True
+
+
+def _daily_energy_store(hass: HomeAssistant, entry: ConfigEntry) -> Store[Any]:
+    """Return the store of the entry's daily energy counter state."""
+    return Store(
+        hass, DAILY_ENERGY_STORAGE_VERSION, f"{DOMAIN}.daily_energy.{entry.entry_id}"
+    )
 
 
 def _create_device(data: Mapping[str, Any]) -> THZDevice:
@@ -707,6 +709,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     Clean up all entity registry entries to ensure a fresh start on re-setup.
     """
     ir.async_delete_issue(hass, DOMAIN, clock_drift_issue_id(entry.entry_id))
+    await _daily_energy_store(hass, entry).async_remove()
 
     # Get entity registry
     entity_reg = er.async_get(hass)

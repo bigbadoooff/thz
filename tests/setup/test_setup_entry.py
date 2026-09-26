@@ -470,11 +470,16 @@ class TestAsyncRemoveEntry:
                 "async_entries_for_config_entry",
                 return_value=[entity1, entity2],
             ),
+            patch.object(thz_module, "Store") as store_cls,
         ):
+            store_cls.return_value.async_remove = AsyncMock()
             await thz_module.async_remove_entry(hass, entry)
 
         mock_get.return_value.async_remove.assert_any_call("sensor.thz_a")
         mock_get.return_value.async_remove.assert_any_call("sensor.thz_b")
+        # The daily energy counter state of the entry is deleted.
+        assert store_cls.call_args.args[2] == "thz.daily_energy.entry1"
+        store_cls.return_value.async_remove.assert_awaited_once()
 
 
 class TestCleanupOrphanedEntities:
