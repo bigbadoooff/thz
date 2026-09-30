@@ -4,7 +4,7 @@ All notable changes to the THZ integration are documented here.
 
 ---
 
-## [Unreleased]
+## [0.7.1] – 2026-09-30
 
 ### Bug Fixes
 
