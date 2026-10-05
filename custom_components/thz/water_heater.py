@@ -46,6 +46,7 @@ from .parameter_io import (
     parameter_length,
 )
 from .register_maps.model import WriteParam
+from .runtime_data import BlockCoordinator
 from .value_codec import THZValueCodec
 from .write_errors import raise_write_errors
 
@@ -115,7 +116,7 @@ async def async_setup_entry(
     async_add_entities([entity])
 
 
-class THZWaterHeater(CoordinatorEntity, WaterHeaterEntity):
+class THZWaterHeater(CoordinatorEntity[BlockCoordinator], WaterHeaterEntity):
     """The heat pump's hot water."""
 
     _attr_has_entity_name = True

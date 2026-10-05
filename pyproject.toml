@@ -58,15 +58,12 @@ python_version = "3.13"
 files = ["custom_components/thz"]
 strict = true
 
-# Dev-only type stubs (see requirements_test.txt: mypy, homeassistant-stubs,
-# types-pyserial) may lag behind the minimum Home Assistant version this
-# integration targets. custom_components/thz/_typing_compat.py and scattered
-# `# type: ignore` comments document and confine the resulting gaps; see
-# that module's docstring for details.
+# mypy reads Home Assistant's own types (py.typed), from the version pinned
+# in requirements_test_ha.txt. custom_components/thz/_typing_compat.py
+# confines the gaps to older Home Assistant versions; see its docstring.
 #
 # python_version here must stay >= whatever CPython version mypy itself is
 # invoked under (see .github/workflows/ci.yml's typecheck job) -- it's a
 # checking-semantics target, not a request to mypy's own parser, which can
-# only read syntax its host interpreter's grammar supports (e.g.
-# homeassistant-stubs' PEP 695/696 `type` statements need mypy running on
-# Python 3.12+ regardless of this setting).
+# only read syntax its host interpreter's grammar supports (Home
+# Assistant's sources need Python 3.13 regardless of this setting).

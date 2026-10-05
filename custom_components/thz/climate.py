@@ -67,8 +67,8 @@ from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any, cast
 
-from homeassistant.components.climate import (
-    ClimateEntity,
+from homeassistant.components.climate import ClimateEntity
+from homeassistant.components.climate.const import (
     ClimateEntityFeature,
     HVACAction,
     HVACMode,
@@ -99,6 +99,7 @@ from .parameter_io import (
     parameter_read_key,
 )
 from .register_maps.model import WriteParam
+from .runtime_data import BlockCoordinator
 from .value_codec import THZValueCodec, decode_raw_value
 from .value_maps import SELECT_MAP
 from .write_errors import raise_write_errors
@@ -495,7 +496,7 @@ def _bit_active(data: bytes, byte_idx: int, bit_idx: int) -> bool:
     return bool((data[byte_idx] >> bit_idx) & 0x01)
 
 
-class THZClimate(CoordinatorEntity, ClimateEntity):
+class THZClimate(CoordinatorEntity[BlockCoordinator], ClimateEntity):
     """Climate entity for a THZ heating circuit.
 
     Supports heating (always) and optional cooling (when the write-register
@@ -523,7 +524,7 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
 
     def __init__(
         self,
-        coordinator: DataUpdateCoordinator,
+        coordinator: BlockCoordinator,
         config: ClimateConfig,
         *,
         device: Any,
@@ -633,9 +634,6 @@ class THZClimate(CoordinatorEntity, ClimateEntity):
             self._cool_switch_entry is not None
             and self._cool_setpoint_entry is not None
         )
-        # HVACMode/ClimateEntityFeature members are mistyped as plain `str`/
-        # `int` in some older homeassistant-stubs snapshots; not real type
-        # errors.
         if self._supports_cooling:
             self._attr_hvac_modes = [HVACMode.HEAT, HVACMode.COOL]
         else:

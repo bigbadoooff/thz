@@ -24,7 +24,7 @@ follow [CONTRIBUTING.md](CONTRIBUTING.md). The rules that matter most:
 ```bash
 ruff check custom_components/thz tests tests_ha
 ruff format --check custom_components/thz tests tests_ha
-mypy                                   # Python 3.13 with homeassistant-stubs
+mypy                                   # Python 3.13 with requirements_test_ha.txt
 python3 -m pytest tests/               # stubbed Home Assistant
 python3 -m pytest tests_ha -o asyncio_mode=auto   # real Home Assistant, Python 3.13
 ```

@@ -14,7 +14,7 @@ welcome as code. For a bug, please include:
 
 ```bash
 pip install -r requirements_test.txt
-pip install --no-deps homeassistant-stubs   # for mypy, needs Python 3.13
+pip install -r requirements_test_ha.txt   # for mypy and tests_ha, Python 3.13
 pip install pre-commit && pre-commit install
 ```
 

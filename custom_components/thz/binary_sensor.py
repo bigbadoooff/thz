@@ -33,7 +33,7 @@ from .devices import assign_subdevices, thz_device_info
 from .entity_id_style import resolve_suggested_object_id
 from .log_once import OncePerEpisode
 from .register_maps.register_map_manager import RegisterMapManager
-from .runtime_data import THZConfigEntry
+from .runtime_data import BlockCoordinator, THZConfigEntry
 from .value_codec import decode_raw_value
 
 if TYPE_CHECKING:
@@ -158,7 +158,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class THZBinarySensor(CoordinatorEntity, BinarySensorEntity):
+class THZBinarySensor(CoordinatorEntity[BlockCoordinator], BinarySensorEntity):
     """Represents a binary (on/off) sensor entity for the THZ integration.
 
     Reads a single bit from a coordinator-provided register block and
