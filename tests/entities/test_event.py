@@ -9,6 +9,7 @@ from custom_components.thz.event import (
     THZFilterEvent,
     async_setup_entry,
 )
+from tests.fault.test_fault_memory import D1_AFTER, D1_BEFORE, FakeStore
 from tests.helpers import FakeRegisterManager, make_runtime_data
 
 
@@ -41,9 +42,19 @@ def _coordinator(data=None):
 
 async def _added(entity):
     entity.hass = MagicMock()
+    entity.hass.async_create_task = lambda coro: entity.__dict__.setdefault(
+        "tasks", []
+    ).append(coro)
     entity.async_write_ha_state = MagicMock()
     await entity.async_added_to_hass()
     return entity
+
+
+async def _run_tasks(entity):
+    tasks = entity.__dict__.pop("tasks", [])
+    for task in tasks:
+        await task
+    return len(tasks)
 
 
 def _update(entity, data):
@@ -137,6 +148,73 @@ class TestFaultEvent:
         event = await _added(THZFaultEvent(_coordinator(_d1(R3)), "dev1"))
         assert _update(event, b"\x00\x01") == []
         assert _update(event, _d1(R3)) == []
+
+    @pytest.mark.asyncio
+    async def test_several_new_records_fire_oldest_first_with_one_state_each(self):
+        event = await _added(THZFaultEvent(_coordinator(_d1()), "dev1"))
+        triggered = _update(event, _d1(R3, R5))
+        assert [attrs["fault_code"] for _, attrs in triggered] == ["F03", "F05"]
+        # One state per event, plus the one after the update.
+        assert event.async_write_ha_state.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_overwritten_ring_buffer_slot_fires_once(self):
+        event = await _added(THZFaultEvent(_coordinator(D1_BEFORE), "dev1"))
+        triggered = _update(event, D1_AFTER)
+        assert [(a["fault_code"], a["date"]) for _, a in triggered] == [
+            ("F03", "15.09")
+        ]
+
+
+class TestFaultEventStore:
+    @pytest.mark.asyncio
+    async def test_first_start_saves_the_baseline_and_fires_nothing(self):
+        store = FakeStore()
+        event = await _added(THZFaultEvent(_coordinator(_d1(R3)), "dev1", store))
+        assert event.__dict__.get("triggered", []) == []
+        assert await _run_tasks(event) == 1
+        assert store.data == {"records": [R3.hex().upper()]}
+
+    @pytest.mark.asyncio
+    async def test_fault_written_while_stopped_fires_after_the_start(self):
+        store = FakeStore({"records": [R3.hex().upper()]})
+        event = await _added(THZFaultEvent(_coordinator(_d1(R3, R5)), "dev1", store))
+        assert [a["fault_code"] for _, a in event.__dict__["triggered"]] == ["F05"]
+        event.async_write_ha_state.assert_called_once()
+        await _run_tasks(event)
+        assert store.data == {"records": [R3.hex().upper(), R5.hex().upper()]}
+
+    @pytest.mark.asyncio
+    async def test_restored_records_wait_for_the_first_data(self):
+        store = FakeStore({"records": [R3.hex().upper()]})
+        event = await _added(THZFaultEvent(_coordinator(None), "dev1", store))
+        assert len(_update(event, _d1(R3, R5))) == 1
+        assert await _run_tasks(event) == 1
+
+    @pytest.mark.asyncio
+    async def test_unchanged_records_are_not_saved_again(self):
+        store = FakeStore({"records": [R3.hex().upper()]})
+        event = await _added(THZFaultEvent(_coordinator(_d1(R3)), "dev1", store))
+        _update(event, _d1(R3))
+        assert await _run_tasks(event) == 0
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("stored", [None, {"records": "nope"}, ["x"]])
+    async def test_missing_or_corrupt_store_is_a_first_start(self, stored):
+        store = FakeStore(stored)
+        event = await _added(THZFaultEvent(_coordinator(_d1(R3, R5)), "dev1", store))
+        assert event.__dict__.get("triggered", []) == []
+        assert await _run_tasks(event) == 1
+
+    @pytest.mark.asyncio
+    async def test_store_errors_are_logged(self, caplog):
+        store = MagicMock()
+        store.async_load = MagicMock(side_effect=OSError("disk"))
+        store.async_save = MagicMock(side_effect=OSError("full"))
+        event = await _added(THZFaultEvent(_coordinator(_d1(R3)), "dev1", store))
+        await _run_tasks(event)
+        assert "Could not load the seen fault records" in caplog.text
+        assert "Could not persist the seen fault records" in caplog.text
 
     def test_device_info(self):
         from custom_components.thz.const import DOMAIN

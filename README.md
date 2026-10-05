@@ -235,9 +235,11 @@ Two event entities let automations react to things that happen once:
 | Filter change | `filter_both`, `filter_up`, `filter_down` | the heat pump starts asking for that filter change (`pxx0A0176`) | — |
 
 They use data that is polled anyway, so the blocks must be selected for
-polling. What is already there when Home Assistant starts (the fault
-history, a filter that is already due) fires nothing; the fault sensors and
-filter binary sensors show that state.
+polling. The fault event remembers the records it has seen, so a fault
+stored while Home Assistant was not running fires once after the start. On
+the very first start the existing fault history fires nothing, and neither
+does a filter that is already due; the fault sensors and filter binary
+sensors show that state.
 
 ### Device Clock
 
@@ -427,8 +429,6 @@ serial/network connection to the heat pump is released.
   on 5.x devices whose cooling hardware answers at setup.
 - **Hot water mode** follows the heat pump's time program and operating
   mode; the water heater sets the temperature, not the mode.
-- **Faults while Home Assistant is down** fire no event when it starts; the
-  fault sensors still show them as new until acknowledged.
 - **Energy values and COP** need firmware 4.39 or newer.
 
 ## Troubleshooting

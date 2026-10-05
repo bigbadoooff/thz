@@ -12,11 +12,12 @@ from custom_components.thz.fault_memory import (
     CLEAR_CONFIRMATION,
     FAULT_CLEAR_PAYLOAD,
     FAULT_MEMORY_COMMAND,
+    chronological,
     clear_fault_memory,
     decode_fault_date,
     decode_fault_memory,
     decode_fault_time,
-    new_record_start,
+    new_record_indices,
     read_fault_memory,
     record_fingerprints,
 )
@@ -34,9 +35,9 @@ def _record(number, hhmm, ddmm):
     return bytes([number, 0]) + t.to_bytes(2, "little") + d.to_bytes(2, "little")
 
 
-def _payload(*records, reported=None):
+def _payload(*records, reported=None, index=0):
     count = len(records) if reported is None else reported
-    return bytes([0x00, 0xD1, count, 0x00]) + b"".join(records)
+    return bytes([0x00, 0xD1, count, index]) + b"".join(records)
 
 
 R3 = _record(3, "08:15", "05.01")
@@ -105,25 +106,121 @@ class TestDecodeFaultMemory:
         assert len(decoded["entries"]) == 1
 
 
-class TestNewRecordStart:
+class TestNewRecordIndices:
     def test_no_history_means_everything_is_new(self):
-        assert new_record_start([], ["a", "b"]) == 0
+        assert new_record_indices([], ["a", "b"]) == [0, 1]
 
     def test_identical_history_has_nothing_new(self):
-        assert new_record_start(["a", "b"], ["a", "b"]) == 2
+        assert new_record_indices(["a", "b"], ["a", "b"]) == []
 
     def test_appended_record_is_new(self):
-        assert new_record_start(["a", "b"], ["a", "b", "c"]) == 2
+        assert new_record_indices(["a", "b"], ["a", "b", "c"]) == [2]
 
-    def test_rolling_window_keeps_overlap(self):
-        assert new_record_start(["a", "b", "c"], ["b", "c", "d"]) == 2
+    def test_rolling_window_finds_the_new_record(self):
+        assert new_record_indices(["a", "b", "c"], ["b", "c", "d"]) == [2]
+
+    def test_order_of_the_known_records_does_not_matter(self):
+        assert new_record_indices(["c", "a", "b"], ["b", "c", "d"]) == [2]
 
     def test_no_overlap_means_everything_is_new(self):
-        assert new_record_start(["a"], ["x", "y"]) == 0
+        assert new_record_indices(["a"], ["x", "y"]) == [0, 1]
+
+    def test_the_newest_copy_of_a_duplicate_is_new(self):
+        assert new_record_indices(["a", "b"], ["a", "b", "a"]) == [2]
 
     def test_fingerprints_skip_incomplete_records(self):
         entries = [{"complete": True, "raw": "aa"}, {"complete": False, "raw": "b"}]
         assert record_fingerprints(entries) == ["AA"]
+
+
+# D1 of a THZ 403 SOL on firmware 4.39, read on 20.08. and 03.10.2026: one fault
+# (F03 on 15.09. 11:38) was written in between. It overwrote slot 0 in place,
+# the other nine slots are byte-identical and the write index (byte 3) moved
+# from 0 to 1.
+D1_SLOTS_1_TO_9 = bytes.fromhex(
+    "17003605C20B 030063049801 0F00A406FC01 030068048205 0F002F02960A"
+    " 030054086609 0F00DD04CA09 03006A04930A 0F00A406F70A"
+)
+D1_BEFORE = bytes.fromhex("00D10A00 0F00A4064706") + D1_SLOTS_1_TO_9
+D1_AFTER = bytes.fromhex("47D10A01 03007204E505") + D1_SLOTS_1_TO_9
+
+
+def _dates(entries):
+    return [(e["fault_code"], e["date"], e["time"]) for e in entries]
+
+
+class TestRingBuffer:
+    def test_full_buffer_with_index_0_is_in_slot_order(self):
+        decoded = decode_fault_memory(D1_BEFORE)
+        assert decoded["write_index"] == 0
+        assert [e["slot"] for e in decoded["entries"]] == list(range(10))
+        assert _dates(decoded["entries"])[-1] == ("F15", "28.07", "17:00")
+
+    def test_wrapped_buffer_starts_at_the_write_index(self):
+        decoded = decode_fault_memory(D1_AFTER)
+        assert decoded["write_index"] == 1
+        assert [e["slot"] for e in decoded["entries"]] == [*range(1, 10), 0]
+        assert _dates(decoded["entries"]) == [
+            ("F23", "30.10", "13:34"),
+            ("F03", "04.08", "11:23"),
+            ("F15", "05.08", "17:00"),
+            ("F03", "14.10", "11:28"),
+            ("F15", "27.10", "05:59"),
+            ("F03", "24.06", "21:32"),
+            ("F15", "25.06", "12:45"),
+            ("F03", "27.07", "11:30"),
+            ("F15", "28.07", "17:00"),
+            ("F03", "15.09", "11:38"),
+        ]
+
+    def test_partly_filled_buffer_keeps_the_slot_order(self):
+        slots = [{"slot": n} for n in range(3)]
+        assert chronological(slots, 3) == slots
+        assert chronological(slots, 1) == slots
+
+    def test_index_outside_the_buffer_keeps_the_slot_order(self):
+        slots = [{"slot": n} for n in range(10)]
+        assert chronological(slots, 10) == slots
+        assert chronological(slots, 0xFF) == slots
+
+    def test_overwritten_slot_is_the_only_new_fault(self):
+        tracker = THZFaultTracker(FakeStore())
+        tracker.process(D1_BEFORE)
+        state = tracker.process(D1_AFTER)
+        assert state["new_count"] == 1
+        assert _dates(state["new_entries"]) == [("F03", "15.09", "11:38")]
+        assert _dates([state["latest"]]) == [("F03", "15.09", "11:38")]
+        assert _dates(state["entries"])[0] == ("F03", "15.09", "11:38")
+
+    def test_next_fault_overwrites_slot_1(self):
+        tracker = THZFaultTracker(FakeStore())
+        tracker.process(D1_AFTER)
+        following = bytearray(D1_AFTER)
+        following[3] = 2
+        following[10:16] = _record(15, "17:00", "02.10")
+        state = tracker.process(bytes(following))
+        assert state["new_count"] == 1
+        assert _dates([state["latest"]]) == [("F15", "02.10", "17:00")]
+
+    def test_new_record_equal_to_a_stored_one_is_new(self):
+        tracker = THZFaultTracker(FakeStore())
+        tracker.process(D1_AFTER)
+        following = bytearray(D1_AFTER)
+        following[3] = 2
+        following[10:16] = following[4:10]  # the same F03 15.09. 11:38 again
+        assert tracker.process(bytes(following))["new_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_baseline_saved_in_slot_order_still_matches(self):
+        slot_order = [
+            entry["raw"]
+            for entry in sorted(
+                decode_fault_memory(D1_AFTER)["entries"], key=lambda e: e["slot"]
+            )
+        ]
+        tracker = THZFaultTracker(FakeStore({"acknowledged_records": slot_order}))
+        await tracker.async_load()
+        assert tracker.process(D1_AFTER)["new_count"] == 0
 
 
 class FakeStore:
