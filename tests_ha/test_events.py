@@ -71,3 +71,19 @@ async def test_filter_change_fires_an_event(hass, fake_device):
         "filter_down",
     ]
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_fault_written_while_stopped_fires_after_the_start(hass, fake_device):
+    entry = await _setup(hass, fake_device)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # The heat pump stores a fault while Home Assistant is not running.
+    fake_device.initial_registers = {b"\xd1": _d1(R3, R5), FILTER_BLOCK: bytes(2)}
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(entity_id(hass, entry, "event", "new_fault"))
+    assert state.attributes["event_type"] == "fault"
+    assert state.attributes["fault_code"] == "F05"
+    assert await hass.config_entries.async_unload(entry.entry_id)

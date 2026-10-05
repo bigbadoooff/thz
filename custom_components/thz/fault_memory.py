@@ -2,10 +2,15 @@
 
 Layout (firmware 4.x, verified on a THZ 303 SOL running 4.19; the existing
 ``pxxD1`` read map uses the same offsets): the response echoes the command at
-byte 1, byte 2 is the number of stored faults and byte 3 is reserved. Up to
-ten six-byte records follow from byte 4, oldest first::
+byte 1, byte 2 is the number of stored faults and byte 3 is the write index.
+Up to ten six-byte records follow from byte 4::
 
     [fault number][reserved][time: 2 bytes swapped][date: 2 bytes swapped]
+
+The records form a ring buffer (seen on a THZ 403 SOL running 4.39): a
+new fault overwrites the slot at the write index in place and the index moves
+on by one, so once all ten slots are used the oldest record is the one at the
+write index. Before the buffer is full, the slots fill in order from slot 0.
 
 Time and date are two-digit decimal pairs stored byte-swapped (see
 ``value_codec._dec_turnhex2time`` / ``_dec_turnhexdate``); no year is stored.
@@ -18,6 +23,7 @@ validate the D1 response and success is decided by reading D1 back.
 from __future__ import annotations
 
 import asyncio
+from collections import Counter
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -102,11 +108,26 @@ def decode_fault_record(data: bytes, slot: int) -> dict[str, Any]:
     return result
 
 
+def chronological(
+    slots: list[dict[str, Any]], write_index: int
+) -> list[dict[str, Any]]:
+    """Return the records of a D1 ring buffer oldest first.
+
+    Only a full buffer has wrapped; then the oldest record sits at the write
+    index. A partly filled buffer, or an index outside the buffer, keeps the
+    slot order.
+    """
+    if len(slots) == FAULT_MAX_RECORDS and 0 < write_index < FAULT_MAX_RECORDS:
+        return slots[write_index:] + slots[:write_index]
+    return list(slots)
+
+
 def decode_fault_memory(data: bytes) -> dict[str, Any]:
     """Decode a complete D1 response.
 
     Returns ``{"valid": False, "error": ...}`` for an unusable payload,
-    otherwise the reported count and the decoded ``entries`` (oldest first).
+    otherwise the reported count, the write index and the decoded ``entries``
+    (oldest first; each record keeps its physical ``slot``).
     """
     if len(data) < FAULT_HEADER_SIZE:
         return {
@@ -123,13 +144,17 @@ def decode_fault_memory(data: bytes) -> dict[str, Any]:
         }
 
     reported = data[2]
+    write_index = data[3]
     available = (len(data) - FAULT_HEADER_SIZE) // FAULT_RECORD_SIZE
     count = min(reported, available, FAULT_MAX_RECORDS)
     result: dict[str, Any] = {
         "valid": True,
         "fault_count_reported": reported,
         "records_available": available,
-        "entries": [decode_fault_record(data, slot) for slot in range(count)],
+        "write_index": write_index,
+        "entries": chronological(
+            [decode_fault_record(data, slot) for slot in range(count)], write_index
+        ),
     }
     if reported > count:
         result["warning"] = (
@@ -147,17 +172,22 @@ def record_fingerprints(entries: list[dict[str, Any]]) -> list[str]:
     ]
 
 
-def new_record_start(acknowledged: list[str], current: list[str]) -> int:
-    """Return the first index in ``current`` that is newer than acknowledged.
+def new_record_indices(known: list[str], current: list[str]) -> list[int]:
+    """Return the indices of the records in ``current`` that ``known`` lacks.
 
-    D1 is a rolling history of at most ten records, so the acknowledged tail
-    and the current head overlap when nothing was lost. The largest overlap
-    wins; with no overlap every current record counts as new.
+    The records are compared as a multiset, so neither the order of ``known``
+    nor where the device wrote a record matters. When a fingerprint occurs
+    more often in ``current`` than in ``known``, its newest occurrences count
+    as new (``current`` is oldest first).
     """
-    for overlap in range(min(len(acknowledged), len(current)), 0, -1):
-        if acknowledged[-overlap:] == current[:overlap]:
-            return overlap
-    return 0
+    remaining = Counter(known)
+    new: list[int] = []
+    for index, fingerprint in enumerate(current):
+        if remaining[fingerprint] > 0:
+            remaining[fingerprint] -= 1
+        else:
+            new.append(index)
+    return new
 
 
 async def read_fault_memory(hass: HomeAssistant, device: THZDevice) -> dict[str, Any]:

@@ -4,6 +4,26 @@ All notable changes to the THZ integration are documented here.
 
 ---
 
+## [0.7.2-beta.1] – 2026-10-05
+
+### Bug Fixes
+
+- **Fault memory is read as a ring buffer** (#262). The heat pump writes a
+  new fault over the oldest of its ten records in place and keeps the write
+  position in byte 3 of D1. The integration treated D1 as a list that
+  shifts, so once all ten slots were used *Latest fault* showed the wrong
+  record and every new fault marked all ten records as new. The records are
+  now put in order from the write position: *Latest fault* is the newest
+  record, the `entries` attributes are newest first, and only the record
+  that was really written counts as new. An acknowledgement saved by an
+  older version stays valid.
+- **The fault event fires for faults stored while Home Assistant was not
+  running.** It now remembers the records it has seen and fires for the
+  new ones after the start. On the first start after the update it takes
+  the current history as the baseline, as before.
+- **Several new faults in one poll fire one event each.** Automations saw
+  only the last one before.
+
 ## [0.7.1] – 2026-09-30
 
 ### Bug Fixes

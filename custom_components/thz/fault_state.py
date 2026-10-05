@@ -1,6 +1,6 @@
 """Acknowledgement tracking for the D1 fault memory.
 
-The heat pump keeps a rolling history of its last ten faults and has no
+The heat pump keeps its last ten faults in a ring buffer and has no
 "acknowledged" concept. This tracker remembers, in Home Assistant only, which
 records the user has already seen so a dashboard can show "new faults" and an
 automation can alert on them. Nothing here writes to the device.
@@ -17,7 +17,7 @@ from typing import Any, Protocol
 
 from .fault_memory import (
     decode_fault_memory,
-    new_record_start,
+    new_record_indices,
     record_fingerprints,
 )
 
@@ -104,13 +104,16 @@ class THZFaultTracker:
             return None
         self._last_raw = raw
 
-        entries: list[dict[str, Any]] = list(decoded["entries"])
+        # Oldest first, see fault_memory.chronological.
+        entries: list[dict[str, Any]] = [
+            entry for entry in decoded["entries"] if entry.get("complete")
+        ]
         current = record_fingerprints(entries)
 
+        new_indices: list[int] = []
         if not self._baseline_exists:
             # First run: pre-existing history must not raise an alarm.
             self._set_baseline(current)
-            new_start = len(current)
             _LOGGER.debug(
                 "Fault baseline initialised with %d existing D1 record(s)",
                 len(current),
@@ -119,11 +122,10 @@ class THZFaultTracker:
             # D1 was cleared on the device: mirror that (HA side only).
             if self._acknowledged:
                 self._set_baseline([])
-            new_start = 0
         else:
-            new_start = new_record_start(self._acknowledged, current)
+            new_indices = new_record_indices(self._acknowledged, current)
 
-        new_entries = entries[new_start:]
+        new_entries = [entries[index] for index in new_indices]
         self.state = {
             "status": STATUS_FAULT if new_entries else STATUS_OK,
             "fault_count": len(entries),

@@ -7,9 +7,11 @@
   ``filter_down`` when the heat pump starts asking for that filter change.
 
 Both read data their block coordinators poll anyway, so they add no serial
-traffic. What is already there when Home Assistant starts (the fault history,
-a filter that is already due) sets the baseline and fires nothing; the
-fault sensors and filter binary sensors show that state.
+traffic. The fault event stores the records it has seen, so a fault written
+while Home Assistant was not running fires once after the start. Without a
+stored state (the first start) the fault history sets the baseline and fires
+nothing, as does a filter that is already due; the fault sensors and filter
+binary sensors show that state.
 """
 
 from __future__ import annotations
@@ -20,11 +22,14 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.event import EventEntity
 from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import DOMAIN
 from .devices import assign_subdevices, thz_device_info
-from .fault_memory import decode_fault_memory, record_fingerprints
+from .fault_memory import decode_fault_memory, new_record_indices, record_fingerprints
 from .fault_sensor import D1_BLOCK, supports_fault_memory
+from .fault_state import FaultStore
 from .register_maps.model import ReadField
 from .runtime_data import BlockCoordinator
 from .value_codec import decode_raw_value
@@ -48,6 +53,7 @@ FILTER_FIELDS = {
     "filterDown": "filter_down",
 }
 EVENT_FAULT = "fault"
+FAULT_SEEN_STORAGE_VERSION = 1
 # Fault record keys passed on as event attributes.
 FAULT_ATTRIBUTES = ("fault_number", "fault_code", "description", "time", "date")
 
@@ -65,7 +71,12 @@ async def async_setup_entry(
 
     fault_coordinator = entry_data.polled_coordinator(D1_BLOCK)
     if fault_coordinator is not None and supports_fault_memory(register_manager):
-        entities.append(THZFaultEvent(fault_coordinator, device_id))
+        store: Store[dict[str, Any]] = Store(
+            hass,
+            FAULT_SEEN_STORAGE_VERSION,
+            f"{DOMAIN}.fault_seen.{config_entry.entry_id}",
+        )
+        entities.append(THZFaultEvent(fault_coordinator, device_id, store))
 
     filter_coordinator = entry_data.polled_coordinator(FILTER_BLOCK)
     filters = {
@@ -86,6 +97,8 @@ class _THZEvent(CoordinatorEntity[BlockCoordinator], EventEntity):
     _attr_has_entity_name = True
     KEY = ""
     UNIQUE_SUFFIX = ""
+    # Fire for what changed against a restored baseline when added.
+    _fire_when_added = False
 
     # Sub-device group, set by devices.assign_subdevices.
     _subdevice: str | None = None
@@ -112,9 +125,9 @@ class _THZEvent(CoordinatorEntity[BlockCoordinator], EventEntity):
         )
 
     async def async_added_to_hass(self) -> None:
-        """Take what the block holds now as the baseline."""
+        """Process what the block holds now; fire only against a restored state."""
         await super().async_added_to_hass()
-        self._process(self.coordinator.data, fire=False)
+        self._process(self.coordinator.data, fire=self._fire_when_added)
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -134,10 +147,38 @@ class THZFaultEvent(_THZEvent):
     UNIQUE_SUFFIX = "new_fault"
     _attr_event_types = [EVENT_FAULT]  # noqa: RUF012
 
-    def __init__(self, coordinator: Any, device_id: str) -> None:
-        """Initialise with no known records."""
+    def __init__(
+        self, coordinator: Any, device_id: str, store: FaultStore | None = None
+    ) -> None:
+        """Initialise with no known records; ``store`` keeps them over restarts."""
         super().__init__(coordinator, device_id)
-        self._known: set[str] | None = None
+        self._store = store
+        self._known: list[str] | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Restore the records seen before the restart, then process the block."""
+        self._known = await self._async_load_known()
+        self._fire_when_added = self._known is not None
+        await super().async_added_to_hass()
+
+    async def _async_load_known(self) -> list[str] | None:
+        if self._store is None:
+            return None
+        try:
+            stored = await self._store.async_load()
+        except (OSError, ValueError, TypeError) as err:
+            _LOGGER.warning("Could not load the seen fault records: %s", err)
+            return None
+        if not isinstance(stored, dict) or not isinstance(stored.get("records"), list):
+            return None
+        return [str(v).upper() for v in stored["records"] if isinstance(v, str)]
+
+    @staticmethod
+    async def _async_save_known(store: FaultStore, records: list[str]) -> None:
+        try:
+            await store.async_save({"records": records})
+        except (OSError, ValueError, TypeError) as err:
+            _LOGGER.error("Could not persist the seen fault records: %s", err)
 
     def _process(self, data: bytes | None, *, fire: bool) -> None:
         if not data:
@@ -145,17 +186,26 @@ class THZFaultEvent(_THZEvent):
         decoded = decode_fault_memory(bytes(data))
         if not decoded["valid"]:
             return
+        # Oldest first, so several new records fire in the order they happened.
         entries = [e for e in decoded["entries"] if e.get("complete")]
         fingerprints = record_fingerprints(entries)
-        known, self._known = self._known, set(fingerprints)
+        known, self._known = self._known, fingerprints
+        if self._store is not None and (
+            known is None or sorted(known) != sorted(fingerprints)
+        ):
+            self.hass.async_create_task(
+                self._async_save_known(self._store, fingerprints)
+            )
         if known is None or not fire:
             return
-        for entry, fingerprint in zip(entries, fingerprints, strict=True):
-            if fingerprint not in known:
-                _LOGGER.debug("New fault in the fault memory: %s", entry)
-                self._trigger_event(
-                    EVENT_FAULT, {key: entry.get(key) for key in FAULT_ATTRIBUTES}
-                )
+        for index in new_record_indices(known, fingerprints):
+            entry = entries[index]
+            _LOGGER.debug("New fault in the fault memory: %s", entry)
+            self._trigger_event(
+                EVENT_FAULT, {key: entry.get(key) for key in FAULT_ATTRIBUTES}
+            )
+            # One state per event, or automations only see the last one.
+            self.async_write_ha_state()
 
 
 class THZFilterEvent(_THZEvent):
