@@ -7,15 +7,14 @@ platforms, the services and diagnostics.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import ENTITY_ID_STYLE_DEFAULT, ENTITY_VISIBILITY_DEFAULT
 
 if TYPE_CHECKING:
-    from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-
     from .fault_state import THZFaultTracker
     from .parameter_poller import ParameterPoller
     from .register_maps.register_map_manager import (
@@ -23,6 +22,9 @@ if TYPE_CHECKING:
         RegisterMapManagerWrite,
     )
     from .thz_device import THZDevice
+
+# A block coordinator's data: the block's bytes, None if the block is missing.
+BlockCoordinator: TypeAlias = DataUpdateCoordinator[bytes | None]
 
 
 @dataclass

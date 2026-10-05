@@ -1,8 +1,6 @@
-"""Compatibility shims for HA type/attribute gaps in older stub snapshots.
+"""Compatibility shims for names that older Home Assistant versions lack.
 
-The mypy dev environment's ``homeassistant-stubs`` package may lag behind
-the minimum Home Assistant version this integration targets. This module
-confines the resulting workarounds to one place instead of scattering
+This module confines the workarounds to one place instead of scattering
 ``# type: ignore`` comments throughout the codebase.
 """
 
@@ -12,8 +10,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     try:
-        # Real name since HA 2024.6. Older homeassistant-stubs snapshots
-        # (as pinned by some dev mirrors) predate it.
+        # Real name since HA 2024.6.
         from homeassistant.config_entries import ConfigFlowResult
     except ImportError:
         # mypy considers the two branches' ConfigFlowResult incompatible

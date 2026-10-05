@@ -49,7 +49,7 @@ from .entity_id_style import resolve_suggested_object_id
 from .fault_sensor import async_setup_fault_sensors
 from .log_once import OncePerEpisode
 from .register_maps.register_map_manager import RegisterMapManager
-from .runtime_data import THZConfigEntry
+from .runtime_data import BlockCoordinator, THZConfigEntry
 from .value_codec import decode_raw_value
 from .value_maps import (
     STATE_TRANSLATED_DECODE_TYPES,
@@ -318,7 +318,7 @@ def normalize_entry(entry: tuple[Any, ...] | dict[str, Any]) -> dict[str, Any]:
     raise ValueError("Unsupported sensor entry format.")
 
 
-class THZGenericSensor(CoordinatorEntity, SensorEntity):
+class THZGenericSensor(CoordinatorEntity[BlockCoordinator], SensorEntity):
     """Represents a generic sensor entity for the THZ integration.
 
     This class is responsible for managing the state and properties of a

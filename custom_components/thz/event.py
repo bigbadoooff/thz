@@ -31,6 +31,7 @@ from .fault_memory import decode_fault_memory, new_record_indices, record_finger
 from .fault_sensor import D1_BLOCK, supports_fault_memory
 from .fault_state import FaultStore
 from .register_maps.model import ReadField
+from .runtime_data import BlockCoordinator
 from .value_codec import decode_raw_value
 
 if TYPE_CHECKING:
@@ -90,7 +91,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class _THZEvent(CoordinatorEntity, EventEntity):
+class _THZEvent(CoordinatorEntity[BlockCoordinator], EventEntity):
     """An event entity fed by a block coordinator."""
 
     _attr_has_entity_name = True

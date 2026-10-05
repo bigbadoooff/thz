@@ -31,7 +31,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .devices import assign_subdevices, thz_device_info
-from .runtime_data import THZConfigEntry
+from .runtime_data import BlockCoordinator, THZConfigEntry
 from .value_codec import decode_raw_value
 
 if TYPE_CHECKING:
@@ -218,7 +218,7 @@ def _cop_inputs(cop_type: str, period: str) -> tuple[str, ...]:
     )
 
 
-class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
+class THZCurrentCOPSensor(CoordinatorEntity[BlockCoordinator], SensorEntity):
     """Sensor for current/instantaneous COP based on power values.
 
     COP = actualPower_Qc / actualPower_Pel, both read from pxxFB at the
@@ -314,7 +314,7 @@ class THZCurrentCOPSensor(CoordinatorEntity, SensorEntity):
         )
 
 
-class THZBaseCOPSensor(CoordinatorEntity, SensorEntity):
+class THZBaseCOPSensor(CoordinatorEntity[BlockCoordinator], SensorEntity):
     """Base class for COP sensors that compute from energy block data.
 
     Provides shared coordinator storage, common sensor attributes,

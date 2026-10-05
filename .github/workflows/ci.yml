@@ -51,17 +51,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          # mypy itself must run under an interpreter new enough to parse
-          # whatever syntax homeassistant-stubs' .pyi files use (e.g. PEP
-          # 695/696 type statements) -- this is independent of the
-          # [tool.mypy] python_version target in pyproject.toml, which only
-          # controls checking semantics, not what mypy's own parser can
-          # physically read. See pyproject.toml's comment on this setting.
+          # Home Assistant ships its own types (py.typed) and needs Python
+          # 3.13; requirements_test_ha.txt pins the version mypy checks
+          # against, the same one tests_ha runs on.
           python-version: "3.13"
       - name: Install type-check dependencies
         run: |
-          pip install -r requirements_test.txt
-          pip install --no-deps homeassistant-stubs
+          pip install -r requirements_test.txt -r requirements_test_ha.txt
       - name: Run mypy
         run: mypy
 

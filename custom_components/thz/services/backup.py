@@ -303,16 +303,19 @@ async def async_handle_backup_parameters(
         path,
         len(read_errors),
     )
-    return {
-        "success": True,
-        "file": filename,
-        "path": path,
-        "parameter_count": len(parameters),
-        "read_errors": read_errors[:20],
-        "created": created,
-        "clock_drift_seconds": clock_drift_seconds,
-        "clock_corrected": clock_corrected,
-    }
+    return cast(
+        "ServiceResponse",
+        {
+            "success": True,
+            "file": filename,
+            "path": path,
+            "parameter_count": len(parameters),
+            "read_errors": read_errors[:20],
+            "created": created,
+            "clock_drift_seconds": clock_drift_seconds,
+            "clock_corrected": clock_corrected,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
