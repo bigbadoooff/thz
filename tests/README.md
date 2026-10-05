@@ -23,12 +23,11 @@ environment, set up as described below.
 
 ### Type check
 
-`homeassistant-stubs` uses syntax only Python 3.12+ can parse, so mypy must
-run under Python 3.13 (as in CI). Under an older interpreter it only reports
-`import-not-found` errors.
+mypy checks against Home Assistant itself, which needs Python 3.13 (as in
+CI). Under an older interpreter it only reports `import-not-found` errors.
 
 ```bash
-pip install --no-deps homeassistant-stubs
+pip install -r requirements_test_ha.txt
 mypy
 ```
 

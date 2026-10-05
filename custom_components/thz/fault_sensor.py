@@ -19,7 +19,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .devices import thz_device_info
 from .fault_state import STATUS_FAULT, STATUS_OK, STORAGE_VERSION, THZFaultTracker
-from .runtime_data import THZConfigEntry
+from .runtime_data import BlockCoordinator, THZConfigEntry
 from .value_maps import STATE_NONE, state_options, to_state
 
 if TYPE_CHECKING:
@@ -89,7 +89,7 @@ async def async_setup_fault_sensors(
     )
 
 
-class _THZFaultSensor(CoordinatorEntity, SensorEntity):
+class _THZFaultSensor(CoordinatorEntity[BlockCoordinator], SensorEntity):
     """Base class: value comes from the tracker's decoded state."""
 
     _attr_has_entity_name = True

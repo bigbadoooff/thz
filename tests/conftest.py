@@ -44,6 +44,10 @@ class MockEntity:
 class MockCoordinatorEntity(MockEntity):
     """Mock coordinator entity."""
 
+    def __class_getitem__(cls, _item):
+        """Accept CoordinatorEntity[...] like the generic class."""
+        return cls
+
     def __init__(self, coordinator):
         """Initialise with a coordinator reference."""
         self.coordinator = coordinator
@@ -184,7 +188,17 @@ sys.modules["homeassistant.helpers.entity"] = entity_mock
 # Mock update coordinator module with mock classes
 update_coordinator_mock = MagicMock()
 update_coordinator_mock.CoordinatorEntity = MockCoordinatorEntity
-update_coordinator_mock.DataUpdateCoordinator = MagicMock
+
+
+class MockDataUpdateCoordinator(MagicMock):
+    """MagicMock that accepts DataUpdateCoordinator[...] like the generic class."""
+
+    def __class_getitem__(cls, _item):
+        """Return the class itself for any type argument."""
+        return cls
+
+
+update_coordinator_mock.DataUpdateCoordinator = MockDataUpdateCoordinator
 update_coordinator_mock.UpdateFailed = Exception
 sys.modules["homeassistant.helpers.update_coordinator"] = update_coordinator_mock
 
@@ -334,6 +348,7 @@ climate_mock.ClimateEntity = MockClimateEntity
 climate_mock.ClimateEntityFeature = MockClimateEntityFeature
 climate_mock.HVACMode = MockHVACMode
 sys.modules["homeassistant.components.climate"] = climate_mock
+sys.modules["homeassistant.components.climate.const"] = climate_mock
 # Mock binary_sensor component
 binary_sensor_mock = MagicMock()
 binary_sensor_mock.BinarySensorEntity = MockBinarySensorEntity

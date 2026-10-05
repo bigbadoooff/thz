@@ -12,8 +12,8 @@ repos:
       - id: ruff-format
   - repo: local
     hooks:
-      # Runs the mypy from the active environment: it needs homeassistant-stubs
-      # (installed with --no-deps, see tests/README.md) and Python 3.13, which
+      # Runs the mypy from the active environment: it needs Home Assistant
+      # (requirements_test_ha.txt, see tests/README.md) and Python 3.13, which
       # an isolated pre-commit environment cannot provide.
       - id: mypy
         name: mypy

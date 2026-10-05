@@ -14,7 +14,7 @@ error when no THZ entry is loaded. The handlers live in modules by topic:
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
 from functools import partial
 import logging
 from typing import Any
@@ -42,7 +42,7 @@ _SCAN_TARGET: dict[vol.Marker, Any] = {
 }
 _MAX_RESULTS = vol.All(vol.Coerce(int), vol.Range(min=1, max=65535))
 
-_Handler = Callable[[HomeAssistant, ServiceCall], Awaitable[ServiceResponse]]
+_Handler = Callable[[HomeAssistant, ServiceCall], Coroutine[Any, Any, ServiceResponse]]
 
 SERVICES: dict[str, tuple[_Handler, vol.Schema]] = {
     "read_raw_register": (
