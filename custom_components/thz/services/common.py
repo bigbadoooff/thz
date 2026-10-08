@@ -58,10 +58,11 @@ def _require_target_entry_data(
 def _normalize_block_name(block: str) -> str:
     """Normalise a block name to the coordinator key format ``pxxXX``.
 
-    Accepts any of: ``"FB"``, ``"fb"``, ``"pxxFB"``, ``"0xFB"``, ``"0A0176"``.
-    Always returns lowercase ``pxx`` prefix with upper-cased hex suffix.
+    Accepts any of: ``"FB"``, ``"fb"``, ``"pxxFB"``, ``"0xFB"``, ``"0A0176"``,
+    also in quotes. Always returns lowercase ``pxx`` prefix with upper-cased
+    hex suffix.
     """
-    b = block.strip()
+    b = block.strip().strip("\"'").strip()
     if b.lower().startswith("0x"):
         b = b[2:]
     if b.lower().startswith("pxx"):

@@ -4,6 +4,16 @@ All notable changes to the THZ integration are documented here.
 
 ---
 
+## [Unreleased]
+
+### Bug Fixes
+
+- **`thz.read_raw_register` accepts block names as the logs show them.**
+  `pxx0A091A` and `0x0A091A` now read the block `0A091A`, as they already
+  did for `thz.refresh_block`; before, they failed as invalid hex. Both
+  services also ignore quotes around the value. An invalid command is
+  logged as a warning without a traceback.
+
 ## [0.7.2-beta.1] – 2026-10-05
 
 ### Bug Fixes

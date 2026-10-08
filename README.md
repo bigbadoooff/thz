@@ -67,7 +67,7 @@ HC1 also exposes **HVAC action** (heating / cooling / idle / off) and optional *
 ### Services
 
 #### `thz.read_raw_register`
-Read any raw register block directly from the heat pump and return the hex dump. Useful for firmware research and debugging. See [docs/read-raw-register-service.md](docs/read-raw-register-service.md) for full documentation.
+Read any raw register block directly from the heat pump and return the hex dump. Useful for firmware research and debugging. Accepts the same block name forms as `thz.refresh_block`. See [docs/read-raw-register-service.md](docs/read-raw-register-service.md) for full documentation.
 
 #### `thz.refresh_block`
 Force an immediate re-read of a specific coordinator block without waiting for the next poll interval. Accepts any block name form (`"FB"`, `"pxxFB"`, `"0xFB"`). Returns `{success, block}`.
