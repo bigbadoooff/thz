@@ -110,6 +110,7 @@ class _THZFaultSensor(CoordinatorEntity[BlockCoordinator], SensorEntity):
     _subdevice: str | None = None
     _subdevice_device_name: str | None = None
     _subdevice_area: str | None = None
+    _subdevice_via_device_id: str | None = None
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -119,6 +120,7 @@ class _THZFaultSensor(CoordinatorEntity[BlockCoordinator], SensorEntity):
             self._subdevice,
             self._subdevice_device_name,
             self._subdevice_area,
+            self._subdevice_via_device_id,
         )
 
     @property

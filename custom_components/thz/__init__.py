@@ -210,6 +210,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         entity_id_style=entity_id_style,
         entity_visibility=entity_visibility,
         entity_id_prefix=entity_id_prefix,
+        device_entry_id=device_entry.id,
         area_name=area_name(hass, data),
     )
     config_entry.runtime_data = entry_data

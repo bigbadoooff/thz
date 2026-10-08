@@ -79,13 +79,26 @@ def test_device_info_for_heat_pump_and_subdevice():
     )
 
 
+def test_device_info_links_by_registry_id_when_supported(monkeypatch):
+    monkeypatch.setattr(devices, "_HAS_VIA_DEVICE_ID", True)
+    info = thz_device_info(DEVICE, "dhw", "lwz", None, "parent-id")
+    assert info["via_device_id"] == "parent-id"  # type: ignore[typeddict-item]
+    assert "via_device" not in info
+    # Without the registry id the identifier link stays.
+    assert thz_device_info(DEVICE, "dhw")["via_device"] == (DOMAIN, DEVICE)
+
+    monkeypatch.setattr(devices, "_HAS_VIA_DEVICE_ID", False)
+    info = thz_device_info(DEVICE, "dhw", "lwz", None, "parent-id")
+    assert info["via_device"] == (DOMAIN, DEVICE)
+
+
 def _entity(unique_id):
     return SimpleNamespace(unique_id=unique_id, _device_id=DEVICE)
 
 
 def test_assign_subdevices_only_when_enabled():
     entity = _entity("set_0a0140_p32hystdhw")
-    runtime_data = SimpleNamespace(area_name="Basement")
+    runtime_data = SimpleNamespace(area_name="Basement", device_entry_id="parent-id")
     entry = SimpleNamespace(data={"alias": "lwz"}, runtime_data=runtime_data)
     assign_subdevices([entity], entry)
     assert not hasattr(entity, "_subdevice")
@@ -95,6 +108,7 @@ def test_assign_subdevices_only_when_enabled():
     assert entity._subdevice == "dhw"
     assert entity._subdevice_device_name == "lwz"
     assert entity._subdevice_area == "Basement"
+    assert entity._subdevice_via_device_id == "parent-id"
 
 
 def _registries(devices_by_id, entities_by_device):

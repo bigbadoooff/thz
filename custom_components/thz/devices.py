@@ -3,7 +3,7 @@
 Without the split every entity belongs to the heat pump device. With
 ``CONF_SPLIT_DEVICES`` enabled, entities are grouped by function (heating
 circuits, hot water, ventilation, compressor, solar, cooling) into
-sub-devices linked to the heat pump via ``via_device``. General entities
+sub-devices linked to the heat pump. General entities
 (clock, fault memory, versions, operating mode, ...) stay on the heat pump.
 
 The group is derived from the entity's unique_id, which carries the register
@@ -26,6 +26,11 @@ from homeassistant.helpers import (
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import CONF_SPLIT_DEVICES, DOMAIN
+
+# Newer Home Assistant versions link a sub-device by the registry id of its
+# parent and deprecate the ``via_device`` identifier; older ones only know
+# ``via_device``.
+_HAS_VIA_DEVICE_ID = "via_device_id" in getattr(DeviceInfo, "__annotations__", {})
 
 
 def entry_unique_id(data: Mapping[str, Any]) -> str:
@@ -143,21 +148,26 @@ def thz_device_info(
     subdevice: str | None,
     device_name: str | None = None,
     area: str | None = None,
+    via_device_id: str | None = None,
 ) -> DeviceInfo:
     """Return the DeviceInfo linking an entity to the heat pump or a sub-device.
 
     ``area`` is the heat pump's configured area; Home Assistant applies it
     only when it creates the sub-device, so a later change by the user stays.
+    ``via_device_id`` is the heat pump's device registry id.
     """
     if subdevice is None:
         return DeviceInfo(identifiers={(DOMAIN, device_id)})
     info = DeviceInfo(
         identifiers={(DOMAIN, subdevice_identifier(device_id, subdevice))},
-        via_device=(DOMAIN, device_id),
         translation_key=subdevice,
         translation_placeholders={"device_name": device_name or device_id},
         manufacturer="Stiebel Eltron / Tecalor",
     )
+    if _HAS_VIA_DEVICE_ID and via_device_id:
+        info["via_device_id"] = via_device_id  # type: ignore[typeddict-unknown-key]
+    else:
+        info["via_device"] = (DOMAIN, device_id)
     if area:
         info["suggested_area"] = area
     return info
@@ -193,11 +203,13 @@ def assign_subdevices(entities: Iterable[Any], config_entry: ConfigEntry) -> Non
         return
     name = main_device_name(data)
     area = config_entry.runtime_data.area_name
+    via_device_id = config_entry.runtime_data.device_entry_id
     for entity in entities:
         unique_id = getattr(entity, "unique_id", None) or ""
         entity._subdevice = subdevice_for(unique_id, entity._device_id)
         entity._subdevice_device_name = name
         entity._subdevice_area = area
+        entity._subdevice_via_device_id = via_device_id
 
 
 def _subdevice_entries(
