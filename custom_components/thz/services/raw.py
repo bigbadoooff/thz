@@ -196,7 +196,8 @@ async def async_handle_read_raw_register(
     Returns:
         ServiceResponse dict with command, length, hex, and formatted fields
     """
-    command_str = call.data.get("command", "").strip().upper()
+    # Same forms as a block name: "FB", "pxxFB", "0xFB".
+    command_str = _normalize_block_name(call.data.get("command", ""))[3:]
     requested_entry_id: str | None = call.data.get("entry_id")
 
     # Validate hex string
@@ -204,7 +205,7 @@ async def async_handle_read_raw_register(
         command_bytes = bytes.fromhex(command_str)
     except ValueError as err:
         error_msg = f"Invalid hex command: {command_str} - {err}"
-        _LOGGER.exception(error_msg)
+        _LOGGER.warning(error_msg)
         # Create persistent notification for the error
         async_notify(
             hass,

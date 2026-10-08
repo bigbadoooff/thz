@@ -12,7 +12,7 @@ The `thz.read_raw_register` service allows you to read raw register data from yo
 
 1. Go to **Developer Tools** → **Services**
 2. Select the service: `THZ: Read Raw Register`
-3. Enter a hex command string in the `command` field
+3. Enter a hex command string in the `command` field (`FB`, `pxxFB` and `0xFB` all work)
 4. Click **Call Service**
 
 The result will appear in:
@@ -88,8 +88,8 @@ INFO Raw register FB read successfully (45 bytes):
 
 ### "Invalid hex command" error
 - Ensure you're using valid hexadecimal characters (0-9, A-F)
-- Don't include spaces or `0x` prefix
-- Examples: `FB` ✓, `0A0176` ✓, `0xFB` ✗, `F B` ✗
+- A `pxx` or `0x` prefix and surrounding quotes are removed; don't include spaces
+- Examples: `FB` ✓, `0A0176` ✓, `pxx0A0176` ✓, `0xFB` ✓, `F B` ✗
 
 ### "THZ device not initialized" error
 - The integration hasn't fully started yet
