@@ -352,7 +352,7 @@ WRITE_MAP = {
     "p11DHWsetManualTemp": {
         "command": "0A0580",
         "min": "10",
-        "max": "55",
+        "max": "65",
         "unit": " °C",
         "step": 0.1,
         "type": "number",
