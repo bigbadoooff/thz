@@ -6,8 +6,19 @@ All notable changes to the THZ integration are documented here.
 
 ## [0.7.2-beta.1] – 2026-10-05
 
+### Features
+
+- Add the 5.39 supplemental sensor map for firmware 7.02, matching the profile
+  reported to work on THZ 5.5 eco devices.
+- Use the standard 5.39 write map for firmware 7.02, including the full P75
+  passive-cooling range (0–4); technician-only write parameters are not added.
+
 ### Bug Fixes
 
+- **Firmware 7.02 compressor status uses the display indicator** (#269). On
+  affected devices, the `pxxFB` compressor flag can remain set while stopped.
+  The integration now polls `pxx0A0176` and uses its compressor indicator for
+  the existing entity, keeping its entity-registry identity.
 - **Fault memory is read as a ring buffer** (#262). The heat pump writes a
   new fault over the oldest of its ten records in place and keeps the write
   position in byte 3 of D1. The integration treated D1 as a list that

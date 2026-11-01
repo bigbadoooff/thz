@@ -32,11 +32,13 @@ from .const import (
     CONF_SPLIT_DEVICES,
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_WRITE_INTERVAL,
+    DISPLAY_STATUS_BLOCK,
     DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_ALL,
     ENTITY_VISIBILITY_DEFAULT,
     ENTITY_VISIBILITY_EXTENDED,
+    FIRMWARE_702,
     FIRMWARE_OVERRIDE_AUTO,
     should_hide_entity,
 )
@@ -316,10 +318,22 @@ def _refresh_intervals(data: Mapping[str, Any], device: THZDevice) -> dict[str, 
     """
     refresh_intervals = data.get("refresh_intervals")
     if refresh_intervals is not None:
+        intervals = dict(refresh_intervals)
+        if (
+            device.firmware_profile == FIRMWARE_702
+            and DISPLAY_STATUS_BLOCK in device.available_reading_blocks
+        ):
+            # The display bit is the reliable compressor status on this
+            # firmware, so keep its coordinator even if read polling was
+            # deselected in the config entry.
+            intervals.setdefault(
+                DISPLAY_STATUS_BLOCK,
+                intervals.get("pxxFB", DEFAULT_UPDATE_INTERVAL),
+            )
         _LOGGER.debug(
-            "Creating coordinators with refresh intervals: %s", refresh_intervals
+            "Creating coordinators with refresh intervals: %s", intervals
         )
-        return dict(refresh_intervals)
+        return intervals
 
     available_blocks = device.available_reading_blocks
     if not available_blocks:

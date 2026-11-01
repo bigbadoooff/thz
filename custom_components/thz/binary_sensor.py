@@ -24,8 +24,11 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
+    DISPLAY_STATUS_BLOCK,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
+    FIRMWARE_702,
+    GLOBAL_STATUS_BLOCK,
     should_hide_entity,
     should_hide_entity_by_default,
 )
@@ -101,6 +104,16 @@ async def async_setup_entry(
     entity_id_style = entry_data.entity_id_style
     entity_visibility = entry_data.entity_visibility
     entity_id_prefix = entry_data.entity_id_prefix
+    firmware_version = getattr(register_manager, "firmware_version", "")
+    use_display_compressor = firmware_version == FIRMWARE_702
+    global_compressor_field = next(
+        (
+            read_field
+            for read_field in register_manager.fields().get(GLOBAL_STATUS_BLOCK, [])
+            if read_field.name == "compressor"
+        ),
+        None,
+    )
 
     entities: list[THZBinarySensor] = []
     seen_sensor_names: set[str] = set()
@@ -122,6 +135,15 @@ async def async_setup_entry(
 
             sensor_name = read_field.name
 
+            # Firmware 7.02 can report the compressor bit in pxxFB as stuck
+            # on; use the display's compressor icon when that block is polled.
+            if (
+                use_display_compressor
+                and block == GLOBAL_STATUS_BLOCK
+                and sensor_name == "compressor"
+            ):
+                continue
+
             # Skip duplicate sensor names
             if sensor_name in seen_sensor_names:
                 _LOGGER.debug(
@@ -141,6 +163,18 @@ async def async_setup_entry(
                 "icon": read_field.meta.get("icon"),
                 "translation_key": read_field.translation_key,
             }
+            if (
+                use_display_compressor
+                and block == DISPLAY_STATUS_BLOCK
+                and sensor_name == "compressor"
+                and global_compressor_field is not None
+            ):
+                # Keep the existing entity-registry identity while its data
+                # source changes to the display status block.
+                entry["unique_id_block"] = bytes.fromhex(
+                    GLOBAL_STATUS_BLOCK.removeprefix("pxx")
+                )
+                entry["unique_id_offset"] = global_compressor_field.byte_offset
             entities.append(
                 THZBinarySensor(
                     coordinator,
@@ -207,6 +241,8 @@ class THZBinarySensor(CoordinatorEntity[BlockCoordinator], BinarySensorEntity):
         self._offset = entry["offset"]
         self._length = entry["length"]
         self._decode_type = entry["decode"]
+        self._unique_id_block = entry.get("unique_id_block", block)
+        self._unique_id_offset = entry.get("unique_id_offset", self._offset)
         self._device_id = device_id
         self._entity_name = entry["name"]
         self._read_problem = OncePerEpisode(_LOGGER)
@@ -295,7 +331,8 @@ class THZBinarySensor(CoordinatorEntity[BlockCoordinator], BinarySensorEntity):
         """Return a unique identifier for this entity."""
         name_slug = self._entity_name.lower().replace(" ", "_")
         return (
-            f"thz_{self._device_id}_bin_{self._block.hex()}_{self._offset}_{name_slug}"
+            f"thz_{self._device_id}_bin_{self._unique_id_block.hex()}_"
+            f"{self._unique_id_offset}_{name_slug}"
         )
 
     @property
