@@ -38,7 +38,6 @@ from .const import (
     ENTITY_VISIBILITY_ALL,
     ENTITY_VISIBILITY_DEFAULT,
     ENTITY_VISIBILITY_EXTENDED,
-    FIRMWARE_702,
     FIRMWARE_OVERRIDE_AUTO,
     should_hide_entity,
 )
@@ -320,12 +319,11 @@ def _refresh_intervals(data: Mapping[str, Any], device: THZDevice) -> dict[str, 
     if refresh_intervals is not None:
         intervals = dict(refresh_intervals)
         if (
-            device.firmware_profile == FIRMWARE_702
+            device.firmware_profile not in {"206", "214", "214j"}
             and DISPLAY_STATUS_BLOCK in device.available_reading_blocks
         ):
-            # The display bit is the reliable compressor status on this
-            # firmware, so keep its coordinator even if read polling was
-            # deselected in the config entry.
+            # Prefer the display compressor indicator on 4.x/5.x profiles;
+            # retain its poll even if the user deselected the display block.
             intervals.setdefault(
                 DISPLAY_STATUS_BLOCK,
                 intervals.get("pxxFB", DEFAULT_UPDATE_INTERVAL),

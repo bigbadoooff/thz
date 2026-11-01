@@ -15,10 +15,11 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
-- **Firmware 7.02 compressor status uses the display indicator** (#269). On
-  affected devices, the `pxxFB` compressor flag can remain set while stopped.
-  The integration now polls `pxx0A0176` and uses its compressor indicator for
-  the existing entity, keeping its entity-registry identity.
+- **Compressor status prefers the display indicator when available** (#269).
+  On affected devices, the `pxxFB` compressor flag can remain set while
+  stopped. The integration polls `pxx0A0176` on supported 4.x/5.x profiles and
+  uses its compressor indicator for the existing entity, keeping its
+  entity-registry identity. If the block is unavailable, it uses `pxxFB`.
 - **Fault memory is read as a ring buffer** (#262). The heat pump writes a
   new fault over the oldest of its ten records in place and keeps the write
   position in byte 3 of D1. The integration treated D1 as a list that

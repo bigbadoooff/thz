@@ -27,7 +27,6 @@ from .const import (
     DISPLAY_STATUS_BLOCK,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
-    FIRMWARE_702,
     GLOBAL_STATUS_BLOCK,
     should_hide_entity,
     should_hide_entity_by_default,
@@ -104,8 +103,9 @@ async def async_setup_entry(
     entity_id_style = entry_data.entity_id_style
     entity_visibility = entry_data.entity_visibility
     entity_id_prefix = entry_data.entity_id_prefix
-    firmware_version = getattr(register_manager, "firmware_version", "")
-    use_display_compressor = firmware_version == FIRMWARE_702
+    use_display_compressor = (
+        entry_data.polled_coordinator(DISPLAY_STATUS_BLOCK) is not None
+    )
     global_compressor_field = next(
         (
             read_field
@@ -135,8 +135,8 @@ async def async_setup_entry(
 
             sensor_name = read_field.name
 
-            # Firmware 7.02 can report the compressor bit in pxxFB as stuck
-            # on; use the display's compressor icon when that block is polled.
+            # Prefer the display indicator whenever its block is available;
+            # fall back to pxxFB on firmware that does not support the block.
             if (
                 use_display_compressor
                 and block == GLOBAL_STATUS_BLOCK
