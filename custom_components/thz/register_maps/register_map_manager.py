@@ -90,6 +90,12 @@ FIRMWARE_MAPS = {
         "write": ["write_map_439_539", "write_map_539"],
         "read": ["readings_map_439", "readings_map_509"],
     },
+    # The 5.39 profile has been used successfully on 7.02 devices. Reuse its
+    # standard read and write maps; technician-only writes remain separate.
+    "702": {
+        "write": ["write_map_439_539", "write_map_539"],
+        "read": ["readings_map_439", "readings_map_539"],
+    },
     # Real 5.39 hardware; kept apart from "default", which is for
     # unrecognised firmware strings.
     "539": {

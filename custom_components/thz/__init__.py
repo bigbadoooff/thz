@@ -32,6 +32,7 @@ from .const import (
     CONF_SPLIT_DEVICES,
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_WRITE_INTERVAL,
+    DISPLAY_STATUS_BLOCK,
     DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_ALL,
@@ -316,10 +317,21 @@ def _refresh_intervals(data: Mapping[str, Any], device: THZDevice) -> dict[str, 
     """
     refresh_intervals = data.get("refresh_intervals")
     if refresh_intervals is not None:
+        intervals = dict(refresh_intervals)
+        if (
+            device.firmware_profile not in {"206", "214", "214j"}
+            and DISPLAY_STATUS_BLOCK in device.available_reading_blocks
+        ):
+            # Prefer the display compressor indicator on 4.x/5.x profiles;
+            # retain its poll even if the user deselected the display block.
+            intervals.setdefault(
+                DISPLAY_STATUS_BLOCK,
+                intervals.get("pxxFB", DEFAULT_UPDATE_INTERVAL),
+            )
         _LOGGER.debug(
-            "Creating coordinators with refresh intervals: %s", refresh_intervals
+            "Creating coordinators with refresh intervals: %s", intervals
         )
-        return dict(refresh_intervals)
+        return intervals
 
     available_blocks = device.available_reading_blocks
     if not available_blocks:

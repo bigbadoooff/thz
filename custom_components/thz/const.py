@@ -33,6 +33,8 @@ DEFAULT_BAUDRATE = 115200
 DEFAULT_PORT = 2323
 DEFAULT_UPDATE_INTERVAL = 600  # in seconds
 DEFAULT_WRITE_INTERVAL = 3600  # seconds; write entities (number/switch/select/time)
+GLOBAL_STATUS_BLOCK = "pxxFB"
+DISPLAY_STATUS_BLOCK = "pxx0A0176"
 
 # Firmware profile override (config-flow "firmware_override" field).
 # "auto" keeps whatever firmware string the device itself reports; any other
