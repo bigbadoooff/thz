@@ -20,6 +20,9 @@ All notable changes to the THZ integration are documented here.
   stopped. The integration polls `pxx0A0176` on supported 4.x/5.x profiles and
   uses its compressor indicator for the existing entity, keeping its
   entity-registry identity. If the block is unavailable, it uses `pxxFB`.
+- **Supply and extract fan speeds are numeric frequency sensors.** Add `Hz`,
+  frequency device class and measurement state class so dashboards plot them as
+  numeric series and Home Assistant can compile long-term statistics.
 - **Fault memory is read as a ring buffer** (#262). The heat pump writes a
   new fault over the oldest of its ten records in place and keeps the write
   position in byte 3 of D1. The integration treated D1 as a list that

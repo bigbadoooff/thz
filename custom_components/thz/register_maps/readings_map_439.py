@@ -410,7 +410,13 @@ REGISTER_MAP = {
             2,
             "hex",
             1,
-            {"icon": "mdi:fan", "translation_key": "input_fan_speed"},
+            {
+                "unit": "Hz",
+                "device_class": "frequency",
+                "state_class": "measurement",
+                "icon": "mdi:fan",
+                "translation_key": "input_fan_speed",
+            },
         ),
         (
             " outputFanSpeed:",
@@ -418,7 +424,13 @@ REGISTER_MAP = {
             2,
             "hex",
             1,
-            {"icon": "mdi:fan", "translation_key": "output_fan_speed"},
+            {
+                "unit": "Hz",
+                "device_class": "frequency",
+                "state_class": "measurement",
+                "icon": "mdi:fan",
+                "translation_key": "output_fan_speed",
+            },
         ),
         (
             " pFanstageXAirflowInlet:",
