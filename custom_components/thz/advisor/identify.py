@@ -36,7 +36,7 @@ class ControllerFit:
 
     kp: float  # %/K
     feed_forward_slope: float  # %/K
-    ref_temp: float  # °C
+    ref_temp: float  # °C, fixed, not fitted
     median_abs_error: float  # percentage points
     rows: int
 
@@ -61,12 +61,11 @@ def _robust_lstsq(x: FloatArray, y: FloatArray) -> FloatArray:
     return coef
 
 
-def fit_controller(d: Table) -> ControllerFit:
-    """Estimate KP, the feed-forward slope and its reference temperature.
+def fit_controller(d: Table, ref_temp: float = StiebelParams.ref_temp) -> ControllerFit:
+    """Estimate KP and the feed-forward slope.
 
-    Fits ``rel = KP * (heat_setpoint - heat_temp) + b0 + b1 * Ta_f`` on
-    heating rows; the slope is ``-b1`` and the reference temperature
-    ``b0 / slope``.
+    Fits ``rel = KP * (heat_setpoint - heat_temp) + slope * (ref_temp - Ta_f)``
+    on heating rows. The reference temperature is fixed in the device.
 
     Raises:
         ValueError: Too few heating rows, or no outside-temperature effect.
@@ -74,18 +73,21 @@ def fit_controller(d: Table) -> ControllerFit:
     m = d["rel"] > REL_HEATING_MIN
     if m.sum() < MIN_ROWS:
         raise ValueError("too few heating rows")
-    error = d["heat_setpoint"][m] - d["heat_temp"][m]
-    outside = d["outside_temp_filtered"][m]
-    x = np.column_stack([error, np.ones(len(error)), outside])
-    kp, b0, b1 = (float(c) for c in _robust_lstsq(x, d["rel"][m]))
-    slope = -b1
+    x = np.column_stack(
+        [
+            d["heat_setpoint"][m] - d["heat_temp"][m],
+            ref_temp - d["outside_temp_filtered"][m],
+        ]
+    )
+    coef = _robust_lstsq(x, d["rel"][m])
+    kp, slope = float(coef[0]), float(coef[1])
     if slope <= 0:
         raise ValueError("no feed-forward found in the data")
-    residual = d["rel"][m] - x @ np.array([kp, b0, b1])
+    residual = d["rel"][m] - x @ coef
     return ControllerFit(
         kp=kp,
         feed_forward_slope=slope,
-        ref_temp=b0 / slope,
+        ref_temp=ref_temp,
         median_abs_error=float(np.median(np.abs(residual))),
         rows=int(m.sum()),
     )
@@ -94,21 +96,16 @@ def fit_controller(d: Table) -> ControllerFit:
 def apply_controller_fit(
     p: StiebelParams, fit: ControllerFit, *, keep_design_temp: bool = True
 ) -> StiebelParams:
-    """Return ``p`` with the fitted KP, reference temperature and slope.
+    """Return ``p`` with the fitted KP and feed-forward slope.
 
     The slope is applied through ``design_power`` at the configured design
     temperature (or the other way round with ``keep_design_temp=False``).
     """
     if keep_design_temp:
-        return p.with_(
-            kp=fit.kp,
-            ref_temp=fit.ref_temp,
-            design_power=fit.design_power_for(p.design_temp),
-        )
+        return p.with_(kp=fit.kp, design_power=fit.design_power_for(p.design_temp))
     return p.with_(
         kp=fit.kp,
-        ref_temp=fit.ref_temp,
-        design_temp=fit.ref_temp - p.design_power / fit.feed_forward_slope,
+        design_temp=p.ref_temp - p.design_power / fit.feed_forward_slope,
     )
 
 

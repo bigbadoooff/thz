@@ -708,6 +708,21 @@
       },
       "fault_new": {
         "default": "mdi:alert"
+      },
+      "advisor_rel_predicted": {
+        "default": "mdi:chart-bell-curve-cumulative"
+      },
+      "advisor_rel_deviation": {
+        "default": "mdi:delta"
+      },
+      "advisor_stop_margin": {
+        "default": "mdi:arrow-collapse-down"
+      },
+      "advisor_start_margin": {
+        "default": "mdi:arrow-collapse-up"
+      },
+      "advisor_model_error": {
+        "default": "mdi:target-variant"
       }
     },
     "switch": {

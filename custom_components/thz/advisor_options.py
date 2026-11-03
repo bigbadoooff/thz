@@ -17,7 +17,6 @@ from .advisor.controller import StiebelParams
 CONF_ADVISOR_KP = "advisor_kp"
 CONF_ADVISOR_DESIGN_POWER = "advisor_design_power"
 CONF_ADVISOR_DESIGN_TEMP = "advisor_design_temp"
-CONF_ADVISOR_REF_TEMP = "advisor_ref_temp"
 CONF_ADVISOR_PRICE = "advisor_price"
 CONF_ADVISOR_PRICE_ENTITY = "advisor_price_entity"
 CONF_ADVISOR_COMFORT_MIN = "advisor_comfort_min"
@@ -43,7 +42,6 @@ NUMBER_OPTIONS: Mapping[str, NumberOption] = {
     CONF_ADVISOR_KP: NumberOption(_P.kp, 0.5, 30.0, 0.1, "%/K"),
     CONF_ADVISOR_DESIGN_POWER: NumberOption(_P.design_power, 40.0, 100.0, 1.0, "%"),
     CONF_ADVISOR_DESIGN_TEMP: NumberOption(_P.design_temp, -25.0, 5.0, 1.0, "°C"),
-    CONF_ADVISOR_REF_TEMP: NumberOption(_P.ref_temp, 10.0, 25.0, 0.5, "°C"),
     CONF_ADVISOR_PRICE: NumberOption(0.30, 0.0, 2.0, 0.01, "EUR/kWh"),
     CONF_ADVISOR_COMFORT_MIN: NumberOption(21.0, 15.0, 25.0, 0.5, "°C"),
 }
@@ -76,7 +74,6 @@ def advisor_settings(options: Mapping[str, Any]) -> AdvisorSettings:
         kp=_number(options, CONF_ADVISOR_KP),
         design_power=_number(options, CONF_ADVISOR_DESIGN_POWER),
         design_temp=_number(options, CONF_ADVISOR_DESIGN_TEMP),
-        ref_temp=_number(options, CONF_ADVISOR_REF_TEMP),
     )
     return AdvisorSettings(
         params=params,

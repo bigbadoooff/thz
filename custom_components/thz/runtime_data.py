@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import ENTITY_ID_STYLE_DEFAULT, ENTITY_VISIBILITY_DEFAULT
 
 if TYPE_CHECKING:
+    from .advisor_coordinator import AdvisorCoordinator
     from .fault_state import THZFaultTracker
     from .parameter_poller import ParameterPoller
     from .register_maps.register_map_manager import (
@@ -52,6 +53,9 @@ class THZRuntimeData:
     # Set up by the platforms: fault memory tracking.
     fault_tracker: THZFaultTracker | None = None
     fault_source: DataUpdateCoordinator[Any] | None = None
+    # Set up by the sensor platform when the firmware has the heating
+    # relative power: calibrates the advisor's controller model.
+    advisor: AdvisorCoordinator | None = None
 
     def polled_coordinator(self, block: str) -> DataUpdateCoordinator[Any] | None:
         """Return the coordinator of a polled block the firmware has.

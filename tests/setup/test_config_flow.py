@@ -744,3 +744,12 @@ class TestReconfigureBlockSelection:
         updated = config_flow_module.merge_reconfigure_input(data, {"alias": "new"})
         assert updated["selected_read_blocks"] == ["pxxFB"]
         assert "refresh_intervals" not in updated
+
+
+def test_config_flow_offers_the_options_flow():
+    class _Flow:
+        pass
+
+    with patch.object(config_flow_module, "THZOptionsFlow", _Flow):
+        flow = THZConfigFlow.async_get_options_flow(MagicMock())
+    assert isinstance(flow, _Flow)

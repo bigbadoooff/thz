@@ -341,7 +341,6 @@
           "advisor_kp": "Proportional component (KP)",
           "advisor_design_power": "Design heating power",
           "advisor_design_temp": "Design temperature",
-          "advisor_ref_temp": "Feed-forward reference temperature",
           "advisor_price": "Electricity price",
           "advisor_price_entity": "Electricity price sensor",
           "advisor_comfort_min": "Comfort limit (room)",
@@ -351,11 +350,10 @@
           "advisor_kp": "Menu value P component of the heating control.",
           "advisor_design_power": "Relative power at the design temperature, 40 to 100 %.",
           "advisor_design_temp": "Outside temperature the heating is designed for, -25 to +5 °C.",
-          "advisor_ref_temp": "Outside temperature at which the feed-forward is 0 %. The manual suggests 20 °C.",
           "advisor_price": "Used when no price sensor is set or it has no value.",
           "advisor_price_entity": "Optional sensor with the current price in EUR/kWh, for example from a dynamic tariff.",
           "advisor_comfort_min": "Room temperatures below this limit count as a comfort penalty.",
-          "advisor_fit_controller": "Fits KP, the feed-forward slope and its reference temperature to the recorded relative power. The values above are used when the fit fails. Design power and design temperature only enter as their ratio."
+          "advisor_fit_controller": "Fits KP and the feed-forward slope to the recorded relative power (reference temperature fixed at 20 °C). The fitted values are used when the model passes its self-test with them, the values above otherwise. Design power and design temperature only enter as their ratio."
         }
       }
     }
@@ -1494,6 +1492,21 @@
       },
       "fault_new": {
         "name": "New faults"
+      },
+      "advisor_rel_predicted": {
+        "name": "Advisor: Predicted Relative Power"
+      },
+      "advisor_rel_deviation": {
+        "name": "Advisor: Deviation from Relative Power"
+      },
+      "advisor_stop_margin": {
+        "name": "Advisor: Margin to Compressor Stop"
+      },
+      "advisor_start_margin": {
+        "name": "Advisor: Margin to Compressor Start"
+      },
+      "advisor_model_error": {
+        "name": "Advisor: Model Error"
       }
     },
     "number": {

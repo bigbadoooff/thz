@@ -106,7 +106,6 @@ def test_advisor_settings_defaults():
     assert s.params.kp == 8.5
     assert s.params.design_power == 40.0
     assert s.params.design_temp == -20.0
-    assert s.params.ref_temp == 20.0
     assert s.price_eur_kwh == 0.30
     assert s.price_entity is None
     assert s.comfort_min == 21.0
@@ -167,17 +166,6 @@ def test_options_schema_without_price_entity(options_flow_module):
     vol.Optional.reset_mock()
     options_flow_module.options_schema({})
     vol.Optional.assert_called_once_with(CONF_ADVISOR_PRICE_ENTITY, description=None)
-
-
-def test_config_flow_offers_the_options_flow():
-    from custom_components.thz import config_flow
-
-    class _Flow:
-        pass
-
-    with patch.object(config_flow, "THZOptionsFlow", _Flow):
-        flow = config_flow.THZConfigFlow.async_get_options_flow(MagicMock())
-    assert isinstance(flow, _Flow)
 
 
 # --- history ----------------------------------------------------------------

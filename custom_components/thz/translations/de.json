@@ -341,7 +341,6 @@
           "advisor_kp": "Proportionalanteil (KP)",
           "advisor_design_power": "Leistung Auslegung Heizen",
           "advisor_design_temp": "Auslegungstemperatur",
-          "advisor_ref_temp": "Bezugstemperatur der Vorsteuerung",
           "advisor_price": "Strompreis",
           "advisor_price_entity": "Strompreis-Sensor",
           "advisor_comfort_min": "Komfortgrenze (Raum)",
@@ -351,11 +350,10 @@
           "advisor_kp": "Menüwert P-Anteil der Heizungsregelung.",
           "advisor_design_power": "Relative Leistung bei Auslegungstemperatur, 40 bis 100 %.",
           "advisor_design_temp": "Außentemperatur, für die die Heizung ausgelegt ist, −25 bis +5 °C.",
-          "advisor_ref_temp": "Außentemperatur, bei der die Vorsteuerung 0 % beträgt. Das Handbuch nennt 20 °C.",
           "advisor_price": "Gilt, wenn kein Preis-Sensor gesetzt ist oder er keinen Wert hat.",
           "advisor_price_entity": "Optionaler Sensor mit dem aktuellen Preis in EUR/kWh, z. B. von einem dynamischen Tarif.",
           "advisor_comfort_min": "Raumtemperaturen unter dieser Grenze zählen als Komfortverlust.",
-          "advisor_fit_controller": "Passt KP, die Steigung der Vorsteuerung und ihre Bezugstemperatur an die aufgezeichnete relative Leistung an. Die Werte oben gelten, wenn die Schätzung scheitert. Leistung Auslegung und Auslegungstemperatur gehen nur als Verhältnis ein."
+          "advisor_fit_controller": "Passt KP und die Steigung der Vorsteuerung an die aufgezeichnete relative Leistung an (Bezugstemperatur fest 20 °C). Die geschätzten Werte gelten, wenn das Modell damit den Selbsttest besteht, sonst die Werte oben. Leistung Auslegung und Auslegungstemperatur gehen nur als Verhältnis ein."
         }
       }
     }
@@ -1479,6 +1477,21 @@
       },
       "fault_new": {
         "name": "Neue Fehler"
+      },
+      "advisor_rel_predicted": {
+        "name": "Berater: vorhergesagte relative Leistung"
+      },
+      "advisor_rel_deviation": {
+        "name": "Berater: Abweichung von der relativen Leistung"
+      },
+      "advisor_stop_margin": {
+        "name": "Berater: Abstand zum Verdichterstopp"
+      },
+      "advisor_start_margin": {
+        "name": "Berater: Abstand zum Verdichterstart"
+      },
+      "advisor_model_error": {
+        "name": "Berater: Modellfehler"
       }
     },
     "number": {

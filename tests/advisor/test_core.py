@@ -17,6 +17,11 @@ from custom_components.thz.advisor.advisor import (
     format_report,
 )
 from custom_components.thz.advisor.building import Building, CompressorModel, CopModel
+from custom_components.thz.advisor.calibrate import (
+    SOURCE_FIT,
+    SOURCE_OPTIONS,
+    calibrate,
+)
 from custom_components.thz.advisor.controller import (
     Compressor,
     StiebelParams,
@@ -146,7 +151,7 @@ def test_controller_fit_recovers_the_settings(controller_data):
     fit = fit_controller(controller_data)
     assert fit.kp == pytest.approx(8.5, abs=0.5)
     assert fit.feed_forward_slope == pytest.approx(1.0, abs=0.1)
-    assert fit.ref_temp == pytest.approx(20.0, abs=1.5)
+    assert fit.ref_temp == 20.0
     assert fit.median_abs_error < 3
     assert fit.design_power_for(-20.0) == pytest.approx(
         fit.feed_forward_slope * (fit.ref_temp + 20.0)
@@ -250,3 +255,45 @@ def test_default_scenarios_are_mild_and_cold():
 def test_with_changes_is_a_copy():
     assert replace(P, kp=5.0) == P.with_(kp=5.0)
     assert P.kp == 8.5
+
+
+def test_calibrate_uses_the_fit_when_it_passes(controller_data):
+    c = calibrate(P, controller_data, fit=True)
+    assert c.source == SOURCE_FIT
+    assert c.params.kp == pytest.approx(c.fit.kp)
+    assert c.params.ref_temp == 20.0
+    assert c.params.feed_forward_slope == pytest.approx(c.fit.feed_forward_slope)
+    assert c.selftest.passed
+    assert c.fit_rejected is None
+
+
+def test_calibrate_with_entered_values_matches_the_selftest(controller_data):
+    c = calibrate(P, controller_data, fit=False)
+    assert c.source == SOURCE_OPTIONS
+    assert c.params == P
+    # Same numbers as `hp-advisor selftest` on this data.
+    assert c.selftest.rows == 1576
+    assert c.selftest.median_abs == pytest.approx(2.5)
+    assert c.selftest.rmse == pytest.approx(8.343, abs=1e-3)
+    assert c.selftest.bias == pytest.approx(-0.909, abs=1e-3)
+
+
+def test_calibrate_keeps_entered_values_when_the_fit_fails(controller_data):
+    idle = {**controller_data, "rel": controller_data["rel"] * 0 - 50}
+    c = calibrate(P, idle, fit=True)
+    assert c.source == SOURCE_OPTIONS
+    assert c.fit is None
+    assert c.fit_rejected == "too few heating rows"
+
+
+def test_calibrate_rejects_a_fit_that_fails_the_selftest(controller_data):
+    rng = np.random.default_rng(1)
+    noisy = {
+        **controller_data,
+        "rel": controller_data["rel"] + rng.normal(0, 30, len(controller_data["rel"])),
+    }
+    c = calibrate(P, noisy, fit=True)
+    assert c.source == SOURCE_OPTIONS
+    assert c.fit is not None
+    assert c.fit_rejected.startswith("self-test failed")
+    assert not c.selftest.passed

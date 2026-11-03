@@ -6,10 +6,9 @@ Sources: the commissioning manual (room influence, flow share, outside
 temperature damping, integral component, compressor cycling) and a fit to
 measured data (feed-forward, thresholds 20/40 %).
 
-The heating curve, the room influence and the proportional component are
-confirmed against measured data. Still open: the reference temperature of
-the feed-forward (``ref_temp``), the integral component and a derivative
-component.
+The heating curve, the room influence, the proportional component and the
+feed-forward reference temperature (20 °C) are confirmed against measured
+data. Still open: the integral component and a derivative component.
 
 Formulas (I = 0)::
 
@@ -44,7 +43,8 @@ class StiebelParams:
     design_power: float = 40.0
     # °C, design temperature (-25..+5). No register.
     design_temp: float = -20.0
-    # °C, temperature at which the feed-forward is 0 % (manual suggests 20).
+    # °C, temperature at which the feed-forward is 0 %. Fixed in the device
+    # (manual; a free fit to measured data gives 20.3 °C).
     ref_temp: float = 20.0
     # h, outside temperature damping, first-order filter (register p77).
     outside_filter_h: float = 12.0

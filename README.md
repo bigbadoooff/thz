@@ -264,16 +264,31 @@ and simulates which settings would save electricity.
 - **It only advises.** It never writes a setting or changes the operating
   mode. Every result is a simulation, not a measurement.
 - **Nothing leaves Home Assistant.** It reads the recorder, nothing else.
-- So far there are only its options (**Configure** on the integration):
-  KP, design power and design temperature, which have no register, the
-  reference temperature of the feed-forward, the electricity price (fixed,
-  or a price sensor) and the room comfort limit. With *Estimate KP and
-  feed-forward from the history* on, KP and the feed-forward are fitted to
-  the recorded relative power instead.
+- **Options** (**Configure** on the integration): KP, design power and
+  design temperature, which have no register, the electricity price (fixed,
+  or a price sensor) and the room comfort limit. The feed-forward reference
+  temperature is fixed at 20 °C. With *Estimate KP and feed-forward from the
+  history* on (default), KP and the feed-forward slope are fitted to the
+  last 10 days of recorded relative power; the fitted values are used only
+  if the model passes its self-test with them, the entered ones otherwise.
+- **Sensors** (only on firmware with *Heating Relative Power*, 5.39 and
+  7.x):
+  - *Advisor: Predicted Relative Power*: what the controller model
+    predicts from the current heat setpoint, heat temperature and filtered
+    outside temperature;
+  - *Advisor: Deviation from Relative Power*: predicted minus measured;
+  - *Advisor: Margin to Compressor Stop* / *Start*: percentage points of
+    the measured relative power above the stop threshold (20 %) and below
+    the start threshold (40 %); the attribute `kelvin` gives the same in
+    kelvin of control temperature (points / KP);
+  - *Advisor: Model Error*: median error of the prediction over the last
+    10 days, recomputed daily and when the options change. Its attributes
+    show the settings in use and where they come from (`source`: `fit` or
+    `options`), the self-test (`passed` below 4 points, `rmse`, `bias`) and
+    missing inputs.
 - It needs the sensors *Heating Relative Power*, *Heat Setpoint
   Temperature*, *Heat Temperature* and *Outside Temperature (Filtered)*,
-  and for the building model the power, return and outside temperature
-  sensors, all recorded by the recorder.
+  recorded by the recorder.
 
 ## Compatibility
 
