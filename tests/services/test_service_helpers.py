@@ -209,6 +209,7 @@ class TestNormalizeBlockName:
             ("0xFB", "pxxFB"),
             ("0A0176", "pxx0A0176"),
             (" FB ", "pxxFB"),
+            ('"pxx0A091A"', "pxx0A091A"),
         ],
     )
     def test_normalizes(self, raw, expected):

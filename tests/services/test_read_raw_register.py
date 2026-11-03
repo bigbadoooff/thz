@@ -133,6 +133,25 @@ class TestReadRawRegisterService:
         assert create.call_args.kwargs["notification_id"] == "thz_raw_FB"
 
     @pytest.mark.asyncio
+    async def test_read_raw_register_accepts_block_name(self, mock_hass, mock_device):
+        """A block name like the one the logs show ("pxx0A091A") is accepted."""
+        from custom_components.thz.services import async_setup_services
+
+        mock_hass.data[DOMAIN]["test_entry"] = {"device": mock_device}
+        mock_device.async_execute = AsyncMock(return_value=b"\x01\x02")
+
+        async_setup_services(mock_hass)
+        handler = self._handler_for(mock_hass, "read_raw_register")
+
+        call = MagicMock()
+        call.data = {"command": "pxx0a091a"}
+
+        result = await handler(call)
+
+        assert result["command"] == "0A091A"
+        assert mock_device.async_execute.call_args.args[1] == bytes.fromhex("0A091A")
+
+    @pytest.mark.asyncio
     async def test_read_raw_register_invalid_hex(self, mock_hass, mock_device):
         """Test read with invalid hex command."""
         from custom_components.thz.services import async_setup_services

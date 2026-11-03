@@ -4,6 +4,21 @@ All notable changes to the THZ integration are documented here.
 
 ---
 
+## [Unreleased]
+
+### Bug Fixes
+
+- **No more `via_device` deprecation warnings at startup.** With the split
+  into sub-devices on, newer Home Assistant versions warned once per
+  platform that `via_device` stops working in 2027.8.0. Sub-devices are now
+  linked to the heat pump by its device registry id (`via_device_id`);
+  older Home Assistant versions keep the previous link.
+- **`thz.read_raw_register` accepts block names as the logs show them.**
+  `pxx0A091A` and `0x0A091A` now read the block `0A091A`, as they already
+  did for `thz.refresh_block`; before, they failed as invalid hex. Both
+  services also ignore quotes around the value. An invalid command is
+  logged as a warning without a traceback.
+
 ## [0.7.2-beta.1] – 2026-10-05
 
 ### Bug Fixes
