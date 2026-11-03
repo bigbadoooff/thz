@@ -14,6 +14,12 @@ All notable changes to the THZ integration are documented here.
 
 ### Bug Fixes
 
+- **The compressor sensor follows the display** (#269). On some firmware,
+  such as 7.02, the compressor bit of `pxxFB` stayed on while the
+  compressor was off. The *Compressor* binary sensor now reads the bit of
+  sDisplay (`pxx0A0176`), which shows what the heat pump's display shows,
+  and falls back to `pxxFB` when sDisplay is not polled. The sensor keeps
+  its entity ID and history.
 - **No more `via_device` deprecation warnings at startup.** With the split
   into sub-devices on, newer Home Assistant versions warned once per
   platform that `via_device` stops working in 2027.8.0. Sub-devices are now

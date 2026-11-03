@@ -88,3 +88,34 @@ async def test_old_unique_ids_are_scoped_and_keep_their_entity_id(
         f"thz_ip-{HOST}_set_0a0005_p01roomtempdayhc1"
     )
     assert registry.async_get(entity_ids["fan"]).unique_id == old["fan"]
+
+
+async def test_compressor_moves_to_sdisplay_and_keeps_its_entity_id(
+    hass: HomeAssistant, fake_device
+) -> None:
+    entry = make_entry(
+        device_identifier=f"ip-{HOST}",
+        refresh_intervals={**BLOCKS, "pxx0A0176": 600},
+    )
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    old = registry.async_get_or_create(
+        "binary_sensor",
+        DOMAIN,
+        f"thz_ip-{HOST}_bin_fb_23_compressor",
+        config_entry=entry,
+        suggested_object_id="thz_compressor",
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    compressors = [
+        e
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.domain == "binary_sensor" and e.unique_id.endswith("_compressor")
+    ]
+    assert [(e.entity_id, e.unique_id) for e in compressors] == [
+        (old.entity_id, f"thz_ip-{HOST}_bin_0a0176_5_compressor")
+    ]
+    assert hass.states.get(old.entity_id) is not None

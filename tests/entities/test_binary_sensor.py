@@ -6,7 +6,7 @@ well as additional THZBinarySensor property paths not already covered by
 tests/entities/test_platform_modules.py.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -90,6 +90,112 @@ class TestAsyncSetupEntry:
 
         (entities,) = async_add_entities.call_args[0]
         assert len(entities) == 1
+
+    @pytest.mark.asyncio
+    async def test_compressor_is_read_from_sdisplay_when_polled(self):
+        registers = {
+            "pxxFB": [("compressor", 8, 1, "bit3", 1)],
+            "pxx0A0176": [("compressor", 11, 1, "bit1", 1)],
+        }
+        coords = {
+            "pxxFB": MagicMock(data=bytes(20)),
+            "pxx0A0176": MagicMock(data=bytes(20)),
+        }
+        hass, config_entry = _make_hass_and_entry(registers, coords)
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(hass, config_entry, async_add_entities)
+
+        (entities,) = async_add_entities.call_args[0]
+        assert [e._block for e in entities] == [bytes.fromhex("0A0176")]
+
+    @pytest.mark.asyncio
+    async def test_compressor_falls_back_to_fb_without_sdisplay(self):
+        registers = {
+            "pxxFB": [("compressor", 8, 1, "bit3", 1)],
+            "pxx0A0176": [("compressor", 11, 1, "bit1", 1)],
+        }
+        hass, config_entry = _make_hass_and_entry(
+            registers, {"pxxFB": MagicMock(data=bytes(20))}
+        )
+        async_add_entities = MagicMock()
+
+        await async_setup_entry(hass, config_entry, async_add_entities)
+
+        (entities,) = async_add_entities.call_args[0]
+        assert [e._block for e in entities] == [bytes.fromhex("FB")]
+
+    @pytest.mark.asyncio
+    async def test_compressor_keeps_its_registry_entry(self):
+        import custom_components.thz.binary_sensor as binary_sensor_module
+
+        registers = {
+            "pxxFB": [("compressor", 8, 1, "bit3", 1)],
+            "pxx0A0176": [("compressor", 11, 1, "bit1", 1)],
+        }
+        coords = {
+            "pxxFB": MagicMock(data=bytes(20)),
+            "pxx0A0176": MagicMock(data=bytes(20)),
+        }
+        hass, config_entry = _make_hass_and_entry(registers, coords)
+        old = MagicMock(
+            domain="binary_sensor",
+            entity_id="binary_sensor.thz_compressor",
+            unique_id="thz_dev1_bin_fb_23_compressor",
+        )
+        other = MagicMock(
+            domain="binary_sensor",
+            entity_id="binary_sensor.thz_dhw_pump",
+            unique_id="thz_dev1_bin_fb_22_dhwpump",
+        )
+        registry = MagicMock()
+        er_module = binary_sensor_module.er
+
+        with (
+            patch.object(er_module, "async_get", return_value=registry),
+            patch.object(
+                er_module, "async_entries_for_config_entry", return_value=[old, other]
+            ),
+        ):
+            await async_setup_entry(hass, config_entry, MagicMock())
+
+        registry.async_update_entity.assert_called_once_with(
+            "binary_sensor.thz_compressor",
+            new_unique_id="thz_dev1_bin_0a0176_5_compressor",
+        )
+
+    @pytest.mark.asyncio
+    async def test_registered_compressor_is_not_moved_again(self):
+        import custom_components.thz.binary_sensor as binary_sensor_module
+
+        registers = {"pxx0A0176": [("compressor", 11, 1, "bit1", 1)]}
+        hass, config_entry = _make_hass_and_entry(
+            registers, {"pxx0A0176": MagicMock(data=bytes(20))}
+        )
+        current = MagicMock(
+            domain="binary_sensor",
+            entity_id="binary_sensor.thz_compressor",
+            unique_id="thz_dev1_bin_0a0176_5_compressor",
+        )
+        stale = MagicMock(
+            domain="binary_sensor",
+            entity_id="binary_sensor.thz_compressor_2",
+            unique_id="thz_dev1_bin_fb_23_compressor",
+        )
+        registry = MagicMock()
+        er_module = binary_sensor_module.er
+
+        with (
+            patch.object(er_module, "async_get", return_value=registry),
+            patch.object(
+                er_module,
+                "async_entries_for_config_entry",
+                return_value=[stale, current],
+            ),
+        ):
+            await async_setup_entry(hass, config_entry, MagicMock())
+
+        registry.async_update_entity.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_strips_whitespace_and_colon_from_name(self):
