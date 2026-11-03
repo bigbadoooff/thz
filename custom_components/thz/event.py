@@ -104,6 +104,7 @@ class _THZEvent(CoordinatorEntity[BlockCoordinator], EventEntity):
     _subdevice: str | None = None
     _subdevice_device_name: str | None = None
     _subdevice_area: str | None = None
+    _subdevice_via_device_id: str | None = None
 
     def __init__(self, coordinator: Any, device_id: str) -> None:
         """Initialise the entity for ``device_id``."""
@@ -122,6 +123,7 @@ class _THZEvent(CoordinatorEntity[BlockCoordinator], EventEntity):
             self._subdevice,
             self._subdevice_device_name,
             self._subdevice_area,
+            self._subdevice_via_device_id,
         )
 
     async def async_added_to_hass(self) -> None:

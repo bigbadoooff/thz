@@ -15,6 +15,10 @@ from typing import ClassVar
 from unittest.mock import patch
 
 import pytest
+from pytest_homeassistant_custom_component.syrupy import (
+    HomeAssistantSnapshotExtension,
+)
+from syrupy.assertion import SnapshotAssertion
 
 from custom_components.thz.thz_device import THZDevice
 
@@ -80,6 +84,17 @@ class FakeTHZDevice(THZDevice):
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Load custom_components/thz in every test."""
     return
+
+
+@pytest.fixture
+def snapshot(snapshot: SnapshotAssertion) -> SnapshotAssertion:
+    """Store snapshots in snapshots/ whatever order pytest loads plugins in.
+
+    pytest-homeassistant-custom-component and syrupy both define a snapshot
+    fixture; when syrupy's plugin is registered last, its fixture wins and
+    looks for the files in __snapshots__/.
+    """
+    return snapshot.use_extension(HomeAssistantSnapshotExtension)
 
 
 @pytest.fixture

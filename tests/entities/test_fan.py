@@ -1,7 +1,7 @@
 """Tests for fan.py (THZFan and async_setup_entry)."""
 
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.exceptions import HomeAssistantError
 import pytest
@@ -107,10 +107,12 @@ class _PolledData(dict):
 
 
 @pytest.fixture
-def now(monkeypatch):
+def now():
+    # patch.object, not monkeypatch: dt_util is a MagicMock stub, and
+    # monkeypatch's undo deletes the attribute from it for every later test.
     clock = {"now": MONDAY_8}
-    monkeypatch.setattr(fan_module.dt_util, "now", lambda: clock["now"])
-    return clock
+    with patch.object(fan_module.dt_util, "now", lambda: clock["now"]):
+        yield clock
 
 
 def _fan(

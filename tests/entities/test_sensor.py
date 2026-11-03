@@ -5,7 +5,7 @@ skipping, duplicate-name skipping, metadata pass-through) as well as the
 THZGenericSensor entity properties under varied coordinator-data states.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -443,7 +443,7 @@ class TestAbsentAndNibbleFields:
 class TestPlaceholderSensorCleanup:
     """Registry entries for "n.a." placeholder fields are removed."""
 
-    def test_removes_only_this_entrys_placeholders(self, monkeypatch):
+    def test_removes_only_this_entrys_placeholders(self):
         import custom_components.thz.sensor as sensor_module
 
         entries = {
@@ -454,14 +454,14 @@ class TestPlaceholderSensorCleanup:
         registry = MagicMock()
         registry.async_get_entity_id.side_effect = lambda _d, _p, uid: ids.get(uid)
         registry.async_get.side_effect = entries.get
-        monkeypatch.setattr(
-            sensor_module.er, "async_get", MagicMock(return_value=registry)
-        )
         config_entry = MagicMock(entry_id="entry1")
 
-        sensor_module._async_remove_placeholder_sensors(
-            MagicMock(), config_entry, {"uid_mine", "uid_foreign", "uid_unknown"}
-        )
+        # patch.object, not monkeypatch: er is a MagicMock stub, and
+        # monkeypatch's undo deletes the attribute from it for every later test.
+        with patch.object(sensor_module.er, "async_get", return_value=registry):
+            sensor_module._async_remove_placeholder_sensors(
+                MagicMock(), config_entry, {"uid_mine", "uid_foreign", "uid_unknown"}
+            )
 
         registry.async_remove.assert_called_once_with("sensor.mine")
 
