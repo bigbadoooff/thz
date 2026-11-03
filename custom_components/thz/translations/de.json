@@ -388,6 +388,9 @@
       },
       "z_reset_last10errors": {
         "name": "Fehlerprotokoll zurücksetzen"
+      },
+      "advisor_run": {
+        "name": "Berater: jetzt berechnen"
       }
     },
     "sensor": {
@@ -1492,6 +1495,9 @@
       },
       "advisor_model_error": {
         "name": "Berater: Modellfehler"
+      },
+      "advisor_saving": {
+        "name": "Berater: mögliche Einsparung"
       }
     },
     "number": {

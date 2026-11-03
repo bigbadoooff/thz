@@ -285,10 +285,31 @@ and simulates which settings would save electricity.
     10 days, recomputed daily and when the options change. Its attributes
     show the settings in use and where they come from (`source`: `fit` or
     `options`), the self-test (`passed` below 4 points, `rmse`, `bias`) and
-    missing inputs.
+    missing inputs;
+  - *Advisor: Possible Saving* (EUR/day): the advisor's result. It
+    identifies the building, the compressor and the COP from the last 10
+    days, simulates KP, room influence and low end variants over a mild and
+    a cold week, and ranks them by electricity cost, compressor starts and
+    time below the comfort limit. Attributes: `recommendation` (e.g.
+    `kp 8.5 -> 5`), `ranking` (the best five with kWh/day, COP, starts/day,
+    room range), `current`, `price_eur_kwh`, `assumed` (settings without a
+    value, taken from the defaults), `warnings` and the full `report`.
+    **Only shown when the model passes its self-test**; otherwise
+    `skipped` says why.
+- **Button** *Advisor: Run Now*: calibrates and advises right away (it
+  otherwise runs once a day). The computing takes about 2 s and runs
+  outside Home Assistant's event loop.
 - It needs the sensors *Heating Relative Power*, *Heat Setpoint
   Temperature*, *Heat Temperature* and *Outside Temperature (Filtered)*,
-  recorded by the recorder.
+  and for the advice also the electric and thermal power, return and
+  outside temperature, all recorded by the recorder. The heating-curve
+  settings (gradient, low end, room influence, flow share, outside
+  temperature damping) and the day/night room setpoints are read from
+  their number entities; enable them, or the defaults are assumed.
+- **Limits:** the model was identified in mild weather (outside
+  temperature 2 °C and above); advice for frost is extrapolation. Starts
+  per day are not validated, since the day/night switching of automations
+  is not simulated.
 
 ## Compatibility
 

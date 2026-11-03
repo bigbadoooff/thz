@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 from pathlib import Path
+import threading
 from unittest.mock import patch
 
 from homeassistant.core import HomeAssistant
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.thz import advisor_coordinator
 from custom_components.thz.advisor.controller import StiebelParams
 from custom_components.thz.advisor.data import load_csv
 from custom_components.thz.advisor.quality import selftest
 from custom_components.thz.advisor_history import AdvisorInputError
-from custom_components.thz.advisor_options import CONF_ADVISOR_FIT_CONTROLLER
+from custom_components.thz.advisor_options import (
+    CONF_ADVISOR_FIT_CONTROLLER,
+    CONF_ADVISOR_PRICE_ENTITY,
+)
 
 from .common import entity_id, setup_entry
 
@@ -35,6 +40,27 @@ async def _setup_759(hass: HomeAssistant, fake_device, **data) -> MockConfigEntr
     entry = await setup_entry(hass, refresh_intervals=None, **data)
     await hass.async_block_till_done(wait_background_tasks=True)
     return entry
+
+
+_TABLES = {
+    "rel": load_csv(DATA / "controller_10d.csv"),
+    "power_el": load_csv(DATA / "cop_week.csv"),
+}
+
+
+def _history(heat_temp_offset: float = 0.0):
+    """Stand-in for async_load_table: the measured tables by input."""
+    calls: list[tuple[str, ...]] = []
+
+    async def load(hass, mapping, names, start, end):
+        calls.append(tuple(names))
+        table = dict(_TABLES[names[0]])
+        if "heat_temp" in table:
+            table["heat_temp"] = table["heat_temp"] + heat_temp_offset
+        return table
+
+    load.calls = calls
+    return load
 
 
 def _advisor(hass: HomeAssistant, entry: MockConfigEntry, key: str) -> str:
@@ -79,8 +105,8 @@ async def test_live_sensors_follow_the_inputs(hass: HomeAssistant, fake_device):
 
 
 async def test_model_error_matches_the_selftest(hass: HomeAssistant, fake_device):
-    table = load_csv(DATA / "controller_10d.csv")
-    with patch(_LOAD, return_value=table):
+    table = _TABLES["rel"]
+    with patch(_LOAD, _history()):
         entry = await _setup_759(hass, fake_device)
 
         model = hass.states.get(_advisor(hass, entry, "model_error"))
@@ -112,3 +138,92 @@ async def test_no_advisor_without_relative_power(hass: HomeAssistant, fake_devic
     fake_device.firmware = 509
     entry = await setup_entry(hass, refresh_intervals=None)
     assert entry.runtime_data.advisor is None
+
+
+async def test_advice_runs_in_an_executor(hass: HomeAssistant, fake_device):
+    threads = []
+    original = advisor_coordinator.compute_advice
+
+    def compute(*args):
+        threads.append(threading.current_thread() is threading.main_thread())
+        return original(*args)
+
+    load = _history()
+    with (
+        patch(_LOAD, load),
+        patch.object(advisor_coordinator, "compute_advice", compute),
+    ):
+        entry = await _setup_759(hass, fake_device)
+        saving = hass.states.get(_advisor(hass, entry, "saving"))
+
+        assert threads == [False]
+        assert saving.attributes["runtime_s"] < 5
+        assert float(saving.state) >= 0
+        assert saving.attributes["skipped"] is None
+        assert saving.attributes["recommendation"]
+        assert len(saving.attributes["ranking"]) == 5
+        assert (
+            saving.attributes["ranking"][0]["saving_eur_day"] == float(saving.state)
+            or saving.attributes["recommendation"] == "keep the current settings"
+        )
+        assert saving.attributes["price_eur_kwh"] == 0.3
+        assert "Simulation, not measurement." in saving.attributes["warnings"]
+        assert "Simulation, not measurement." in saving.attributes["report"]
+        # Settings without a value are taken from the defaults and listed.
+        assert "gradient" in saving.attributes["assumed"]
+        assert "room_day" in saving.attributes["assumed"]
+
+        # The button runs it again, with the room setpoint now known.
+        room_day = entry.runtime_data.advisor.data.inputs.params["room_day"]
+        hass.states.async_set(room_day, "21.5")
+        calls = len(load.calls)
+        button = entity_id(hass, entry, "button", "advisor_run")
+        await hass.services.async_call(
+            "button", "press", {"entity_id": button}, blocking=True
+        )
+        await hass.async_block_till_done()
+        assert len(load.calls) == calls + 2
+        assert threads == [False, False]
+        saving = hass.states.get(_advisor(hass, entry, "saving"))
+        assert "room_day" not in saving.attributes["assumed"]
+        assert entry.runtime_data.advisor.data.advice.schedule.day == 21.5
+
+
+async def test_no_advice_from_a_model_that_fails_the_selftest(
+    hass: HomeAssistant, fake_device
+):
+    # Heat temperature 3 K off: the model no longer predicts rel.
+    with patch(_LOAD, _history(heat_temp_offset=3.0)):
+        entry = await _setup_759(
+            hass,
+            fake_device,
+        )
+
+    saving = hass.states.get(_advisor(hass, entry, "saving"))
+    assert saving.state == "unknown"
+    assert saving.attributes["skipped"].startswith("model not validated")
+    assert "recommendation" not in saving.attributes
+    model = hass.states.get(_advisor(hass, entry, "model_error"))
+    assert model.attributes["passed"] is False
+    assert float(model.state) > 4
+
+
+@pytest.mark.parametrize(
+    ("state", "unit", "price"),
+    [("32.5", "ct/kWh", 0.325), ("0.28", "EUR/kWh", 0.28), ("unknown", "", 0.3)],
+)
+async def test_price_from_a_sensor(
+    hass: HomeAssistant, fake_device, state, unit, price
+):
+    hass.states.async_set(
+        "sensor.price", state, {"unit_of_measurement": unit} if unit else {}
+    )
+    with patch(_LOAD, _history()):
+        entry = await _setup_759(hass, fake_device)
+        hass.config_entries.async_update_entry(
+            entry, options={CONF_ADVISOR_PRICE_ENTITY: "sensor.price"}
+        )
+        await hass.async_block_till_done()
+
+    saving = hass.states.get(_advisor(hass, entry, "saving"))
+    assert saving.attributes["price_eur_kwh"] == price

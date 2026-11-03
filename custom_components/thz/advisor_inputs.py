@@ -29,13 +29,16 @@ SENSOR_KEYS: Mapping[str, tuple[str, ...]] = {
     "power_heat": ("actual_power_qc",),
 }
 
-# StiebelParams field -> translation keys of number entities holding it.
+# StiebelParams field (or room setpoint of the schedule) -> translation keys
+# of number entities holding it.
 PARAM_KEYS: Mapping[str, tuple[str, ...]] = {
     "gradient": ("gradient_hc1",),
     "low_end": ("low_end_hc1",),
     "room_influence": ("room_influence_hc1",),
     "flow_share": ("flow_proportion_hc1",),
     "outside_filter_h": ("out_temp_filter_time",),
+    "room_day": ("room_temp_day_hc1", "room_temp_day"),
+    "room_night": ("room_temp_night_hc1", "room_temp_night"),
 }
 
 # Inputs each part of the advisor needs.

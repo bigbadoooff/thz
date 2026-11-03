@@ -22,6 +22,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .advisor_coordinator import async_setup_advisor
 from .clock_sync import async_setup_clock_check, clock_drift_issue_id
 from .const import (
     CONF_DEVICE_IDENTIFIER,
@@ -214,6 +215,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         area_name=area_name(hass, data),
     )
     config_entry.runtime_data = entry_data
+    entry_data.advisor = async_setup_advisor(hass, config_entry)
 
     # Periodic clock-drift check (independent of per-entity polling of the
     # individual pClock* registers — see clock_sync.py). Always runs so
@@ -244,6 +246,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     if split_devices:
         async_remove_empty_subdevices(hass, config_entry, unique_id)
+
+    # The advisor reads the history of entities registered by now; after
+    # setup, so it does not delay it.
+    if entry_data.advisor is not None:
+        config_entry.async_create_background_task(
+            hass, entry_data.advisor.async_refresh(), "thz advisor"
+        )
 
     # A block whose first read failed is tried again right away, not only
     # after its poll interval, so its entities recover quickly.

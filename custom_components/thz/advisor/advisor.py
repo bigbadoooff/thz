@@ -142,3 +142,60 @@ def format_report(baseline: Candidate, best: Sequence[Candidate]) -> str:
         )
     lines += ["", f"{DISCLAIMER} Change one setting at a time and keep a way back."]
     return "\n".join(lines)
+
+
+# Savings below this (EUR/day) are within the model's noise: no change.
+MIN_SAVING_EUR_DAY = 0.01
+
+
+@dataclass(frozen=True)
+class Advice:
+    """Result of one advisor run."""
+
+    baseline: Candidate
+    ranking: list[Candidate]
+    report: str
+
+    @property
+    def best(self) -> Candidate | None:
+        """The best candidate if it saves enough, else None (keep settings)."""
+        if self.ranking and self.saving(self.ranking[0]) >= MIN_SAVING_EUR_DAY:
+            return self.ranking[0]
+        return None
+
+    def saving(self, c: Candidate) -> float:
+        """EUR per day the candidate saves against the current settings."""
+        return self.baseline.score - c.score
+
+
+def recommend(
+    base: StiebelParams,
+    plant: Plant,
+    schedule: Schedule,
+    *,
+    weights: Weights | None = None,
+    comfort_min: float = 21.0,
+    scenarios: Sequence[tuple[FloatArray, FloatArray]] | None = None,
+) -> Advice:
+    """Run the advisor and keep its ranking and report."""
+    baseline, ranking = advise(
+        base,
+        plant,
+        schedule,
+        scenarios=scenarios,
+        weights=weights,
+        comfort_min=comfort_min,
+    )
+    return Advice(baseline, ranking, format_report(baseline, ranking))
+
+
+def describe_changes(
+    base: StiebelParams, schedule: Schedule, changes: Mapping[str, float]
+) -> str:
+    """Changes against the current settings, e.g. ``kp 8.5 -> 5``."""
+    parts = []
+    for name, value in changes.items():
+        current = schedule.night if name == "night" else getattr(base, name)
+        if current != value:
+            parts.append(f"{name} {current:g} -> {value:g}")
+    return ", ".join(parts)

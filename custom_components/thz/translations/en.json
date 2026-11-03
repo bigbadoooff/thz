@@ -1507,6 +1507,9 @@
       },
       "advisor_model_error": {
         "name": "Advisor: Model Error"
+      },
+      "advisor_saving": {
+        "name": "Advisor: Possible Saving"
       }
     },
     "number": {
@@ -2941,6 +2944,9 @@
       },
       "z_reset_last10errors": {
         "name": "Reset Fault Log"
+      },
+      "advisor_run": {
+        "name": "Advisor: Run Now"
       }
     },
     "event": {

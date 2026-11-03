@@ -19,7 +19,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .advisor.advisor import DISCLAIMER
+from .advisor.advisor import DISCLAIMER, Candidate, describe_changes
 from .advisor.controller import StiebelParams, rel_power, threshold_margins
 from .advisor_coordinator import HISTORY_DAYS, AdvisorCoordinator, AdvisorState
 from .advisor_inputs import SELFTEST_INPUTS
@@ -31,20 +31,7 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-# Translation key of the heating relative power; without it the firmware
-# gives the advisor nothing to work with.
-REL_TRANSLATION_KEY = "heating_rel_power"
 PERCENT_POINTS = "%"
-
-
-def has_relative_power(config_entry: THZConfigEntry) -> bool:
-    """Whether a polled block of the firmware has the heating relative power."""
-    data = config_entry.runtime_data
-    return any(
-        data.polled_coordinator(block) is not None
-        and any(f.translation_key == REL_TRANSLATION_KEY for f in fields)
-        for block, fields in data.register_manager.fields().items()
-    )
 
 
 async def async_setup_advisor_sensors(
@@ -52,12 +39,10 @@ async def async_setup_advisor_sensors(
     config_entry: THZConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Add the advisor sensors and start the first calibration."""
-    if not has_relative_power(config_entry):
-        _LOGGER.debug("No heating relative power on this firmware, no advisor")
+    """Add the advisor sensors if the entry has an advisor."""
+    coordinator = config_entry.runtime_data.advisor
+    if coordinator is None:
         return
-    coordinator = AdvisorCoordinator(hass, config_entry)
-    config_entry.runtime_data.advisor = coordinator
     device_id = config_entry.runtime_data.device_id
     sensors: list[AdvisorSensor] = [
         AdvisorRelPredictedSensor(coordinator, device_id),
@@ -65,26 +50,10 @@ async def async_setup_advisor_sensors(
         AdvisorStopMarginSensor(coordinator, device_id),
         AdvisorStartMarginSensor(coordinator, device_id),
         AdvisorModelErrorSensor(coordinator, device_id),
+        AdvisorSavingSensor(coordinator, device_id),
     ]
     assign_subdevices(sensors, config_entry)
     async_add_entities(sensors)
-    config_entry.async_on_unload(
-        config_entry.add_update_listener(_async_options_updated)
-    )
-    # The input sensors are registered by now; their history is read after
-    # setup so it does not delay it.
-    config_entry.async_create_background_task(
-        hass, coordinator.async_refresh(), "thz advisor calibration"
-    )
-
-
-async def _async_options_updated(
-    hass: HomeAssistant, config_entry: THZConfigEntry
-) -> None:
-    """Calibrate again with the changed options."""
-    coordinator = config_entry.runtime_data.advisor
-    if coordinator is not None:
-        await coordinator.async_refresh()
 
 
 class AdvisorSensor(CoordinatorEntity[AdvisorCoordinator], SensorEntity):
@@ -319,4 +288,80 @@ def model_attributes(state: AdvisorState) -> dict[str, Any]:
                 fit_kp=round(c.fit.kp, 2),
                 fit_feed_forward_slope=round(c.fit.feed_forward_slope, 3),
             )
+    return attrs
+
+
+class AdvisorSavingSensor(AdvisorSensor):
+    """Saving of the best candidate setting, with the ranking as attributes.
+
+    Shown only when the model passed its self-test; a simulation, not a
+    measurement.
+    """
+
+    _attr_translation_key = "advisor_saving"
+    _attr_native_unit_of_measurement = "EUR/d"
+    _attr_suggested_display_precision = 2
+
+    @property
+    def native_value(self) -> float | None:
+        """EUR per day the best candidate saves; 0 to keep the settings."""
+        state = self.coordinator.data
+        run = state.advice if state else None
+        if run is None:
+            return None
+        best = run.advice.best
+        return 0.0 if best is None else round(run.advice.saving(best), 2)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Recommendation, ranking and what the run was based on."""
+        state = self.coordinator.data
+        return advice_attributes(state) if state else {}
+
+
+def _candidate(c: Candidate, saving: float) -> dict[str, Any]:
+    m = c.metrics
+    return {
+        "changes": c.changes,
+        "saving_eur_day": round(saving, 2),
+        "cost_eur_day": round(c.score, 2),
+        "el_kwh_day": round(m["el_kwh_day"], 2),
+        "cop": round(m["cop"], 2),
+        "starts_day": round(m["starts_day"], 1),
+        "room_min": round(m["room_min"], 1),
+        "room_max": round(m["room_max"], 1),
+    }
+
+
+def advice_attributes(state: AdvisorState) -> dict[str, Any]:
+    """Attributes of the saving sensor."""
+    attrs: dict[str, Any] = {
+        "note": DISCLAIMER,
+        "skipped": state.advice_skipped or state.error,
+        "model_error": (
+            round(state.calibration.selftest.median_abs, 2)
+            if state.calibration
+            else None
+        ),
+    }
+    run = state.advice
+    if run is None:
+        return attrs
+    advice = run.advice
+    best = advice.best
+    attrs.update(
+        recommendation=(
+            describe_changes(run.params, run.schedule, best.changes)
+            if best
+            else "keep the current settings"
+        ),
+        changes=best.changes if best else {},
+        ranking=[_candidate(c, advice.saving(c)) for c in advice.ranking],
+        current=_candidate(advice.baseline, 0.0),
+        price_eur_kwh=round(run.price_eur_kwh, 4),
+        assumed=list(run.assumed),
+        runtime_s=round(run.runtime_s, 2),
+        warnings=list(state.warnings),
+        report=advice.report,
+    )
     return attrs

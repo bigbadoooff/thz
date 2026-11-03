@@ -11,10 +11,14 @@ import pytest
 
 from custom_components.thz.advisor.advisor import (
     DISCLAIMER,
+    Advice,
+    Candidate,
     Plant,
     advise,
     default_scenarios,
+    describe_changes,
     format_report,
+    recommend,
 )
 from custom_components.thz.advisor.building import Building, CompressorModel, CopModel
 from custom_components.thz.advisor.calibrate import (
@@ -27,6 +31,7 @@ from custom_components.thz.advisor.controller import (
     StiebelParams,
     control_temp,
     feed_forward,
+    params_from_registers,
     rel_power,
     target_temp,
     threshold_margins,
@@ -297,3 +302,37 @@ def test_calibrate_rejects_a_fit_that_fails_the_selftest(controller_data):
     assert c.fit is not None
     assert c.fit_rejected.startswith("self-test failed")
     assert not c.selftest.passed
+
+
+def _cand(score, **changes):
+    return Candidate(dict(changes), {}, score)
+
+
+def test_advice_best_needs_a_real_saving():
+    a = Advice(_cand(1.0), [_cand(0.95, kp=5.0), _cand(0.99)], "r")
+    assert a.best.changes == {"kp": 5.0}
+    assert a.saving(a.best) == pytest.approx(0.05)
+    assert Advice(_cand(1.0), [_cand(0.995, kp=5.0)], "r").best is None
+    assert Advice(_cand(1.0), [], "r").best is None
+
+
+def test_describe_changes():
+    text = describe_changes(P, Schedule(), {"kp": 5.0, "low_end": 3.0, "night": 18.0})
+    assert text == "kp 8.5 -> 5, night 19 -> 18"
+
+
+def test_params_from_registers():
+    p = params_from_registers(
+        P, {"gradient": 0.3, "flow_share": 50.0, "room_day": 21.0}
+    )
+    assert p.gradient == 0.3
+    assert p.flow_share == 0.5
+    assert p.kp == P.kp
+
+
+def test_recommend_keeps_the_report():
+    a = recommend(
+        P, Plant(), Schedule(), scenarios=[synthetic_outside(days=4, dt_h=1 / 10)]
+    )
+    assert a.report.startswith("current")
+    assert len(a.ranking) == 5

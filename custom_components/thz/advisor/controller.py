@@ -144,3 +144,26 @@ def filter_step(filtered: float, raw: float, dt_h: float, tau_h: float) -> float
     (12 h: 0.03 K RMSE).
     """
     return filtered + (raw - filtered) * dt_h / tau_h
+
+
+# Register value -> StiebelParams field, with the factor to its unit.
+REGISTER_FACTORS: dict[str, float] = {
+    "gradient": 1.0,
+    "low_end": 1.0,
+    "room_influence": 1.0,
+    "flow_share": 0.01,  # register in %, field 0..1
+    "outside_filter_h": 1.0,
+}
+
+
+def params_from_registers(
+    base: StiebelParams, values: dict[str, float]
+) -> StiebelParams:
+    """Return ``base`` with the given register values; others stay."""
+    return base.with_(
+        **{
+            name: value * REGISTER_FACTORS[name]
+            for name, value in values.items()
+            if name in REGISTER_FACTORS
+        }
+    )

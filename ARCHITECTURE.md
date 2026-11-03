@@ -167,7 +167,7 @@ contents.
 | `advisor/` | Controller model, simulation and parameter advisor. No Home Assistant imports; numpy only. Never writes to the device |
 | `advisor_inputs.py` | Finds the advisor's input sensors and heating-curve parameters of an entry by translation key in the entity registry |
 | `advisor_history.py` | Reads those inputs from the recorder (in the recorder's executor) onto a 5-minute grid |
-| `advisor_coordinator.py`, `advisor_sensor.py` | Daily calibration of the controller model from 10 days of history (in an executor), and the read-only advisor sensors |
+| `advisor_coordinator.py`, `advisor_sensor.py`, `advisor_button.py` | Daily (and on demand) calibration of the controller model and advisor run from 10 days of history, in an executor; the read-only advisor sensors and the run button |
 | `advisor_options.py`, `options_flow.py` | Advisor options (KP, design power and temperature, prices) and the options flow |
 
 ## Tests

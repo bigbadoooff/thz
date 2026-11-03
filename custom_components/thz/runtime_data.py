@@ -53,8 +53,8 @@ class THZRuntimeData:
     # Set up by the platforms: fault memory tracking.
     fault_tracker: THZFaultTracker | None = None
     fault_source: DataUpdateCoordinator[Any] | None = None
-    # Set up by the sensor platform when the firmware has the heating
-    # relative power: calibrates the advisor's controller model.
+    # Set up when the firmware has the heating relative power: calibrates
+    # the advisor's controller model and runs the advisor.
     advisor: AdvisorCoordinator | None = None
 
     def polled_coordinator(self, block: str) -> DataUpdateCoordinator[Any] | None:
