@@ -6,6 +6,12 @@ All notable changes to the THZ integration are documented here.
 
 ## [Unreleased]
 
+### Changes
+
+- **The manual hot water setpoint goes up to 65 °C** on firmware 4.x, 5.x
+  and 7.x. *DHW Temperature Manual* (`p11DHWsetManualTemp`) stopped at
+  55 °C; the range is now 10-65 °C.
+
 ### Bug Fixes
 
 - **No more `via_device` deprecation warnings at startup.** With the split
