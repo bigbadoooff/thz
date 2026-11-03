@@ -164,6 +164,10 @@ contents.
 | `diagnostics.py` | Redacted diagnostics dump |
 | `write_errors.py` | Turns a failed write of an entity action into `HomeAssistantError` |
 | `notify.py` | Persistent notifications |
+| `advisor/` | Controller model, simulation and parameter advisor. No Home Assistant imports; numpy only. Never writes to the device |
+| `advisor_inputs.py` | Finds the advisor's input sensors and heating-curve parameters of an entry by translation key in the entity registry |
+| `advisor_history.py` | Reads those inputs from the recorder (in the recorder's executor) onto a 5-minute grid |
+| `advisor_options.py`, `options_flow.py` | Advisor options (KP, design power and temperature, prices) and the options flow |
 
 ## Tests
 

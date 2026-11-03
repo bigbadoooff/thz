@@ -332,6 +332,34 @@
       "invalid_port": "Invalid port number. Port must be between 1 and 65535."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Advisor",
+        "description": "The advisor simulates controller settings from the recorded history and suggests changes. It never writes to the heat pump; its results are a simulation, not a measurement. KP, design power and design temperature have no register: enter the values set in the heat pump's menu.",
+        "data": {
+          "advisor_kp": "Proportional component (KP)",
+          "advisor_design_power": "Design heating power",
+          "advisor_design_temp": "Design temperature",
+          "advisor_ref_temp": "Feed-forward reference temperature",
+          "advisor_price": "Electricity price",
+          "advisor_price_entity": "Electricity price sensor",
+          "advisor_comfort_min": "Comfort limit (room)",
+          "advisor_fit_controller": "Estimate KP and feed-forward from the history"
+        },
+        "data_description": {
+          "advisor_kp": "Menu value P component of the heating control.",
+          "advisor_design_power": "Relative power at the design temperature, 40 to 100 %.",
+          "advisor_design_temp": "Outside temperature the heating is designed for, -25 to +5 °C.",
+          "advisor_ref_temp": "Outside temperature at which the feed-forward is 0 %. The manual suggests 20 °C.",
+          "advisor_price": "Used when no price sensor is set or it has no value.",
+          "advisor_price_entity": "Optional sensor with the current price in EUR/kWh, for example from a dynamic tariff.",
+          "advisor_comfort_min": "Room temperatures below this limit count as a comfort penalty.",
+          "advisor_fit_controller": "Fits KP, the feed-forward slope and its reference temperature to the recorded relative power. The values above are used when the fit fails. Design power and design temperature only enter as their ratio."
+        }
+      }
+    }
+  },
   "device": {
     "heating": {
       "name": "{device_name} Heating circuit 1"

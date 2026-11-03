@@ -332,6 +332,34 @@
       "invalid_port": "Ungültige Portnummer. Port muss zwischen 1 und 65535 liegen."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Berater",
+        "description": "Der Berater simuliert Reglereinstellungen anhand des aufgezeichneten Verlaufs und schlägt Änderungen vor. Er schreibt nie in die Wärmepumpe; seine Ergebnisse sind eine Simulation, keine Messung. KP, Leistung Auslegung und Auslegungstemperatur haben kein Register: Tragen Sie die im Menü der Wärmepumpe eingestellten Werte ein.",
+        "data": {
+          "advisor_kp": "Proportionalanteil (KP)",
+          "advisor_design_power": "Leistung Auslegung Heizen",
+          "advisor_design_temp": "Auslegungstemperatur",
+          "advisor_ref_temp": "Bezugstemperatur der Vorsteuerung",
+          "advisor_price": "Strompreis",
+          "advisor_price_entity": "Strompreis-Sensor",
+          "advisor_comfort_min": "Komfortgrenze (Raum)",
+          "advisor_fit_controller": "KP und Vorsteuerung aus dem Verlauf schätzen"
+        },
+        "data_description": {
+          "advisor_kp": "Menüwert P-Anteil der Heizungsregelung.",
+          "advisor_design_power": "Relative Leistung bei Auslegungstemperatur, 40 bis 100 %.",
+          "advisor_design_temp": "Außentemperatur, für die die Heizung ausgelegt ist, −25 bis +5 °C.",
+          "advisor_ref_temp": "Außentemperatur, bei der die Vorsteuerung 0 % beträgt. Das Handbuch nennt 20 °C.",
+          "advisor_price": "Gilt, wenn kein Preis-Sensor gesetzt ist oder er keinen Wert hat.",
+          "advisor_price_entity": "Optionaler Sensor mit dem aktuellen Preis in EUR/kWh, z. B. von einem dynamischen Tarif.",
+          "advisor_comfort_min": "Raumtemperaturen unter dieser Grenze zählen als Komfortverlust.",
+          "advisor_fit_controller": "Passt KP, die Steigung der Vorsteuerung und ihre Bezugstemperatur an die aufgezeichnete relative Leistung an. Die Werte oben gelten, wenn die Schätzung scheitert. Leistung Auslegung und Auslegungstemperatur gehen nur als Verhältnis ein."
+        }
+      }
+    }
+  },
   "device": {
     "heating": {
       "name": "{device_name} Heizkreis 1"

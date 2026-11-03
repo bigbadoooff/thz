@@ -8,6 +8,13 @@ All notable changes to the THZ integration are documented here.
 
 ### Changes
 
+- **Groundwork for a controller advisor.** A model of the heating control
+  of the LWZ 5 CS Premium with a simulation and a parameter advisor
+  (`advisor/`), which finds its input sensors per firmware and reads their
+  history from the recorder. The integration now has options
+  (**Configure**) for the advisor. It only advises and never writes to the
+  heat pump; there are no advisor entities yet. Adds numpy as a
+  requirement.
 - **The manual hot water setpoint goes up to 65 °C** on firmware 4.x, 5.x
   and 7.x. *DHW Temperature Manual* (`p11DHWsetManualTemp`) stopped at
   55 °C; the range is now 10-65 °C.

@@ -253,6 +253,28 @@ than a minute:
   on automatic sync for the future. The issue goes away by itself once the
   clock is right again.
 
+### Advisor (in development)
+
+The integration is getting an advisor for the controller settings of the
+LWZ 5 CS Premium (firmware 7.x). It models the heating control (heating
+curve, room influence, proportional component, feed-forward, compressor
+hysteresis), identifies the building and the COP from the recorded history,
+and simulates which settings would save electricity.
+
+- **It only advises.** It never writes a setting or changes the operating
+  mode. Every result is a simulation, not a measurement.
+- **Nothing leaves Home Assistant.** It reads the recorder, nothing else.
+- So far there are only its options (**Configure** on the integration):
+  KP, design power and design temperature, which have no register, the
+  reference temperature of the feed-forward, the electricity price (fixed,
+  or a price sensor) and the room comfort limit. With *Estimate KP and
+  feed-forward from the history* on, KP and the feed-forward are fitted to
+  the recorded relative power instead.
+- It needs the sensors *Heating Relative Power*, *Heat Setpoint
+  Temperature*, *Heat Temperature* and *Outside Temperature (Filtered)*,
+  and for the building model the power, return and outside temperature
+  sensors, all recorded by the recorder.
+
 ## Compatibility
 
 ### Supported Firmware Versions
