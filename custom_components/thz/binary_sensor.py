@@ -19,7 +19,8 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -44,6 +45,11 @@ _LOGGER = logging.getLogger(__name__)
 # Read-only sensors backed by a DataUpdateCoordinator: no per-entity polling
 # and no service actions, so updates are not limited.
 PARALLEL_UPDATES = 0
+
+# Bits that several blocks carry, and the block to read them from while it
+# is polled. The compressor bit of pxxFB can stay set while the compressor
+# is off; sDisplay (pxx0A0176) has the state the heat pump's display shows.
+_PREFERRED_BLOCKS = {"compressor": "pxx0A0176"}
 
 
 def _get_device_class(name: str) -> BinarySensorDeviceClass | None:
@@ -102,6 +108,14 @@ async def async_setup_entry(
     entity_visibility = entry_data.entity_visibility
     entity_id_prefix = entry_data.entity_id_prefix
 
+    polled_bits = {
+        (block, read_field.name)
+        for block, fields in register_manager.fields().items()
+        if entry_data.polled_coordinator(block) is not None
+        for read_field in fields
+        if read_field.is_bit
+    }
+
     entities: list[THZBinarySensor] = []
     seen_sensor_names: set[str] = set()
     for block, fields in register_manager.fields().items():
@@ -121,6 +135,14 @@ async def async_setup_entry(
                 continue
 
             sensor_name = read_field.name
+
+            preferred = _PREFERRED_BLOCKS.get(sensor_name)
+            if (
+                preferred is not None
+                and block != preferred
+                and (preferred, sensor_name) in polled_bits
+            ):
+                continue
 
             # Skip duplicate sensor names
             if sensor_name in seen_sensor_names:
@@ -154,8 +176,54 @@ async def async_setup_entry(
             )
 
     _LOGGER.debug("Created %d binary sensor entities", len(entities))
+    _adopt_registry_entries(hass, config_entry, entities)
     assign_subdevices(entities, config_entry)
     async_add_entities(entities)
+
+
+@callback
+def _adopt_registry_entries(
+    hass: HomeAssistant,
+    config_entry: THZConfigEntry,
+    entities: list[THZBinarySensor],
+) -> None:
+    """Give a bit read from its preferred block the entry it had before.
+
+    A bit that was read from another block keeps its entity_id, history and
+    settings: its registry entry moves to the unique_id of the new block.
+    """
+    ent_reg = er.async_get(hass)
+    registered = {
+        entry.unique_id: entry
+        for entry in er.async_entries_for_config_entry(ent_reg, config_entry.entry_id)
+        if entry.domain == "binary_sensor"
+    }
+    for entity in entities:
+        name = entity._entity_name
+        unique_id = entity.unique_id
+        if name not in _PREFERRED_BLOCKS or unique_id is None:
+            continue
+        if unique_id in registered:
+            continue
+        prefix = f"thz_{entity._device_id}_bin_"
+        suffix = f"_{name.lower()}"
+        old = next(
+            (
+                entry
+                for old_id, entry in registered.items()
+                if old_id.startswith(prefix) and old_id.endswith(suffix)
+            ),
+            None,
+        )
+        if old is None:
+            continue
+        _LOGGER.debug(
+            "Moving %s from unique_id %s to %s",
+            old.entity_id,
+            old.unique_id,
+            unique_id,
+        )
+        ent_reg.async_update_entity(old.entity_id, new_unique_id=unique_id)
 
 
 class THZBinarySensor(CoordinatorEntity[BlockCoordinator], BinarySensorEntity):
