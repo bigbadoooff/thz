@@ -8,18 +8,18 @@ All notable changes to the THZ integration are documented here.
 
 ### Changes
 
-- **Controller advisor, first sensors** (firmware 5.39 and 7.x). A model
-  of the heating control of the LWZ 5 CS Premium with a simulation and a
-  parameter advisor (`advisor/`). New read-only sensors show the relative
-  power the model predicts, its deviation from the measured one, the
-  margins to the compressor stop and start thresholds, and the model error
-  over the last 10 days. *Advisor: Possible Saving* ranks candidate
-  settings by simulated cost per day and recommends the best, only when
-  the model passes its self-test; a button runs it on demand. KP and the
-  feed-forward are fitted to the history
-  when the model passes its self-test with them; the integration's new
-  options (**Configure**) hold the values otherwise. The advisor never
-  writes to the heat pump. Adds numpy as a requirement.
+- **Controller advisor** (firmware 5.39 and 7.x). A model of the heating
+  control of the LWZ 5 CS Premium with a simulation and a parameter
+  advisor. New read-only sensors show the relative power the model
+  predicts, its deviation from the measured one, the margins to the
+  compressor stop and start thresholds, and the model error over the last
+  10 days. *Advisor: Possible Saving* ranks candidate settings by
+  simulated cost per day and recommends the best, only when the model
+  passes its self-test; a button runs it on demand. KP and the
+  feed-forward are fitted to the history when the model passes its
+  self-test with them; the integration's new options (**Configure**) hold
+  the values otherwise. The advisor never writes to the heat pump. Adds
+  numpy as a requirement. See [docs/advisor.md](docs/advisor.md).
 - **The manual hot water setpoint goes up to 65 °C** on firmware 4.x, 5.x
   and 7.x. *DHW Temperature Manual* (`p11DHWsetManualTemp`) stopped at
   55 °C; the range is now 10-65 °C.

@@ -44,6 +44,7 @@ Parts of this software have been developed by the help of AI.
 - ✅ **Water Heater Platform**: Hot water as a water heater entity — temperature, setpoint and eco (setback) / performance / off state
 - ✅ **Fan Platform**: Ventilation as a fan entity — shows the current stage and starts unscheduled ventilation at stage 0–3
 - ✅ **Event Platform**: Events for a new fault and a requested filter change
+- ✅ **Controller Advisor**: Simulates controller settings from the recorded history and suggests the ones that save electricity — advice only, nothing is written (firmware 5.39/7.x, see [docs/advisor.md](docs/advisor.md))
 - ✅ **Repairs**: A drifted heat pump clock raises a fixable repair issue
 - ✅ **Diagnostics**: Download a diagnostics report for troubleshooting (via Settings → Devices & Services)
 - ✅ **Device Registry Integration**: Proper device identification in Home Assistant
@@ -253,63 +254,29 @@ than a minute:
   on automatic sync for the future. The issue goes away by itself once the
   clock is right again.
 
-### Advisor (in development)
+### Controller Advisor (firmware 5.39 / 7.x)
 
-The integration is getting an advisor for the controller settings of the
-LWZ 5 CS Premium (firmware 7.x). It models the heating control (heating
-curve, room influence, proportional component, feed-forward, compressor
-hysteresis), identifies the building and the COP from the recorded history,
-and simulates which settings would save electricity.
+The advisor suggests settings of the heating control that would save
+electricity. It models the controller of the LWZ 5 CS Premium, learns the
+building, compressor and COP from the last 10 days in the recorder, and
+ranks variants of KP, room influence and low end by simulated cost per
+day.
 
-- **It only advises.** It never writes a setting or changes the operating
-  mode. Every result is a simulation, not a measurement.
-- **Nothing leaves Home Assistant.** It reads the recorder, nothing else.
-- **Options** (**Configure** on the integration): KP, design power and
-  design temperature, which have no register, the electricity price (fixed,
-  or a price sensor) and the room comfort limit. The feed-forward reference
-  temperature is fixed at 20 °C. With *Estimate KP and feed-forward from the
-  history* on (default), KP and the feed-forward slope are fitted to the
-  last 10 days of recorded relative power; the fitted values are used only
-  if the model passes its self-test with them, the entered ones otherwise.
-- **Sensors** (only on firmware with *Heating Relative Power*, 5.39 and
-  7.x):
-  - *Advisor: Predicted Relative Power*: what the controller model
-    predicts from the current heat setpoint, heat temperature and filtered
-    outside temperature;
-  - *Advisor: Deviation from Relative Power*: predicted minus measured;
-  - *Advisor: Margin to Compressor Stop* / *Start*: percentage points of
-    the measured relative power above the stop threshold (20 %) and below
-    the start threshold (40 %); the attribute `kelvin` gives the same in
-    kelvin of control temperature (points / KP);
-  - *Advisor: Model Error*: median error of the prediction over the last
-    10 days, recomputed daily and when the options change. Its attributes
-    show the settings in use and where they come from (`source`: `fit` or
-    `options`), the self-test (`passed` below 4 points, `rmse`, `bias`) and
-    missing inputs;
-  - *Advisor: Possible Saving* (EUR/day): the advisor's result. It
-    identifies the building, the compressor and the COP from the last 10
-    days, simulates KP, room influence and low end variants over a mild and
-    a cold week, and ranks them by electricity cost, compressor starts and
-    time below the comfort limit. Attributes: `recommendation` (e.g.
-    `kp 8.5 -> 5`), `ranking` (the best five with kWh/day, COP, starts/day,
-    room range), `current`, `price_eur_kwh`, `assumed` (settings without a
-    value, taken from the defaults), `warnings` and the full `report`.
-    **Only shown when the model passes its self-test**; otherwise
-    `skipped` says why.
-- **Button** *Advisor: Run Now*: calibrates and advises right away (it
-  otherwise runs once a day). The computing takes about 2 s and runs
-  outside Home Assistant's event loop.
-- It needs the sensors *Heating Relative Power*, *Heat Setpoint
-  Temperature*, *Heat Temperature* and *Outside Temperature (Filtered)*,
-  and for the advice also the electric and thermal power, return and
-  outside temperature, all recorded by the recorder. The heating-curve
-  settings (gradient, low end, room influence, flow share, outside
-  temperature damping) and the day/night room setpoints are read from
-  their number entities; enable them, or the defaults are assumed.
-- **Limits:** the model was identified in mild weather (outside
-  temperature 2 °C and above); advice for frost is extrapolation. Starts
-  per day are not validated, since the day/night switching of automations
-  is not simulated.
+- **It only advises:** it never writes a setting or changes the operating
+  mode. Every result is a **simulation, not a measurement**.
+- **Nothing leaves Home Assistant;** it reads the recorder only.
+- Sensors show the predicted relative power, its deviation from the
+  measured one, the margins to the compressor stop and start thresholds,
+  the model error, and the possible saving in EUR/day with the
+  recommendation and ranking as attributes. A recommendation appears only
+  when the model passes its self-test (median error below 4 points). The
+  button *Advisor: Run Now* runs it on demand.
+- KP, design power and design temperature have no register; enter them
+  under **Configure**, or let the advisor fit KP and the feed-forward to
+  the history.
+
+See [docs/advisor.md](docs/advisor.md) for the entities, options, model,
+validation and limits.
 
 ## Compatibility
 
@@ -488,6 +455,10 @@ serial/network connection to the heat pump is released.
 - **Hot water mode** follows the heat pump's time program and operating
   mode; the water heater sets the temperature, not the mode.
 - **Energy values and COP** need firmware 4.39 or newer.
+- **Controller advisor:** only on firmware with the heating relative power
+  (5.39, 7.x), and modelled on the LWZ 5 CS Premium. Its model comes from
+  mild weather (2 °C and above): advice for frost is extrapolation, and
+  starts per day are not validated. See [docs/advisor.md](docs/advisor.md).
 
 ## Troubleshooting
 
