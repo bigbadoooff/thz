@@ -5,10 +5,13 @@ The CSV files in data/ are measured on an LWZ 5 CS Premium.
 
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 
+from custom_components.thz.advisor import advisor as advisor_module
 from custom_components.thz.advisor.advisor import (
     DISCLAIMER,
     Advice,
@@ -314,6 +317,7 @@ def test_advice_best_needs_a_real_saving():
     assert a.saving(a.best) == pytest.approx(0.05)
     assert Advice(_cand(1.0), [_cand(0.995, kp=5.0)], "r").best is None
     assert Advice(_cand(1.0), [], "r").best is None
+    assert Advice(_cand(0.0), [_cand(-1.0)], "r").best is None
 
 
 def test_describe_changes():
@@ -330,9 +334,61 @@ def test_params_from_registers():
     assert p.kp == P.kp
 
 
+def test_advice_cost_per_kelvin():
+    base = Candidate({}, {"el_kwh_day": 5.0, "kwh_per_k_room": 0.4}, 1.5)
+    a = Advice(base, [], "r")
+    assert a.kwh_per_k_room == 0.4
+    assert a.percent_per_k_room == pytest.approx(8.0)
+    idle = Candidate({}, {"el_kwh_day": 0.0}, 0.0)
+    assert Advice(idle, [], "r").percent_per_k_room == 0.0
+
+
 def test_recommend_keeps_the_report():
     a = recommend(
         P, Plant(), Schedule(), scenarios=[synthetic_outside(days=4, dt_h=1 / 10)]
     )
     assert a.report.startswith("current")
     assert len(a.ranking) == 5
+
+
+def test_advisor_compares_at_equal_room_temperature(cop_data):
+    m = identify(cop_data)
+    plant = Plant(m.building, m.compressor, m.cop)
+    base, best = advise(P, plant, Schedule(), grid={"kp": (3.0,)})
+    k = base.metrics["kwh_per_k_room"]
+    assert k > 0
+    (kp3,) = best
+    # KP 3 keeps the room much cooler and uses less electricity as
+    # simulated, but not at equal room temperature.
+    assert kp3.metrics["room_delta_k"] < -1
+    assert kp3.metrics["el_kwh_day"] < base.metrics["el_kwh_day"] * 0.9
+    assert kp3.metrics["el_kwh_day_equal_comfort"] == pytest.approx(
+        kp3.metrics["el_kwh_day"] - kp3.metrics["room_delta_k"] * k
+    )
+    assert kp3.metrics["el_kwh_day_equal_comfort"] == pytest.approx(
+        base.metrics["el_kwh_day"], rel=0.02
+    )
+    # It also drops below the comfort limit, which costs extra.
+    assert kp3.score > base.score
+
+
+def test_advisor_without_room_response():
+    # The room does not follow the setpoint: the cost per kelvin is unknown.
+    metrics = {
+        "el_kwh_day": 5.0,
+        "room_mean": 22.0,
+        "starts_day": 1.0,
+        "comfort_kh_day": 0.0,
+    }
+    result = SimpleNamespace(metrics=metrics)
+    with patch.object(advisor_module, "simulate", return_value=result):
+        base, best = advise(
+            P, Plant(), Schedule(), scenarios=[(None, None)], grid={"kp": (5.0,)}
+        )
+    assert base.metrics["kwh_per_k_room"] == 0.0
+    assert best[0].metrics["el_kwh_day_equal_comfort"] == 5.0
+
+
+def test_schedule_shifted():
+    s = Schedule().shifted(-0.5)
+    assert (s.day, s.night) == (22.0, 18.5)

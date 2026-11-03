@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.thz import advisor_button, advisor_coordinator, advisor_sensor
-from custom_components.thz.advisor.advisor import Advice
+from custom_components.thz.advisor.advisor import Advice, Candidate
 from custom_components.thz.advisor.calibrate import SOURCE_FIT, calibrate
 from custom_components.thz.advisor.controller import StiebelParams
 from custom_components.thz.advisor.data import load_csv
@@ -423,9 +423,9 @@ def test_saving_sensor():
     state = _advised_state()
     sensor = _sensor(AdvisorSavingSensor, state, {})
     run = state.advice
-    best = run.advice.best
-    expected = 0.0 if best is None else round(run.advice.saving(best), 2)
-    assert sensor.native_value == expected
+    # At equal room temperature no variant saves 2 % on the measured data.
+    assert run.advice.best is None
+    assert sensor.native_value == 0.0
     attrs = sensor.extra_state_attributes
     assert attrs["skipped"] is None
     assert attrs["model_error"] == round(state.calibration.selftest.median_abs, 2)
@@ -433,11 +433,28 @@ def test_saving_sensor():
     assert attrs["current"]["saving_eur_day"] == 0.0
     assert attrs["report"] == run.advice.report
     assert attrs["warnings"] == list(advisor_coordinator.WARNINGS)
-    if best is None:
-        assert attrs["recommendation"] == "keep the current settings"
-    else:
-        assert attrs["recommendation"]
-        assert attrs["changes"] == best.changes
+    assert attrs["recommendation"] == (
+        "keep the current settings; lowering the room setpoint by 1 K saves "
+        f"about {run.advice.percent_per_k_room:.0f} %"
+    )
+    assert 5 < attrs["percent_per_k_room"] < 12
+    assert attrs["changes"] == {}
+    top = attrs["ranking"][0]
+    assert {"el_kwh_day_equal_comfort", "room_delta_k"} <= top.keys()
+
+
+def test_saving_sensor_with_a_real_saving():
+    state = _advised_state()
+    advice = state.advice.advice
+    better = Candidate(
+        {"kp": 5.0}, dict(advice.baseline.metrics), advice.baseline.score * 0.9
+    )
+    run = replace(state.advice, advice=Advice(advice.baseline, [better], advice.report))
+    sensor = _sensor(AdvisorSavingSensor, replace(state, advice=run), {})
+    assert sensor.native_value == round(advice.baseline.score * 0.1, 2)
+    attrs = sensor.extra_state_attributes
+    assert attrs["recommendation"] == f"kp {run.params.kp:.3g} -> 5"
+    assert attrs["changes"] == {"kp": 5.0}
 
 
 def test_saving_sensor_keeps_settings_without_a_saving():
@@ -452,7 +469,7 @@ def test_saving_sensor_keeps_settings_without_a_saving():
     )
     sensor = _sensor(AdvisorSavingSensor, flat, {})
     assert sensor.native_value == 0.0
-    assert sensor.extra_state_attributes["recommendation"] == (
+    assert sensor.extra_state_attributes["recommendation"].startswith(
         "keep the current settings"
     )
     assert sensor.extra_state_attributes["changes"] == {}

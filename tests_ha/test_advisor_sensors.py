@@ -158,14 +158,13 @@ async def test_advice_runs_in_an_executor(hass: HomeAssistant, fake_device):
 
         assert threads == [False]
         assert saving.attributes["runtime_s"] < 5
-        assert float(saving.state) >= 0
+        # At equal room temperature nothing saves enough: keep the settings.
+        assert float(saving.state) == 0
         assert saving.attributes["skipped"] is None
-        assert saving.attributes["recommendation"]
-        assert len(saving.attributes["ranking"]) == 5
-        assert (
-            saving.attributes["ranking"][0]["saving_eur_day"] == float(saving.state)
-            or saving.attributes["recommendation"] == "keep the current settings"
+        assert saving.attributes["recommendation"].startswith(
+            "keep the current settings; lowering the room setpoint by 1 K"
         )
+        assert len(saving.attributes["ranking"]) == 5
         assert saving.attributes["price_eur_kwh"] == 0.3
         assert "Simulation, not measurement." in saving.attributes["warnings"]
         assert "Simulation, not measurement." in saving.attributes["report"]

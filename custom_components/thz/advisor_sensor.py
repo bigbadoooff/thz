@@ -294,8 +294,9 @@ def model_attributes(state: AdvisorState) -> dict[str, Any]:
 class AdvisorSavingSensor(AdvisorSensor):
     """Saving of the best candidate setting, with the ranking as attributes.
 
-    Shown only when the model passed its self-test; a simulation, not a
-    measurement.
+    The saving is at equal mean room temperature: a setting that only keeps
+    the room cooler saves nothing here. Shown only when the model passed
+    its self-test; a simulation, not a measurement.
     """
 
     _attr_translation_key = "advisor_saving"
@@ -325,7 +326,9 @@ def _candidate(c: Candidate, saving: float) -> dict[str, Any]:
         "changes": c.changes,
         "saving_eur_day": round(saving, 2),
         "cost_eur_day": round(c.score, 2),
+        "el_kwh_day_equal_comfort": round(m["el_kwh_day_equal_comfort"], 2),
         "el_kwh_day": round(m["el_kwh_day"], 2),
+        "room_delta_k": round(m["room_delta_k"], 2),
         "cop": round(m["cop"], 2),
         "starts_day": round(m["starts_day"], 1),
         "room_min": round(m["room_min"], 1),
@@ -353,8 +356,12 @@ def advice_attributes(state: AdvisorState) -> dict[str, Any]:
         recommendation=(
             describe_changes(run.params, run.schedule, best.changes)
             if best
-            else "keep the current settings"
+            else (
+                "keep the current settings; lowering the room setpoint by "
+                f"1 K saves about {advice.percent_per_k_room:.0f} %"
+            )
         ),
+        percent_per_k_room=round(advice.percent_per_k_room, 1),
         changes=best.changes if best else {},
         ranking=[_candidate(c, advice.saving(c)) for c in advice.ranking],
         current=_candidate(advice.baseline, 0.0),

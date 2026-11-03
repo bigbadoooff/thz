@@ -34,10 +34,21 @@ class Candidate:
     score: float
 
 
+# K the room setpoint is lowered to measure what a kelvin of room
+# temperature costs.
+ROOM_PROBE_K = 0.5
+# Below this room response (K) to the probe the cost per kelvin is unknown.
+_MIN_ROOM_RESPONSE_K = 0.05
+
+
 def score(m: Mapping[str, float], w: Weights) -> float:
-    """Cost per day in EUR (lower is better)."""
+    """Cost per day in EUR (lower is better).
+
+    Electricity counts at equal comfort when the metrics have it, so a
+    setting is not credited for merely keeping the room cooler.
+    """
     return (
-        m["el_kwh_day"] * w.eur_per_kwh
+        m.get("el_kwh_day_equal_comfort", m["el_kwh_day"]) * w.eur_per_kwh
         + m["starts_day"] * w.eur_per_start
         + m["comfort_kh_day"] * w.eur_per_comfort_kh
     )
@@ -84,15 +95,20 @@ def advise(
     Each candidate is simulated over all ``scenarios`` (default: mild and
     cold weather) and its metrics averaged. ``nights`` adds night room
     setpoints to try; ``None`` keeps the schedule's own.
+
+    Candidates are compared at equal comfort: the current setting is also
+    simulated with the room setpoint ``ROOM_PROBE_K`` lower, which gives
+    the electricity one kelvin of mean room temperature costs
+    (``kwh_per_k_room`` in the baseline's metrics). Each candidate's
+    electricity is corrected by its change of mean room temperature
+    (``room_delta_k``) to ``el_kwh_day_equal_comfort``, and scored on that.
     """
     scenarios = default_scenarios() if scenarios is None else scenarios
     grid = DEFAULT_GRID if grid is None else grid
     weights = Weights() if weights is None else weights
     names = list(grid)
 
-    def evaluate(changes: dict[str, float], night: float | None) -> Candidate:
-        p = base.with_(**changes)
-        sch = schedule if night is None else schedule.with_night(night)
+    def run(p: StiebelParams, sch: Schedule) -> dict[str, float]:
         runs = [
             simulate(
                 p,
@@ -106,13 +122,32 @@ def advise(
             ).metrics
             for t, ta in scenarios
         ]
-        m = {k: float(np.mean([r[k] for r in runs])) for k in runs[0]}
+        return {k: float(np.mean([r[k] for r in runs])) for k in runs[0]}
+
+    base_m = run(base, schedule)
+    cool_m = run(base, schedule.shifted(-ROOM_PROBE_K))
+    room_response = base_m["room_mean"] - cool_m["room_mean"]
+    kwh_per_k = (
+        (base_m["el_kwh_day"] - cool_m["el_kwh_day"]) / room_response
+        if room_response > _MIN_ROOM_RESPONSE_K
+        else 0.0
+    )
+
+    def candidate(changes: dict[str, float], m: dict[str, float]) -> Candidate:
+        delta = m["room_mean"] - base_m["room_mean"]
+        m["room_delta_k"] = delta
+        m["el_kwh_day_equal_comfort"] = m["el_kwh_day"] - delta * kwh_per_k
+        return Candidate(changes, m, score(m, weights))
+
+    def evaluate(changes: dict[str, float], night: float | None) -> Candidate:
+        sch = schedule if night is None else schedule.with_night(night)
         ch = dict(changes)
         if night is not None:
             ch["night"] = night
-        return Candidate(ch, m, score(m, weights))
+        return candidate(ch, run(base.with_(**changes), sch))
 
-    baseline = evaluate({}, None)
+    baseline = candidate({}, dict(base_m))
+    baseline.metrics["kwh_per_k_room"] = kwh_per_k
     candidates = [
         evaluate(dict(zip(names, values, strict=True)), night)
         for values in itertools.product(*(grid[n] for n in names))
@@ -128,9 +163,11 @@ def format_report(baseline: Candidate, best: Sequence[Candidate]) -> str:
     def row(label: str, c: Candidate) -> str:
         m = c.metrics
         return (
-            f"{label:<34} {c.score:6.2f} EUR/d  {m['el_kwh_day']:5.2f} kWh/d  "
-            f"COP {m['cop']:4.2f}  {m['starts_day']:4.1f} starts/d  "
-            f"room {m['room_min']:4.1f}..{m['room_max']:4.1f} °C"
+            f"{label:<34} {c.score:6.2f} EUR/d  "
+            f"{m['el_kwh_day_equal_comfort']:5.2f} kWh/d at equal room "
+            f"({m['el_kwh_day']:5.2f} as simulated, room "
+            f"{m['room_delta_k']:+.2f} K)  COP {m['cop']:4.2f}  "
+            f"{m['starts_day']:4.1f} starts/d"
         )
 
     lines = [row("current", baseline), ""]
@@ -140,12 +177,20 @@ def format_report(baseline: Candidate, best: Sequence[Candidate]) -> str:
         lines.append(
             row(f"{i}. {label or '(unchanged)'}", c) + f"  Δ {delta:+.2f} EUR/d"
         )
-    lines += ["", f"{DISCLAIMER} Change one setting at a time and keep a way back."]
+    k = baseline.metrics.get("kwh_per_k_room", 0.0)
+    el = baseline.metrics["el_kwh_day"]
+    lines += [
+        "",
+        f"Compared at equal mean room temperature; 1 K of room temperature "
+        f"costs about {k:.2f} kWh/d ({100 * k / el if el else 0:.1f} %).",
+        f"{DISCLAIMER} Change one setting at a time and keep a way back.",
+    ]
     return "\n".join(lines)
 
 
-# Savings below this (EUR/day) are within the model's noise: no change.
-MIN_SAVING_EUR_DAY = 0.01
+# Savings below this share of today's cost are within the model's
+# uncertainty: keep the settings.
+MIN_RELATIVE_SAVING = 0.02
 
 
 @dataclass(frozen=True)
@@ -158,10 +203,24 @@ class Advice:
 
     @property
     def best(self) -> Candidate | None:
-        """The best candidate if it saves enough, else None (keep settings)."""
-        if self.ranking and self.saving(self.ranking[0]) >= MIN_SAVING_EUR_DAY:
-            return self.ranking[0]
+        """The best candidate if it saves enough at equal comfort, else None."""
+        if not self.ranking or self.baseline.score <= 0:
+            return None
+        best = self.ranking[0]
+        if self.saving(best) / self.baseline.score >= MIN_RELATIVE_SAVING:
+            return best
         return None
+
+    @property
+    def kwh_per_k_room(self) -> float:
+        """Electricity per day that one kelvin of room temperature costs."""
+        return self.baseline.metrics.get("kwh_per_k_room", 0.0)
+
+    @property
+    def percent_per_k_room(self) -> float:
+        """The same in percent of today's electricity."""
+        el = self.baseline.metrics["el_kwh_day"]
+        return 100 * self.kwh_per_k_room / el if el > 0 else 0.0
 
     def saving(self, c: Candidate) -> float:
         """EUR per day the candidate saves against the current settings."""
@@ -197,5 +256,5 @@ def describe_changes(
     for name, value in changes.items():
         current = schedule.night if name == "night" else getattr(base, name)
         if current != value:
-            parts.append(f"{name} {current:g} -> {value:g}")
+            parts.append(f"{name} {current:.3g} -> {value:.3g}")
     return ", ".join(parts)

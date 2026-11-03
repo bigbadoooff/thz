@@ -260,7 +260,8 @@ The advisor suggests settings of the heating control that would save
 electricity. It models the controller of the LWZ 5 CS Premium, learns the
 building, compressor and COP from the last 10 days in the recorder, and
 ranks variants of KP, room influence and low end by simulated cost per
-day.
+day, compared at equal room temperature (a setting that only leaves the
+room cooler is not counted as a saving).
 
 - **It only advises:** it never writes a setting or changes the operating
   mode. Every result is a **simulation, not a measurement**.

@@ -50,6 +50,10 @@ class Schedule:
         """Return a copy with another night setpoint."""
         return replace(self, night=night)
 
+    def shifted(self, delta_k: float) -> Schedule:
+        """Return a copy with day and night setpoints moved by ``delta_k``."""
+        return replace(self, day=self.day + delta_k, night=self.night + delta_k)
+
 
 def synthetic_outside(
     mean: float = 6.0,

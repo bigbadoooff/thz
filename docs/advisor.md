@@ -54,7 +54,7 @@ current states, nothing else.
 | *Advisor: Margin to Compressor Stop* (%) | Measured relative power minus the stop threshold (20 %). Attribute `kelvin`: the same in kelvin of control temperature (points / KP). |
 | *Advisor: Margin to Compressor Start* (%) | Start threshold (40 %) minus measured relative power, with `kelvin`. |
 | *Advisor: Model Error* (%) | Median error of the predicted relative power over the last 10 days. Attributes: settings in use (`kp`, `feed_forward_slope`, `ref_temp`, `design_power`, `design_temp`), their `source` (`fit` or `options`), the self-test (`passed`, `rows`, `rmse`, `bias`), `fit_kp` and `fit_feed_forward_slope`, `fit_rejected`, `missing_inputs`, `error`. |
-| *Advisor: Possible Saving* (EUR/day) | Saving of the best candidate against the current settings; 0 if none saves at least 0.01 EUR/day. Attributes: `recommendation` (e.g. `kp 8.5 -> 5`), `changes`, `ranking` (best five: cost, saving, kWh/day, COP, starts/day, room range), `current`, `price_eur_kwh`, `assumed`, `runtime_s`, `warnings`, `report`, and `skipped` with the reason when there is no advice. |
+| *Advisor: Possible Saving* (EUR/day) | Saving of the best candidate against the current settings **at equal room temperature**; 0 if none saves at least 2 %. Attributes: `recommendation` (e.g. `kp 8.5 -> 5`, or `keep the current settings; lowering the room setpoint by 1 K saves about 8 %`), `changes`, `percent_per_k_room`, `ranking` (best five: cost, saving, kWh/day at equal room temperature and as simulated, room change in K, COP, starts/day, room range), `current`, `price_eur_kwh`, `assumed`, `runtime_s`, `warnings`, `report`, and `skipped` with the reason when there is no advice. |
 | *Advisor: Run Now* (button) | Runs calibration and advice right away. |
 
 The advisor runs after setup, once a day, when its options change and on
@@ -134,9 +134,20 @@ Only when the self-test passes, the advisor:
    room influence (30, 50) and low end (2, 3 K), each over a mild (8 °C
    mean) and a cold (2 °C mean) synthetic week, with the day/night room
    setpoints from the heat pump (22.5 / 19 °C if unknown, day 06-22 h);
-3. ranks them by cost per day: electricity at the configured price, plus
-   0.05 EUR per compressor start and 0.10 EUR per kelvin-hour below the
-   comfort limit.
+3. compares them **at equal room temperature**. A setting that leaves the
+   room cooler uses less electricity for that reason alone; the same can
+   be had, more directly, from the room setpoint. So the advisor also
+   simulates the current settings with the room setpoint 0.5 K lower,
+   which gives what one kelvin of mean room temperature costs (about
+   8 % of the electricity on the measured data), and corrects every
+   candidate's electricity by its change of mean room temperature;
+4. ranks them by cost per day: that electricity at the configured price,
+   plus 0.05 EUR per compressor start and 0.10 EUR per kelvin-hour below
+   the comfort limit;
+5. recommends the best only if it saves at least 2 % of today's cost;
+   otherwise it recommends keeping the settings and states what a kelvin
+   of room temperature saves. The room change of every candidate is in
+   the ranking, so a cooler room is visible but not counted as a gain.
 
 ## Validation
 
@@ -174,10 +185,18 @@ outside temperature 4 to 12 °C:
    Stop*, electric energy per day at similar outside temperatures.
 4. Keep it or go back.
 
-On the measured data, for example, the model gives for KP 8.5 → 5 alone
-about 2 % less electricity with the room 0.2 K cooler on average;
-together with room influence 30 and low end 2 K about 7 %. A design
-temperature of -25 °C instead of -20 °C alone gives about 1 %.
+On the measured data, the controller settings hardly change the
+efficiency. Compared at equal room temperature:
+
+| Change | Electricity as simulated | Room (mean) | At equal room temperature |
+|---|---|---|---|
+| KP 8.5 → 5 | -2.0 % | -0.21 K | -0.3 % |
+| KP 5, room influence 30, low end 2 K | -6.9 % | -0.68 K | -1.5 % |
+| Design temperature -25 °C | -0.8 % | -0.10 K | 0.0 % |
+| KP 3 | -13.6 % | -1.76 K | +0.2 % |
+
+What these settings seem to save comes from a cooler room. Lowering the
+room setpoint by 1 K saves about 8 %, with any controller setting.
 
 ## Troubleshooting
 
