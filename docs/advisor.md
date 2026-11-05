@@ -79,34 +79,13 @@ event loop.
 
 ### Controller model
 
-The model of the heating control (profile LWZ 5 CS Premium, firmware
-around 7.59), with the integral component switched off:
-
-```
-T_target  = Rs + LE + G * (Rs - Ta_f) + (RI * G / 10) * (Rs - R_act)
-T_control = FS * T_flow + (1 - FS) * T_return
-rel       = KP * (T_target - T_control) + P_design * (20 - Ta_f) / (20 - T_design)
-```
-
-| Symbol | Setting | Register | Default |
-|---|---|---|---|
-| Rs, R_act | Room setpoint, room temperature | | |
-| LE | Low end | p14 | 3 K |
-| G | Gradient | p13 | 0.17 |
-| RI | Room influence | p15 | 50 |
-| FS | Flow share | p19 / 100 | 0 (return control) |
-| KP | Proportional component | none (option) | 8.5 %/K |
-| P_design | Design heating power | none (option) | 40 % |
-| T_design | Design temperature | none (option) | -20 °C |
-| 20 °C | Feed-forward reference temperature | fixed in the device | |
-| Ta_f | Outside temperature, first-order filter | p77 (time constant) | 12 h |
-
-The compressor starts above 40 % relative power and stops below 20 %, with
-a 20-minute restart lock. In kelvin of return temperature the hysteresis is
-20 / KP, about 2.35 K at KP 8.5. The relative power decides start and stop,
-not the heating power: while running, the compressor delivers about its
-minimum modulation (identified from the history, about 2.6 kW), rising
-slightly with the relative power up to 5.5 kW.
+The advisor simulates the heating control of the LWZ 5 CS Premium: heating
+curve and room influence give the target temperature, a proportional
+controller plus a feed-forward from the outside temperature gives the
+relative power, and the relative power starts (above 40 %) and stops (below
+20 %) the compressor, which then runs at about its minimum modulation. The
+formulas, settings, background and validation are on their own page:
+[How the heating control works](heating-control.md).
 
 ### Calibration
 

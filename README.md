@@ -42,6 +42,7 @@ with the help of AI.
 | Fault memory | Sensors and an event for new faults; acknowledge or clear (4.x/5.x) | [Fault memory](docs/fault-memory.md) |
 | Events and automations | Events for a new fault and a filter change, with examples | [Automations](docs/automations.md) |
 | Services | Block refresh, raw register access, parameter backup/restore, diverter valve | [Services](docs/services.md) |
+| Heating control | How the controller decides start and stop: formulas, settings, background | [Heating control](docs/heating-control.md) |
 | **Controller advisor** (new) | Simulates controller settings from the history and suggests savings — advice only (5.39/7.x) | [Below](#controller-advisor), [Advisor](docs/advisor.md) |
 | Configuration | Entity visibility tiers, sub-devices, per-block poll intervals, clock sync | [Configuration](docs/configuration.md) |
 | Diagnostics and repairs | Diagnostics download; a drifted clock raises a fixable repair issue | [Troubleshooting](docs/troubleshooting.md) |
@@ -71,8 +72,9 @@ the heating control would save electricity on **your** heat pump.
   enter KP, design power and design temperature under **Configure** or let
   the advisor estimate them.
 
-Details on entities, options, the model, its validation and limits:
-[docs/advisor.md](docs/advisor.md).
+How the heat pump's controller works, with the formulas and background:
+[docs/heating-control.md](docs/heating-control.md). Entities, options,
+validation and limits of the advisor: [docs/advisor.md](docs/advisor.md).
 
 ## Installation
 
