@@ -15,9 +15,9 @@ they act on.
 | [`thz.backup_parameters`](#parameter-backup) | Saves every writable parameter to a file |
 | [`thz.restore_parameters`](#parameter-backup) | Writes a saved backup back to the heat pump |
 | [`thz.list_parameter_backups`](#parameter-backup) | Lists the saved backups |
-| [`thz.probe_fault_memory`](fault-memory.md#services) | Reads the fault memory |
-| [`thz.acknowledge_faults`](fault-memory.md#services) | Marks the stored faults as seen (Home Assistant only) |
-| [`thz.clear_fault_memory`](fault-memory.md#services) | Clears the heat pump's fault memory |
+| [`thz.probe_fault_memory`](fault-memory.md) | Reads the fault memory |
+| [`thz.acknowledge_faults`](fault-memory.md) | Marks the stored faults as seen (Home Assistant only) |
+| [`thz.clear_fault_memory`](fault-memory.md) | Clears the heat pump's fault memory |
 
 ## `thz.refresh_block`
 
