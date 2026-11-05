@@ -17,6 +17,11 @@
 > **Version 0.7.1** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
 > features and breaking changes in this release.
 
+> **New: controller advisor** (firmware 5.39 / 7.x). The integration can now
+> tell you whether other controller settings would save electricity —
+> simulated from your own history, without writing anything to the heat
+> pump. See [Controller advisor](#controller-advisor).
+
 ## Introduction
 
 A custom Home Assistant integration for Stiebel Eltron LWZ and Tecalor THZ
@@ -37,9 +42,37 @@ with the help of AI.
 | Fault memory | Sensors and an event for new faults; acknowledge or clear (4.x/5.x) | [Fault memory](docs/fault-memory.md) |
 | Events and automations | Events for a new fault and a filter change, with examples | [Automations](docs/automations.md) |
 | Services | Block refresh, raw register access, parameter backup/restore, diverter valve | [Services](docs/services.md) |
-| Controller advisor | Simulates controller settings from the history and suggests savings — advice only (5.39/7.x) | [Advisor](docs/advisor.md) |
+| **Controller advisor** (new) | Simulates controller settings from the history and suggests savings — advice only (5.39/7.x) | [Below](#controller-advisor), [Advisor](docs/advisor.md) |
 | Configuration | Entity visibility tiers, sub-devices, per-block poll intervals, clock sync | [Configuration](docs/configuration.md) |
 | Diagnostics and repairs | Diagnostics download; a drifted clock raises a fixable repair issue | [Troubleshooting](docs/troubleshooting.md) |
+
+## Controller advisor
+
+*New, firmware 5.39 / 7.x.* The advisor checks whether other settings of
+the heating control would save electricity on **your** heat pump.
+
+- **What it does:** it learns how your house and heat pump behave from the
+  last 10 days in the recorder, simulates variants of KP, room influence
+  and low end, and compares them with your current settings at the **same
+  room temperature**. A setting that only makes the house cooler does not
+  count as a saving.
+- **What you see:** *Advisor: Possible Saving* in EUR/day with the
+  recommendation (or "keep the current settings"), plus sensors for the
+  predicted relative power, the margins to compressor start and stop and
+  the model error. *Advisor: Run Now* recalculates at once; otherwise it
+  runs daily.
+- **When it advises:** only if its model predicts your measured relative
+  power well enough (median error below 4 percentage points). Otherwise it
+  says why it gives no advice.
+- **What it never does:** write a setting or change the operating mode.
+  Every result is a **simulation, not a measurement**, and no data leaves
+  Home Assistant.
+- **Setup:** keep the recorder running and the heat pump's sensors enabled;
+  enter KP, design power and design temperature under **Configure** or let
+  the advisor estimate them.
+
+Details on entities, options, the model, its validation and limits:
+[docs/advisor.md](docs/advisor.md).
 
 ## Installation
 
