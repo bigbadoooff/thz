@@ -80,5 +80,6 @@ These keep the protocol code safe to change. Reviews check them.
 - Describe what changed for the user. For a protocol or map change, also
   describe how it was verified: a device and firmware, the FHEM reference,
   or a test.
-- Update `README.md` for user-visible behaviour and `CHANGELOG.md` for
-  anything worth a release note.
+- Update the documentation for user-visible behaviour: the topic's page
+  under `docs/` for the details, `README.md` only for its short overview.
+  Add anything worth a release note to `CHANGELOG.md`.

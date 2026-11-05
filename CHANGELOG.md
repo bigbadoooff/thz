@@ -21,6 +21,9 @@ All notable changes to the THZ integration are documented here.
   self-test with them; the integration's new options (**Configure**) hold
   the values otherwise. The advisor never writes to the heat pump. Adds
   numpy as a requirement. See [docs/advisor.md](docs/advisor.md).
+- **The README is a short overview now.** The details moved to topic pages
+  under `docs/`: entities, fault memory, services, configuration,
+  firmware, troubleshooting and the advisor, each linked from the README.
 - **The manual hot water setpoint goes up to 65 °C** on firmware 4.x, 5.x
   and 7.x. *DHW Temperature Manual* (`p11DHWsetManualTemp`) stopped at
   55 °C; the range is now 10-65 °C.

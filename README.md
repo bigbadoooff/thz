@@ -19,487 +19,115 @@
 
 ## Introduction
 
-This is a custom Home Assistant integration for connecting Stiebel Eltron LWZ or Tecalor THZ heat pumps to Home Assistant. The integration enables comprehensive monitoring and control of your heat pump system directly from your Home Assistant instance.
+A custom Home Assistant integration for Stiebel Eltron LWZ and Tecalor THZ
+heat pumps. It talks to the heat pump over its serial protocol, by USB or
+over the network (ser2net), and is set up entirely in the UI.
 
-The integration communicates with the heat pump using the serial protocol, supporting both direct USB connections and network-based serial connections (via ser2net). This allows flexible deployment options depending on your home automation setup.
-
-Parts of this software have been developed by the help of AI.
-
-**Origin**: This integration is based on the FHEM-Module developed by Immi, adapted for Home Assistant with modern async architecture and full UI configuration support.
+It is based on the FHEM module by Immi, adapted for Home Assistant with an
+async architecture and UI configuration. Parts of it have been developed
+with the help of AI.
 
 ## Features
 
-### Currently Implemented
-
-- ✅ **Full UI Configuration**: Easy setup through Home Assistant's integration interface — no YAML configuration required
-- ✅ **Connection Options**: Support for both USB serial and network (ser2net) connections
-- ✅ **Sensor Platform**: Monitor temperatures, pressures, operating states, runtime hours, and more
-- ✅ **Binary Sensor Platform**: Status flags such as compressor, pumps, valves and filter alarms
-- ✅ **Switch Platform**: Control heat pump functions on/off
-- ✅ **Number Platform**: Adjust numeric settings and parameters
-- ✅ **Select Platform**: Choose between predefined options — including **passive cooling mode** (firmware 4.39/5.39)
-- ✅ **Time Platform**: Set time-based parameters, schedules and programmes
-- ✅ **Button Platform**: One-shot commands, e.g. resetting the error list (depending on the firmware)
-- ✅ **Climate Platform**: Climate entities for Heating Circuit 1 and Heating Circuit 2 — with temperature control, HVAC mode and preset support
-- ✅ **Water Heater Platform**: Hot water as a water heater entity — temperature, setpoint and eco (setback) / performance / off state
-- ✅ **Fan Platform**: Ventilation as a fan entity — shows the current stage and starts unscheduled ventilation at stage 0–3
-- ✅ **Event Platform**: Events for a new fault and a requested filter change
-- ✅ **Controller Advisor**: Simulates controller settings from the recorded history and suggests the ones that save electricity — advice only, nothing is written (firmware 5.39/7.x, see [docs/advisor.md](docs/advisor.md))
-- ✅ **Repairs**: A drifted heat pump clock raises a fixable repair issue
-- ✅ **Diagnostics**: Download a diagnostics report for troubleshooting (via Settings → Devices & Services)
-- ✅ **Device Registry Integration**: Proper device identification in Home Assistant
-- ✅ **Per-Block Polling Intervals**: Each register block has its own configurable poll interval
-- ✅ **Smart Entity Management**: Non-essential entities are hidden by default to reduce clutter
-- ✅ **Services**: `thz.read_raw_register`, `thz.refresh_block`, `thz.set_diverter_valve`, parameter backup/restore (`thz.backup_parameters`, `thz.restore_parameters`, `thz.list_parameter_backups`), and fault memory (`thz.probe_fault_memory`, `thz.acknowledge_faults`, `thz.clear_fault_memory`)
-
-### Climate Entities
-
-These entities are created when the required data blocks and parameters are available:
-
-| Entity | Source | Supports |
-|--------|-------------|---------|
-| Heating Circuit 1 (climate) | `pxxF4` | Temperature setpoint, HVAC mode (heat, or cool with cooling support: follows the cooling switch, and in cool mode the temperature is the cooling setpoint), preset (operating mode); a circuit in standby shows the action `off` |
-| Heating Circuit 2 (climate) | `pxxF5` | Temperature setpoint, HVAC mode, preset — created only when HC2 is configured |
-| Hot Water (water heater) | `pxxF3` | Temperature and setpoint in effect; state `performance` (day), `eco` (setback, night setpoint) or `off` (standby). Setting a temperature writes the day setpoint (`p04`), the night setpoint (`p05`) while in eco, or the manual setpoint (`p11`) when that one is in effect. |
-| Ventilation (fan) | `p99startUnschedVent` (4.x/5.x), `pxxF6`/`pxxEE` (2.x) | The time programs set the ventilation stage; the fan controls *unscheduled ventilation*. A speed of 33/66/100 % starts it at stage 1/2/3, off starts it at stage 0, each for the time set in `p43`–`p46`; then the program takes over again. The program's stage settings (`p07` etc.) are not changed. Shown is the stage the ventilation runs at, also as the `stage` attribute: from the supply airflow of the current stage (`pxxE8`, when polled) compared with `p37`–`p39`, otherwise from today's fan time program (day stage `p07` inside a window, night stage `p08` outside). On 2.x firmware, which has no command to start ventilation, the fan only shows the stage (from the polled blocks `pxxF6` and `pxxEE`): the one set at the device while its time runs, otherwise the stage of the fan program state (day, night or standby). The fan reads its registers through the same parameter poller as the other settings, so it adds no extra requests for registers that are polled anyway. |
-
-HC1 also exposes **HVAC action** (heating / cooling / idle / off) and optional **cooling mode** when the device supports active cooling. The HVAC mode is what is selected (the cooling switch); the action shows whether the heat pump is cooling right now.
-
-### Services
-
-#### `thz.read_raw_register`
-Read any raw register block directly from the heat pump and return the hex dump. Useful for firmware research and debugging. Accepts the same block name forms as `thz.refresh_block`. See [docs/read-raw-register-service.md](docs/read-raw-register-service.md) for full documentation.
-
-#### `thz.refresh_block`
-Force an immediate re-read of a specific coordinator block without waiting for the next poll interval. Accepts any block name form (`"FB"`, `"pxxFB"`, `"0xFB"`). Returns `{success, block}`.
-
-```yaml
-service: thz.refresh_block
-data:
-  block: "FB"
-```
-
-#### `thz.set_diverter_valve`
-Manual control of the 3-way diverter valve motor. Both `heating` and `dhw` directions are guarded by the `diverterValve` status bit in `pxxF2`, read from the heat pump right before the move — the command is refused if the heat pump is currently pressurising the opposite circuit, or if `pxxF2` cannot be read. After 3 seconds the motor is automatically stopped and the stop is verified by reading back both motor registers.
-
-```yaml
-service: thz.set_diverter_valve
-data:
-  position: "dhw"   # heating | dhw | off
-```
-
-⚠️ Only use this service if you have a manually-controlled 3-way valve and understand the risk of incorrect actuation.
-
-### Fault Memory (firmware 4.x / 5.x)
-
-The heat pump keeps its last ten faults but has no "acknowledged" concept. When the **Fault Log** (`pxxD1`) block is polled, four sensors are created from it (no extra serial traffic):
-
-| Sensor | Meaning |
-|--------|---------|
-| Fault status | `No fault` / `Fault` — `Fault` while there are records you have not acknowledged |
-| Fault memory | Number of stored records; all records (newest first) are in the `entries` attribute |
-| Latest fault | The newest stored fault, translated (`none` if there is none) with code, date and time as attributes |
-| New faults | Number of records not yet acknowledged; the records are in the `entries` attribute |
-
-Faults already stored when the integration first sees the block are treated as acknowledged, so an existing history does not trigger an alarm. The heat pump stores day and month only, no year.
-
-#### `thz.probe_fault_memory`
-Read-only. Returns the raw D1 bytes and the decoded records.
-
-#### `thz.acknowledge_faults`
-Marks all records currently stored as seen. Only affects Home Assistant (the *Fault status* and *New faults* sensors); nothing is written to the heat pump.
-
-#### `thz.clear_fault_memory`
-Physically clears the heat pump's fault memory. It reads and validates D1 first, sends **one** clear command (`0000` to D1, never retried) and verifies the result by reading D1 again. The history on the device is lost. You must pass `confirmation: "CLEAR D1"`. It works on every firmware that provides D1, but the write has only been verified on real hardware on firmware **4.19**; if the readback still shows faults the service reports an error.
-
-```yaml
-service: thz.clear_fault_memory
-data:
-  confirmation: "CLEAR D1"
-```
-
-### Hidden Entities by Default
-
-To provide a cleaner initial setup experience, the following entity types are hidden by default:
-
-- **Time plan/programme entities**: Advanced schedule configuration entities (`programDHW_*`, `programHC1_*`)
-- **Advanced technical parameters**: Parameters like gradient, hysteresis, integral components (typically p13 and higher)
-- **HC2 (Heating Circuit 2) entities**: Only needed if you have a second heating circuit installed, including HC2's own schedule entities (`programHC2_*`). Gated separately from the two categories above (see below).
-
-Two independent settings control this, both asked during setup and changeable later via **Settings → Devices & Services → THZ → Configure**. Changing either retroactively bulk enables/disables the matching entities already in the registry, not just newly-created ones — any entity you've individually re-enabled or disabled by hand is left alone.
-
-- **Entity visibility** — a three-way tier covering schedules and advanced parameters:
-  - *Default*: hide both.
-  - *Extended*: enable advanced parameters, keep schedules hidden.
-  - *All*: enable both.
-- **Enable HC2 entities** — a separate checkbox, off by default. Independent of the tier above — even the "All" tier leaves HC2 hidden until this is checked, since most installs only have one heating circuit.
-
-Entities can also always be re-enabled individually via **Settings → Devices & Services → THZ → device → Show disabled entities**.
-
-### Sub-devices
-
-The entities can be grouped into sub-devices linked to the heat pump:
-
-- Heating circuit 1
-- Heating circuit 2
-- Hot water
-- Ventilation
-- Compressor (compressor, refrigerant circuit, defrost, COP)
-- Solar
-- Cooling
-
-General entities, such as the clock, fault memory, versions, outside temperature and operating mode, stay on the heat pump device. Each sub-device has its own device page and can be put in its own area.
-
-The **Split into sub-devices** setting is asked during setup, on by default. It can be changed later via **Settings → Devices & Services → THZ → Configure**. Installations set up before this option existed keep the single device until you switch it on.
-
-Switching the split on or off keeps the entity IDs, but the displayed names change. With the split on, a name is made of the sub-device name and the entity name, for example "lwz Hot water DHW temperature". Automations that refer to entity IDs keep working. Automations that pick a *device* (device triggers, conditions or actions) must be pointed to the new device. When the split is switched off, the entities move back to the heat pump with their names, areas and enabled state intact, and the sub-devices are removed.
-
-### COP (Coefficient of Performance) Sensors
-
-For firmware versions that support energy monitoring (e.g., 4.39), the integration automatically provides COP sensors:
-
-- **Current COP**: Real-time COP based on instantaneous power measurements
-- **Daily COP DHW / Heating / Total**
-- **Lifetime COP DHW / Heating / Total**
-
-The heat pump resets only the kWh part of its daily energy counters at midnight and keeps the Wh part. The integration subtracts that kept part, so the daily counters and the daily COP start at 0 each day. The correction starts with the first midnight after installation.
-
-COP = Heat Output ÷ Electrical Input. A COP of 3.0 means 3 kW of heat for every 1 kW of electricity consumed.
-
-### Runtime Hours (firmware 4.39 / 5.39)
-
-The `sHistory` block (command `09`) provides cumulative operating hours for the compressor and booster heaters:
-
-- `compressor_runtime_heating` — compressor hours in heating mode
-- `compressor_runtime_cooling` — compressor hours in cooling mode
-- `compressor_runtime_dhw` — compressor hours in DHW mode
-- `booster_runtime_dhw` — booster heater hours for DHW
-- `booster_runtime_heating` — booster heater hours for heating
-
-### Passive Cooling (firmware 4.39 / 5.39)
-
-A **Passive Cooling** select entity controls the passive cooling mode:
-
-| Mode | Description |
-|------|-------------|
-| `off` | Passive cooling disabled |
-| `exhaust_air` | Cool via exhaust air only |
-| `supply_air` | Cool via supply air only |
-| `bypass` | Bypass mode |
-| `sommerkassette` | Summer cassette mode |
-
-### Diagnostics
-
-The integration supports Home Assistant's built-in diagnostics download:
-
-1. Go to **Settings** → **Devices & Services** → **THZ**
-2. Click on your heat pump device
-3. Click **Download Diagnostics**
-
-The report includes firmware version, connection status, coordinator last-update times, and redacted hex dumps of all currently-polled register blocks.
-
-### How Data Is Updated
-
-The integration polls the heat pump over its serial protocol; the heat pump
-never pushes anything. Only one request is on the line at a time.
-
-- **Read values** (sensors, binary sensors, climate, water heater): each
-  register block has its own coordinator and interval, 600 seconds by
-  default, set per block under **Reconfigure**. A block is read in one
-  request, and all entities of the block update together.
-- **Settings** (number, select, switch, time, fan, and the climate preset
-  and cooling setpoint): one parameter poller per
-  heat pump reads every setting once per **write interval** (3600 seconds by
-  default), one after the other. A register shown by several entities is
-  read once; disabled entities are not read. On 2.x firmware, settings
-  inside a polled block take their value from that block.
-- **After a change from Home Assistant** the entity shows the written value
-  at once, and the register (or, for a 2.x setting inside a polled block,
-  its block) is read again right away, so every entity showing it follows.
-- **Right now:** `homeassistant.update_entity` reads a setting at once;
-  `thz.refresh_block` re-reads a block.
-- **Clock:** compared with Home Assistant's time every 15 minutes (see
-  Device Clock).
-
-When the heat pump does not answer, the entities become unavailable and
-recover with the next successful read.
-
-### Events
-
-See [docs/automations.md](docs/automations.md) for example automations.
-
-Two event entities let automations react to things that happen once:
-
-| Entity | Event types | Fires when | Attributes |
-|--------|-------------|-----------|-----------|
-| Fault | `fault` | a new record appears in the fault memory (`pxxD1`, firmware 4.x/5.x) | `fault_number`, `fault_code`, `description`, `time`, `date` |
-| Filter change | `filter_both`, `filter_up`, `filter_down` | the heat pump starts asking for that filter change (`pxx0A0176`) | — |
-
-They use data that is polled anyway, so the blocks must be selected for
-polling. The fault event remembers the records it has seen, so a fault
-stored while Home Assistant was not running fires once after the start. On
-the very first start the existing fault history fires nothing, and neither
-does a filter that is already due; the fault sensors and filter binary
-sensors show that state.
-
-### Device Clock
-
-The heat pump's time programs run on its own clock. Every 15 minutes the
-integration compares it with Home Assistant's time. If it is off by more
-than a minute:
-
-- with **Auto-sync clock** on (Reconfigure), the clock is corrected;
-- otherwise a **repair issue** appears under Settings → System → Repairs.
-  Fixing it sets the heat pump clock to Home Assistant's time, and can turn
-  on automatic sync for the future. The issue goes away by itself once the
-  clock is right again.
-
-### Controller Advisor (firmware 5.39 / 7.x)
-
-The advisor suggests settings of the heating control that would save
-electricity. It models the controller of the LWZ 5 CS Premium, learns the
-building, compressor and COP from the last 10 days in the recorder, and
-ranks variants of KP, room influence and low end by simulated cost per
-day, compared at equal room temperature (a setting that only leaves the
-room cooler is not counted as a saving).
-
-- **It only advises:** it never writes a setting or changes the operating
-  mode. Every result is a **simulation, not a measurement**.
-- **Nothing leaves Home Assistant;** it reads the recorder only.
-- Sensors show the predicted relative power, its deviation from the
-  measured one, the margins to the compressor stop and start thresholds,
-  the model error, and the possible saving in EUR/day with the
-  recommendation and ranking as attributes. A recommendation appears only
-  when the model passes its self-test (median error below 4 points). The
-  button *Advisor: Run Now* runs it on demand.
-- KP, design power and design temperature have no register; enter them
-  under **Configure**, or let the advisor fit KP and the feed-forward to
-  the history.
-
-See [docs/advisor.md](docs/advisor.md) for the entities, options, model,
-validation and limits.
-
-## Compatibility
-
-### Supported Firmware Versions
-
-| Firmware | Notes |
-|----------|-------|
-| 2.06     | Sensor read support; write support via block read-modify-write |
-| 2.14 / 2.14j | Sensor read support; write support via block read-modify-write |
-| 4.19     | 4.39-like profile for the THZ 303 SOL; a few `pxxFB` sensors the shorter payload cannot supply are disabled. Fault memory clear verified on this firmware |
-| 4.39     | Full support including energy sensors, COP, runtime hours, and passive cooling |
-| 5.09 / 7.09 | 4.39-based profile with the 5.09 extras (7.09 uses the 5.09 maps) |
-| 5.39     | Full support including passive cooling energy sensor (`sCoolHCTotal`) |
-| 7.59     | Uses the 5.39 maps |
-| Other    | Falls back to a 4.39-like configuration (like the reference FHEM module) — may work partially |
-
-### How Firmware Versions Are Loaded
-
-The firmware the heat pump reports at setup (or a firmware override chosen
-at setup or under Reconfigure) selects which register map modules the
-integration merges together. This determines both which sensors/entities
-get created and how their raw bytes are decoded — picking the wrong firmware
-typically produces missing entities or garbled values, not errors.
-
-Everything is driven by `RegisterMapManager` / `RegisterMapManagerWrite`
-(`custom_components/thz/register_maps/register_map_manager.py`), which build
-a merged map for a given `firmware` string in three layers, applied in order
-(a later layer's entries win, matched by sensor name within the same
-register block):
-
-1. **Base map** — `register_map_all.py` (reads) is always loaded first. It
-   defines the registers common to essentially every firmware (climate
-   blocks `F2`–`F5`, `sGlobal`/`FB`, `sTimedate`/`FC`, firmware/hardware
-   version `FD`/`FE`, etc.), using the 4.39/5.39 byte layout. There is no
-   `write_map_all.py` — the base write map is effectively empty.
-2. **Write maps** — one or more `write_map_*.py` modules for the firmware,
-   merged in listed order.
-3. **Read maps** — one or more `readings_map_*.py` / `register_map_*.py`
-   modules for the firmware, merged in listed order over the base map.
-
-| `firmware` value | Write maps | Read maps (over the base) |
+| Topic | In short | Details |
 |---|---|---|
-| `206` | `write_map_206` | `readings_map_2xx`, `readings_map_206`, `register_map_206` |
-| `214` | `write_map_206`, `write_map_214` | `readings_map_2xx`, `readings_map_214`, `register_map_214` |
-| `214j` | `write_map_206`, `write_map_214` | `readings_map_2xx`, `readings_map_214j`, `register_map_214j` |
-| `419` | `write_map_439_539`, `write_map_439` | `readings_map_439`, `register_map_419` |
-| `439` | `write_map_439_539`, `write_map_439` | `readings_map_439`, `register_map_439` |
-| `439technician` | `write_map_439_539`, `write_map_439`, `write_map_X39tech` | `readings_map_439`, `register_map_439` |
-| `509` / `709` | `write_map_439_539`, `write_map_539` | `readings_map_439`, `readings_map_509` |
-| `539` / `759` | `write_map_439_539`, `write_map_539` | `readings_map_439`, `readings_map_539` |
-| `539technician` | `write_map_439_539`, `write_map_539`, `write_map_X39tech` | `readings_map_439`, `readings_map_539` |
-| anything else | `write_map_439_539`, `write_map_439` | `readings_map_439` (`default`, treated as 4.39-like) |
-
-`709` is intentionally identical to `509` — the 7.09 firmware has no register
-differences from 5.09 that this integration is aware of, and `759` likewise
-uses the 5.39 maps. An unrecognized
-`firmware` string falls back to `default`, which mirrors the reference FHEM
-module's own behaviour of assuming 4.39 rather than guessing at 5.39-like
-registers that may not exist on the device (e.g. cooling-only blocks).
-
-#### The 2xx family (206 / 214 / 214j)
-
-- `readings_map_2xx.py` holds the sensor blocks the legacy FHEM module
-  requests identically for **all three** 2.xx variants (defrost/heating/DHW/
-  solar parameters, operating hours, schedules, fan calibration, solar
-  circuit, system status, time/date). `readings_map_206.py`,
-  `readings_map_214.py`, and `readings_map_214j.py` then only need to add
-  what genuinely differs per variant:
-  - `pFan` (cmd `01`): 206 uses a longer byte layout than 214/214j, which
-    share a shorter one.
-  - `sHC1` (cmd `F4`) and `sGlobal` (cmd `FB`): each variant has its own bit
-    layout, since the underlying hardware/firmware differ.
-  - The fault log `sLast10errors` (cmd `D1`) only exists on 206 — 214/214j
-    firmware doesn't expose it, so no entity is created for those variants.
-- Writing a parameter on 2xx firmware works differently from 4.39/5.39: the
-  protocol has no per-register write command, so `RegisterMapManagerWrite`
-  cross-references the read register maps to look up each writable
-  parameter's containing block, byte offset, and length, then performs a
-  read-modify-write of the whole block (`write_mode="block"`, see
-  `_enrich_2xx_write_entries`). 4.39/5.39 write registers directly.
-- No energy/COP metering, runtime-hours-by-mode, or passive cooling exists
-  on 2xx firmware — those registers were only added starting with 4.39 (see
-  below).
-
-#### The 4.39 / 5.39 family (439 / 509 / 709 / 539 / 759)
-
-- `readings_map_439.py` is the common base for this family (energy/COP
-  sensors, compressor & booster runtime hours, fault log, solar circuit,
-  fan speeds); `readings_map_509.py` / `readings_map_539.py` layer
-  firmware-specific extras on top (e.g. flow rate, humidity thresholds,
-  compressor power/rotation limits, dew point sensors, and — 5.39 only —
-  the passive-cooling energy sensor `sCoolHCTotal`).
-- Devices without active cooling hardware get cooling-only registers
-  stripped from the merged 5.39 maps (`_COOLING_READ_BLOCKS` /
-  `_COOLING_WRITE_KEYS`, applied via the `has_cooling` flag from your
-  config), so the passive cooling select entity and its related sensors
-  only appear when relevant.
-- The `439technician` / `539technician` variants add `write_map_X39tech` on
-  top of the normal 439/539 write maps, exposing extra technician-only
-  parameters that are otherwise not writable.
-
-### Confirmed Working Devices
-
-| Model | Firmware Version | Status |
-|-------|------------------|--------|
-| LWZ5  | 7.59 | ✅ Working |
-
-**Note**: While this integration has been confirmed to work with the devices listed above, it may work with other Stiebel Eltron LWZ and Tecalor THZ models. Users are encouraged to test and report compatibility.
+| Sensors and settings | Temperatures, pressures, states, runtime hours, energy; settings as number, select, switch and time entities | [Entities](docs/entities.md) |
+| Heating, hot water, ventilation | Climate entities for HC1/HC2, a water heater and a fan entity for unscheduled ventilation | [Entities](docs/entities.md#heating-hot-water-and-ventilation) |
+| Energy and COP | Current, daily and lifetime COP (4.39 and newer) | [COP sensors](docs/entities.md#cop-sensors) |
+| Fault memory | Sensors and an event for new faults; acknowledge or clear (4.x/5.x) | [Fault memory](docs/fault-memory.md) |
+| Events and automations | Events for a new fault and a filter change, with examples | [Automations](docs/automations.md) |
+| Services | Block refresh, raw register access, parameter backup/restore, diverter valve | [Services](docs/services.md) |
+| Controller advisor | Simulates controller settings from the history and suggests savings — advice only (5.39/7.x) | [Advisor](docs/advisor.md) |
+| Configuration | Entity visibility tiers, sub-devices, per-block poll intervals, clock sync | [Configuration](docs/configuration.md) |
+| Diagnostics and repairs | Diagnostics download; a drifted clock raises a fixable repair issue | [Troubleshooting](docs/troubleshooting.md) |
 
 ## Installation
 
-### Prerequisites
+**Prerequisites:** a current Home Assistant release (tested with 2026.2;
+releases before 2024.11 are not supported), a USB-to-serial adapter or a
+ser2net server, and access to the heat pump's serial interface.
 
-- A current Home Assistant release (tested with 2026.2; releases before
-  2024.11 are not supported)
-- USB-to-serial adapter or ser2net server for network connection
-- Physical access to your heat pump's serial interface
+**HACS (recommended)**
 
-### Option 1: HACS (Recommended)
+1. Open HACS → **Integrations** → three-dot menu → **Custom repositories**
+2. Add `https://github.com/bigbadoooff/thz` with category **Integration**
+3. Search for "Stiebel Eltron LWZ / Tecalor THZ", click **Download** and
+   restart Home Assistant
 
-1. Ensure [HACS](https://hacs.xyz/) is installed in your Home Assistant instance
-2. Open HACS → **Integrations** → three-dot menu → **Custom repositories**
-3. Add `https://github.com/bigbadoooff/thz` as a custom repository with category **Integration**
-4. Search for "Stiebel Eltron LWZ / Tecalor THZ" and click **Download**
-5. Restart Home Assistant
+**Manual:** copy the `thz` folder of the
+[latest release](https://github.com/bigbadoooff/thz/releases) to
+`<config_dir>/custom_components/thz/` and restart Home Assistant.
 
-### Option 2: Manual Installation
+**Setup:** **Settings → Devices & Services → + Add integration →
+"Stiebel Eltron LWZ / Tecalor THZ"**, choose USB or network and follow the
+wizard. Settings can be changed later under **Reconfigure**; see
+[Configuration](docs/configuration.md).
 
-1. Download the latest release from the [releases page](https://github.com/bigbadoooff/thz/releases)
-2. Copy the `thz` folder to `<config_dir>/custom_components/thz/`
-3. Restart Home Assistant
+## How it works
 
-### Configuration
+- **Polling.** The heat pump never pushes data. Each register block is read
+  on its own interval (600 s by default); settings are read once per write
+  interval (1 hour by default) and right after a change from Home
+  Assistant. See [How data is updated](docs/configuration.md#how-data-is-updated).
+- **Fewer entities by default.** Schedules, advanced parameters and HC2
+  are hidden until you enable them. See
+  [Entity visibility](docs/configuration.md#entity-visibility).
+- **Sub-devices.** Entities are grouped into heating circuits, hot water,
+  ventilation, compressor, solar and cooling. See
+  [Sub-devices](docs/configuration.md#sub-devices).
 
-1. Go to **Settings** → **Devices & Services** → **+ ADD INTEGRATION**
-2. Search for **"Stiebel Eltron LWZ / Tecalor THZ Integration"**
-3. Choose your connection type (USB or Network/ser2net) and follow the wizard
+## Compatibility
 
-## Removal
+| Firmware | Support |
+|---|---|
+| 2.06, 2.14, 2.14j | Sensors; settings via block read-modify-write |
+| 4.19 | 4.39-like profile for the THZ 303 SOL |
+| 4.39 | Full, incl. energy, COP, runtime hours, passive cooling |
+| 5.09, 7.09 | 4.39-based with the 5.09 extras |
+| 5.39, 7.59 | Full, incl. passive cooling energy and the controller advisor |
+| Other | Falls back to the 4.39 maps — may work partially |
 
-1. Go to **Settings** → **Devices & Services** → **THZ**
-2. Click the three-dot menu on the integration entry and choose **Delete**
-3. Confirm the removal — this stops all polling and removes the device and
-   its entities from Home Assistant. The `thz.*` services stay registered
-   until Home Assistant restarts without the integration.
-
-After deleting the integration in the UI, also remove the files depending on
-how it was installed:
-
-- **HACS**: open HACS → **Integrations**, find "Stiebel Eltron LWZ / Tecalor
-  THZ", and click **Remove**
-- **Manual installation**: delete the `<config_dir>/custom_components/thz/`
-  folder
-
-Then restart Home Assistant. No credentials or external accounts are created
-by this integration, so there is nothing else to revoke — only the local
-serial/network connection to the heat pump is released.
+Confirmed working: LWZ5 with firmware 7.59. Other LWZ/THZ models may work;
+please report yours. Details, firmware override and how the register maps
+are loaded: [Firmware](docs/firmware.md).
 
 ## Known Limitations
 
-- **One client per serial line.** The heat pump's interface serves one
-  program at a time. FHEM or another tool on the same USB port or ser2net
-  connection disturbs the communication.
+- **One client per serial line.** FHEM or another tool on the same USB port
+  or ser2net connection disturbs the communication.
 - **No discovery.** USB and ser2net connections are set up by hand.
-- **Settings update slowly.** A change made at the heat pump's control panel
-  shows up after the next write interval (1 hour by default), unless you
-  refresh the entity (see How Data Is Updated).
-- **Firmware coverage.** The register maps cover 2.06, 2.14, 2.14j, 4.19,
-  4.39, 5.09, 5.39, 7.09 and 7.59. Any other firmware uses the 4.39 maps; some
-  values may then be missing or wrong. A firmware override is available
-  under Reconfigure.
-- **2.x firmware:** no fault memory sensors or fault events (different
-  `pxxD1` layout), and the ventilation can only be shown, not started.
-- **Cooling:** passive cooling exists on 4.39 and 5.39; active cooling only
-  on 5.x devices whose cooling hardware answers at setup.
+- **Settings update slowly.** A change at the control panel shows up after
+  the next write interval, unless you refresh the entity.
+- **Firmware-dependent features.** Fault memory needs 4.x/5.x, energy and
+  COP 4.39 or newer, active cooling 5.x with cooling hardware; 2.x can show
+  the ventilation but not start it. See [Firmware](docs/firmware.md).
 - **Hot water mode** follows the heat pump's time program and operating
   mode; the water heater sets the temperature, not the mode.
-- **Energy values and COP** need firmware 4.39 or newer.
-- **Controller advisor:** only on firmware with the heating relative power
-  (5.39, 7.x), and modelled on the LWZ 5 CS Premium. Its model comes from
-  mild weather (2 °C and above): advice for frost is extrapolation, and
-  starts per day are not validated. See [docs/advisor.md](docs/advisor.md).
+- **Controller advisor:** modelled on the LWZ 5 CS Premium in mild weather;
+  advice for frost is extrapolation. See [Advisor](docs/advisor.md#limits).
 
 ## Troubleshooting
 
-### USB connection stops working after host reboot
+- **"Handshake 1 failed" after a reboot:** another program (e.g. FHEM) holds
+  the serial port.
+- **No entities:** check the log for `thz`; the firmware may not be
+  detected or a block not supported.
+- **Debug logging:** **Enable debug logging** on the integration's page.
 
-If you are using USB and another application (e.g., FHEM) also accesses the serial port, it may grab the device before Home Assistant on startup, causing "Handshake 1 failed" errors. Disable the THZ device in FHEM (or whichever application is competing) and restart the Home Assistant container.
+More, including logging and diagnostics:
+[Troubleshooting](docs/troubleshooting.md).
 
-If HA is running in Docker and the device was not enumerated when the container started, restart the container after the USB adapter appears: `docker restart homeassistant`.
+## Removal
 
-### Integration does not create entities
+1. **Settings → Devices & Services → THZ** → three-dot menu → **Delete**.
+   This stops polling and removes the device and its entities. The `thz.*`
+   services stay registered until Home Assistant restarts.
+2. Remove the files: in HACS → **Integrations** → "Stiebel Eltron LWZ /
+   Tecalor THZ" → **Remove**, or delete `<config_dir>/custom_components/thz/`.
+3. Restart Home Assistant.
 
-Check HA logs for `thz` entries. Common causes:
-- Firmware version not detected (empty firmware string) — the integration falls back to a default map but some blocks may be empty
-- Block not supported on the device — blocks returning no data are skipped silently
-
-Use `thz.read_raw_register` to verify that a specific block returns data on your device.
-
-### Logging
-
-In normal operation the integration logs one line at startup ("Connected to
-the heat pump") and otherwise only what needs attention:
-
-- a lost connection once as a warning, and once as info when it is back
-  (the blocks that fail meanwhile are not logged one by one);
-- a single setting that cannot be read while the heat pump answers, once
-  as a warning, and once as info when it reads again;
-- a sensor whose data is too short or cannot be decoded, and an unknown
-  select value, once until it reads correctly again;
-- a drifted device clock once, when its repair issue is raised (see Device
-  Clock).
-
-For troubleshooting, turn on **Enable debug logging** on the integration's
-page, or set the level in `configuration.yaml`, for example:
-
-```yaml
-logger:
-  logs:
-    custom_components.thz: debug              # everything
-    custom_components.thz.thz_device: debug   # only the serial/TCP exchange
-```
+No credentials or external accounts are created, so there is nothing else
+to revoke.
 
 ## Disclaimer
 
