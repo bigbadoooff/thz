@@ -1,8 +1,7 @@
 # How the heating control works
 
 How the heat pump's controller decides when the compressor runs, as far as
-it is known from the commissioning manual, from measurements and from the
-FHEM community. It applies to the LWZ / THZ 5xx generation; the formulas are
+it is known from the commissioning manual and from measurements. It applies to the LWZ / THZ 5xx generation; the formulas are
 confirmed on an LWZ 5 CS Premium (firmware 7.59). Other models may differ.
 
 The [controller advisor](advisor.md) uses this model to simulate other
@@ -14,7 +13,7 @@ settings.
 - [Compressor start and stop](#compressor-start-and-stop)
 - [Feed-forward](#feed-forward)
 - [Integral component](#integral-component)
-- [Background: observations from the FHEM forum](#background-observations-from-the-fhem-forum)
+- [Practical observations](#practical-observations)
 - [What is confirmed and what is open](#what-is-confirmed-and-what-is-open)
 - [What follows for the settings](#what-follows-for-the-settings)
 
@@ -115,44 +114,35 @@ up erratically. On the measured device it is switched off, and the model
 assumes I = 0.
 
 Switching it off does not reset the integrator: its last value stays as a
-constant offset. After setting it to 0, reset the controller so that offset
-goes to zero (see the background below).
+constant offset, and the actual heating-circuit temperature then no longer
+falls below the target. After setting it to 0, reset the controller so the
+offset goes to zero.
 
-## Background: observations from the FHEM forum
+## Practical observations
 
-A post in the THZ thread of the FHEM forum, on an LWZ 504, describes the
-same behaviour and led to this model. In summary:
-
-- **The problem.** At 0–10 °C outside the heat load of the house was below
-  the heat pump's minimum. The PID controller and the on/off logic coped
-  badly; after each compressor start the power rose erratically.
-- **The integral component off** (following an observation by user
-  *sakko*). With it set to 0 the controller is a PD controller, and the
-  erratic rises stopped. Afterwards the actual heating-circuit temperature
-  no longer fell below the target. The author explains this: the
-  integrator keeps its last value, so a controller reset is needed after
-  switching it off.
-- **The relative power.** The compressor starts above about 40 % and stops
-  below about 20 %. Without I, the relative power is a characteristic of
-  the outside temperature plus KP × (target − actual), and a derivative
-  part that was ignored. The temperature band between start and stop is
-  about 20 % / KP. For a band of 2.5 K the author chose a P component of
-  6.7 %/K, which acted as about 7.4 %/K.
-- **The feed-forward.** The author assumed a line through 0 % near 12 °C
-  with the design values (−25 °C, 40 %). On the LWZ 5 CS Premium the
-  measured reference is 20 °C (see below).
-- **Flow share.** A flow share of 25 % makes the controlled temperature
-  jump by about 0.9 K when the compressor starts (flow +3–4 K). That cuts
-  the relative power by about 6.5 points, so the compressor ramps down
-  sooner and runs longer at low power; it also reaches the stop threshold
-  sooner. At 25 % both effects about cancelled out.
-- **Result.** One or two long cycles a day at −1 to 7 °C, flow about
-  26 °C, a COP of 6–7 as the device reports it.
-- **Switching by room setpoint.** Since rel changes by KP × ΔRs, an
-  automation can start or stop heating with a few writes. It sets the night
-  room setpoint and switches to the day setpoint as soon as the computed
-  day rel would exceed 40 %. This day/night switching is what the advisor
-  does not simulate yet.
+- **Below the minimum heat load.** In mild weather (roughly 0–10 °C
+  outside) the house needs less heat than the compressor's minimum
+  modulation. With the integral component on, the PID controller and the
+  on/off logic cope badly: after each start the power rises erratically.
+  With it off (and the controller reset) the heat pump runs long, even
+  cycles at low power.
+- **Choosing KP.** The temperature band between start and stop is about
+  20 % / KP. Pick KP for the swing the house tolerates, for example 2.5 K
+  → KP 8 %/K. The relative power jitters a little, so the effective band is
+  somewhat smaller than 20 points; choose KP slightly lower than the
+  calculation gives.
+- **Flow share.** While the compressor is off, flow and return are about
+  equal, so the flow share does not change when it starts. When it runs,
+  the flow rises by about 3–4 K; with a flow share of 25 % the controlled
+  temperature rises by about 0.9 K, and the relative power drops by
+  KP × 0.9 K (about 7 points at KP 8.5). The compressor ramps down sooner
+  and runs longer at low power, but also reaches the stop threshold
+  sooner. Which effect wins depends on the house.
+- **Switching by room setpoint.** The relative power changes by KP × ΔRs
+  when the room setpoint changes. An automation can therefore start and
+  stop heating with two writes per cycle. It keeps the night setpoint and
+  switches to the day setpoint as soon as the computed day relative power
+  would exceed 40 %. The advisor does not simulate this switching yet.
 
 ## What is confirmed and what is open
 
