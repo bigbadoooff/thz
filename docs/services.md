@@ -4,20 +4,20 @@ All services are under **Developer tools → Actions** with their fields.
 With more than one heat pump, most services take the `entry_id` of the one
 they act on.
 
-| Service | Does |
-|---|---|
-| [`thz.refresh_block`](#thzrefresh_block) | Re-reads one register block now |
-| [`thz.read_raw_register`](read-raw-register-service.md) | Reads a raw register and returns the hex dump |
-| [`thz.scan_raw_registers`](#raw-register-research) | Reads many raw registers by pattern or range |
-| [`thz.watch_raw_registers_changes`](#raw-register-research) | Watches raw registers for changes for a while |
-| [`thz.set_diverter_valve`](#thzset_diverter_valve) | Moves the 3-way diverter valve by hand |
-| [`thz.clear_value`](#thzclear_value) | Clears a time or schedule entity to "unset" |
-| [`thz.backup_parameters`](#parameter-backup) | Saves every writable parameter to a file |
-| [`thz.restore_parameters`](#parameter-backup) | Writes a saved backup back to the heat pump |
-| [`thz.list_parameter_backups`](#parameter-backup) | Lists the saved backups |
-| [`thz.probe_fault_memory`](fault-memory.md) | Reads the fault memory |
-| [`thz.acknowledge_faults`](fault-memory.md) | Marks the stored faults as seen (Home Assistant only) |
-| [`thz.clear_fault_memory`](fault-memory.md) | Clears the heat pump's fault memory |
+| Service | Does | Details |
+|---|---|---|
+| `thz.refresh_block` | Re-reads one register block now | [below](#thzrefresh_block) |
+| `thz.read_raw_register` | Reads a raw register and returns the hex dump | [Raw register](read-raw-register-service.md) |
+| `thz.scan_raw_registers` | Reads many raw registers by pattern or range | [below](#raw-register-research) |
+| `thz.watch_raw_registers_changes` | Watches raw registers for changes for a while | [below](#raw-register-research) |
+| `thz.set_diverter_valve` | Moves the 3-way diverter valve by hand | [below](#thzset_diverter_valve) |
+| `thz.clear_value` | Clears a time or schedule entity to "unset" | [below](#thzclear_value) |
+| `thz.backup_parameters` | Saves every writable parameter to a file | [below](#parameter-backup) |
+| `thz.restore_parameters` | Writes a saved backup back to the heat pump | [below](#parameter-backup) |
+| `thz.list_parameter_backups` | Lists the saved backups | [below](#parameter-backup) |
+| `thz.probe_fault_memory` | Reads the fault memory | [Fault memory](fault-memory.md) |
+| `thz.acknowledge_faults` | Marks the stored faults as seen (Home Assistant only) | [Fault memory](fault-memory.md) |
+| `thz.clear_fault_memory` | Clears the heat pump's fault memory | [Fault memory](fault-memory.md) |
 
 ## `thz.refresh_block`
 
