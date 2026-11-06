@@ -21,6 +21,18 @@ CONF_ADVISOR_PRICE = "advisor_price"
 CONF_ADVISOR_PRICE_ENTITY = "advisor_price_entity"
 CONF_ADVISOR_COMFORT_MIN = "advisor_comfort_min"
 CONF_ADVISOR_FIT_CONTROLLER = "advisor_fit_controller"
+CONF_ADVISOR_POWER_EL_ENTITY = "advisor_power_el_entity"
+CONF_ADVISOR_POWER_HEAT_ENTITY = "advisor_power_heat_entity"
+CONF_ADVISOR_FLOW_RATE_ENTITY = "advisor_flow_rate_entity"
+CONF_ADVISOR_FLOW_RATE = "advisor_flow_rate"
+
+# Optional sensors of other integrations, in the order the form shows them.
+ENTITY_OPTIONS = (
+    CONF_ADVISOR_PRICE_ENTITY,
+    CONF_ADVISOR_POWER_EL_ENTITY,
+    CONF_ADVISOR_POWER_HEAT_ENTITY,
+    CONF_ADVISOR_FLOW_RATE_ENTITY,
+)
 
 
 @dataclass(frozen=True)
@@ -44,6 +56,8 @@ NUMBER_OPTIONS: Mapping[str, NumberOption] = {
     CONF_ADVISOR_DESIGN_TEMP: NumberOption(_P.design_temp, -25.0, 5.0, 1.0, "°C"),
     CONF_ADVISOR_PRICE: NumberOption(0.30, 0.0, 2.0, 0.01, "EUR/kWh"),
     CONF_ADVISOR_COMFORT_MIN: NumberOption(21.0, 15.0, 25.0, 0.5, "°C"),
+    # 0: no fixed flow rate.
+    CONF_ADVISOR_FLOW_RATE: NumberOption(0.0, 0.0, 5000.0, 10.0, "l/h"),
 }
 DEFAULT_FIT_CONTROLLER = True
 
@@ -57,6 +71,12 @@ class AdvisorSettings:
     price_entity: str | None
     comfort_min: float
     fit_controller: bool
+    # External sensors in place of the heat pump's own, and a fixed flow
+    # rate (l/h) for the heating power from flow x delta T.
+    power_el_entity: str | None = None
+    power_heat_entity: str | None = None
+    flow_rate_entity: str | None = None
+    flow_rate_lph: float | None = None
 
 
 def _number(options: Mapping[str, Any], key: str) -> float:
@@ -83,4 +103,8 @@ def advisor_settings(options: Mapping[str, Any]) -> AdvisorSettings:
         fit_controller=bool(
             options.get(CONF_ADVISOR_FIT_CONTROLLER, DEFAULT_FIT_CONTROLLER)
         ),
+        power_el_entity=options.get(CONF_ADVISOR_POWER_EL_ENTITY) or None,
+        power_heat_entity=options.get(CONF_ADVISOR_POWER_HEAT_ENTITY) or None,
+        flow_rate_entity=options.get(CONF_ADVISOR_FLOW_RATE_ENTITY) or None,
+        flow_rate_lph=_number(options, CONF_ADVISOR_FLOW_RATE) or None,
     )

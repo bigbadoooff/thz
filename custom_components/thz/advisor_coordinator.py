@@ -11,7 +11,7 @@ to the heat pump.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 import logging
 import math
@@ -19,23 +19,25 @@ import time
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .advisor.advisor import Advice, Plant, Weights, recommend
 from .advisor.calibrate import SOURCE_OPTIONS, Calibration, calibrate
 from .advisor.controller import StiebelParams, params_from_registers
-from .advisor.data import Table
+from .advisor.data import Table, heat_from_flow
 from .advisor.identify import identify
 from .advisor.quality import MAX_MEDIAN_ERROR
 from .advisor.simulate import Schedule
 from .advisor_history import AdvisorInputError, async_load_table
 from .advisor_inputs import (
-    IDENTIFY_INPUTS,
     PARAM_KEYS,
     SELFTEST_INPUTS,
     InputMapping,
+    PlantInputs,
     async_resolve_inputs,
+    plant_inputs,
 )
 from .advisor_options import AdvisorSettings, advisor_settings
 from .runtime_data import THZConfigEntry
@@ -62,6 +64,8 @@ class AdviceRun:
     # Settings without an enabled entity, taken from the defaults.
     assumed: tuple[str, ...]
     runtime_s: float
+    # power_el / power_heat -> where the values came from.
+    sources: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -234,12 +238,18 @@ class AdvisorCoordinator(DataUpdateCoordinator[AdvisorState]):
         end: datetime,
     ) -> AdvisorState:
         inputs = state.inputs
+        plant = self._plant_inputs(inputs, settings)
         try:
             plant_table = await async_load_table(
-                self.hass, inputs, IDENTIFY_INPUTS, start, end
+                self.hass, plant.mapping, plant.names, start, end
             )
         except AdvisorInputError as err:
             return _skip(state, str(err))
+        if plant.heat_from_flow:
+            flow = plant_table.get("flow_rate", plant.flow_lph or 0.0)
+            plant_table["power_heat"] = heat_from_flow(
+                flow, plant_table["flow_temp"], plant_table["return_temp"]
+            )
         registers = {
             name: value
             for name, entity_id in inputs.params.items()
@@ -259,7 +269,39 @@ class AdvisorCoordinator(DataUpdateCoordinator[AdvisorState]):
             return _skip(state, str(err))
         assumed = tuple(sorted(n for n in PARAM_KEYS if n not in registers))
         _LOGGER.debug("Advisor ran in %.2f s", run.runtime_s)
-        return replace(state, advice=replace(run, assumed=assumed), warnings=WARNINGS)
+        run = replace(run, assumed=assumed, sources=plant.sources)
+        return replace(state, advice=run, warnings=WARNINGS)
+
+    def _unit(self, entity_id: str) -> str | None:
+        """Unit of a sensor from the entity registry, else from its state."""
+        entry = er.async_get(self.hass).async_get(entity_id)
+        if entry is not None and entry.unit_of_measurement:
+            return entry.unit_of_measurement
+        state = self.hass.states.get(entity_id)
+        unit = state.attributes.get("unit_of_measurement") if state else None
+        return str(unit) if unit else None
+
+    def _plant_inputs(
+        self, inputs: InputMapping, settings: AdvisorSettings
+    ) -> PlantInputs:
+        external = [
+            e
+            for e in (
+                settings.power_el_entity,
+                settings.power_heat_entity,
+                settings.flow_rate_entity,
+            )
+            if e
+        ]
+        units = {e: unit for e in external if (unit := self._unit(e))}
+        return plant_inputs(
+            inputs,
+            power_el_entity=settings.power_el_entity,
+            power_heat_entity=settings.power_heat_entity,
+            flow_rate_entity=settings.flow_rate_entity,
+            flow_rate_lph=settings.flow_rate_lph,
+            units=units,
+        )
 
 
 # Limits of the model every advice carries.

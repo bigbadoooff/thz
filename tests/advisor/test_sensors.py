@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import numpy as np
 import pytest
 
 from custom_components.thz import advisor_button, advisor_coordinator, advisor_sensor
@@ -26,6 +27,8 @@ from custom_components.thz.advisor_history import AdvisorInputError
 from custom_components.thz.advisor_inputs import PARAM_KEYS, InputMapping
 from custom_components.thz.advisor_options import (
     CONF_ADVISOR_FIT_CONTROLLER,
+    CONF_ADVISOR_FLOW_RATE,
+    CONF_ADVISOR_POWER_EL_ENTITY,
     CONF_ADVISOR_PRICE_ENTITY,
     advisor_settings,
 )
@@ -485,3 +488,77 @@ def test_saving_sensor_without_advice():
     empty = _sensor(AdvisorSavingSensor, None, {})
     assert empty.native_value is None
     assert empty.extra_state_attributes == {}
+
+
+def test_coordinator_computes_heat_from_a_fixed_flow_rate():
+    cop = TABLES["power_el"]
+    plant = {k: v for k, v in cop.items() if k != "power_heat"}
+    loads = []
+
+    async def load(hass, mapping, names, start, end):
+        loads.append((mapping, tuple(names)))
+        if names[0] == "power_el":
+            return dict(plant)
+        return dict(TABLES["rel"])
+
+    no_heat = InputMapping(
+        sensors={
+            **INPUTS.sensors,
+            "power_el": "sensor.pel",
+            "return_temp": "sensor.ret",
+            "flow_temp": "sensor.flow",
+            "outside_temp": "sensor.out",
+        }
+    )
+    c = _coordinator({CONF_ADVISOR_FLOW_RATE: 1700})
+    c.hass.states.get.side_effect = {}.get
+    with (
+        patch.object(advisor_coordinator, "async_resolve_inputs", return_value=no_heat),
+        patch.object(
+            advisor_coordinator, "async_load_table", AsyncMock(side_effect=load)
+        ),
+        patch.object(advisor_coordinator.dt_util, "utcnow", return_value=NOW),
+        patch.object(
+            advisor_coordinator,
+            "compute_advice",
+            wraps=advisor_coordinator.compute_advice,
+        ) as compute,
+    ):
+        state = asyncio.run(c._async_update_data())
+    _, names = loads[-1]
+    assert "power_heat" not in names and "flow_temp" in names
+    table = compute.call_args.args[2]
+    expected = 1700 * 1.163 * (cop["flow_temp"] - cop["return_temp"]) / 1000
+    np.testing.assert_allclose(table["power_heat"], expected)
+    assert state.advice.sources == {
+        "power_el": "sensor.pel",
+        "power_heat": "flow rate x delta T (1700 l/h)",
+    }
+
+
+def test_coordinator_unit_of_an_external_sensor():
+    c = _coordinator()
+    registry = MagicMock()
+    registry.async_get.return_value = SimpleNamespace(unit_of_measurement="kW")
+    with patch.object(advisor_coordinator.er, "async_get", return_value=registry):
+        assert c._unit("sensor.meter") == "kW"
+        registry.async_get.return_value = None
+        c.hass.states.get.side_effect = {
+            "sensor.meter": SimpleNamespace(attributes={"unit_of_measurement": "W"})
+        }.get
+        assert c._unit("sensor.meter") == "W"
+        c.hass.states.get.side_effect = {}.get
+        assert c._unit("sensor.meter") is None
+
+
+def test_coordinator_passes_external_sensors_with_units():
+    c = _coordinator(
+        {
+            CONF_ADVISOR_POWER_EL_ENTITY: "sensor.meter",
+            CONF_ADVISOR_FIT_CONTROLLER: True,
+        }
+    )
+    with patch.object(c, "_unit", return_value="kW"):
+        plant = c._plant_inputs(INPUTS, advisor_settings(c.config_entry.options))
+    assert plant.mapping.sensors["power_el"] == "sensor.meter"
+    assert plant.mapping.units["power_el"] == "kW"

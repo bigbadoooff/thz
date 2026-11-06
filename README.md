@@ -70,7 +70,9 @@ the heating control would save electricity on **your** heat pump.
   Home Assistant.
 - **Setup:** keep the recorder running and the heat pump's sensors enabled;
   enter KP, design power and design temperature under **Configure** or let
-  the advisor estimate them.
+  the advisor estimate them. External power meters can replace the heat
+  pump's own power values; without a heating power value it is computed
+  from the flow rate × ΔT.
 
 How the heat pump's controller works, with the formulas and background:
 [docs/heating-control.md](docs/heating-control.md). Entities, options,

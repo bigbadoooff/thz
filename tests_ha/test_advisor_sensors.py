@@ -17,6 +17,7 @@ from custom_components.thz.advisor.quality import selftest
 from custom_components.thz.advisor_history import AdvisorInputError
 from custom_components.thz.advisor_options import (
     CONF_ADVISOR_FIT_CONTROLLER,
+    CONF_ADVISOR_POWER_EL_ENTITY,
     CONF_ADVISOR_PRICE_ENTITY,
 )
 
@@ -226,3 +227,19 @@ async def test_price_from_a_sensor(
 
     saving = hass.states.get(_advisor(hass, entry, "saving"))
     assert saving.attributes["price_eur_kwh"] == price
+
+
+async def test_external_power_sensor(hass: HomeAssistant, fake_device):
+    hass.states.async_set("sensor.meter", "450", {"unit_of_measurement": "W"})
+    load = _history()
+    with patch(_LOAD, load):
+        entry = await _setup_759(hass, fake_device)
+        hass.config_entries.async_update_entry(
+            entry, options={CONF_ADVISOR_POWER_EL_ENTITY: "sensor.meter"}
+        )
+        await hass.async_block_till_done()
+
+    saving = hass.states.get(_advisor(hass, entry, "saving"))
+    sources = saving.attributes["power_sources"]
+    assert sources["power_el"] == "sensor.meter"
+    assert sources["power_heat"].startswith("sensor.")

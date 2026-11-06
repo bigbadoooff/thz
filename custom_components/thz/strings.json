@@ -344,7 +344,11 @@
           "advisor_price": "Electricity price",
           "advisor_price_entity": "Electricity price sensor",
           "advisor_comfort_min": "Comfort limit (room)",
-          "advisor_fit_controller": "Estimate KP and feed-forward from the history"
+          "advisor_fit_controller": "Estimate KP and feed-forward from the history",
+          "advisor_power_el_entity": "Electric power sensor (external)",
+          "advisor_power_heat_entity": "Heating power sensor (external)",
+          "advisor_flow_rate_entity": "Flow rate sensor (external)",
+          "advisor_flow_rate": "Fixed flow rate"
         },
         "data_description": {
           "advisor_kp": "Menu value P component of the heating control.",
@@ -353,7 +357,11 @@
           "advisor_price": "Used when no price sensor is set or it has no value.",
           "advisor_price_entity": "Optional sensor with the current price in EUR/kWh, for example from a dynamic tariff.",
           "advisor_comfort_min": "Room temperatures below this limit count as a comfort penalty.",
-          "advisor_fit_controller": "Fits KP and the feed-forward slope to the recorded relative power (reference temperature fixed at 20 °C). The fitted values are used when the model passes its self-test with them, the values above otherwise. Design power and design temperature only enter as their ratio."
+          "advisor_fit_controller": "Fits KP and the feed-forward slope to the recorded relative power (reference temperature fixed at 20 °C). The fitted values are used when the model passes its self-test with them, the values above otherwise. Design power and design temperature only enter as their ratio.",
+          "advisor_power_el_entity": "Optional: a meter of the heat pump's electric power (W or kW) used instead of its own value, for example a more accurate energy meter.",
+          "advisor_power_heat_entity": "Optional: a heat meter (W or kW) used instead of the heat pump's own heating power.",
+          "advisor_flow_rate_entity": "Optional: heating-circuit flow rate (l/h, l/min or m³/h). Without a heating power value, the heating power is computed as flow rate × 1.163 Wh/(l·K) × (flow − return temperature).",
+          "advisor_flow_rate": "Used for that calculation when no flow-rate sensor is available; 0 = none. An approximation for a pump running at constant speed."
         }
       }
     }

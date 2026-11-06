@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # Specific heat of water in Wh/(l*K).
-_WATER_WH_PER_L_K = 1.163
+WATER_WH_PER_L_K = 1.163
 
 
 @dataclass(frozen=True)
@@ -51,7 +51,7 @@ class Building:
 
     def flow_temp(self, return_temp: float, q_kw: float) -> float:
         """Flow temperature for a return temperature and heating power."""
-        return return_temp + q_kw * 1000.0 / (self.flow_lph * _WATER_WH_PER_L_K)
+        return return_temp + q_kw * 1000.0 / (self.flow_lph * WATER_WH_PER_L_K)
 
 
 @dataclass(frozen=True)

@@ -367,6 +367,7 @@ def advice_attributes(state: AdvisorState) -> dict[str, Any]:
         current=_candidate(advice.baseline, 0.0),
         price_eur_kwh=round(run.price_eur_kwh, 4),
         assumed=list(run.assumed),
+        power_sources=dict(run.sources),
         runtime_s=round(run.runtime_s, 2),
         warnings=list(state.warnings),
         report=advice.report,

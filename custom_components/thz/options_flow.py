@@ -21,8 +21,8 @@ import voluptuous as vol
 
 from .advisor_options import (
     CONF_ADVISOR_FIT_CONTROLLER,
-    CONF_ADVISOR_PRICE_ENTITY,
     DEFAULT_FIT_CONTROLLER,
+    ENTITY_OPTIONS,
     NUMBER_OPTIONS,
 )
 
@@ -47,13 +47,13 @@ def options_schema(options: Mapping[str, Any]) -> vol.Schema:
                 )
             )
         )
-    price_entity = options.get(CONF_ADVISOR_PRICE_ENTITY)
-    fields[
-        vol.Optional(
-            CONF_ADVISOR_PRICE_ENTITY,
-            description={"suggested_value": price_entity} if price_entity else None,
-        )
-    ] = EntitySelector(EntitySelectorConfig(domain="sensor"))
+    for key in ENTITY_OPTIONS:
+        current = options.get(key)
+        fields[
+            vol.Optional(
+                key, description={"suggested_value": current} if current else None
+            )
+        ] = EntitySelector(EntitySelectorConfig(domain="sensor"))
     fields[
         vol.Required(
             CONF_ADVISOR_FIT_CONTROLLER,

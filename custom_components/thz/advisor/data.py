@@ -13,6 +13,8 @@ from pathlib import Path
 import numpy as np
 import numpy.typing as npt
 
+from .building import WATER_WH_PER_L_K
+
 FloatArray = npt.NDArray[np.float64]
 # Logical input name -> [(unix timestamp, value), ...], sorted by time.
 Series = dict[str, list[tuple[float, float]]]
@@ -35,6 +37,7 @@ INPUTS: tuple[str, ...] = (
     "room_temp",  # °C
     "power_el",  # kW, electric power
     "power_heat",  # kW, heating power
+    "flow_rate",  # l/h, heating-circuit flow rate
 )
 
 
@@ -85,6 +88,18 @@ def resample(
         idx = np.clip(np.searchsorted(stamps, grid, side="right") - 1, 0, None)
         out[n] = values[idx]
     return out
+
+
+def heat_from_flow(
+    flow_lph: FloatArray | float, flow_temp: FloatArray, return_temp: FloatArray
+) -> FloatArray:
+    """Heating power in kW from flow rate (l/h) and flow/return temperature.
+
+    Q = V * 1.163 Wh/(l*K) * (T_flow - T_return). Negative while defrosting,
+    when the heating circuit gives heat back.
+    """
+    spread = np.asarray(flow_temp, dtype=np.float64) - return_temp
+    return np.asarray(flow_lph, dtype=np.float64) * WATER_WH_PER_L_K * spread / 1000
 
 
 def load_csv(path: str | Path) -> Table:

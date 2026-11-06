@@ -17,8 +17,17 @@ from homeassistant.helpers.recorder import get_instance
 from .advisor.data import DEFAULT_STEP_S, Table, resample, series_from_states
 from .advisor_inputs import InputMapping
 
-# Unit -> factor to the unit the advisor computes in (kW).
-_POWER_TO_KW = {"W": 0.001, "kW": 1.0}
+# Unit -> factor to the unit the advisor computes in: kW for power, l/h for
+# flow rates. Other units (temperatures, %) stay as they are.
+_UNIT_FACTORS = {
+    "W": 0.001,
+    "kW": 1.0,
+    "l/min": 60.0,
+    "L/min": 60.0,
+    "l/h": 1.0,
+    "L/h": 1.0,
+    "m³/h": 1000.0,
+}
 
 
 class AdvisorInputError(Exception):
@@ -62,7 +71,7 @@ async def async_load_table(
 ) -> Table:
     """Read the inputs ``names`` between ``start`` and ``end`` onto a grid.
 
-    Power inputs are converted to kW.
+    Power inputs are converted to kW, flow rates to l/h.
 
     Raises:
         AdvisorInputError: An input has no enabled entity, or no numeric
@@ -82,7 +91,7 @@ async def async_load_table(
     if empty:
         raise AdvisorInputError(empty, "no recorded values")
     for name, values in series.items():
-        factor = _POWER_TO_KW.get(mapping.units.get(name, ""), 1.0)
+        factor = _UNIT_FACTORS.get(mapping.units.get(name, ""), 1.0)
         if factor != 1.0:
             series[name] = [(t, v * factor) for t, v in values]
     try:

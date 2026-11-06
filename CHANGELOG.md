@@ -20,7 +20,10 @@ All notable changes to the THZ integration are documented here.
   feed-forward are fitted to the history when the model passes its
   self-test with them; the integration's new options (**Configure**) hold
   the values otherwise. The advisor never writes to the heat pump. Adds
-  numpy as a requirement. See [docs/advisor.md](docs/advisor.md).
+  numpy as a requirement. For the building model, external power sensors
+  can replace the heat pump's own values, and the heating power can be
+  computed from the flow rate × (flow − return temperature). See
+  [docs/advisor.md](docs/advisor.md).
 - **The README is a short overview now.** The details moved to topic pages
   under `docs/`: entities, fault memory, services, configuration,
   firmware, troubleshooting, the heating control (formulas and background)

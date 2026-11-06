@@ -16,14 +16,19 @@ from custom_components.thz.advisor_inputs import (
     SELFTEST_INPUTS,
     SENSOR_KEYS,
     InputMapping,
+    plant_inputs,
     resolve_inputs,
 )
 from custom_components.thz.advisor_options import (
     CONF_ADVISOR_DESIGN_POWER,
     CONF_ADVISOR_FIT_CONTROLLER,
+    CONF_ADVISOR_FLOW_RATE,
+    CONF_ADVISOR_FLOW_RATE_ENTITY,
     CONF_ADVISOR_KP,
+    CONF_ADVISOR_POWER_EL_ENTITY,
     CONF_ADVISOR_PRICE,
     CONF_ADVISOR_PRICE_ENTITY,
+    ENTITY_OPTIONS,
     NUMBER_OPTIONS,
     advisor_settings,
 )
@@ -165,7 +170,12 @@ def test_options_schema_without_price_entity(options_flow_module):
     vol = sys.modules["voluptuous"]
     vol.Optional.reset_mock()
     options_flow_module.options_schema({})
-    vol.Optional.assert_called_once_with(CONF_ADVISOR_PRICE_ENTITY, description=None)
+    assert [c.args[0] for c in vol.Optional.call_args_list if c.args] == list(
+        ENTITY_OPTIONS
+    )
+    assert all(
+        c.kwargs == {"description": None} for c in vol.Optional.call_args_list if c.args
+    )
 
 
 # --- history ----------------------------------------------------------------
@@ -224,6 +234,18 @@ def test_load_table_converts_power_and_resamples(history_module):
     assert kwargs == {"significant_changes_only": False, "no_attributes": True}
 
 
+def test_load_table_converts_flow_rates(history_module):
+    module, history, get_instance = history_module
+    history.get_significant_states.return_value = {
+        "sensor.vdot": [_State(0, "20"), _State(900, "25")],
+    }
+    mapping = InputMapping(
+        sensors={"flow_rate": "sensor.vdot"}, units={"flow_rate": "l/min"}
+    )
+    table = _run_load(module, get_instance, mapping, ["flow_rate"])
+    np.testing.assert_array_equal(table["flow_rate"], [1200.0, 1200.0, 1200.0])
+
+
 def test_load_table_errors(history_module):
     module, history, get_instance = history_module
     mapping = InputMapping(sensors={"rel": "sensor.rel", "heat_temp": "sensor.ht"})
@@ -242,3 +264,99 @@ def test_load_table_errors(history_module):
     with pytest.raises(module.AdvisorInputError, match="overlap") as err:
         _run_load(module, get_instance, mapping, ["rel", "heat_temp"])
     assert err.value.inputs == ("rel", "heat_temp")
+
+
+# --- power sources ------------------------------------------------------------
+
+OWN = InputMapping(
+    sensors={
+        "power_el": "sensor.pel",
+        "power_heat": "sensor.qc",
+        "return_temp": "sensor.ret",
+        "flow_temp": "sensor.flow",
+        "outside_temp": "sensor.out",
+    },
+    units={"power_el": "W", "power_heat": "W"},
+)
+
+
+def _without(mapping, *names):
+    sensors = {k: v for k, v in mapping.sensors.items() if k not in names}
+    units = {k: v for k, v in mapping.units.items() if k not in names}
+    return InputMapping(sensors=sensors, units=units)
+
+
+def test_plant_inputs_use_the_heat_pumps_own_sensors():
+    p = plant_inputs(OWN)
+    assert p.names == ("power_el", "power_heat", "return_temp", "outside_temp")
+    assert not p.heat_from_flow
+    assert p.mapping.sensors == OWN.sensors
+    assert p.sources == {"power_el": "sensor.pel", "power_heat": "sensor.qc"}
+
+
+def test_plant_inputs_prefer_external_sensors():
+    p = plant_inputs(
+        OWN,
+        power_el_entity="sensor.meter",
+        power_heat_entity="sensor.heat_meter",
+        units={"sensor.meter": "kW"},
+    )
+    assert p.mapping.sensors["power_el"] == "sensor.meter"
+    assert p.mapping.units["power_el"] == "kW"
+    # No unit known for the heat meter: none is assumed.
+    assert "power_heat" not in p.mapping.units
+    assert p.sources == {"power_el": "sensor.meter", "power_heat": "sensor.heat_meter"}
+
+
+def test_plant_inputs_compute_heat_from_the_own_flow_rate():
+    own = InputMapping(
+        sensors={**_without(OWN, "power_heat").sensors, "flow_rate": "sensor.vdot"},
+        units={"power_el": "W", "flow_rate": "l/min"},
+    )
+    p = plant_inputs(own, flow_rate_lph=1200.0)
+    assert p.heat_from_flow
+    assert p.flow_lph is None  # the sensor wins over the fixed value
+    assert set(p.names) == {
+        "power_el",
+        "return_temp",
+        "outside_temp",
+        "flow_temp",
+        "flow_rate",
+    }
+    assert p.sources["power_heat"] == "flow rate x delta T (sensor.vdot)"
+
+
+def test_plant_inputs_external_or_fixed_flow_rate():
+    base = _without(OWN, "power_heat")
+    ext = plant_inputs(
+        base, flow_rate_entity="sensor.ext_flow", units={"sensor.ext_flow": "m³/h"}
+    )
+    assert ext.mapping.sensors["flow_rate"] == "sensor.ext_flow"
+    assert ext.mapping.units["flow_rate"] == "m³/h"
+    fixed = plant_inputs(base, flow_rate_lph=1700.0)
+    assert fixed.heat_from_flow
+    assert fixed.flow_lph == 1700.0
+    assert "flow_rate" not in fixed.names
+    assert fixed.sources["power_heat"] == "flow rate x delta T (1700 l/h)"
+
+
+def test_plant_inputs_without_any_heat_source():
+    p = plant_inputs(_without(OWN, "power_heat", "power_el"))
+    assert "power_heat" in p.names
+    assert p.mapping.lacking(p.names) == ["power_el", "power_heat"]
+    assert p.sources == {}
+
+
+def test_advisor_settings_power_sources():
+    s = advisor_settings(
+        {
+            CONF_ADVISOR_POWER_EL_ENTITY: "sensor.meter",
+            CONF_ADVISOR_FLOW_RATE_ENTITY: "",
+            CONF_ADVISOR_FLOW_RATE: 1500,
+        }
+    )
+    assert s.power_el_entity == "sensor.meter"
+    assert s.power_heat_entity is None
+    assert s.flow_rate_entity is None
+    assert s.flow_rate_lph == 1500.0
+    assert advisor_settings({}).flow_rate_lph is None

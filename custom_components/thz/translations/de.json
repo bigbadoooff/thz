@@ -344,7 +344,11 @@
           "advisor_price": "Strompreis",
           "advisor_price_entity": "Strompreis-Sensor",
           "advisor_comfort_min": "Komfortgrenze (Raum)",
-          "advisor_fit_controller": "KP und Vorsteuerung aus dem Verlauf schätzen"
+          "advisor_fit_controller": "KP und Vorsteuerung aus dem Verlauf schätzen",
+          "advisor_power_el_entity": "Sensor elektrische Leistung (extern)",
+          "advisor_power_heat_entity": "Sensor Heizleistung (extern)",
+          "advisor_flow_rate_entity": "Sensor Volumenstrom (extern)",
+          "advisor_flow_rate": "Fester Volumenstrom"
         },
         "data_description": {
           "advisor_kp": "Menüwert P-Anteil der Heizungsregelung.",
@@ -353,7 +357,11 @@
           "advisor_price": "Gilt, wenn kein Preis-Sensor gesetzt ist oder er keinen Wert hat.",
           "advisor_price_entity": "Optionaler Sensor mit dem aktuellen Preis in EUR/kWh, z. B. von einem dynamischen Tarif.",
           "advisor_comfort_min": "Raumtemperaturen unter dieser Grenze zählen als Komfortverlust.",
-          "advisor_fit_controller": "Passt KP und die Steigung der Vorsteuerung an die aufgezeichnete relative Leistung an (Bezugstemperatur fest 20 °C). Die geschätzten Werte gelten, wenn das Modell damit den Selbsttest besteht, sonst die Werte oben. Leistung Auslegung und Auslegungstemperatur gehen nur als Verhältnis ein."
+          "advisor_fit_controller": "Passt KP und die Steigung der Vorsteuerung an die aufgezeichnete relative Leistung an (Bezugstemperatur fest 20 °C). Die geschätzten Werte gelten, wenn das Modell damit den Selbsttest besteht, sonst die Werte oben. Leistung Auslegung und Auslegungstemperatur gehen nur als Verhältnis ein.",
+          "advisor_power_el_entity": "Optional: ein Zähler der elektrischen Leistung der Wärmepumpe (W oder kW), der statt ihres eigenen Werts verwendet wird, z. B. ein genauerer Stromzähler.",
+          "advisor_power_heat_entity": "Optional: ein Wärmemengenzähler (W oder kW), der statt der eigenen Heizleistung der Wärmepumpe verwendet wird.",
+          "advisor_flow_rate_entity": "Optional: Volumenstrom des Heizkreises (l/h, l/min oder m³/h). Ohne Heizleistungswert wird die Heizleistung als Volumenstrom × 1,163 Wh/(l·K) × (Vorlauf − Rücklauf) berechnet.",
+          "advisor_flow_rate": "Wird für diese Berechnung genutzt, wenn kein Volumenstrom-Sensor vorhanden ist; 0 = keiner. Eine Näherung für eine Pumpe mit konstanter Drehzahl."
         }
       }
     }

@@ -27,6 +27,7 @@ SENSOR_KEYS: Mapping[str, tuple[str, ...]] = {
     "room_temp": ("inside_temp_rc", "inside_temp"),
     "power_el": ("actual_power_pel",),
     "power_heat": ("actual_power_qc",),
+    "flow_rate": ("flow_rate",),
 }
 
 # StiebelParams field (or room setpoint of the schedule) -> translation keys
@@ -44,6 +45,8 @@ PARAM_KEYS: Mapping[str, tuple[str, ...]] = {
 # Inputs each part of the advisor needs.
 SELFTEST_INPUTS = ("rel", "heat_setpoint", "heat_temp", "outside_temp_filtered")
 IDENTIFY_INPUTS = ("power_el", "power_heat", "return_temp", "outside_temp")
+# Heating power computed from the flow rate needs these instead of power_heat.
+HEAT_FROM_FLOW_INPUTS = ("flow_temp", "return_temp")
 
 
 @dataclass(frozen=True)
@@ -121,3 +124,81 @@ def async_resolve_inputs(hass: HomeAssistant, entry_id: str) -> InputMapping:
     """Map the advisor's inputs to the entities of config entry ``entry_id``."""
     registry = er.async_get(hass)
     return resolve_inputs(er.async_entries_for_config_entry(registry, entry_id))
+
+
+@dataclass(frozen=True)
+class PlantInputs:
+    """Where the building identification takes its power values from."""
+
+    # The mapping with external sensors in place of the heat pump's own.
+    mapping: InputMapping
+    # Inputs to read from the recorder.
+    names: tuple[str, ...]
+    # Compute power_heat from flow_rate (sensor) or flow_lph and flow/return.
+    heat_from_flow: bool = False
+    # Fixed flow rate in l/h when no flow-rate sensor is used.
+    flow_lph: float | None = None
+    # power_el / power_heat -> where it comes from, for the attributes.
+    sources: dict[str, str] = field(default_factory=dict)
+
+
+def plant_inputs(
+    inputs: InputMapping,
+    *,
+    power_el_entity: str | None = None,
+    power_heat_entity: str | None = None,
+    flow_rate_entity: str | None = None,
+    flow_rate_lph: float | None = None,
+    units: Mapping[str, str] | None = None,
+) -> PlantInputs:
+    """Choose the power sources of the building identification.
+
+    Electric power: the external sensor if set, else the heat pump's own.
+    Heating power: the external sensor if set, else the heat pump's own,
+    else flow rate x (flow - return temperature), with the flow rate from
+    the external sensor, the heat pump's own flow-rate sensor or the fixed
+    value. ``units`` gives the units of the external sensors.
+    """
+    units = units or {}
+    sensors = dict(inputs.sensors)
+    sensor_units = dict(inputs.units)
+    sources: dict[str, str] = {}
+
+    def use(name: str, entity_id: str) -> None:
+        sensors[name] = entity_id
+        if entity_id in units:
+            sensor_units[name] = units[entity_id]
+        else:
+            sensor_units.pop(name, None)
+
+    if power_el_entity:
+        use("power_el", power_el_entity)
+    if "power_el" in sensors:
+        sources["power_el"] = sensors["power_el"]
+    names = list(IDENTIFY_INPUTS)
+    heat_from_flow = False
+    flow_lph = None
+    if power_heat_entity:
+        use("power_heat", power_heat_entity)
+    if "power_heat" in sensors:
+        sources["power_heat"] = sensors["power_heat"]
+    elif flow_rate_entity or "flow_rate" in sensors or flow_rate_lph:
+        heat_from_flow = True
+        names = [n for n in names if n != "power_heat"]
+        names += [n for n in HEAT_FROM_FLOW_INPUTS if n not in names]
+        if flow_rate_entity:
+            use("flow_rate", flow_rate_entity)
+        if "flow_rate" in sensors:
+            names.append("flow_rate")
+            sources["power_heat"] = f"flow rate x delta T ({sensors['flow_rate']})"
+        else:
+            flow_lph = flow_rate_lph
+            sources["power_heat"] = f"flow rate x delta T ({flow_rate_lph:g} l/h)"
+    mapping = InputMapping(
+        sensors,
+        inputs.params,
+        sensor_units,
+        inputs.disabled,
+        inputs.missing,
+    )
+    return PlantInputs(mapping, tuple(names), heat_from_flow, flow_lph, sources)
