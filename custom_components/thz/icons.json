@@ -74,6 +74,9 @@
       },
       "z_reset_last10errors": {
         "default": "mdi:trash-can-outline"
+      },
+      "advisor_run": {
+        "default": "mdi:calculator-variant-outline"
       }
     },
     "number": {
@@ -708,6 +711,24 @@
       },
       "fault_new": {
         "default": "mdi:alert"
+      },
+      "advisor_rel_predicted": {
+        "default": "mdi:chart-bell-curve-cumulative"
+      },
+      "advisor_rel_deviation": {
+        "default": "mdi:delta"
+      },
+      "advisor_stop_margin": {
+        "default": "mdi:arrow-collapse-down"
+      },
+      "advisor_start_margin": {
+        "default": "mdi:arrow-collapse-up"
+      },
+      "advisor_model_error": {
+        "default": "mdi:target-variant"
+      },
+      "advisor_saving": {
+        "default": "mdi:piggy-bank-outline"
       }
     },
     "switch": {

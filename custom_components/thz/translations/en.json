@@ -332,6 +332,40 @@
       "invalid_port": "Invalid port number. Port must be between 1 and 65535."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Advisor",
+        "description": "The advisor simulates controller settings from the recorded history and suggests changes. It never writes to the heat pump; its results are a simulation, not a measurement. KP, design power and design temperature have no register: enter the values set in the heat pump's menu.",
+        "data": {
+          "advisor_kp": "Proportional component (KP)",
+          "advisor_design_power": "Design heating power",
+          "advisor_design_temp": "Design temperature",
+          "advisor_price": "Electricity price",
+          "advisor_price_entity": "Electricity price sensor",
+          "advisor_comfort_min": "Comfort limit (room)",
+          "advisor_fit_controller": "Estimate KP and feed-forward from the history",
+          "advisor_power_el_entity": "Electric power sensor (external)",
+          "advisor_power_heat_entity": "Heating power sensor (external)",
+          "advisor_flow_rate_entity": "Flow rate sensor (external)",
+          "advisor_flow_rate": "Fixed flow rate"
+        },
+        "data_description": {
+          "advisor_kp": "Menu value P component of the heating control.",
+          "advisor_design_power": "Relative power at the design temperature, 40 to 100 %.",
+          "advisor_design_temp": "Outside temperature the heating is designed for, -25 to +5 °C.",
+          "advisor_price": "Used when no price sensor is set or it has no value.",
+          "advisor_price_entity": "Optional sensor with the current price in EUR/kWh, for example from a dynamic tariff.",
+          "advisor_comfort_min": "Room temperatures below this limit count as a comfort penalty.",
+          "advisor_fit_controller": "Fits KP and the feed-forward slope to the recorded relative power (reference temperature fixed at 20 °C). The fitted values are used when the model passes its self-test with them, the values above otherwise. Design power and design temperature only enter as their ratio.",
+          "advisor_power_el_entity": "Optional: a meter of the heat pump's electric power (W or kW) used instead of its own value, for example a more accurate energy meter.",
+          "advisor_power_heat_entity": "Optional: a heat meter (W or kW) used instead of the heat pump's own heating power.",
+          "advisor_flow_rate_entity": "Optional: heating-circuit flow rate (l/h, l/min or m³/h). Without a heating power value, the heating power is computed as flow rate × 1.163 Wh/(l·K) × (flow − return temperature).",
+          "advisor_flow_rate": "Used for that calculation when no flow-rate sensor is available; 0 = none. An approximation for a pump running at constant speed."
+        }
+      }
+    }
+  },
   "device": {
     "heating": {
       "name": "{device_name} Heating circuit 1"
@@ -1466,6 +1500,24 @@
       },
       "fault_new": {
         "name": "New faults"
+      },
+      "advisor_rel_predicted": {
+        "name": "Advisor: Predicted Relative Power"
+      },
+      "advisor_rel_deviation": {
+        "name": "Advisor: Deviation from Relative Power"
+      },
+      "advisor_stop_margin": {
+        "name": "Advisor: Margin to Compressor Stop"
+      },
+      "advisor_start_margin": {
+        "name": "Advisor: Margin to Compressor Start"
+      },
+      "advisor_model_error": {
+        "name": "Advisor: Model Error"
+      },
+      "advisor_saving": {
+        "name": "Advisor: Possible Saving"
       }
     },
     "number": {
@@ -2900,6 +2952,9 @@
       },
       "z_reset_last10errors": {
         "name": "Reset Fault Log"
+      },
+      "advisor_run": {
+        "name": "Advisor: Run Now"
       }
     },
     "event": {

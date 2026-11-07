@@ -10,5 +10,6 @@ types-pyserial>=3.5
 voluptuous>=0.13.1
 tzlocal>=5.0
 types-tzlocal>=5.0
+numpy>=1.26.0
 # mypy checks against Home Assistant itself, installed by
 # requirements_test_ha.txt (Python 3.13).

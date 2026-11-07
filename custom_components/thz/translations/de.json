@@ -332,6 +332,40 @@
       "invalid_port": "Ungültige Portnummer. Port muss zwischen 1 und 65535 liegen."
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Berater",
+        "description": "Der Berater simuliert Reglereinstellungen anhand des aufgezeichneten Verlaufs und schlägt Änderungen vor. Er schreibt nie in die Wärmepumpe; seine Ergebnisse sind eine Simulation, keine Messung. KP, Leistung Auslegung und Auslegungstemperatur haben kein Register: Tragen Sie die im Menü der Wärmepumpe eingestellten Werte ein.",
+        "data": {
+          "advisor_kp": "Proportionalanteil (KP)",
+          "advisor_design_power": "Leistung Auslegung Heizen",
+          "advisor_design_temp": "Auslegungstemperatur",
+          "advisor_price": "Strompreis",
+          "advisor_price_entity": "Strompreis-Sensor",
+          "advisor_comfort_min": "Komfortgrenze (Raum)",
+          "advisor_fit_controller": "KP und Vorsteuerung aus dem Verlauf schätzen",
+          "advisor_power_el_entity": "Sensor elektrische Leistung (extern)",
+          "advisor_power_heat_entity": "Sensor Heizleistung (extern)",
+          "advisor_flow_rate_entity": "Sensor Volumenstrom (extern)",
+          "advisor_flow_rate": "Fester Volumenstrom"
+        },
+        "data_description": {
+          "advisor_kp": "Menüwert P-Anteil der Heizungsregelung.",
+          "advisor_design_power": "Relative Leistung bei Auslegungstemperatur, 40 bis 100 %.",
+          "advisor_design_temp": "Außentemperatur, für die die Heizung ausgelegt ist, −25 bis +5 °C.",
+          "advisor_price": "Gilt, wenn kein Preis-Sensor gesetzt ist oder er keinen Wert hat.",
+          "advisor_price_entity": "Optionaler Sensor mit dem aktuellen Preis in EUR/kWh, z. B. von einem dynamischen Tarif.",
+          "advisor_comfort_min": "Raumtemperaturen unter dieser Grenze zählen als Komfortverlust.",
+          "advisor_fit_controller": "Passt KP und die Steigung der Vorsteuerung an die aufgezeichnete relative Leistung an (Bezugstemperatur fest 20 °C). Die geschätzten Werte gelten, wenn das Modell damit den Selbsttest besteht, sonst die Werte oben. Leistung Auslegung und Auslegungstemperatur gehen nur als Verhältnis ein.",
+          "advisor_power_el_entity": "Optional: ein Zähler der elektrischen Leistung der Wärmepumpe (W oder kW), der statt ihres eigenen Werts verwendet wird, z. B. ein genauerer Stromzähler.",
+          "advisor_power_heat_entity": "Optional: ein Wärmemengenzähler (W oder kW), der statt der eigenen Heizleistung der Wärmepumpe verwendet wird.",
+          "advisor_flow_rate_entity": "Optional: Volumenstrom des Heizkreises (l/h, l/min oder m³/h). Ohne Heizleistungswert wird die Heizleistung als Volumenstrom × 1,163 Wh/(l·K) × (Vorlauf − Rücklauf) berechnet.",
+          "advisor_flow_rate": "Wird für diese Berechnung genutzt, wenn kein Volumenstrom-Sensor vorhanden ist; 0 = keiner. Eine Näherung für eine Pumpe mit konstanter Drehzahl."
+        }
+      }
+    }
+  },
   "device": {
     "heating": {
       "name": "{device_name} Heizkreis 1"
@@ -362,6 +396,9 @@
       },
       "z_reset_last10errors": {
         "name": "Fehlerprotokoll zurücksetzen"
+      },
+      "advisor_run": {
+        "name": "Berater: jetzt berechnen"
       }
     },
     "sensor": {
@@ -1451,6 +1488,24 @@
       },
       "fault_new": {
         "name": "Neue Fehler"
+      },
+      "advisor_rel_predicted": {
+        "name": "Berater: vorhergesagte relative Leistung"
+      },
+      "advisor_rel_deviation": {
+        "name": "Berater: Abweichung von der relativen Leistung"
+      },
+      "advisor_stop_margin": {
+        "name": "Berater: Abstand zum Verdichterstopp"
+      },
+      "advisor_start_margin": {
+        "name": "Berater: Abstand zum Verdichterstart"
+      },
+      "advisor_model_error": {
+        "name": "Berater: Modellfehler"
+      },
+      "advisor_saving": {
+        "name": "Berater: mögliche Einsparung"
       }
     },
     "number": {
