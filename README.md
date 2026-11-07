@@ -72,7 +72,8 @@ the heating control would save electricity on **your** heat pump.
   enter KP, design power and design temperature under **Configure** or let
   the advisor estimate them. External power meters can replace the heat
   pump's own power values; without a heating power value it is computed
-  from the flow rate × ΔT.
+  from the flow rate × ΔT, and without an electric power value the COP is
+  estimated with Carnot, giving a minimum saving.
 
 How the heat pump's controller works, with the formulas and background:
 [docs/heating-control.md](docs/heating-control.md). Entities, options,

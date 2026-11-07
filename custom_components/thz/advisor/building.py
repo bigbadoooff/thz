@@ -7,6 +7,7 @@ Every parameter can be replaced by one identified from measured data
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol
 
 # Specific heat of water in Wh/(l*K).
 WATER_WH_PER_L_K = 1.163
@@ -100,3 +101,38 @@ class CopModel:
             + self.d_power * q_kw
         )
         return min(self.hi, max(self.lo, value))
+
+
+# Smallest temperature lift the Carnot estimate uses (K), so that it stays
+# finite when flow and outside temperature meet.
+_MIN_LIFT_K = 1.0
+_KELVIN = 273.15
+
+
+@dataclass(frozen=True)
+class CarnotCop:
+    """Carnot COP: the most a heat pump can reach between two temperatures.
+
+    COP_max = T_hot / (T_hot - T_cold) in kelvin, with the flow temperature
+    as the hot side and the outside air as the cold side. A real heat pump
+    reaches a fraction of it (about 0.36 on the measured device), so
+    electricity computed with it is a lower bound. Used when no electric
+    power is recorded.
+    """
+
+    # l/h, flow rate to get the flow temperature from return and power.
+    flow_lph: float = 1700.0
+
+    def cop(self, outside: float, return_temp: float, q_kw: float) -> float:
+        """Carnot COP for the given conditions."""
+        flow = return_temp + q_kw * 1000.0 / (self.flow_lph * WATER_WH_PER_L_K)
+        hot = flow + _KELVIN
+        lift = max(hot - (outside + _KELVIN), _MIN_LIFT_K)
+        return hot / lift
+
+
+class CopFunction(Protocol):
+    """Anything that gives a COP for outside, return temperature and power."""
+
+    def cop(self, outside: float, return_temp: float, q_kw: float) -> float:
+        """COP for the given conditions."""

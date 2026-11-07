@@ -21,7 +21,12 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .advisor.advisor import DISCLAIMER, Candidate, describe_changes
 from .advisor.controller import StiebelParams, rel_power, threshold_margins
-from .advisor_coordinator import HISTORY_DAYS, AdvisorCoordinator, AdvisorState
+from .advisor_coordinator import (
+    HISTORY_DAYS,
+    AdviceRun,
+    AdvisorCoordinator,
+    AdvisorState,
+)
 from .advisor_inputs import SELFTEST_INPUTS
 from .devices import assign_subdevices, thz_device_info
 from .runtime_data import THZConfigEntry
@@ -336,6 +341,21 @@ def _candidate(c: Candidate, saving: float) -> dict[str, Any]:
     }
 
 
+def _recommendation(run: AdviceRun, best: Candidate | None) -> str:
+    advice = run.advice
+    if best is not None:
+        return describe_changes(run.params, run.schedule, best.changes)
+    if advice.bound:
+        return (
+            "keep the current settings; lowering the room setpoint by 1 K "
+            f"saves at least {advice.kwh_per_k_room:.2f} kWh/d"
+        )
+    return (
+        "keep the current settings; lowering the room setpoint by 1 K saves "
+        f"about {advice.percent_per_k_room:.0f} %"
+    )
+
+
 def advice_attributes(state: AdvisorState) -> dict[str, Any]:
     """Attributes of the saving sensor."""
     attrs: dict[str, Any] = {
@@ -353,15 +373,11 @@ def advice_attributes(state: AdvisorState) -> dict[str, Any]:
     advice = run.advice
     best = advice.best
     attrs.update(
-        recommendation=(
-            describe_changes(run.params, run.schedule, best.changes)
-            if best
-            else (
-                "keep the current settings; lowering the room setpoint by "
-                f"1 K saves about {advice.percent_per_k_room:.0f} %"
-            )
+        recommendation=_recommendation(run, best),
+        bound="minimum (Carnot)" if advice.bound else None,
+        percent_per_k_room=(
+            None if advice.bound else round(advice.percent_per_k_room, 1)
         ),
-        percent_per_k_room=round(advice.percent_per_k_room, 1),
         changes=best.changes if best else {},
         ranking=[_candidate(c, advice.saving(c)) for c in advice.ranking],
         current=_candidate(advice.baseline, 0.0),

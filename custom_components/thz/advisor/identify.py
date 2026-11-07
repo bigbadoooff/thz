@@ -11,7 +11,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from .building import Building, CompressorModel, CopModel
+from .building import Building, CarnotCop, CompressorModel, CopFunction, CopModel
 from .controller import StiebelParams
 from .data import FloatArray, Table
 
@@ -178,11 +178,24 @@ class PlantModel:
 
     building: Building
     compressor: CompressorModel
-    cop: CopModel
-    cop_rmse: float
+    cop: CopFunction
+    # None for the Carnot estimate, which is not fitted.
+    cop_rmse: float | None
+
+    @property
+    def is_bound(self) -> bool:
+        """Whether the COP is the Carnot estimate (results are bounds)."""
+        return isinstance(self.cop, CarnotCop)
 
 
 def identify(d: Table) -> PlantModel:
-    """Identify building, compressor and COP models from one table."""
+    """Identify building, compressor and COP models from one table.
+
+    Without electric power (no ``power_el``) the COP cannot be fitted; the
+    Carnot COP takes its place, which makes the electricity a lower bound.
+    """
+    if "power_el" not in d:
+        return PlantModel(fit_building(d), fit_compressor(d), CarnotCop(), None)
+    cop: CopModel
     cop, rmse = fit_cop(d)
     return PlantModel(fit_building(d), fit_compressor(d), cop, rmse)

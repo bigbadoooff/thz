@@ -54,6 +54,17 @@ INPUTS = InputMapping(
 )
 
 
+# The coordinator also gets the sensors of the building identification.
+FULL = InputMapping(
+    sensors={
+        **INPUTS.sensors,
+        "power_el": "sensor.pel",
+        "power_heat": "sensor.qc",
+        "return_temp": "sensor.ret",
+        "outside_temp": "sensor.out",
+    }
+)
+
 # --- coordinator --------------------------------------------------------------
 
 
@@ -66,8 +77,8 @@ def _coordinator(options=None, components=("recorder",)):
     return c
 
 
-def _update(c):
-    with patch.object(advisor_coordinator, "async_resolve_inputs", return_value=INPUTS):
+def _update(c, inputs=FULL):
+    with patch.object(advisor_coordinator, "async_resolve_inputs", return_value=inputs):
         return asyncio.run(c._async_update_data())
 
 
@@ -85,7 +96,7 @@ def test_coordinator_without_history():
     with patch.object(advisor_coordinator, "async_load_table", side_effect=err):
         state = _update(c)
     assert state.error == "no recorded values: rel"
-    assert state.inputs is INPUTS
+    assert state.inputs is FULL
 
 
 TABLES = {
@@ -97,26 +108,26 @@ NOW = datetime(2026, 11, 3, tzinfo=UTC)
 
 def _loader(offset=0.0, plant=None):
     async def load(hass, mapping, names, start, end):
-        if names[0] == "power_el" and plant is not None:
-            if isinstance(plant, Exception):
-                raise plant
-            return plant
-        table = dict(TABLES[names[0]])
-        if "heat_temp" in table:
+        if "rel" in names:
+            table = dict(TABLES["rel"])
             table["heat_temp"] = table["heat_temp"] + offset
-        return table
+            return table
+        if isinstance(plant, Exception):
+            raise plant
+        source = TABLES["power_el"] if plant is None else plant
+        return {k: v for k, v in source.items() if k == "t" or k in names}
 
     return AsyncMock(side_effect=load)
 
 
-def _run(c, load, states=None):
+def _run(c, load, states=None, inputs=FULL):
     states = states or {}
     c.hass.states.get.side_effect = states.get
     with (
         patch.object(advisor_coordinator, "async_load_table", load),
         patch.object(advisor_coordinator.dt_util, "utcnow", return_value=NOW),
     ):
-        return _update(c)
+        return _update(c, inputs)
 
 
 @pytest.mark.parametrize(("fit", "source"), [(True, "fit"), (False, "options")])
@@ -139,7 +150,7 @@ def test_coordinator_calibrates_and_advises(fit, source):
 
 def test_coordinator_reads_the_registers():
     mapping = InputMapping(
-        sensors=INPUTS.sensors,
+        sensors=FULL.sensors,
         params={"gradient": "number.g", "room_day": "number.d", "low_end": "n.l"},
     )
     c = _coordinator()
@@ -562,3 +573,38 @@ def test_coordinator_passes_external_sensors_with_units():
         plant = c._plant_inputs(INPUTS, advisor_settings(c.config_entry.options))
     assert plant.mapping.sensors["power_el"] == "sensor.meter"
     assert plant.mapping.units["power_el"] == "kW"
+
+
+def test_coordinator_without_electric_power_gives_a_lower_bound():
+    no_el = InputMapping(
+        sensors={k: v for k, v in FULL.sensors.items() if k != "power_el"}
+    )
+    state = _run(_coordinator(), _loader(), inputs=no_el)
+    run = state.advice
+    assert run.advice.bound
+    assert run.sources["power_el"] == "Carnot estimate (no electric power)"
+    assert advisor_coordinator.CARNOT_WARNING in state.warnings
+    sensor = _sensor(AdvisorSavingSensor, state, {})
+    attrs = sensor.extra_state_attributes
+    assert attrs["bound"] == "minimum (Carnot)"
+    assert attrs["percent_per_k_room"] is None
+    if run.advice.best is None:
+        assert attrs["recommendation"] == (
+            "keep the current settings; lowering the room setpoint by 1 K "
+            f"saves at least {run.advice.kwh_per_k_room:.2f} kWh/d"
+        )
+    assert "lower bounds" in attrs["report"]
+    # The fitted model is not a bound.
+    fitted = _sensor(AdvisorSavingSensor, _advised_state(), {})
+    assert fitted.extra_state_attributes["bound"] is None
+
+
+def test_bound_recommendation_without_a_saving():
+    state = _advised_state()
+    advice = state.advice.advice
+    bound = Advice(advice.baseline, [advice.baseline], advice.report, bound=True)
+    run = replace(state.advice, advice=bound)
+    sensor = _sensor(AdvisorSavingSensor, replace(state, advice=run), {})
+    assert sensor.extra_state_attributes["recommendation"].endswith(
+        f"saves at least {advice.kwh_per_k_room:.2f} kWh/d"
+    )

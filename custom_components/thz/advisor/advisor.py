@@ -8,7 +8,13 @@ import itertools
 
 import numpy as np
 
-from .building import Building, CompressorModel, CopModel
+from .building import (
+    Building,
+    CarnotCop,
+    CompressorModel,
+    CopFunction,
+    CopModel,
+)
 from .controller import StiebelParams
 from .data import FloatArray
 from .simulate import Schedule, simulate, synthetic_outside
@@ -67,7 +73,7 @@ class Plant:
 
     building: Building = field(default_factory=Building)
     compressor: CompressorModel = field(default_factory=CompressorModel)
-    cop: CopModel = field(default_factory=CopModel)
+    cop: CopFunction = field(default_factory=CopModel)
 
 
 def default_scenarios() -> list[tuple[FloatArray, FloatArray]]:
@@ -191,6 +197,9 @@ def format_report(baseline: Candidate, best: Sequence[Candidate]) -> str:
 # Savings below this share of today's cost are within the model's
 # uncertainty: keep the settings.
 MIN_RELATIVE_SAVING = 0.02
+# With the Carnot COP the costs are lower bounds and a share of them means
+# little; a saving must reach this many EUR per day instead.
+MIN_BOUND_SAVING_EUR_DAY = 0.02
 
 
 @dataclass(frozen=True)
@@ -200,6 +209,9 @@ class Advice:
     baseline: Candidate
     ranking: list[Candidate]
     report: str
+    # True with the Carnot COP: electricity and savings are lower bounds,
+    # and percentages are not meaningful.
+    bound: bool = False
 
     @property
     def best(self) -> Candidate | None:
@@ -207,7 +219,10 @@ class Advice:
         if not self.ranking or self.baseline.score <= 0:
             return None
         best = self.ranking[0]
-        if self.saving(best) / self.baseline.score >= MIN_RELATIVE_SAVING:
+        saving = self.saving(best)
+        if self.bound:
+            return best if saving >= MIN_BOUND_SAVING_EUR_DAY else None
+        if saving / self.baseline.score >= MIN_RELATIVE_SAVING:
             return best
         return None
 
@@ -236,7 +251,11 @@ def recommend(
     comfort_min: float = 21.0,
     scenarios: Sequence[tuple[FloatArray, FloatArray]] | None = None,
 ) -> Advice:
-    """Run the advisor and keep its ranking and report."""
+    """Run the advisor and keep its ranking and report.
+
+    With the Carnot COP (``plant.cop`` a ``CarnotCop``) the advice is a
+    lower bound of the saving.
+    """
     baseline, ranking = advise(
         base,
         plant,
@@ -245,7 +264,15 @@ def recommend(
         weights=weights,
         comfort_min=comfort_min,
     )
-    return Advice(baseline, ranking, format_report(baseline, ranking))
+    bound = isinstance(plant.cop, CarnotCop)
+    report = format_report(baseline, ranking)
+    if bound:
+        report += (
+            "\nCOP estimated with Carnot (no electric power recorded): "
+            "electricity and savings are lower bounds, percentages are not "
+            "meaningful."
+        )
+    return Advice(baseline, ranking, report, bound)
 
 
 def describe_changes(

@@ -23,7 +23,12 @@ from custom_components.thz.advisor.advisor import (
     format_report,
     recommend,
 )
-from custom_components.thz.advisor.building import Building, CompressorModel, CopModel
+from custom_components.thz.advisor.building import (
+    Building,
+    CarnotCop,
+    CompressorModel,
+    CopModel,
+)
 from custom_components.thz.advisor.calibrate import (
     SOURCE_FIT,
     SOURCE_OPTIONS,
@@ -392,3 +397,60 @@ def test_advisor_without_room_response():
 def test_schedule_shifted():
     s = Schedule().shifted(-0.5)
     assert (s.day, s.night) == (22.0, 18.5)
+
+
+def test_carnot_cop():
+    c = CarnotCop()
+    # Flow 35 °C, outside 0 °C: 308.15 / 35.
+    assert c.cop(0.0, 35.0, 0.0) == pytest.approx(308.15 / 35)
+    # The heating power raises the flow above the return.
+    assert c.cop(0.0, 35.0, 2.0) < c.cop(0.0, 35.0, 0.0)
+    # Flow at outside temperature: limited to a lift of 1 K.
+    assert c.cop(30.0, 30.0, 0.0) == pytest.approx(303.15)
+
+
+def test_identify_without_electric_power_uses_carnot(cop_data):
+    m = identify({k: v for k, v in cop_data.items() if k != "power_el"})
+    assert m.is_bound
+    assert isinstance(m.cop, CarnotCop)
+    assert m.cop_rmse is None
+    assert not identify(cop_data).is_bound
+
+
+def test_carnot_saving_is_below_the_fitted_saving(cop_data):
+    """On the measured data the Carnot saving is a lower bound in kWh/d."""
+    fitted = identify(cop_data)
+    grid = {"kp": (5.0,), "room_influence": (30.0,), "low_end": (2.0,)}
+    savings, electricity = {}, {}
+    for name, cop in (("fitted", fitted.cop), ("carnot", CarnotCop())):
+        plant = Plant(fitted.building, fitted.compressor, cop)
+        base, (cand,) = advise(P, plant, Schedule(), grid=grid)
+        electricity[name] = base.metrics["el_kwh_day"]
+        savings[name] = (
+            base.metrics["el_kwh_day"] - cand.metrics["el_kwh_day_equal_comfort"]
+        )
+    # Carnot electricity is far below the real one, and so is its saving.
+    assert electricity["carnot"] < 0.5 * electricity["fitted"]
+    assert 0 < savings["carnot"] < savings["fitted"]
+
+
+def test_recommend_with_carnot_is_a_bound():
+    a = recommend(
+        P,
+        Plant(cop=CarnotCop()),
+        Schedule(),
+        scenarios=[synthetic_outside(days=4, dt_h=1 / 10)],
+    )
+    assert a.bound
+    assert "lower bounds" in a.report
+
+
+def test_bound_advice_uses_an_absolute_threshold():
+    base = _cand(1.0)
+    assert Advice(base, [_cand(0.97, kp=5.0)], "r", bound=True).best is not None
+    assert Advice(base, [_cand(0.99, kp=5.0)], "r", bound=True).best is None
+    # With a small bound cost a share is inflated: 5 % of 0.20 EUR/d passes
+    # the relative threshold, but 0.01 EUR/d is below the absolute one.
+    small, cand = _cand(0.20), _cand(0.19, kp=5.0)
+    assert Advice(small, [cand], "r").best is cand
+    assert Advice(small, [cand], "r", bound=True).best is None

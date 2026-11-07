@@ -270,7 +270,8 @@ class AdvisorCoordinator(DataUpdateCoordinator[AdvisorState]):
         assumed = tuple(sorted(n for n in PARAM_KEYS if n not in registers))
         _LOGGER.debug("Advisor ran in %.2f s", run.runtime_s)
         run = replace(run, assumed=assumed, sources=plant.sources)
-        return replace(state, advice=run, warnings=WARNINGS)
+        warnings = WARNINGS + ((CARNOT_WARNING,) if run.advice.bound else ())
+        return replace(state, advice=run, warnings=warnings)
 
     def _unit(self, entity_id: str) -> str | None:
         """Unit of a sensor from the entity registry, else from its state."""
@@ -310,6 +311,12 @@ WARNINGS = (
     "The model was identified in mild weather; advice for frost is extrapolation.",
     "Starts per day are not validated: the day/night switching of "
     "automations is not simulated.",
+)
+
+
+CARNOT_WARNING = (
+    "No electric power recorded: the COP is the Carnot maximum, so the "
+    "electricity and the savings are lower bounds."
 )
 
 

@@ -22,7 +22,9 @@ All notable changes to the THZ integration are documented here.
   the values otherwise. The advisor never writes to the heat pump. Adds
   numpy as a requirement. For the building model, external power sensors
   can replace the heat pump's own values, and the heating power can be
-  computed from the flow rate × (flow − return temperature). See
+  computed from the flow rate × (flow − return temperature). Without any
+  electric power value the COP is estimated with Carnot, and the saving is
+  shown as a lower bound. See
   [docs/advisor.md](docs/advisor.md).
 - **The README is a short overview now.** The details moved to topic pages
   under `docs/`: entities, fault memory, services, configuration,

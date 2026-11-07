@@ -12,6 +12,7 @@ import pytest
 
 from custom_components.thz import advisor_inputs
 from custom_components.thz.advisor_inputs import (
+    CARNOT_SOURCE,
     PARAM_KEYS,
     SELFTEST_INPUTS,
     SENSOR_KEYS,
@@ -341,10 +342,17 @@ def test_plant_inputs_external_or_fixed_flow_rate():
 
 
 def test_plant_inputs_without_any_heat_source():
-    p = plant_inputs(_without(OWN, "power_heat", "power_el"))
+    p = plant_inputs(_without(OWN, "power_heat"))
     assert "power_heat" in p.names
-    assert p.mapping.lacking(p.names) == ["power_el", "power_heat"]
-    assert p.sources == {}
+    assert p.mapping.lacking(p.names) == ["power_heat"]
+    assert p.sources == {"power_el": "sensor.pel"}
+
+
+def test_plant_inputs_without_electric_power_use_carnot():
+    p = plant_inputs(_without(OWN, "power_el"))
+    assert "power_el" not in p.names
+    assert p.sources["power_el"] == CARNOT_SOURCE
+    assert p.sources["power_heat"] == "sensor.qc"
 
 
 def test_advisor_settings_power_sources():

@@ -54,7 +54,7 @@ current states, nothing else.
 | *Advisor: Margin to Compressor Stop* (%) | Measured relative power minus the stop threshold (20 %). Attribute `kelvin`: the same in kelvin of control temperature (points / KP). |
 | *Advisor: Margin to Compressor Start* (%) | Start threshold (40 %) minus measured relative power, with `kelvin`. |
 | *Advisor: Model Error* (%) | Median error of the predicted relative power over the last 10 days. Attributes: settings in use (`kp`, `feed_forward_slope`, `ref_temp`, `design_power`, `design_temp`), their `source` (`fit` or `options`), the self-test (`passed`, `rows`, `rmse`, `bias`), `fit_kp` and `fit_feed_forward_slope`, `fit_rejected`, `missing_inputs`, `error`. |
-| *Advisor: Possible Saving* (EUR/day) | Saving of the best candidate against the current settings **at equal room temperature**; 0 if none saves at least 2 %. Attributes: `recommendation` (e.g. `kp 8.5 -> 5`, or `keep the current settings; lowering the room setpoint by 1 K saves about 8 %`), `changes`, `percent_per_k_room`, `ranking` (best five: cost, saving, kWh/day at equal room temperature and as simulated, room change in K, COP, starts/day, room range), `current`, `price_eur_kwh`, `assumed`, `power_sources`, `runtime_s`, `warnings`, `report`, and `skipped` with the reason when there is no advice. |
+| *Advisor: Possible Saving* (EUR/day) | Saving of the best candidate against the current settings **at equal room temperature**; 0 if none saves at least 2 %. Attributes: `recommendation` (e.g. `kp 8.5 -> 5`, or `keep the current settings; lowering the room setpoint by 1 K saves about 8 %`), `changes`, `percent_per_k_room`, `ranking` (best five: cost, saving, kWh/day at equal room temperature and as simulated, room change in K, COP, starts/day, room range), `current`, `price_eur_kwh`, `assumed`, `power_sources`, `bound` (set when the result is a [lower bound](#without-electric-power-carnot-estimate)), `runtime_s`, `warnings`, `report`, and `skipped` with the reason when there is no advice. |
 | *Advisor: Run Now* (button) | Runs calibration and advice right away. |
 
 The advisor runs after setup, once a day, when its options change and on
@@ -86,7 +86,7 @@ advisor takes them from these sources, in this order:
 
 | Value | Sources, first available wins |
 |---|---|
-| Electric power | external sensor → the heat pump's *Actual Electric Power* |
+| Electric power | external sensor → the heat pump's *Actual Electric Power* → none: [Carnot estimate](#without-electric-power-carnot-estimate) |
 | Heating power | external sensor → the heat pump's *Actual Thermal Power* → computed |
 
 Computed heating power: **Q = V̇ × 1.163 Wh/(l·K) × (T_flow − T_return)**,
@@ -96,6 +96,40 @@ value is an approximation for a pump that runs at constant speed. Use this
 for heat pumps without their own power values, or when an energy or heat
 meter is more accurate. The attribute `power_sources` of *Advisor:
 Possible Saving* shows which sources were used.
+
+
+### Without electric power: Carnot estimate
+
+Without any electric power value the COP cannot be fitted. The advisor then
+uses the **Carnot COP**, the most any heat pump can reach between the flow
+temperature (hot side) and the outside air (cold side):
+
+```
+COP_max = T_flow / (T_flow - T_outside)      (temperatures in kelvin)
+```
+
+A real heat pump reaches only a fraction of it: on the measured device about
+0.36 (COP about 5 against a Carnot COP of about 13.5). The electricity
+computed with it is therefore far too low, and so are the savings: they are
+a **lower bound**, a saving of at least this much.
+
+- *Advisor: Possible Saving* then has the attribute `bound:
+  "minimum (Carnot)"`, `power_sources.power_el` reads `Carnot estimate (no
+  electric power)`, and a warning says so.
+- **kWh and EUR are lower bounds, percentages are not meaningful.** Carnot
+  overstates how much the COP depends on the temperature lift, so the
+  saving in percent comes out too high. `percent_per_k_room` is left out,
+  and the recommendation for the room setpoint is given in kWh/day ("saves
+  at least …").
+- A candidate is recommended when it saves at least 0.02 EUR/day, instead
+  of 2 % of today's cost.
+- The bound holds as long as the heat pump's share of the Carnot COP does
+  not change much between the settings compared. On the measured data the
+  Carnot saving of the best candidate is 0.079 kWh/day against 0.092 kWh/day
+  with the fitted COP.
+- The heating power is still needed (the heat pump's own, a heat meter or
+  flow rate × ΔT): the building and compressor models are identified from
+  it.
 
 ## How it works
 

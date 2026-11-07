@@ -45,6 +45,8 @@ PARAM_KEYS: Mapping[str, tuple[str, ...]] = {
 # Inputs each part of the advisor needs.
 SELFTEST_INPUTS = ("rel", "heat_setpoint", "heat_temp", "outside_temp_filtered")
 IDENTIFY_INPUTS = ("power_el", "power_heat", "return_temp", "outside_temp")
+# Source shown when no electric power is recorded and the COP is estimated.
+CARNOT_SOURCE = "Carnot estimate (no electric power)"
 # Heating power computed from the flow rate needs these instead of power_heat.
 HEAT_FROM_FLOW_INPUTS = ("flow_temp", "return_temp")
 
@@ -153,7 +155,9 @@ def plant_inputs(
 ) -> PlantInputs:
     """Choose the power sources of the building identification.
 
-    Electric power: the external sensor if set, else the heat pump's own.
+    Electric power: the external sensor if set, else the heat pump's own,
+    else none: the advisor then estimates the COP with Carnot and gives
+    lower bounds.
     Heating power: the external sensor if set, else the heat pump's own,
     else flow rate x (flow - return temperature), with the flow rate from
     the external sensor, the heat pump's own flow-rate sensor or the fixed
@@ -171,11 +175,15 @@ def plant_inputs(
         else:
             sensor_units.pop(name, None)
 
+    names = list(IDENTIFY_INPUTS)
     if power_el_entity:
         use("power_el", power_el_entity)
     if "power_el" in sensors:
         sources["power_el"] = sensors["power_el"]
-    names = list(IDENTIFY_INPUTS)
+    else:
+        # No electric power: the COP becomes the Carnot estimate.
+        names.remove("power_el")
+        sources["power_el"] = CARNOT_SOURCE
     heat_from_flow = False
     flow_lph = None
     if power_heat_entity:

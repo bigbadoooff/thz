@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from .building import Building, CompressorModel, CopModel
+from .building import Building, CompressorModel, CopFunction
 from .controller import (
     Compressor,
     StiebelParams,
@@ -102,7 +102,7 @@ def simulate(
     params: StiebelParams,
     building: Building,
     comp: CompressorModel,
-    cop: CopModel,
+    cop: CopFunction,
     t: FloatArray,
     outside: FloatArray,
     schedule: Schedule,
