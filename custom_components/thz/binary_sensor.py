@@ -27,7 +27,6 @@ from .const import (
     DISPLAY_STATUS_BLOCK,
     ENTITY_ID_STYLE_DEFAULT,
     ENTITY_VISIBILITY_DEFAULT,
-    GLOBAL_STATUS_BLOCK,
     should_hide_entity,
     should_hide_entity_by_default,
 )
@@ -106,10 +105,13 @@ async def async_setup_entry(
     use_display_compressor = (
         entry_data.polled_coordinator(DISPLAY_STATUS_BLOCK) is not None
     )
-    global_compressor_field = next(
+    previous_compressor_source = next(
         (
-            read_field
-            for read_field in register_manager.fields().get(GLOBAL_STATUS_BLOCK, [])
+            (block, read_field)
+            for block, fields in register_manager.fields().items()
+            if block != DISPLAY_STATUS_BLOCK
+            and entry_data.polled_coordinator(block) is not None
+            for read_field in fields
             if read_field.name == "compressor"
         ),
         None,
@@ -135,12 +137,13 @@ async def async_setup_entry(
 
             sensor_name = read_field.name
 
-            # Prefer the display indicator whenever its block is available;
-            # fall back to pxxFB on firmware that does not support the block.
+            # Prefer the display indicator whenever its block is available.
+            # Several earlier maps contain a compressor field (pxxF2 comes
+            # before pxxFB), so skip every non-display duplicate here.
             if (
                 use_display_compressor
-                and block == GLOBAL_STATUS_BLOCK
                 and sensor_name == "compressor"
+                and block != DISPLAY_STATUS_BLOCK
             ):
                 continue
 
@@ -167,14 +170,16 @@ async def async_setup_entry(
                 use_display_compressor
                 and block == DISPLAY_STATUS_BLOCK
                 and sensor_name == "compressor"
-                and global_compressor_field is not None
+                and previous_compressor_source is not None
             ):
                 # Keep the existing entity-registry identity while its data
-                # source changes to the display status block.
+                # source changes to the display status block. Preserve the
+                # field that previously won duplicate-name resolution; on
+                # 5.39 this is the pxxF2 compressor flag.
                 entry["unique_id_block"] = bytes.fromhex(
-                    GLOBAL_STATUS_BLOCK.removeprefix("pxx")
+                    previous_compressor_source[0].removeprefix("pxx")
                 )
-                entry["unique_id_offset"] = global_compressor_field.byte_offset
+                entry["unique_id_offset"] = previous_compressor_source[1].byte_offset
             entities.append(
                 THZBinarySensor(
                     coordinator,

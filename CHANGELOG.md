@@ -18,8 +18,10 @@ All notable changes to the THZ integration are documented here.
 - **Compressor status prefers the display indicator when available** (#269).
   On affected devices, the `pxxFB` compressor flag can remain set while
   stopped. The integration polls `pxx0A0176` on supported 4.x/5.x profiles and
-  uses its compressor indicator for the existing entity, keeping its
-  entity-registry identity. If the block is unavailable, it uses `pxxFB`.
+  uses its compressor indicator for the existing entity, even when `pxxF2`
+  appears earlier in the map and would otherwise win duplicate-name handling.
+  It keeps the entity-registry identity. If the block is unavailable, the
+  first legacy compressor field remains the fallback.
 - **Supply and extract fan speeds are numeric frequency sensors.** Add `Hz`,
   frequency device class and measurement state class so dashboards plot them as
   numeric series and Home Assistant can compile long-term statistics.
