@@ -16,7 +16,10 @@ All notable changes to the THZ integration are documented here.
   10 days. *Advisor: Possible Saving* ranks candidate settings by
   simulated cost per day at equal room temperature and recommends the
   best, only when the model passes its self-test and the saving is at
-  least 2 %; a button runs it on demand. KP and the
+  least 2 %; a button runs it on demand. Candidates vary the P-component,
+  room influence and the heating curve's low end and, as of this version,
+  its gradient (0.12, 0.17, 0.25) too — previously only the curve's offset
+  was tested, never its slope. KP and the
   feed-forward are fitted to the history when the model passes its
   self-test with them; the integration's new options (**Configure**) hold
   the values otherwise. The advisor never writes to the heat pump. Adds

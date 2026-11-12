@@ -64,6 +64,9 @@ DEFAULT_GRID: dict[str, tuple[float, ...]] = {
     "kp": (3.0, 5.0, 8.5),
     "room_influence": (30.0, 50.0),
     "low_end": (2.0, 3.0),
+    # Heating curve slope (p13GradientHC1), bracketing the profile's 0.17
+    # default; the candidates above only move the curve's offset.
+    "gradient": (0.12, 0.17, 0.25),
 }
 
 

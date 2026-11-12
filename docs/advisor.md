@@ -65,7 +65,7 @@ current states, nothing else.
 | *Advisor: Run Now* (button) | Runs calibration and advice right away. |
 
 The advisor runs after setup, once a day, when its options change and on
-the button. A run takes about 2 seconds and runs outside Home Assistant's
+the button. A run takes about 3 seconds and runs outside Home Assistant's
 event loop.
 
 ## Options
@@ -173,9 +173,10 @@ Only when the self-test passes, the advisor:
    (minimum power, slope) and the COP (linear in outside temperature,
    return temperature and power) from the last 10 days;
 2. simulates the current settings and every combination of KP (3, 5, 8.5),
-   room influence (30, 50) and low end (2, 3 K), each over a mild (8 °C
-   mean) and a cold (2 °C mean) synthetic week, with the day/night room
-   setpoints from the heat pump (22.5 / 19 °C if unknown, day 06-22 h);
+   room influence (30, 50), low end (2, 3 K) and heating curve gradient
+   (0.12, 0.17, 0.25), each over a mild (8 °C mean) and a cold (2 °C mean)
+   synthetic week, with the day/night room setpoints from the heat pump
+   (22.5 / 19 °C if unknown, day 06-22 h);
 3. compares them **at equal room temperature**. A setting that leaves the
    room cooler uses less electricity for that reason alone; the same can
    be had, more directly, from the room setpoint. So the advisor also
