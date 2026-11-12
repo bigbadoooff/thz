@@ -10,6 +10,12 @@ and simulates candidate settings.
 > operating mode. Change settings yourself, one at a time, and keep a way
 > back.
 
+Read **Advisor: Recommendation**. The other advisor sensors hold the
+supporting numbers — the ranking, the model check, the raw settings — as
+attributes, which Home Assistant's UI shows alphabetized and collapsed by
+default; *Recommendation* exists so the one sentence that says what to do
+is visible without opening them.
+
 - [What you need](#what-you-need)
 - [Entities](#entities)
 - [Options](#options)
@@ -55,6 +61,7 @@ current states, nothing else.
 | *Advisor: Margin to Compressor Start* (%) | Start threshold (40 %) minus measured relative power, with `kelvin`. |
 | *Advisor: Model Error* (%) | Median error of the predicted relative power over the last 10 days. Attributes: settings in use (`kp`, `feed_forward_slope`, `ref_temp`, `design_power`, `design_temp`), their `source` (`fit` or `options`), the self-test (`passed`, `rows`, `rmse`, `bias`), `fit_kp` and `fit_feed_forward_slope`, `fit_rejected`, `missing_inputs`, `error`. |
 | *Advisor: Possible Saving* (EUR/day) | Saving of the best candidate against the current settings **at equal room temperature**; 0 if none saves at least 2 %. Attributes: `recommendation` (e.g. `kp 8.5 -> 5`, or `keep the current settings; lowering the room setpoint by 1 K saves about 8 %`), `changes`, `percent_per_k_room`, `ranking` (best five: cost, saving, kWh/day at equal room temperature and as simulated, room change in K, COP, starts/day, room range), `current`, `price_eur_kwh`, `assumed`, `power_sources`, `bound` (set when the result is a [lower bound](#without-electric-power-carnot-estimate)), `runtime_s`, `warnings`, `report`, and `skipped` with the reason when there is no advice. |
+| *Advisor: Recommendation* (text) | The same `recommendation` as *Advisor: Possible Saving*, but as the sensor's state: what to change (or that nothing is worth changing) in one sentence, without opening that sensor's attributes. When there is no advice yet, its state says why (e.g. `no advice: model not validated: …`). |
 | *Advisor: Run Now* (button) | Runs calibration and advice right away. |
 
 The advisor runs after setup, once a day, when its options change and on

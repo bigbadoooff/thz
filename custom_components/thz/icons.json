@@ -729,6 +729,9 @@
       },
       "advisor_saving": {
         "default": "mdi:piggy-bank-outline"
+      },
+      "advisor_recommendation": {
+        "default": "mdi:lightbulb-on-outline"
       }
     },
     "switch": {

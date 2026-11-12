@@ -206,6 +206,22 @@ async def test_no_advice_from_a_model_that_fails_the_selftest(
     model = hass.states.get(_advisor(hass, entry, "model_error"))
     assert model.attributes["passed"] is False
     assert float(model.state) > 4
+    # The recommendation sensor explains why there is none, instead of
+    # just going unknown like the saving sensor.
+    recommendation = hass.states.get(_advisor(hass, entry, "recommendation"))
+    assert recommendation.state.startswith("no advice: model not validated")
+
+
+async def test_recommendation_sensor_mirrors_the_saving_sensor(
+    hass: HomeAssistant, fake_device
+):
+    with patch(_LOAD, _history()):
+        entry = await _setup_759(hass, fake_device)
+
+    saving = hass.states.get(_advisor(hass, entry, "saving"))
+    recommendation = hass.states.get(_advisor(hass, entry, "recommendation"))
+    assert recommendation.state == saving.attributes["recommendation"]
+    assert recommendation.attributes["note"] == "Simulation, not measurement."
 
 
 @pytest.mark.parametrize(

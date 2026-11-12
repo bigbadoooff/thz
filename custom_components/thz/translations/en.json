@@ -1518,6 +1518,9 @@
       },
       "advisor_saving": {
         "name": "Advisor: Possible Saving"
+      },
+      "advisor_recommendation": {
+        "name": "Advisor: Recommendation"
       }
     },
     "number": {

@@ -56,6 +56,7 @@ async def async_setup_advisor_sensors(
         AdvisorStartMarginSensor(coordinator, device_id),
         AdvisorModelErrorSensor(coordinator, device_id),
         AdvisorSavingSensor(coordinator, device_id),
+        AdvisorRecommendationSensor(coordinator, device_id),
     ]
     assign_subdevices(sensors, config_entry)
     async_add_entities(sensors)
@@ -65,9 +66,9 @@ class AdvisorSensor(CoordinatorEntity[AdvisorCoordinator], SensorEntity):
     """Base of the advisor sensors."""
 
     _attr_has_entity_name = True
-    _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_native_unit_of_measurement = PERCENT_POINTS
-    _attr_suggested_display_precision = 1
+    _attr_state_class: SensorStateClass | None = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement: str | None = PERCENT_POINTS
+    _attr_suggested_display_precision: int | None = 1
     # Inputs whose state changes update the sensor; none for a sensor that
     # only shows the calibration.
     _live_inputs: tuple[str, ...] = ()
@@ -389,3 +390,55 @@ def advice_attributes(state: AdvisorState) -> dict[str, Any]:
         report=advice.report,
     )
     return attrs
+
+
+# A HA sensor state is limited to 255 characters (the recorder's column
+# width); describe_changes() is normally far shorter, but this keeps a
+# pathological case from being rejected outright.
+_HEADLINE_MAX_LEN = 255
+
+
+def headline(state: AdvisorState) -> str | None:
+    """One plain-language line: what to do, or why there is nothing to say.
+
+    This is the single most useful thing the advisor has to say, meant to
+    be read as the sensor's state rather than dug out of the attributes of
+    *Advisor: Possible Saving*.
+    """
+    run = state.advice
+    if run is None:
+        reason = state.advice_skipped or state.error
+        return f"no advice: {reason}" if reason else None
+    text = _recommendation(run, run.advice.best)
+    if len(text) > _HEADLINE_MAX_LEN:
+        text = text[: _HEADLINE_MAX_LEN - 1] + "…"
+    return text
+
+
+class AdvisorRecommendationSensor(AdvisorSensor):
+    """Plain-language recommendation, as the sensor's state.
+
+    *Advisor: Possible Saving* carries the same information, but as one
+    attribute among many (the ranking, the report, the raw settings) that
+    Home Assistant's UI shows alphabetized and collapsed by default. This
+    sensor exists so the one actionable sentence is visible without
+    opening that list.
+    """
+
+    _attr_translation_key = "advisor_recommendation"
+    _attr_native_unit_of_measurement = None
+    _attr_state_class = None
+    _attr_suggested_display_precision = None
+
+    @property
+    def native_value(self) -> str | None:
+        """The recommendation, or why there is none yet."""
+        state = self.coordinator.data
+        return None if state is None else headline(state)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Point to the sensor with the full detail."""
+        if self.coordinator.data is None:
+            return {}
+        return {"note": DISCLAIMER, "see_also": "Advisor: Possible Saving"}

@@ -1506,6 +1506,9 @@
       },
       "advisor_saving": {
         "name": "Berater: mögliche Einsparung"
+      },
+      "advisor_recommendation": {
+        "name": "Berater: Empfehlung"
       }
     },
     "number": {

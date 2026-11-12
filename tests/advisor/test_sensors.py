@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 
 from custom_components.thz import advisor_button, advisor_coordinator, advisor_sensor
-from custom_components.thz.advisor.advisor import Advice, Candidate
+from custom_components.thz.advisor.advisor import DISCLAIMER, Advice, Candidate
 from custom_components.thz.advisor.calibrate import SOURCE_FIT, calibrate
 from custom_components.thz.advisor.controller import StiebelParams
 from custom_components.thz.advisor.data import load_csv
@@ -34,12 +34,14 @@ from custom_components.thz.advisor_options import (
 )
 from custom_components.thz.advisor_sensor import (
     AdvisorModelErrorSensor,
+    AdvisorRecommendationSensor,
     AdvisorRelDeviationSensor,
     AdvisorRelPredictedSensor,
     AdvisorSavingSensor,
     AdvisorStartMarginSensor,
     AdvisorStopMarginSensor,
     async_setup_advisor_sensors,
+    headline,
 )
 from tests.helpers import make_runtime_data
 
@@ -288,6 +290,7 @@ def test_setup_adds_sensors_and_button():
             "start_margin",
             "model_error",
             "saving",
+            "recommendation",
         )
     }
     add = MagicMock()
@@ -499,6 +502,56 @@ def test_saving_sensor_without_advice():
     empty = _sensor(AdvisorSavingSensor, None, {})
     assert empty.native_value is None
     assert empty.extra_state_attributes == {}
+
+
+def test_recommendation_sensor_mirrors_the_saving_sensors_text():
+    state = _advised_state()
+    sensor = _sensor(AdvisorRecommendationSensor, state, {})
+    saving_attrs = _sensor(AdvisorSavingSensor, state, {}).extra_state_attributes
+    assert sensor.native_value == saving_attrs["recommendation"]
+    assert sensor.extra_state_attributes == {
+        "note": DISCLAIMER,
+        "see_also": "Advisor: Possible Saving",
+    }
+
+
+def test_recommendation_sensor_with_a_real_saving():
+    state = _advised_state()
+    advice = state.advice.advice
+    better = Candidate(
+        {"kp": 5.0}, dict(advice.baseline.metrics), advice.baseline.score * 0.9
+    )
+    run = replace(state.advice, advice=Advice(advice.baseline, [better], advice.report))
+    sensor = _sensor(AdvisorRecommendationSensor, replace(state, advice=run), {})
+    assert sensor.native_value == f"kp {run.params.kp:.3g} -> 5"
+
+
+def test_recommendation_sensor_explains_why_there_is_none():
+    sensor = _sensor(AdvisorRecommendationSensor, _state(error="no data"), {})
+    assert sensor.native_value == "no advice: no data"
+
+
+def test_recommendation_sensor_unavailable_without_data():
+    empty = _sensor(AdvisorRecommendationSensor, None, {})
+    assert empty.native_value is None
+    assert empty.extra_state_attributes == {}
+
+
+def test_headline_none_when_nothing_to_report():
+    # No advice and no error/skip reason at all.
+    assert headline(_state()) is None
+
+
+def test_headline_truncates_an_overlong_recommendation():
+    state = _advised_state()
+    with patch(
+        "custom_components.thz.advisor_sensor._recommendation",
+        return_value="x" * 300,
+    ):
+        text = headline(state)
+    assert text is not None
+    assert len(text) == 255
+    assert text.endswith("…")
 
 
 def test_coordinator_computes_heat_from_a_fixed_flow_rate():

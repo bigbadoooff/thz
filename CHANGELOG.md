@@ -24,8 +24,10 @@ All notable changes to the THZ integration are documented here.
   can replace the heat pump's own values, and the heating power can be
   computed from the flow rate × (flow − return temperature). Without any
   electric power value the COP is estimated with Carnot, and the saving is
-  shown as a lower bound. See
-  [docs/advisor.md](docs/advisor.md).
+  shown as a lower bound. *Advisor: Recommendation* carries the same
+  sentence as *Advisor: Possible Saving*'s `recommendation` attribute, but
+  as the sensor's own state, so it is visible without opening that
+  sensor's attributes. See [docs/advisor.md](docs/advisor.md).
 - **The README is a short overview now.** The details moved to topic pages
   under `docs/`: entities, fault memory, services, configuration,
   firmware, troubleshooting, the heating control (formulas and background)
