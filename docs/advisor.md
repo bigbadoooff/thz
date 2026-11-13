@@ -172,11 +172,15 @@ Only when the self-test passes, the advisor:
 1. identifies the building (heat loss UA from daily means), the compressor
    (minimum power, slope) and the COP (linear in outside temperature,
    return temperature and power) from the last 10 days;
-2. simulates the current settings and every combination of KP (3, 5, 8.5),
-   room influence (30, 50), low end (2, 3 K) and heating curve gradient
-   (0.12, 0.17, 0.25), each over a mild (8 °C mean) and a cold (2 °C mean)
-   synthetic week, with the day/night room setpoints from the heat pump
-   (22.5 / 19 °C if unknown, day 06-22 h);
+2. starting from the current settings, searches KP, room influence, low
+   end and the heating curve's gradient for a local optimum: it tries a
+   step of each in each direction, moves to any improvement, and halves
+   the step once a round finds none, down to the register's own
+   resolution (or the menu dial's, for KP). Each trial is simulated over a
+   mild (8 °C mean) and a cold (2 °C mean) synthetic week, with the
+   day/night room setpoints from the heat pump (22.5 / 19 °C if unknown,
+   day 06-22 h). Being a local search, it refines around today's settings
+   and can miss a better combination further away;
 3. compares them **at equal room temperature**. A setting that leaves the
    room cooler uses less electricity for that reason alone; the same can
    be had, more directly, from the room setpoint. So the advisor also
@@ -218,6 +222,10 @@ outside temperature 4 to 12 °C:
   Other models may follow other rules.
 - **Synthetic weather.** The candidates are compared over two synthetic
   weeks, not over the forecast.
+- **Local search.** The optimizer (KP, room influence, low end, gradient)
+  refines around today's settings; it does not scan every possible
+  combination, so it can miss a better one further away. Running it again
+  after accepting a recommendation refines from the new settings instead.
 
 ## Trying a recommendation
 

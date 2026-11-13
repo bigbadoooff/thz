@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 import itertools
 
@@ -60,14 +60,125 @@ def score(m: Mapping[str, float], w: Weights) -> float:
     )
 
 
-DEFAULT_GRID: dict[str, tuple[float, ...]] = {
-    "kp": (3.0, 5.0, 8.5),
-    "room_influence": (30.0, 50.0),
-    "low_end": (2.0, 3.0),
-    # Heating curve slope (p13GradientHC1), bracketing the profile's 0.17
-    # default; the candidates above only move the curve's offset.
-    "gradient": (0.12, 0.17, 0.25),
+@dataclass(frozen=True)
+class Dimension:
+    """Bounds and the device's own resolution for one optimized field."""
+
+    low: float
+    high: float
+    # The smallest change the register (or, for KP, the menu dial) can
+    # make; the optimizer never reports a setting finer than this.
+    resolution: float
+    # Starting step size of the search, before any halving.
+    initial_step: float
+
+
+# Bounds from the commissioning manual (KP has no register: see
+# advisor_options.NUMBER_OPTIONS) and the registers' own min/max/step
+# (room_influence p15, low_end p14, gradient p13; see controller.py).
+OPTIMIZE_DIMENSIONS: dict[str, Dimension] = {
+    "kp": Dimension(0.5, 30.0, 0.1, 2.0),
+    "room_influence": Dimension(0.0, 100.0, 1.0, 20.0),
+    "low_end": Dimension(0.0, 10.0, 0.1, 2.0),
+    "gradient": Dimension(0.1, 5.0, 0.01, 0.1),
 }
+# Hard cap on simulations per pattern search, so a run stays within budget
+# regardless of how many rounds convergence takes.
+MAX_OPTIMIZE_EVALS = 36
+
+
+class _Search:
+    """Mutable state of one pattern search (point, step sizes, cache).
+
+    Kept as a class, rather than closures inside :func:`_pattern_search`, so
+    its methods carry their own (small) complexity instead of the loop
+    that drives them.
+    """
+
+    def __init__(
+        self,
+        dims: Mapping[str, Dimension],
+        score_of: Callable[[dict[str, float]], Candidate],
+        start: Mapping[str, float],
+    ) -> None:
+        """Snap ``start`` onto the resolution grid as the initial point."""
+        self.dims = dims
+        self.score_of = score_of
+        self.names = list(dims)
+        self.point = {n: self._snap(n, start[n]) for n in self.names}
+        self.step = {n: dims[n].initial_step for n in self.names}
+        self.visited: dict[tuple[float, ...], Candidate] = {}
+
+    def _snap(self, name: str, value: float) -> float:
+        dim = self.dims[name]
+        value = min(dim.high, max(dim.low, value))
+        # The extra round() clears float noise (e.g. 1.2000000000000002)
+        # that dividing by a resolution like 0.1 would otherwise leave in
+        # a value that is now otherwise clean.
+        return round(round(value / dim.resolution) * dim.resolution, 6)
+
+    def evaluate(self, point: Mapping[str, float]) -> Candidate:
+        """Score ``point``, reusing an earlier result if already tried."""
+        key = tuple(point[n] for n in self.names)
+        cand = self.visited.get(key)
+        if cand is None:
+            cand = self.score_of(dict(point))
+            self.visited[key] = cand
+        return cand
+
+    def probe(self, name: str, best: Candidate) -> tuple[Candidate, bool]:
+        """Try both directions of ``name``; keep whichever improves on ``best``."""
+        improved = False
+        for direction in (1.0, -1.0):
+            value = self._snap(name, self.point[name] + direction * self.step[name])
+            if value == self.point[name]:
+                continue
+            trial = dict(self.point)
+            trial[name] = value
+            cand = self.evaluate(trial)
+            if cand.score < best.score - 1e-9:
+                best, self.point[name], improved = cand, value, True
+        return best, improved
+
+    def exhausted(self) -> bool:
+        """Whether every step has reached its dimension's resolution."""
+        return len(self.visited) >= MAX_OPTIMIZE_EVALS or all(
+            self.step[n] <= self.dims[n].resolution / 2 for n in self.names
+        )
+
+
+def _pattern_search(
+    start: Mapping[str, float],
+    dims: Mapping[str, Dimension],
+    score_of: Callable[[dict[str, float]], Candidate],
+) -> list[Candidate]:
+    """Hooke-Jeeves coordinate search: a real local optimum, not fixed points.
+
+    From ``start`` (today's own settings), tries a step in each direction of
+    each dimension and greedily moves to any improvement. Once a full round
+    finds none, every step is halved. Stops once every step is at half the
+    dimension's resolution or below, or ``MAX_OPTIMIZE_EVALS`` points have
+    been tried. Every point tried is first snapped to its dimension's
+    resolution, so every candidate this returns — not just the final one —
+    is a setting the device can actually be set to.
+
+    Being a *local* search, it can miss a better optimum far from today's
+    settings; it is meant to refine around them, not to replace trying a
+    deliberately different configuration.
+    """
+    search = _Search(dims, score_of, start)
+    best = search.evaluate(search.point)
+    while not search.exhausted():
+        improved = False
+        for name in search.names:
+            if search.step[name] > search.dims[name].resolution / 2:
+                best, moved = search.probe(name, best)
+                improved = improved or moved
+        if not improved:
+            for name in search.names:
+                search.step[name] /= 2
+
+    return list(search.visited.values())
 
 
 @dataclass(frozen=True)
@@ -111,11 +222,15 @@ def advise(
     (``kwh_per_k_room`` in the baseline's metrics). Each candidate's
     electricity is corrected by its change of mean room temperature
     (``room_delta_k``) to ``el_kwh_day_equal_comfort``, and scored on that.
+
+    Without ``grid``, KP, room influence, the heating curve's low end and
+    its gradient are optimized with a local pattern search (see
+    :func:`_pattern_search`) starting from today's own settings. Passing
+    ``grid`` instead evaluates every combination of its values (no
+    optimizer), mainly for reproducible tests.
     """
     scenarios = default_scenarios() if scenarios is None else scenarios
-    grid = DEFAULT_GRID if grid is None else grid
     weights = Weights() if weights is None else weights
-    names = list(grid)
 
     def run(p: StiebelParams, sch: Schedule) -> dict[str, float]:
         runs = [
@@ -157,11 +272,25 @@ def advise(
 
     baseline = candidate({}, dict(base_m))
     baseline.metrics["kwh_per_k_room"] = kwh_per_k
-    candidates = [
-        evaluate(dict(zip(names, values, strict=True)), night)
-        for values in itertools.product(*(grid[n] for n in names))
-        for night in nights
-    ]
+
+    if grid is not None:
+        names = list(grid)
+        candidates = [
+            evaluate(dict(zip(names, values, strict=True)), night)
+            for values in itertools.product(*(grid[n] for n in names))
+            for night in nights
+        ]
+    else:
+        start = {n: getattr(base, n) for n in OPTIMIZE_DIMENSIONS}
+
+        def score_of(night: float | None) -> Callable[[dict[str, float]], Candidate]:
+            return lambda changes: evaluate(changes, night)
+
+        candidates = [
+            cand
+            for night in nights
+            for cand in _pattern_search(start, OPTIMIZE_DIMENSIONS, score_of(night))
+        ]
     candidates.sort(key=lambda c: c.score)
     return baseline, candidates[:top]
 

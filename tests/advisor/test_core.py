@@ -16,7 +16,9 @@ from custom_components.thz.advisor.advisor import (
     DISCLAIMER,
     Advice,
     Candidate,
+    Dimension,
     Plant,
+    _pattern_search,
     advise,
     default_scenarios,
     describe_changes,
@@ -229,6 +231,76 @@ def test_simulation_without_heating_has_no_cop():
     r = simulate(P, Building(), CompressorModel(), CopModel(), t, ta, Schedule())
     assert r.metrics["el_kwh_day"] == 0
     assert np.isnan(r.metrics["cop"])
+
+
+def _quadratic_score(target):
+    """A synthetic cost with a single, known minimum at ``target``."""
+
+    def score_of(point):
+        cost = sum((point[n] - target[n]) ** 2 for n in point)
+        return Candidate(dict(point), {}, cost)
+
+    return score_of
+
+
+class TestPatternSearch:
+    """`_pattern_search` on a synthetic cost, independent of the simulator."""
+
+    DIMS = {
+        "a": Dimension(0.0, 10.0, 0.1, 2.0),
+        "b": Dimension(0.0, 10.0, 0.5, 2.0),
+    }
+    START = {"a": 1.0, "b": 1.0}
+
+    def test_converges_near_the_target(self):
+        target = {"a": 7.3, "b": 4.0}
+        visited = _pattern_search(self.START, self.DIMS, _quadratic_score(target))
+        best = min(visited, key=lambda c: c.score)
+        assert best.changes["a"] == pytest.approx(target["a"], abs=0.1)
+        assert best.changes["b"] == pytest.approx(target["b"], abs=0.5)
+
+    def test_every_point_is_on_the_resolution_grid(self):
+        visited = _pattern_search(
+            self.START, self.DIMS, _quadratic_score({"a": 7.3, "b": 4.0})
+        )
+        for c in visited:
+            assert c.changes["a"] == pytest.approx(round(c.changes["a"] / 0.1) * 0.1)
+            assert c.changes["b"] == pytest.approx(round(c.changes["b"] / 0.5) * 0.5)
+
+    def test_never_leaves_the_bounds(self):
+        # Starts at the edge, with the (synthetic) minimum further outside.
+        visited = _pattern_search(
+            {"a": 0.0, "b": 10.0}, self.DIMS, _quadratic_score({"a": -5.0, "b": 50.0})
+        )
+        for c in visited:
+            assert 0.0 <= c.changes["a"] <= 10.0
+            assert 0.0 <= c.changes["b"] <= 10.0
+
+    def test_eval_count_is_bounded(self):
+        visited = _pattern_search(
+            self.START, self.DIMS, _quadratic_score({"a": 7.3, "b": 4.0})
+        )
+        # A round can overshoot the cap by up to 2 evaluations per
+        # dimension before the next round's check stops it.
+        assert len(visited) <= advisor_module.MAX_OPTIMIZE_EVALS + 2 * len(self.DIMS)
+
+    def test_never_worse_than_the_starting_point(self):
+        target = {"a": 7.3, "b": 4.0}
+        start_score = _quadratic_score(target)(self.START).score
+        visited = _pattern_search(self.START, self.DIMS, _quadratic_score(target))
+        assert min(c.score for c in visited) <= start_score
+
+    def test_a_single_dimension_still_converges(self):
+        dims = {"a": Dimension(0.0, 10.0, 0.1, 2.0)}
+        visited = _pattern_search({"a": 1.0}, dims, _quadratic_score({"a": 6.4}))
+        best = min(visited, key=lambda c: c.score)
+        assert best.changes["a"] == pytest.approx(6.4, abs=0.1)
+
+    def test_already_at_the_optimum_does_nothing_useless(self):
+        # The starting point is the minimum: the search should not wander.
+        visited = _pattern_search(self.START, self.DIMS, _quadratic_score(self.START))
+        best = min(visited, key=lambda c: c.score)
+        assert best.changes == self.START
 
 
 def test_advisor_ranks_not_worse_than_baseline():
