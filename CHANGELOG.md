@@ -8,6 +8,19 @@ All notable changes to the THZ integration are documented here.
 
 ### Changes
 
+- **Fault status now also follows the heat pump's own service symbol**
+  (register `0A0176`, bit "service"), not just the D1 log. Found from a
+  real fault: resetting the control unit cleared the symbol but
+  `thz.acknowledge_faults` had never actually been called, so *Fault
+  status* stayed `Fault` for weeks; and a later re-trip of the same fault
+  lit the symbol again without D1 gaining a second record, which the D1-only
+  tracker had no way to see. Resetting the control unit (the symbol going
+  off) now acknowledges D1 automatically, the same as the service would;
+  while the symbol is lit, status stays `Fault` regardless of
+  acknowledgement, since only the device (or its owner, at the panel) can
+  clear that signal. Firmware or configurations without that block are
+  unaffected. See [docs/fault-memory.md](docs/fault-memory.md#the-service-symbol).
+
 - **Controller advisor** (firmware 5.39 and 7.x). A model of the heating
   control of the LWZ 5 CS Premium with a simulation and a parameter
   advisor. New read-only sensors show the relative power the model

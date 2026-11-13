@@ -6,7 +6,7 @@ four sensors are created from it (no extra serial traffic):
 
 | Sensor | Meaning |
 |--------|---------|
-| Fault status | `No fault` / `Fault` — `Fault` while there are records you have not acknowledged |
+| Fault status | `No fault` / `Fault` — `Fault` while there are records you have not acknowledged, **or** the heat pump's own service symbol (see below) is lit |
 | Fault memory | Number of stored records; all records (newest first) are in the `entries` attribute |
 | Latest fault | The newest stored fault, translated (`none` if there is none) with code, date and time as attributes |
 | New faults | Number of records not yet acknowledged; the records are in the `entries` attribute |
@@ -14,6 +14,29 @@ four sensors are created from it (no extra serial traffic):
 Faults already stored when the integration first sees the block are treated
 as acknowledged, so an existing history does not trigger an alarm. The heat
 pump stores day and month only, no year.
+
+### The service symbol
+
+The heat pump's own display lights a service/wrench symbol while a fault is
+active (register `0A0176`, bit "service"), and clears it the moment the
+owner resets the control unit at the panel. Where that block is polled,
+*Fault status* follows it as a second, independent input, alongside D1:
+
+- While the symbol is lit, status stays `Fault` — even right after calling
+  `thz.acknowledge_faults` — because that only dismisses the D1 log, not a
+  condition the device itself still reports as active.
+- Resetting the control unit (the symbol going off) is treated as a
+  deliberate acknowledgement: everything currently in D1 is marked seen,
+  exactly as `thz.acknowledge_faults` would.
+- If the symbol lights again later, status returns to `Fault` immediately,
+  **even if D1 never gains a second record** for it — e.g. the same fault
+  (say, a float switch) tripping again shows the symbol again without
+  necessarily logging a new, distinct D1 entry. The `fault_count`/`entries`
+  on *Fault memory* reflect the device's own D1 log either way; only the
+  headline status reacts to the symbol between device polls.
+
+Firmware or configurations without the `0A0176` block fall back to the
+D1-only behavior above.
 
 The **Fault** event entity fires once for every new record; see
 [entities.md](entities.md#events) and the notification example in
