@@ -6,6 +6,16 @@ picks the controller settings (fitted or entered), runs the self-test and,
 only if the model passes it, identifies the building and simulates
 candidate settings. The computing runs in an executor. Nothing is written
 to the heat pump.
+
+Home Assistant allows only one path to decide whether a config entry
+reloads: either a flow reloads it directly, or its update listener does
+(warned about since 2026, removed in 2026.12). The advisor needs an
+update listener (to refresh when its options change) and also exists on
+entries that get reconfigured (which changes ``entry.data``), so the
+listener here has to own both: ``config_flow.py``'s ``async_step_reconfigure``
+only updates the entry, and :func:`_async_entry_updated` schedules the
+reload itself when it sees ``entry.data`` has changed since setup, or just
+refreshes the advisor when only ``entry.options`` has.
 """
 
 from __future__ import annotations
@@ -106,18 +116,26 @@ def async_setup_advisor(
         _LOGGER.debug("No heating relative power on this firmware, no advisor")
         return None
     coordinator = AdvisorCoordinator(hass, config_entry)
-    config_entry.async_on_unload(
-        config_entry.add_update_listener(_async_options_updated)
-    )
+    config_entry.async_on_unload(config_entry.add_update_listener(_async_entry_updated))
     return coordinator
 
 
-async def _async_options_updated(
+async def _async_entry_updated(
     hass: HomeAssistant, config_entry: THZConfigEntry
 ) -> None:
-    """Run again if the options changed (not for other entry updates)."""
+    """Reload on a reconfigure; refresh the advisor if only options changed.
+
+    See the module docstring: this listener is the entry's only path to a
+    reload, so a reconfigure (which changes ``entry.data``) has to be
+    handled here, not by the flow that triggered it.
+    """
     coordinator = config_entry.runtime_data.advisor
-    if coordinator is not None and coordinator.options != dict(config_entry.options):
+    if coordinator is None:
+        return
+    if dict(config_entry.data) != coordinator.config_data:
+        hass.config_entries.async_schedule_reload(config_entry.entry_id)
+        return
+    if coordinator.options != dict(config_entry.options):
         await coordinator.async_refresh()
 
 
@@ -179,6 +197,10 @@ class AdvisorCoordinator(DataUpdateCoordinator[AdvisorState]):
         )
         # Options of the last run.
         self.options: dict[str, Any] = dict(config_entry.options)
+        # entry.data as of setup; a later difference means a reconfigure,
+        # which the update listener must then reload the entry for (see
+        # the module docstring).
+        self.config_data: dict[str, Any] = dict(config_entry.data)
 
     def _state_value(self, entity_id: str | None) -> float | None:
         state = self.hass.states.get(entity_id) if entity_id else None

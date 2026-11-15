@@ -353,6 +353,17 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if other.entry_id != entry.entry_id
             ):
                 return self.async_abort(reason="already_configured")
+            if entry.runtime_data.advisor is not None:
+                # The advisor's update listener is this entry's one path to
+                # a reload (see advisor_coordinator.py's module docstring);
+                # calling async_update_reload_and_abort here too is exactly
+                # what Home Assistant has started warning about.
+                return self.async_update_and_abort(
+                    entry,
+                    unique_id=unique_id,
+                    data=updated_data,
+                    reason="reconfigured",
+                )
             return self.async_update_reload_and_abort(
                 entry, unique_id=unique_id, data=updated_data, reason="reconfigured"
             )

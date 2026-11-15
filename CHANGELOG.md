@@ -72,6 +72,14 @@ All notable changes to the THZ integration are documented here.
   did for `thz.refresh_block`; before, they failed as invalid hex. Both
   services also ignore quotes around the value. An invalid command is
   logged as a warning without a traceback.
+- **Reconfigure on an entry with the advisor no longer reloads twice**
+  (#284). The advisor's update listener and `async_step_reconfigure` both
+  reloaded the entry; Home Assistant logged a deprecation warning for it
+  and will refuse it in 2026.12. Reconfigure now only updates an entry
+  that has the advisor (no direct reload), and the listener reloads it
+  itself when it sees `entry.data` has changed, instead of just
+  refreshing the advisor as it does for an options-only change. Entries
+  without the advisor are unaffected.
 
 ## [0.7.2-beta.1] – 2026-10-05
 
