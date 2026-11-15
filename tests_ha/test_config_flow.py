@@ -130,6 +130,37 @@ async def test_reconfigure_updates_entry_and_reloads(hass, fake_device):
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
+async def test_reconfigure_with_the_advisor_still_reloads_once(hass, fake_device):
+    """Issue #284: the advisor adds an update listener to the entry.
+
+    Home Assistant allows only one path to reload an entry -- the flow or
+    the listener, not both -- so this entry's reconfigure must no longer
+    reload directly (see advisor_coordinator.py); the listener must do it
+    instead, exactly once.
+    """
+    fake_device.firmware = 759
+    # 5.x firmware probes 0A0648 for cooling hardware (see test_advisor_sensors.py).
+    fake_device.initial_registers = {bytes.fromhex("0a0648"): b"\x00\x01"}
+    entry = await setup_entry(hass, refresh_intervals=None)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert entry.runtime_data.advisor is not None
+    connections = len(fake_device.instances)
+
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ENTITY_VISIBILITY: "all"}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigured"
+    assert entry.data[CONF_ENTITY_VISIBILITY] == "all"
+    # The advisor's listener reloaded it -- exactly once.
+    assert len(fake_device.instances) == connections + 1
+    assert fake_device.instances[connections - 1].closed
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 async def test_reconfigure_saves_the_write_interval(hass, fake_device):
     entry = await setup_entry(hass)
 

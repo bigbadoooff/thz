@@ -235,6 +235,7 @@ def _entry(has_rel=True, polled=True):
         coordinators={"pxx0A069A": MagicMock()} if polled else {},
     )
     return SimpleNamespace(
+        entry_id="entry1",
         runtime_data=data,
         data={},
         async_on_unload=MagicMock(),
@@ -261,14 +262,45 @@ def test_setup_advisor_and_options_listener():
     entry.runtime_data.advisor = coordinator
     coordinator.async_refresh = AsyncMock()
     coordinator.options = {}
+    coordinator.config_data = dict(entry.data)
     listener = entry.add_update_listener.call_args.args[0]
-    asyncio.run(listener(MagicMock(), entry))  # options unchanged
+    hass = MagicMock()
+
+    asyncio.run(listener(hass, entry))  # neither options nor data changed
     coordinator.async_refresh.assert_not_awaited()
+    hass.config_entries.async_schedule_reload.assert_not_called()
+
     entry.options = {CONF_ADVISOR_FIT_CONTROLLER: False}
-    asyncio.run(listener(MagicMock(), entry))
+    asyncio.run(listener(hass, entry))
     coordinator.async_refresh.assert_awaited_once()
+    hass.config_entries.async_schedule_reload.assert_not_called()
+
     entry.runtime_data.advisor = None
-    asyncio.run(listener(MagicMock(), entry))  # no coordinator: nothing to do
+    asyncio.run(listener(hass, entry))  # no coordinator: nothing to do
+
+
+def test_options_listener_reloads_instead_on_a_reconfigure():
+    """Issue #284: entry.data changing (a reconfigure) must reload the entry.
+
+    config_flow.py's async_step_reconfigure no longer reloads directly for
+    an entry that has this listener, so the listener itself must.
+    """
+    entry = _entry()
+    entry.options = {}
+    with patch.object(advisor_coordinator, "AdvisorCoordinator"):
+        coordinator = async_setup_advisor(MagicMock(), entry)
+    entry.runtime_data.advisor = coordinator
+    coordinator.async_refresh = AsyncMock()
+    coordinator.options = dict(entry.options)
+    coordinator.config_data = dict(entry.data)
+    listener = entry.add_update_listener.call_args.args[0]
+    hass = MagicMock()
+
+    entry.data = {"host": "10.0.0.9"}  # changed by a reconfigure
+    asyncio.run(listener(hass, entry))
+
+    hass.config_entries.async_schedule_reload.assert_called_once_with("entry1")
+    coordinator.async_refresh.assert_not_awaited()  # the reload will do it
 
 
 def test_no_advisor_without_relative_power():
