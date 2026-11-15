@@ -197,9 +197,12 @@ class AdvisorCoordinator(DataUpdateCoordinator[AdvisorState]):
         )
         # Options of the last run.
         self.options: dict[str, Any] = dict(config_entry.options)
-        # entry.data as of setup; a later difference means a reconfigure,
-        # which the update listener must then reload the entry for (see
-        # the module docstring).
+        # entry.data once setup finishes; __init__.py resyncs this after its
+        # own bookkeeping writes (entity visibility tier, HC2) land, so this
+        # is the entry's data net of those, not as it stood when the advisor
+        # was constructed mid-setup. A later difference means a reconfigure,
+        # which the update listener must then reload the entry for (see the
+        # module docstring).
         self.config_data: dict[str, Any] = dict(config_entry.data)
 
     def _state_value(self, entity_id: str | None) -> float | None:

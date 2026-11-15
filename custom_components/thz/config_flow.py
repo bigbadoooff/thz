@@ -353,7 +353,8 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if other.entry_id != entry.entry_id
             ):
                 return self.async_abort(reason="already_configured")
-            if entry.runtime_data.advisor is not None:
+            runtime_data = getattr(entry, "runtime_data", None)
+            if runtime_data is not None and runtime_data.advisor is not None:
                 # The advisor's update listener is this entry's one path to
                 # a reload (see advisor_coordinator.py's module docstring);
                 # calling async_update_reload_and_abort here too is exactly

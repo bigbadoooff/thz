@@ -80,6 +80,14 @@ All notable changes to the THZ integration are documented here.
   itself when it sees `entry.data` has changed, instead of just
   refreshing the advisor as it does for an options-only change. Entries
   without the advisor are unaffected.
+- **Fixed a self-reload the #284 fix introduced.** The advisor's baseline
+  for detecting a reconfigure was taken when its coordinator was created,
+  partway through setup — before `__init__.py` writes the applied entity
+  visibility tier (and HC2 flag) back to `entry.data`. That write then
+  looked like an external reconfigure to the new listener, so *every*
+  setup reloaded the entry a second time right after finishing, and
+  reconfiguring twice reloaded it twice. The baseline is now resynced
+  once that write has landed, before setup returns.
 
 ## [0.7.2-beta.1] – 2026-10-05
 

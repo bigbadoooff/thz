@@ -267,6 +267,14 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # applied, e.g. after the user changes this option via Reconfigure.
     await _async_apply_entity_visibility_tier(hass, config_entry, known_unique_ids)
 
+    if entry_data.advisor is not None:
+        # The visibility-tier update above can itself change config_entry.data
+        # (_entity_visibility_applied / _entity_hc2_applied). Resync the
+        # advisor's baseline now, synchronously and before any further await,
+        # so its update listener does not mistake this setup's own
+        # bookkeeping write for a reconfigure and schedule a spurious reload.
+        entry_data.advisor.config_data = dict(config_entry.data)
+
     return True
 
 
