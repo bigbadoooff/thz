@@ -1,12 +1,13 @@
 {
   "domain": "thz",
   "name": "Stiebel Eltron LWZ / Tecalor THZ Integration (unofficial)",
+  "after_dependencies": ["recorder"],
   "codeowners": ["@bigbadoooff"],
   "config_flow": true,
   "documentation": "https://github.com/bigbadoooff/thz",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/bigbadoooff/thz/issues",
   "loggers": ["serial", "serial_asyncio_fast"],
-  "requirements": ["pyserial-asyncio-fast>=0.16"],
+  "requirements": ["numpy>=1.26.0", "pyserial-asyncio-fast>=0.16"],
   "version": "0.7.2-beta.1"
 }

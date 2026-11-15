@@ -8,6 +8,48 @@ All notable changes to the THZ integration are documented here.
 
 ### Changes
 
+- **Fault status now also follows the heat pump's own service symbol**
+  (register `0A0176`, bit "service"), not just the D1 log. Found from a
+  real fault: resetting the control unit cleared the symbol but
+  `thz.acknowledge_faults` had never actually been called, so *Fault
+  status* stayed `Fault` for weeks; and a later re-trip of the same fault
+  lit the symbol again without D1 gaining a second record, which the D1-only
+  tracker had no way to see. Resetting the control unit (the symbol going
+  off) now acknowledges D1 automatically, the same as the service would;
+  while the symbol is lit, status stays `Fault` regardless of
+  acknowledgement, since only the device (or its owner, at the panel) can
+  clear that signal. Firmware or configurations without that block are
+  unaffected. See [docs/fault-memory.md](docs/fault-memory.md#the-service-symbol).
+
+- **Controller advisor** (firmware 5.39 and 7.x). A model of the heating
+  control of the LWZ 5 CS Premium with a simulation and a parameter
+  advisor. New read-only sensors show the relative power the model
+  predicts, its deviation from the measured one, the margins to the
+  compressor stop and start thresholds, and the model error over the last
+  10 days. *Advisor: Possible Saving* ranks candidate settings by
+  simulated cost per day at equal room temperature and recommends the
+  best, only when the model passes its self-test and the saving is at
+  least 2 %; a button runs it on demand. Candidates come from a local
+  pattern search over the P-component, room influence, and the heating
+  curve's low end and gradient, starting from today's settings and
+  refining down to each one's own resolution — not a fixed handful of
+  points, and (unlike earlier in this series) the curve's slope is now
+  searched too, not just its offset. KP and the
+  feed-forward are fitted to the history when the model passes its
+  self-test with them; the integration's new options (**Configure**) hold
+  the values otherwise. The advisor never writes to the heat pump. Adds
+  numpy as a requirement. For the building model, external power sensors
+  can replace the heat pump's own values, and the heating power can be
+  computed from the flow rate × (flow − return temperature). Without any
+  electric power value the COP is estimated with Carnot, and the saving is
+  shown as a lower bound. *Advisor: Recommendation* carries the same
+  sentence as *Advisor: Possible Saving*'s `recommendation` attribute, but
+  as the sensor's own state, so it is visible without opening that
+  sensor's attributes. See [docs/advisor.md](docs/advisor.md).
+- **The README is a short overview now.** The details moved to topic pages
+  under `docs/`: entities, fault memory, services, configuration,
+  firmware, troubleshooting, the heating control (formulas and background)
+  and the advisor, each linked from the README.
 - **The manual hot water setpoint goes up to 65 °C** on firmware 4.x, 5.x
   and 7.x. *DHW Temperature Manual* (`p11DHWsetManualTemp`) stopped at
   55 °C; the range is now 10-65 °C.
@@ -30,6 +72,23 @@ All notable changes to the THZ integration are documented here.
   did for `thz.refresh_block`; before, they failed as invalid hex. Both
   services also ignore quotes around the value. An invalid command is
   logged as a warning without a traceback.
+- **Reconfigure on an entry with the advisor no longer reloads twice**
+  (#284). The advisor's update listener and `async_step_reconfigure` both
+  reloaded the entry; Home Assistant logged a deprecation warning for it
+  and will refuse it in 2026.12. Reconfigure now only updates an entry
+  that has the advisor (no direct reload), and the listener reloads it
+  itself when it sees `entry.data` has changed, instead of just
+  refreshing the advisor as it does for an options-only change. Entries
+  without the advisor are unaffected.
+- **Fixed a self-reload the #284 fix introduced.** `__init__.py` writes its
+  applied entity-visibility-tier (and HC2) bookkeeping back to `entry.data`
+  on every setup, not only a reconfigure. The advisor's new update listener
+  saw that write as an external reconfigure and scheduled its own reload —
+  and since Home Assistant starts update listeners eagerly, that happened
+  nested inside the very setup still applying the tier, so *every* setup
+  reloaded the entry a second time right after finishing, and reconfiguring
+  twice reloaded it twice. The listener now leaves those two bookkeeping
+  keys out of its comparison.
 
 ## [0.7.2-beta.1] – 2026-10-05
 

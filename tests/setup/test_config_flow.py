@@ -93,6 +93,14 @@ class _FakeConfigFlow(metaclass=_FakeConfigFlowMeta):
         self.hass.config_entries.async_schedule_reload(entry.entry_id)
         return self.async_abort(reason=reason)
 
+    def async_update_and_abort(self, entry, *, unique_id, data, reason):
+        # Unlike async_update_reload_and_abort: no reload. Used when the
+        # entry's own update listener owns that (see advisor_coordinator.py).
+        self.hass.config_entries.async_update_entry(
+            entry, unique_id=unique_id, data=data
+        )
+        return self.async_abort(reason=reason)
+
     def _abort_if_unique_id_configured(self):
         entries = self.hass.config_entries.async_entries(DOMAIN)
         for entry in entries:
@@ -548,6 +556,7 @@ class TestAsyncStepReconfigure:
         flow.context = {"entry_id": "abc123"}
         entry = MagicMock()
         entry.entry_id = "abc123"
+        entry.runtime_data.advisor = None  # no update listener -> flow reloads
         entry.data = {
             "connection_type": CONNECTION_IP,
             CONF_HOST: "10.0.0.5",
@@ -572,9 +581,41 @@ class TestAsyncStepReconfigure:
         assert kwargs["unique_id"] == "ip-10.0.0.5"
 
     @pytest.mark.asyncio
+    async def test_with_an_advisor_updates_the_entry_without_reloading(self, flow):
+        """Issue #284: the advisor's update listener owns the reload instead.
+
+        Calling async_update_reload_and_abort here too, on an entry that
+        also has an update listener, is what newer Home Assistant warns
+        about (and will refuse from 2026.12).
+        """
+        flow.context = {"entry_id": "abc123"}
+        entry = MagicMock()
+        entry.entry_id = "abc123"
+        entry.runtime_data.advisor = MagicMock()  # has an update listener
+        entry.data = {
+            "connection_type": CONNECTION_IP,
+            CONF_HOST: "10.0.0.5",
+            CONF_PORT: 2323,
+            "refresh_intervals": {"p01": 300},
+        }
+        flow.hass.config_entries.async_get_entry.return_value = entry
+
+        result = await flow.async_step_reconfigure(
+            {"refresh_p01": 500, "read_p01": True}
+        )
+
+        assert result == {"type": "abort", "reason": "reconfigured"}
+        flow.hass.config_entries.async_update_entry.assert_called_once()
+        _, kwargs = flow.hass.config_entries.async_update_entry.call_args
+        assert kwargs["data"]["refresh_intervals"] == {"p01": 500}
+        # Not this flow's job when the entry has an advisor -- see above.
+        flow.hass.config_entries.async_schedule_reload.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_changed_host_updates_the_unique_id(self, flow):
         flow.context = {"entry_id": "abc123"}
         entry = MagicMock(entry_id="abc123", unique_id="ip-10.0.0.5")
+        entry.runtime_data.advisor = None
         entry.data = {"connection_type": CONNECTION_IP, CONF_HOST: "10.0.0.5"}
         flow.hass.config_entries.async_get_entry.return_value = entry
         flow.hass.config_entries.async_entries.return_value = [entry]
@@ -605,6 +646,7 @@ class TestAsyncStepReconfigure:
         flow.context = {"entry_id": "abc123"}
         entry = MagicMock()
         entry.entry_id = "abc123"
+        entry.runtime_data.advisor = None
         entry.data = {
             "connection_type": CONNECTION_USB,
             CONF_DEVICE: "/dev/ttyUSB0",
@@ -744,3 +786,12 @@ class TestReconfigureBlockSelection:
         updated = config_flow_module.merge_reconfigure_input(data, {"alias": "new"})
         assert updated["selected_read_blocks"] == ["pxxFB"]
         assert "refresh_intervals" not in updated
+
+
+def test_config_flow_offers_the_options_flow():
+    class _Flow:
+        pass
+
+    with patch.object(config_flow_module, "THZOptionsFlow", _Flow):
+        flow = THZConfigFlow.async_get_options_flow(MagicMock())
+    assert isinstance(flow, _Flow)

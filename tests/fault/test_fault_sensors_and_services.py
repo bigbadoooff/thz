@@ -10,10 +10,12 @@ from custom_components.thz.const import DOMAIN
 from custom_components.thz.exceptions import THZProtocolError
 from custom_components.thz.fault_sensor import (
     NO_FAULT,
+    SERVICE_BLOCK,
     THZFaultMemorySensor,
     THZFaultStatusSensor,
     THZLatestFaultSensor,
     THZNewFaultsSensor,
+    _service_active,
     async_setup_fault_sensors,
     supports_fault_memory,
 )
@@ -37,6 +39,13 @@ def _coordinator(payload):
     return coordinator
 
 
+def _service_payload(active: bool) -> bytes:
+    """8-byte pxx0A0176 payload with the "service" bit (byte 5, bit 6) set."""
+    data = bytearray(8)
+    data[5] = 0x40 if active else 0x00
+    return bytes(data)
+
+
 class TestSupportsFaultMemory:
     @pytest.mark.parametrize("fw", ["419", "439", "509", "539", "709"])
     def test_one_byte_layout_firmware_is_supported(self, fw):
@@ -47,10 +56,36 @@ class TestSupportsFaultMemory:
         assert not supports_fault_memory(RegisterMapManager(fw))
 
 
+class TestServiceActiveHelper:
+    """_service_active(): decoding the device's own "service" display symbol."""
+
+    FIELD = RegisterMapManager("439").find_field(SERVICE_BLOCK, "service")
+
+    def test_decodes_the_lit_and_unlit_symbol(self):
+        on = _coordinator(_service_payload(True))
+        off = _coordinator(_service_payload(False))
+        assert _service_active(on, self.FIELD) is True
+        assert _service_active(off, self.FIELD) is False
+
+    def test_none_without_a_coordinator_or_field(self):
+        coordinator = _coordinator(_service_payload(True))
+        assert _service_active(None, self.FIELD) is None
+        assert _service_active(coordinator, None) is None
+
+    def test_none_without_data_yet(self):
+        coordinator = _coordinator(None)
+        assert _service_active(coordinator, self.FIELD) is None
+
+    def test_none_when_the_payload_is_too_short(self):
+        coordinator = _coordinator(bytes(3))  # field is at byte offset 5
+        assert _service_active(coordinator, self.FIELD) is None
+
+
 class TestSensors:
     def _sensors(self, payload):
         coordinator = _coordinator(payload)
         tracker = _tracker()
+        tracker.process(payload)  # populate tracker.state, as setup does
         args = (coordinator, tracker, "dev")
         return (
             coordinator,
@@ -101,9 +136,10 @@ class TestSensors:
         assert memory.extra_state_attributes["entries"][0]["fault_number"] == 5
 
     def test_a_new_fault_raises_the_status_and_lists_the_record(self):
-        coordinator, _, (status, _, latest, new) = self._sensors(_payload(R3))
+        coordinator, tracker, (status, _, latest, new) = self._sensors(_payload(R3))
         assert status.native_value == "ok"  # baseline
         coordinator.data = _payload(R3, R11)
+        tracker.process(coordinator.data)  # the coordinator listener, in production
         assert status.native_value == "fault"
         assert new.native_value == 1
         assert new.extra_state_attributes["entries"][0]["fault_number"] == 11
@@ -192,6 +228,57 @@ class TestSetup:
         coordinator.data = _payload()  # device-side clear -> baseline changes
         listener()
         hass.async_create_task.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_also_subscribes_to_the_service_block_when_present(self):
+        d1 = _coordinator(_payload(R3))
+        service = _coordinator(_service_payload(False))
+        config_entry = _entry(
+            {"pxxD1": d1, SERVICE_BLOCK: service}, RegisterMapManager("439")
+        )
+        with patch.object(fault_sensor, "Store", return_value=FakeStore()):
+            await async_setup_fault_sensors(MagicMock(), config_entry, MagicMock())
+        d1.async_add_listener.assert_called_once()
+        service.async_add_listener.assert_called_once()
+        assert config_entry.async_on_unload.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_a_lit_service_symbol_without_a_new_d1_record_raises_status(self):
+        """Tonight's real incident: the symbol re-lights, D1 does not change."""
+        d1 = _coordinator(_payload(R3))
+        service = _coordinator(_service_payload(True))
+        config_entry = _entry(
+            {"pxxD1": d1, SERVICE_BLOCK: service}, RegisterMapManager("439")
+        )
+        hass = MagicMock()
+        hass.async_create_task = MagicMock(side_effect=lambda coro: coro.close())
+        with patch.object(fault_sensor, "Store", return_value=FakeStore()):
+            await async_setup_fault_sensors(hass, config_entry, MagicMock())
+        tracker = config_entry.runtime_data.fault_tracker
+        assert tracker.state["status"] == "fault"  # lit from the first read
+
+        # Panel reset: the symbol goes off, D1 is unchanged.
+        service_listener = service.async_add_listener.call_args[0][0]
+        service.data = _service_payload(False)
+        service_listener()
+        assert tracker.state["status"] == "ok"
+        d1.async_update_listeners.assert_called_once()  # sensors told to refresh
+
+        # It lights again later; D1 still never gains a second record.
+        service.data = _service_payload(True)
+        service_listener()
+        assert tracker.state["status"] == "fault"
+        assert tracker.state["fault_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_works_without_the_service_block(self):
+        """No pxx0A0176 coordinator or field: falls back to D1-only, as before."""
+        d1 = _coordinator(_payload(R3))
+        config_entry = _entry({"pxxD1": d1}, RegisterMapManager("439"))
+        with patch.object(fault_sensor, "Store", return_value=FakeStore()):
+            await async_setup_fault_sensors(MagicMock(), config_entry, MagicMock())
+        assert config_entry.runtime_data.fault_tracker.state["status"] == "ok"
+        assert config_entry.async_on_unload.call_count == 1
 
 
 def _hass_with(entry_data):

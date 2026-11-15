@@ -4,3 +4,4 @@
 pytest-homeassistant-custom-component==0.13.316
 pyserial>=3.5
 pyserial-asyncio-fast>=0.16
+numpy>=1.26.0

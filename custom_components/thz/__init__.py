@@ -22,6 +22,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .advisor_coordinator import async_setup_advisor
 from .clock_sync import async_setup_clock_check, clock_drift_issue_id
 from .const import (
     CONF_DEVICE_IDENTIFIER,
@@ -30,6 +31,8 @@ from .const import (
     CONF_ENTITY_VISIBILITY,
     CONF_FIRMWARE_OVERRIDE,
     CONF_SPLIT_DEVICES,
+    DATA_ENTITY_HC2_APPLIED,
+    DATA_ENTITY_VISIBILITY_APPLIED,
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_WRITE_INTERVAL,
     DOMAIN,
@@ -214,6 +217,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         area_name=area_name(hass, data),
     )
     config_entry.runtime_data = entry_data
+    entry_data.advisor = async_setup_advisor(hass, config_entry)
 
     # Periodic clock-drift check (independent of per-entity polling of the
     # individual pClock* registers — see clock_sync.py). Always runs so
@@ -244,6 +248,13 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     if split_devices:
         async_remove_empty_subdevices(hass, config_entry, unique_id)
+
+    # The advisor reads the history of entities registered by now; after
+    # setup, so it does not delay it.
+    if entry_data.advisor is not None:
+        config_entry.async_create_background_task(
+            hass, entry_data.advisor.async_refresh(), "thz advisor"
+        )
 
     # A block whose first read failed is tried again right away, not only
     # after its poll interval, so its entities recover quickly.
@@ -483,13 +494,13 @@ async def _async_apply_entity_visibility_tier(
     )
     enable_hc2 = config_entry.data.get(CONF_ENABLE_HC2, False)
 
-    last_applied = config_entry.data.get("_entity_visibility_applied")
+    last_applied = config_entry.data.get(DATA_ENTITY_VISIBILITY_APPLIED)
     if last_applied is None and config_entry.data.get("_hidden_entities_migrated"):
         # An entry carrying _hidden_entities_migrated has had the "default"
         # tier's hidden set applied.
         last_applied = ENTITY_VISIBILITY_DEFAULT
 
-    last_applied_hc2 = config_entry.data.get("_entity_hc2_applied")
+    last_applied_hc2 = config_entry.data.get(DATA_ENTITY_HC2_APPLIED)
     if last_applied_hc2 is None:
         # Without a stored HC2 state, HC2 entities follow the applied tier:
         # "extended" and "all" show them. Taking that as the applied state
@@ -566,8 +577,8 @@ async def _async_apply_entity_visibility_tier(
         config_entry,
         data={
             **config_entry.data,
-            "_entity_visibility_applied": visibility,
-            "_entity_hc2_applied": enable_hc2,
+            DATA_ENTITY_VISIBILITY_APPLIED: visibility,
+            DATA_ENTITY_HC2_APPLIED: enable_hc2,
         },
     )
 

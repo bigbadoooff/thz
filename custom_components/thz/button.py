@@ -11,13 +11,13 @@ Currently exposed buttons:
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .advisor_button import async_setup_advisor_button
 from .base_entity import THZBaseEntity
 from .const import DOMAIN
 from .entity_translations import get_translation_key
@@ -25,7 +25,11 @@ from .exceptions import DEVICE_ERRORS
 from .parameter_io import async_write_parameter
 from .platform_setup import async_setup_write_platform
 from .register_maps.model import WriteParam
+from .runtime_data import THZConfigEntry
 from .thz_device import THZDevice
+
+if TYPE_CHECKING:
+    from ._typing_compat import AddConfigEntryEntitiesCallback
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,13 +40,14 @@ PARALLEL_UPDATES = 1
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    config_entry: THZConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up THZ button entities from a config entry."""
     await async_setup_write_platform(
         hass, config_entry, async_add_entities, THZButton, "button"
     )
+    await async_setup_advisor_button(hass, config_entry, async_add_entities)
 
 
 # Byte of FHEM's "<command>0000" set message that the parsing rule of a

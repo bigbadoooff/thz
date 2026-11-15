@@ -112,6 +112,14 @@ ENTITY_VISIBILITY_LABELS: dict[str, str] = {
 # is explicitly enabled.
 CONF_ENABLE_HC2 = "enable_hc2"
 
+# __init__.py's own bookkeeping in entry.data, recording the tier/HC2 state
+# last applied to the entity registry. Not user-facing settings: a reload
+# listener comparing entry.data for a reconfigure (e.g. advisor_coordinator.py)
+# must ignore these, since applying them is part of every setup, not a
+# reconfigure.
+DATA_ENTITY_VISIBILITY_APPLIED = "_entity_visibility_applied"
+DATA_ENTITY_HC2_APPLIED = "_entity_hc2_applied"
+
 # Group entities into functional sub-devices (heating circuits, hot water,
 # ventilation, compressor, solar, cooling) linked to the heat pump; see
 # devices.py. Entries without the key keep the single device.

@@ -1,12 +1,22 @@
 """Acknowledgement tracking for the D1 fault memory.
 
 The heat pump keeps its last ten faults in a ring buffer and has no
-"acknowledged" concept. This tracker remembers, in Home Assistant only, which
-records the user has already seen so a dashboard can show "new faults" and an
-automation can alert on them. Nothing here writes to the device.
+"acknowledged" concept of its own for *that log*. It does, however, show a
+"service" symbol on its own display (``pxx0A0176``, bit "service") while a
+fault is active, which clears the moment the owner resets the control unit
+at the panel. That is a deliberate, informed action, so this tracker treats
+it as an acknowledgement too: a True -> False edge marks every record
+currently in D1 as seen, the same as calling the acknowledge service. A
+later False -> True edge is then a fresh signal in its own right, regardless
+of whether the device logged a new D1 record for it (it may not: e.g. the
+same float switch tripping again shows the symbol again without a new log
+entry). While the symbol is lit, status stays "fault" even if the D1 side
+has been explicitly acknowledged — only the device, or its owner, can clear
+that signal.
 
-It is fed from the existing ``pxxD1`` coordinator's payload, so it adds no
-serial traffic and follows that block's polling interval.
+Both inputs are fed from their existing block coordinators, so this adds no
+serial traffic and follows those blocks' own polling interval. Nothing here
+writes to the device.
 """
 
 from __future__ import annotations
@@ -49,6 +59,9 @@ class THZFaultTracker:
         self._acknowledged: list[str] = []
         self._acknowledged_at: str | None = None
         self._last_raw: bytes | None = None
+        # The device's own "service" display symbol, last seen state; None
+        # when that block isn't available (older firmware, or not polled).
+        self._service_active: bool | None = None
         self.state: dict[str, Any] | None = None
         self.dirty = False
 
@@ -85,17 +98,25 @@ class THZFaultTracker:
             self.dirty = True
             _LOGGER.error("Could not persist fault acknowledgement state: %s", err)
 
-    def process(self, payload: bytes | None) -> dict[str, Any] | None:
+    def process(
+        self, payload: bytes | None, service_active: bool | None = None
+    ) -> dict[str, Any] | None:
         """Decode a D1 payload and update ``state``.
 
-        Idempotent for an unchanged payload. An unusable payload makes the
+        ``service_active`` is the device's own "service" display symbol,
+        when available (see the module docstring); its True -> False edge
+        acknowledges everything currently in ``payload``, and while it is
+        True the status is "fault" regardless of acknowledgement.
+
+        Idempotent when neither input changed. An unusable payload makes the
         state ``None`` (unavailable) but keeps the acknowledgement baseline.
         """
         if payload is None:
             self.state = None
             return None
         raw = bytes(payload)
-        if raw == self._last_raw and self.state is not None:
+        unchanged = raw == self._last_raw and service_active == self._service_active
+        if unchanged and self.state is not None:
             return self.state
         decoded = decode_fault_memory(raw)
         if not decoded["valid"]:
@@ -125,9 +146,16 @@ class THZFaultTracker:
         else:
             new_indices = new_record_indices(self._acknowledged, current)
 
+        if self._service_active and service_active is False and current:
+            # The owner just reset the control unit: treat whatever D1
+            # currently shows as seen, same as the acknowledge service.
+            self._set_baseline(current)
+            new_indices = []
+        self._service_active = service_active
+
         new_entries = [entries[index] for index in new_indices]
         self.state = {
-            "status": STATUS_FAULT if new_entries else STATUS_OK,
+            "status": STATUS_FAULT if new_entries or service_active else STATUS_OK,
             "fault_count": len(entries),
             "fault_count_reported": decoded["fault_count_reported"],
             "entries": list(reversed(entries)),  # newest first
@@ -136,14 +164,17 @@ class THZFaultTracker:
             "new_count": len(new_entries),
             "records": current,
             "acknowledged_at": self._acknowledged_at,
+            "service_active": service_active,
         }
         return self.state
 
     def acknowledge(self) -> int:
-        """Mark every currently visible record as seen (HA only).
+        """Mark every currently visible D1 record as seen (HA only).
 
         Returns the number of records that were pending. Call ``async_save``
-        afterwards to persist.
+        afterwards to persist. If the device's own "service" symbol is
+        still lit, status stays "fault": that signal is only cleared by the
+        device itself (see the module docstring), not by this.
         """
         if self.state is None:
             raise RuntimeError("No fault data available to acknowledge")
@@ -151,7 +182,7 @@ class THZFaultTracker:
         self._set_baseline(list(self.state["records"]))
         self.state = {
             **self.state,
-            "status": STATUS_OK,
+            "status": STATUS_FAULT if self._service_active else STATUS_OK,
             "new_entries": [],
             "new_count": 0,
             "acknowledged_at": self._acknowledged_at,

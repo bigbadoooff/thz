@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_DEVICE, CONF_HOST, CONF_PORT
+from homeassistant.core import callback
 from homeassistant.helpers.selector import (
     AreaSelector,
     SelectSelector,
@@ -49,6 +50,7 @@ from .const import (
 )
 from .devices import entry_unique_id
 from .exceptions import DEVICE_ERRORS
+from .options_flow import THZOptionsFlow
 from .register_maps.register_map_manager import RegisterMapManager
 from .runtime_data import loaded_runtime_data
 from .thz_device import THZDevice
@@ -165,6 +167,14 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # 1.2: CONF_DEVICE_IDENTIFIER in the entry data; 1.4: unique_ids carry
     # it (async_migrate_entry).
     MINOR_VERSION = 4
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> THZOptionsFlow:
+        """Return the options flow (advisor settings)."""
+        return THZOptionsFlow()
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -343,6 +353,18 @@ class THZConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if other.entry_id != entry.entry_id
             ):
                 return self.async_abort(reason="already_configured")
+            runtime_data = getattr(entry, "runtime_data", None)
+            if runtime_data is not None and runtime_data.advisor is not None:
+                # The advisor's update listener is this entry's one path to
+                # a reload (see advisor_coordinator.py's module docstring);
+                # calling async_update_reload_and_abort here too is exactly
+                # what Home Assistant has started warning about.
+                return self.async_update_and_abort(
+                    entry,
+                    unique_id=unique_id,
+                    data=updated_data,
+                    reason="reconfigured",
+                )
             return self.async_update_reload_and_abort(
                 entry, unique_id=unique_id, data=updated_data, reason="reconfigured"
             )

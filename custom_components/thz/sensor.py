@@ -36,6 +36,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 
+from .advisor_sensor import async_setup_advisor_sensors
 from .const import (
     DOMAIN,
     ENTITY_ID_STYLE_DEFAULT,
@@ -207,6 +208,7 @@ async def async_setup_entry(
     # Set up COP sensors separately
     await async_setup_cop_sensors(hass, config_entry, async_add_entities)
     await async_setup_fault_sensors(hass, config_entry, async_add_entities)
+    await async_setup_advisor_sensors(hass, config_entry, async_add_entities)
 
 
 def sensor_unique_id(device_id: str, block: bytes, byte_offset: int, name: str) -> str:

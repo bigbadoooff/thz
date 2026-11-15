@@ -325,6 +325,72 @@ class TestTracker:
         assert tracker.process(_payload(R3))["new_count"] == 0  # fresh baseline
 
 
+class TestTrackerServiceSymbol:
+    """The device's own "service" display symbol as a second, live input.
+
+    Ported from a real incident: a float-switch fault (05:42) whose symbol
+    the owner cleared at the panel (07:54), which then lit again (20:08) for
+    what the device's D1 log never recorded as a second entry.
+    """
+
+    def _tracker(self):
+        return THZFaultTracker(FakeStore())
+
+    def test_lit_symbol_is_a_fault_even_on_the_first_read(self):
+        # Baselining (no "new" entries) must not hide an active symbol.
+        state = self._tracker().process(_payload(R3), service_active=True)
+        assert state["status"] == STATUS_FAULT
+        assert state["new_count"] == 0  # the record itself isn't "new"
+
+    def test_reset_edge_acknowledges_everything_currently_in_d1(self):
+        tracker = self._tracker()
+        tracker.process(_payload(R3), service_active=True)
+        state = tracker.process(_payload(R3), service_active=False)
+        assert state["status"] == STATUS_OK
+        assert state["new_count"] == 0
+        assert tracker.dirty
+
+    def test_relighting_is_a_fresh_signal_without_a_new_d1_record(self):
+        tracker = self._tracker()
+        tracker.process(_payload(R3), service_active=True)
+        tracker.process(_payload(R3), service_active=False)  # panel reset
+        state = tracker.process(_payload(R3), service_active=True)  # re-trips
+        assert state["status"] == STATUS_FAULT
+        assert state["fault_count"] == 1  # D1 itself never gained a record
+
+    def test_explicit_acknowledge_does_not_override_a_lit_symbol(self):
+        tracker = self._tracker()
+        tracker.process(_payload(R3))  # baseline, symbol unknown
+        tracker.process(_payload(R3, R11), service_active=True)  # new record + lit
+        pending = tracker.acknowledge()
+        assert pending == 1  # the new D1 record was pending
+        assert tracker.state["new_count"] == 0  # dismissed
+        assert tracker.state["status"] == STATUS_FAULT  # symbol still lit
+
+    def test_symbol_going_off_without_acknowledging_first_is_a_noop(self):
+        # False -> False (never lit): no baseline reset, nothing to persist.
+        tracker = self._tracker()
+        tracker.process(_payload(R3), service_active=False)
+        tracker.dirty = False
+        state = tracker.process(_payload(R3), service_active=False)
+        assert state["status"] == STATUS_OK
+        assert not tracker.dirty
+
+    def test_none_is_backward_compatible_with_no_symbol_input(self):
+        # Firmware/config without the 0A0176 block: behaves exactly as
+        # before, driven only by D1.
+        tracker = self._tracker()
+        tracker.process(_payload(R3))
+        state = tracker.process(_payload(R3, R11))
+        assert state["status"] == STATUS_FAULT
+        assert state["new_count"] == 1
+
+    def test_process_is_idempotent_when_the_symbol_input_repeats(self):
+        tracker = self._tracker()
+        first = tracker.process(_payload(R3), service_active=True)
+        assert tracker.process(_payload(R3), service_active=True) is first
+
+
 def _device(*payloads, write_error=None):
     """Device whose D1 reads return the given payloads in order."""
     device = MagicMock()

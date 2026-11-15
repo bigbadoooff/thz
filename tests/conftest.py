@@ -56,6 +56,15 @@ class MockCoordinatorEntity(MockEntity):
         """No-op stand-in for CoordinatorEntity's listener subscription."""
         return None
 
+    @property
+    def available(self) -> bool:
+        """Like CoordinatorEntity: available after a successful update."""
+        return bool(self.coordinator.last_update_success)
+
+    def _handle_coordinator_update(self) -> None:
+        """Like CoordinatorEntity: write the state."""
+        self.async_write_ha_state()
+
 
 class MockSensorEntity(MockEntity):
     """Mock sensor entity."""
@@ -212,6 +221,7 @@ sys.modules["homeassistant.helpers.area_registry"] = MagicMock()
 sys.modules["homeassistant.helpers.entity_registry"] = MagicMock()
 sys.modules["homeassistant.helpers.selector"] = MagicMock()
 sys.modules["homeassistant.helpers.storage"] = MagicMock()
+sys.modules["homeassistant.helpers.recorder"] = MagicMock()
 sys.modules["homeassistant.helpers.translation"] = MagicMock()
 
 # Mock homeassistant.util (and its "dt" submodule, e.g. dt_util.now()/.utcnow()
@@ -231,6 +241,7 @@ sys.modules["homeassistant.util.dt"] = dt_util_mock
 # Mock components
 components_mock = MagicMock()
 sys.modules["homeassistant.components"] = components_mock
+sys.modules["homeassistant.components.recorder"] = MagicMock()
 
 # Mock diagnostics component
 diagnostics_mock = MagicMock()
