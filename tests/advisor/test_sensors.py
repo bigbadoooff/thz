@@ -143,7 +143,10 @@ def test_coordinator_calibrates_and_advises(fit, source):
     start, end = load.call_args.args[3:5]
     assert (end - start).days == advisor_coordinator.HISTORY_DAYS
     run = state.advice
-    assert run.runtime_s < 5
+    # A sanity bound, not a product requirement: the pattern search is
+    # ~3s on typical dev hardware but has been observed over 7s on CI's
+    # shared/slower runners.
+    assert run.runtime_s < 15
     assert run.price_eur_kwh == 0.30
     assert run.assumed == tuple(sorted(PARAM_KEYS))
     assert state.warnings == advisor_coordinator.WARNINGS
