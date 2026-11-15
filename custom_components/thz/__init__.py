@@ -31,6 +31,8 @@ from .const import (
     CONF_ENTITY_VISIBILITY,
     CONF_FIRMWARE_OVERRIDE,
     CONF_SPLIT_DEVICES,
+    DATA_ENTITY_HC2_APPLIED,
+    DATA_ENTITY_VISIBILITY_APPLIED,
     DEFAULT_UPDATE_INTERVAL,
     DEFAULT_WRITE_INTERVAL,
     DOMAIN,
@@ -267,14 +269,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     # applied, e.g. after the user changes this option via Reconfigure.
     await _async_apply_entity_visibility_tier(hass, config_entry, known_unique_ids)
 
-    if entry_data.advisor is not None:
-        # The visibility-tier update above can itself change config_entry.data
-        # (_entity_visibility_applied / _entity_hc2_applied). Resync the
-        # advisor's baseline now, synchronously and before any further await,
-        # so its update listener does not mistake this setup's own
-        # bookkeeping write for a reconfigure and schedule a spurious reload.
-        entry_data.advisor.config_data = dict(config_entry.data)
-
     return True
 
 
@@ -500,13 +494,13 @@ async def _async_apply_entity_visibility_tier(
     )
     enable_hc2 = config_entry.data.get(CONF_ENABLE_HC2, False)
 
-    last_applied = config_entry.data.get("_entity_visibility_applied")
+    last_applied = config_entry.data.get(DATA_ENTITY_VISIBILITY_APPLIED)
     if last_applied is None and config_entry.data.get("_hidden_entities_migrated"):
         # An entry carrying _hidden_entities_migrated has had the "default"
         # tier's hidden set applied.
         last_applied = ENTITY_VISIBILITY_DEFAULT
 
-    last_applied_hc2 = config_entry.data.get("_entity_hc2_applied")
+    last_applied_hc2 = config_entry.data.get(DATA_ENTITY_HC2_APPLIED)
     if last_applied_hc2 is None:
         # Without a stored HC2 state, HC2 entities follow the applied tier:
         # "extended" and "all" show them. Taking that as the applied state
@@ -583,8 +577,8 @@ async def _async_apply_entity_visibility_tier(
         config_entry,
         data={
             **config_entry.data,
-            "_entity_visibility_applied": visibility,
-            "_entity_hc2_applied": enable_hc2,
+            DATA_ENTITY_VISIBILITY_APPLIED: visibility,
+            DATA_ENTITY_HC2_APPLIED: enable_hc2,
         },
     )
 

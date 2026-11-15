@@ -16,6 +16,11 @@ listener here has to own both: ``config_flow.py``'s ``async_step_reconfigure``
 only updates the entry, and :func:`_async_entry_updated` schedules the
 reload itself when it sees ``entry.data`` has changed since setup, or just
 refreshes the advisor when only ``entry.options`` has.
+
+``entry.data`` also changes on every setup, not only a reconfigure:
+``__init__.py`` writes its own applied-entity-visibility-tier bookkeeping
+back into it. :func:`_reconfigurable_data` leaves those keys out of the
+comparison, so that write is never mistaken for a reconfigure.
 """
 
 from __future__ import annotations
@@ -50,6 +55,7 @@ from .advisor_inputs import (
     plant_inputs,
 )
 from .advisor_options import AdvisorSettings, advisor_settings
+from .const import DATA_ENTITY_HC2_APPLIED, DATA_ENTITY_VISIBILITY_APPLIED
 from .runtime_data import THZConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
@@ -120,6 +126,25 @@ def async_setup_advisor(
     return coordinator
 
 
+def _reconfigurable_data(data: Mapping[str, Any]) -> dict[str, Any]:
+    """``entry.data`` with __init__.py's own bookkeeping keys left out.
+
+    ``_async_apply_entity_visibility_tier`` writes these back into
+    ``entry.data`` as part of every setup, not only a reconfigure (e.g. the
+    very first setup of a new entry, which has neither key yet). That write
+    happens with ``async_create_task``'s default eager start, so it can run
+    the update listener (this module's) nested inside the same setup that
+    is still applying the tier -- before any later code in that setup gets
+    a chance to resync a baseline. Leaving these two out of the comparison
+    avoids the spurious reload outright, regardless of that ordering.
+    """
+    return {
+        k: v
+        for k, v in data.items()
+        if k not in (DATA_ENTITY_VISIBILITY_APPLIED, DATA_ENTITY_HC2_APPLIED)
+    }
+
+
 async def _async_entry_updated(
     hass: HomeAssistant, config_entry: THZConfigEntry
 ) -> None:
@@ -132,7 +157,7 @@ async def _async_entry_updated(
     coordinator = config_entry.runtime_data.advisor
     if coordinator is None:
         return
-    if dict(config_entry.data) != coordinator.config_data:
+    if _reconfigurable_data(config_entry.data) != coordinator.config_data:
         hass.config_entries.async_schedule_reload(config_entry.entry_id)
         return
     if coordinator.options != dict(config_entry.options):
@@ -197,13 +222,11 @@ class AdvisorCoordinator(DataUpdateCoordinator[AdvisorState]):
         )
         # Options of the last run.
         self.options: dict[str, Any] = dict(config_entry.options)
-        # entry.data once setup finishes; __init__.py resyncs this after its
-        # own bookkeeping writes (entity visibility tier, HC2) land, so this
-        # is the entry's data net of those, not as it stood when the advisor
-        # was constructed mid-setup. A later difference means a reconfigure,
+        # entry.data as of setup, net of __init__.py's own bookkeeping keys
+        # (see _reconfigurable_data); a later difference means a reconfigure,
         # which the update listener must then reload the entry for (see the
         # module docstring).
-        self.config_data: dict[str, Any] = dict(config_entry.data)
+        self.config_data: dict[str, Any] = _reconfigurable_data(config_entry.data)
 
     def _state_value(self, entity_id: str | None) -> float | None:
         state = self.hass.states.get(entity_id) if entity_id else None
