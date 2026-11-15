@@ -216,6 +216,19 @@ outside temperature 4 to 12 °C:
 - **Starts per day are not validated.** The simulation does not know the
   day/night switching of automations and shows about one start per day.
   Do not judge cycling by it.
+- **A steeper curve or a higher KP can look like it saves energy for the
+  wrong reason.** Either raises the target temperature, so the compressor
+  starts sooner and runs longer, less frequent cycles instead of short
+  ones. `el_kwh_day_equal_comfort` already discounts the energy credit for
+  the resulting warmer room, so what is left to decide the ranking is
+  mostly `starts_day` and `comfort_kh_day` — priced in `Weights` at an
+  assumed 0.05 EUR per start and 0.10 EUR per kelvin-hour below comfort,
+  not measured on this heat pump. If a start costs less than that in
+  reality (most inverter compressors tolerate cycling fine), the advisor
+  will still favor fewer, longer cycles — this is a property of those
+  assumed weights, not a measured saving. The savings from this effect are
+  consistently tiny (well under the 2 % threshold on the measured data),
+  which is itself a sign it is model noise rather than a real effect.
 - **Integral and derivative components are not modelled.** The model
   assumes I = 0.
 - **One profile.** The controller model is that of the LWZ 5 CS Premium.
