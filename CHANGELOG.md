@@ -4,16 +4,43 @@ All notable changes to the THZ integration are documented here.
 
 ---
 
-## [Unreleased]
+## [0.7.2] – 2026-11-24
+
+This release also contains everything from
+[0.7.2-beta.1](https://github.com/bigbadoooff/thz/releases/tag/v0.7.2-beta.1)
+(fault memory read as a ring buffer, fault events for faults stored while
+Home Assistant was not running).
 
 ### Changes
 
+- **The two flow rate sensors have their own names** (#286). *Flow Rate*
+  (`flowRate` in `pxxFB`) is the water flow through the unit: about
+  14 l/min with the heating circuit pump, about 26 l/min with the hot
+  water pump, 0 when both stand. It keeps the translation key `flow_rate`.
+  The single-register reading `sFlowRate` (`pxx0A033B`) is now *Flow Rate
+  (Sensor)* with the key `flow_rate_sensor`, so dashboards and cards that
+  look entities up by translation key find the right one. Both keep their
+  entity IDs and history.
+- **Flow Rate (Sensor) is disabled by default** on 5.09, 5.39 and 7.09
+  (#286). New installations show only the reliable *Flow Rate*; existing
+  entities stay as they are and can be disabled under the entity's
+  settings.
+- **The README shows the Heat Pump Hydraulic Card**, whose `thz` preset
+  draws the heat pump, hot water tank and heating circuit from this
+  integration's entities.
 - **The manual hot water setpoint goes up to 65 °C** on firmware 4.x, 5.x
   and 7.x. *DHW Temperature Manual* (`p11DHWsetManualTemp`) stopped at
   55 °C; the range is now 10-65 °C.
 
 ### Bug Fixes
 
+- **No more meaningless flow rate and compressor power readings on 7.59**
+  (#286). On firmware 7.59 the registers `pxx0A033B` (`sFlowRate`) and
+  `pxx0A069B` (`sComprRelPower`) both returned the same pair of unrelated
+  raw values (about 17 and 220-240), whatever the pumps and the compressor
+  did. Both are no longer polled on 7.59; their entities become
+  unavailable and can be removed. *Flow Rate* (`pxxFB`) and *Heating
+  Relative Power* (`pxx0A069A`) are unaffected.
 - **The compressor sensor follows the display** (#269). On some firmware,
   such as 7.02, the compressor bit of `pxxFB` stayed on while the
   compressor was off. The *Compressor* binary sensor now reads the bit of
