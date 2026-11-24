@@ -14,7 +14,7 @@
 [![Open your Home Assistant instance and open this repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=bigbadoooff&repository=thz&category=integration)
 [![Open your Home Assistant instance and start setting up this integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=thz)
 
-> **Version 0.7.1** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
+> **Version 0.7.2** — See [CHANGELOG.md](CHANGELOG.md) for the full list of new
 > features and breaking changes in this release.
 
 ## Introduction
@@ -253,6 +253,31 @@ than a minute:
   on automatic sync for the future. The issue goes away by itself once the
   clock is right again.
 
+### Dashboard: Heat Pump Hydraulic Card
+
+The [Heat Pump Hydraulic Card](https://github.com/Sturmi77/heatpump-hydraulic-card)
+by Sturmi77 (HACS, MIT) draws the heat pump, the hot water tank and the
+heating circuit as an animated schematic. Its `thz` preset was built for
+this integration: it finds the entities by their translation keys, so
+entity ids, the entity-id style option and the Home Assistant language do
+not matter.
+
+```yaml
+type: custom:heatpump-flow-card
+preset: thz
+```
+
+![Heat Pump Hydraulic Card with the thz preset](docs/images/thz-hydraulic-card.png)
+
+*The card with the `thz` preset on an LWZ 5 CS (firmware 7.59); the values
+are illustrative.*
+
+Which fields appear depends on the firmware (power and COP from 4.19 on,
+flow rate from 5.09 on). Entities that are disabled by default, such as
+heating circuit 2, are not found until you enable them. The preset's
+[documentation](https://github.com/Sturmi77/heatpump-hydraulic-card/blob/main/docs/presets/thz.md)
+lists what it maps. Questions about the card belong in its own repository.
+
 ## Compatibility
 
 ### Supported Firmware Versions
@@ -265,7 +290,7 @@ than a minute:
 | 4.39     | Full support including energy sensors, COP, runtime hours, and passive cooling |
 | 5.09 / 7.09 | 4.39-based profile with the 5.09 extras (7.09 uses the 5.09 maps) |
 | 5.39     | Full support including passive cooling energy sensor (`sCoolHCTotal`) |
-| 7.59     | Uses the 5.39 maps |
+| 7.59     | The 5.39 maps without the flow rate sensor (`pxx0A033B`) and compressor relative power (`pxx0A069B`) blocks, which 7.59 does not answer with real readings |
 | Other    | Falls back to a 4.39-like configuration (like the reference FHEM module) — may work partially |
 
 ### How Firmware Versions Are Loaded
@@ -301,13 +326,14 @@ register block):
 | `439` | `write_map_439_539`, `write_map_439` | `readings_map_439`, `register_map_439` |
 | `439technician` | `write_map_439_539`, `write_map_439`, `write_map_X39tech` | `readings_map_439`, `register_map_439` |
 | `509` / `709` | `write_map_439_539`, `write_map_539` | `readings_map_439`, `readings_map_509` |
-| `539` / `759` | `write_map_439_539`, `write_map_539` | `readings_map_439`, `readings_map_539` |
+| `539` | `write_map_439_539`, `write_map_539` | `readings_map_439`, `readings_map_539` |
+| `759` | `write_map_439_539`, `write_map_539` | `readings_map_439`, `readings_map_759` |
 | `539technician` | `write_map_439_539`, `write_map_539`, `write_map_X39tech` | `readings_map_439`, `readings_map_539` |
 | anything else | `write_map_439_539`, `write_map_439` | `readings_map_439` (`default`, treated as 4.39-like) |
 
 `709` is intentionally identical to `509` — the 7.09 firmware has no register
-differences from 5.09 that this integration is aware of, and `759` likewise
-uses the 5.39 maps. An unrecognized
+differences from 5.09 that this integration is aware of. `759` is the 5.39
+map without two blocks that 7.59 answers with unrelated values. An unrecognized
 `firmware` string falls back to `default`, which mirrors the reference FHEM
 module's own behaviour of assuming 4.39 rather than guessing at 5.39-like
 registers that may not exist on the device (e.g. cooling-only blocks).
@@ -340,10 +366,16 @@ registers that may not exist on the device (e.g. cooling-only blocks).
 
 - `readings_map_439.py` is the common base for this family (energy/COP
   sensors, compressor & booster runtime hours, fault log, solar circuit,
-  fan speeds); `readings_map_509.py` / `readings_map_539.py` layer
-  firmware-specific extras on top (e.g. flow rate, humidity thresholds,
-  compressor power/rotation limits, dew point sensors, and — 5.39 only —
-  the passive-cooling energy sensor `sCoolHCTotal`).
+  fan speeds); `readings_map_509.py` / `readings_map_539.py` /
+  `readings_map_759.py` layer firmware-specific extras on top (e.g. flow
+  rate, humidity thresholds, compressor power/rotation limits, dew point
+  sensors, and — 5.39 / 7.59 only — the passive-cooling energy sensor
+  `sCoolHCTotal`).
+- **Flow rate.** The water flow through the unit is *Flow Rate*
+  (`flowRate` in `pxxFB`, translation key `flow_rate`). The single-register
+  reading *Flow Rate (Sensor)* (`sFlowRate`, `pxx0A033B`, key
+  `flow_rate_sensor`) is disabled by default on 5.09, 5.39 and 7.09 and
+  not created on 7.59.
 - Devices without active cooling hardware get cooling-only registers
   stripped from the merged 5.39 maps (`_COOLING_READ_BLOCKS` /
   `_COOLING_WRITE_KEYS`, applied via the `has_cooling` flag from your
