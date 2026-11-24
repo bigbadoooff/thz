@@ -482,6 +482,9 @@
       "flow_rate": {
         "name": "Durchflussmenge"
       },
+      "flow_rate_sensor": {
+        "name": "Durchflussmenge (Sensor)"
+      },
       "pressure_hc": {
         "name": "Heizkreisdruck"
       },

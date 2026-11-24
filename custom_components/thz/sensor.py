@@ -180,6 +180,7 @@ async def async_setup_entry(
                 "state_class": meta.get("state_class"),
                 "icon": meta.get("icon"),
                 "translation_key": read_field.translation_key,
+                "enabled_default": meta.get("enabled_default", True),
             }
             if read_field.nibble is not None:
                 # Single-nibble value (e.g. Weekday) sharing its byte with the
@@ -289,7 +290,8 @@ def normalize_entry(entry: tuple[Any, ...] | dict[str, Any]) -> dict[str, Any]:
         entry: The sensor entry to normalize. If a tuple, it should contain
             (name, offset, length, decode, factor[, meta_dict]) where the
             optional 6th element is a dict with HA metadata keys: unit,
-            device_class, state_class, icon, translation_key.
+            device_class, state_class, icon, translation_key,
+            enabled_default.
 
     Returns:
         A dictionary containing the normalized sensor entry.
@@ -311,6 +313,7 @@ def normalize_entry(entry: tuple[Any, ...] | dict[str, Any]) -> dict[str, Any]:
             "state_class": meta.get("state_class"),
             "icon": meta.get("icon"),
             "translation_key": meta.get("translation_key"),
+            "enabled_default": meta.get("enabled_default", True),
         }
     if isinstance(entry, dict):
         return entry
@@ -425,9 +428,12 @@ class THZGenericSensor(CoordinatorEntity[BlockCoordinator], SensorEntity):
         # Uses HA's standard _attr_ pattern - no explicit @property override.
         # See base_entity.py for rationale on avoiding @property overrides
         # for entity_registry_enabled_default.
-        self._attr_entity_registry_enabled_default = not should_hide_entity(
-            self._entity_name, entity_visibility
-        )
+        # A map entry can also be off by default on its own ("enabled_default":
+        # False), e.g. a reading that is less reliable than another one for the
+        # same quantity.
+        self._attr_entity_registry_enabled_default = bool(
+            e.get("enabled_default", True)
+        ) and not should_hide_entity(self._entity_name, entity_visibility)
 
         # Entity-ID naming style: independent of translation_key/unique_id.
         # NOTE: Home Assistant has no "_attr_suggested_object_id" hook --

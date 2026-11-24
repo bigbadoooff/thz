@@ -13,7 +13,7 @@ Where:
     - decode_type: Decoding function identifier
     - factor: Scaling factor for the value
     - meta_dict (optional): HA entity metadata (unit, device_class, state_class, icon,
-      translation_key)
+      translation_key, enabled_default)
 
 Energy sensors use paired registers - see readings_map_439.py for details.
 """
@@ -40,7 +40,8 @@ REGISTER_MAP = {
             4,
             "hex2int",
             10,
-            {"unit": "l/min", "state_class": "measurement", "translation_key": "flow_rate"},
+            # Off by default: pxxFB flowRate is the reliable water flow reading.
+            {"unit": "l/min", "state_class": "measurement", "translation_key": "flow_rate_sensor", "enabled_default": False},
         ),
     ],
     "pxx0A064F": [

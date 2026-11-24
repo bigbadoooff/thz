@@ -1,5 +1,7 @@
 """Tests for register map manager."""
 
+import pytest
+
 from custom_components.thz.register_maps.register_map_manager import (
     FIRMWARE_MAPS,
     RegisterMapManager,
@@ -214,17 +216,35 @@ class TestRegisterMapManagerWrite:
         assert "command" not in manager._merged_map["pUnknownParent"]
 
 
-def test_759_uses_the_539_maps():
-    assert FIRMWARE_MAPS["759"] == FIRMWARE_MAPS["539"]
+def test_759_uses_the_539_maps_without_unsupported_blocks():
+    assert FIRMWARE_MAPS["759"]["write"] == FIRMWARE_MAPS["539"]["write"]
+    unsupported = {"pxx0A033B", "pxx0A069B"}
     for has_cooling in (True, False):
-        assert (
-            RegisterMapManager("759", has_cooling=has_cooling).get_all_registers()
-            == RegisterMapManager("539", has_cooling=has_cooling).get_all_registers()
-        )
+        regs_759 = RegisterMapManager(
+            "759", has_cooling=has_cooling
+        ).get_all_registers()
+        regs_539 = RegisterMapManager(
+            "539", has_cooling=has_cooling
+        ).get_all_registers()
+        assert not unsupported & regs_759.keys()
+        assert unsupported <= regs_539.keys()
+        assert regs_759 == {k: v for k, v in regs_539.items() if k not in unsupported}
         assert (
             RegisterMapManagerWrite("759", has_cooling=has_cooling).params().keys()
             == RegisterMapManagerWrite("539", has_cooling=has_cooling).params().keys()
         )
+
+
+def test_flow_rate_translation_keys_are_distinct():
+    regs = RegisterMapManager("539").get_all_registers()
+    keys = {
+        e[0].rstrip(":"): e[5]["translation_key"]
+        for block in ("pxxFB", "pxx0A033B")
+        for e in regs[block]
+        if len(e) > 5 and "translation_key" in e[5]
+    }
+    assert keys["flowRate"] == "flow_rate"
+    assert keys["sFlowRate"] == "flow_rate_sensor"
 
 
 class TestBaseRegisterMapManager:
@@ -448,3 +468,12 @@ class TestRegisterMapManagerWrite2xxEnrichment:
         assert entry is not None
         assert entry.get("command") == "17"
         assert entry.get("write_mode") == "block"
+
+
+@pytest.mark.parametrize("fw", ["509", "539", "709"])
+def test_flow_rate_sensor_is_disabled_by_default(fw):
+    regs = RegisterMapManager(fw).get_all_registers()
+    (s_flow,) = regs["pxx0A033B"]
+    assert s_flow[5]["enabled_default"] is False
+    (flow,) = [e for e in regs["pxxFB"] if e[0].startswith("flowRate")]
+    assert flow[5].get("enabled_default", True) is True

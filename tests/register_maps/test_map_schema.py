@@ -30,7 +30,14 @@ _STRINGS = json.loads(
 # values shown as raw hex.
 _SKIPPED_READ_TYPES = {"disabled", "n.a.", "n.a"}
 _HEX_READ_TYPES = {"raw", "swver", "hex2ascii", "opmode2"}
-_META_KEYS = {"unit", "device_class", "state_class", "icon", "translation_key"}
+_META_KEYS = {
+    "unit",
+    "device_class",
+    "state_class",
+    "icon",
+    "translation_key",
+    "enabled_default",
+}
 
 _WRITE_TYPES = {"number", "select", "switch", "time", "schedule", "ptime", "button"}
 _WRITE_DECODE_TYPES = {

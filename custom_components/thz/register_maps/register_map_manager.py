@@ -13,6 +13,7 @@ from . import (
     readings_map_439,  # noqa: F401
     readings_map_509,  # noqa: F401
     readings_map_539,  # noqa: F401
+    readings_map_759,  # noqa: F401
     register_map_206,  # noqa: F401
     register_map_214,  # noqa: F401
     register_map_214j,  # noqa: F401
@@ -96,10 +97,11 @@ FIRMWARE_MAPS = {
         "write": ["write_map_439_539", "write_map_539"],
         "read": ["readings_map_439", "readings_map_539"],
     },
-    # 7.59 (e.g. LWZ 5) uses the 5.39 maps.
+    # 7.59 (e.g. LWZ 5) uses the 5.39 write map and the 5.39 readings
+    # without the blocks 7.59 does not answer (see readings_map_759).
     "759": {
         "write": ["write_map_439_539", "write_map_539"],
-        "read": ["readings_map_439", "readings_map_539"],
+        "read": ["readings_map_439", "readings_map_759"],
     },
     # Fallback for any firmware string not listed above (e.g. "438", "437",
     # "440" — off-by-a-point-release 4.3x builds we don't have a dedicated
@@ -221,7 +223,7 @@ class BaseRegisterMapManager:
         self, module_name: str, register_map: dict[str, Any]
     ) -> dict[str, Any]:
         """Remove cooling-only entries from 5.39 maps for non-cooling devices."""
-        if module_name == "readings_map_539":
+        if module_name in ("readings_map_539", "readings_map_759"):
             return {
                 k: v for k, v in register_map.items() if k not in _COOLING_READ_BLOCKS
             }
