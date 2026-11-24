@@ -82,7 +82,7 @@
           "read_pxx0A0648": "Read: Cooling HC Total",
           "read_pxx0B0264": "Read: Dew Point HC1",
           "read_pxx0C0264": "Read: Dew Point HC2",
-          "read_pxx0A05D1": "Read: Compressor Operating Hours",
+          "read_pxx0A05D1": "Read: Party Time",
           "write_heating_hc1": "Write: Heating Circuit 1",
           "write_heating_hc2": "Write: Heating Circuit 2",
           "write_dhw": "Write: Domestic Hot Water",
@@ -307,7 +307,7 @@
           "read_pxx0A0648": "Read: Cooling HC Total",
           "read_pxx0B0264": "Read: Dew Point HC1",
           "read_pxx0C0264": "Read: Dew Point HC2",
-          "read_pxx0A05D1": "Read: Compressor Operating Hours",
+          "read_pxx0A05D1": "Read: Party Time",
           "write_heating_hc1": "Write: Heating Circuit 1",
           "write_heating_hc2": "Write: Heating Circuit 2",
           "write_dhw": "Write: Domestic Hot Water",
@@ -1966,12 +1966,6 @@
       },
       "holiday_end_time": {
         "name": "Holiday End Time"
-      },
-      "party_time": {
-        "name": "Party Start"
-      },
-      "party_time_end": {
-        "name": "Party End"
       },
       "programhc1_mo_0_start": {
         "name": "HC1 Program Monday 1 Start"

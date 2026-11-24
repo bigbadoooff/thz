@@ -34,6 +34,15 @@ Home Assistant was not running).
 
 ### Bug Fixes
 
+- **Party time is read-only on firmware 4.x, 5.x and 7.x.** Setting *Party
+  Time* or *Party Time End* failed with "Device rejected the write: unknown
+  answer 0105e60a05d11003": the controller does not accept writes to the
+  party register `0A05D1`, and FHEM does not offer them on these firmwares
+  either. The two time entities are gone; the *Party Time* sensor still
+  shows the party period. The leftover entities show as unavailable and can
+  be deleted. Backups that contain `party-time` restore everything else and
+  list it as skipped. The poll-interval option for this block was
+  mislabelled *Compressor Operating Hours* and is now *Party Time*.
 - **No more meaningless flow rate and compressor power readings on 7.59**
   (#286). On firmware 7.59 the registers `pxx0A033B` (`sFlowRate`) and
   `pxx0A069B` (`sComprRelPower`) both returned the same pair of unrelated

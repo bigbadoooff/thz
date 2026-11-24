@@ -1009,17 +1009,6 @@ WRITE_MAP = {
         "icon": "mdi:clock-outline",
         "decode_type": "9holy",
     },
-    "party-time": {
-        "command": "0A05D1",
-        "min": "00:00",
-        "max": "23:59",
-        "unit": "",
-        "step": "",
-        "type": "time",
-        "device_class": "measurement",
-        "icon": "mdi:calendar-clock",
-        "decode_type": "8party",
-    },
     "programHC1_Mo_0": {
         "command": "0B1410",
         "min": "00:00",

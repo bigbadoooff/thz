@@ -82,7 +82,7 @@
           "read_pxx0A0648": "Lesen: Kühlung HK gesamt",
           "read_pxx0B0264": "Lesen: Taupunkt HK1",
           "read_pxx0C0264": "Lesen: Taupunkt HK2",
-          "read_pxx0A05D1": "Lesen: Verdichter Betriebsstunden",
+          "read_pxx0A05D1": "Lesen: Party-Zeit",
           "write_heating_hc1": "Schreiben: Heizkreis 1",
           "write_heating_hc2": "Schreiben: Heizkreis 2",
           "write_dhw": "Schreiben: Warmwasser",
@@ -307,7 +307,7 @@
           "read_pxx0A0648": "Lesen: Kühlung HK gesamt",
           "read_pxx0B0264": "Lesen: Taupunkt HK1",
           "read_pxx0C0264": "Lesen: Taupunkt HK2",
-          "read_pxx0A05D1": "Lesen: Verdichter Betriebsstunden",
+          "read_pxx0A05D1": "Lesen: Party-Zeit",
           "write_heating_hc1": "Schreiben: Heizkreis 1",
           "write_heating_hc2": "Schreiben: Heizkreis 2",
           "write_dhw": "Schreiben: Warmwasser",
@@ -1951,12 +1951,6 @@
       },
       "holiday_end_time": {
         "name": "Urlaubsende Zeit"
-      },
-      "party_time": {
-        "name": "Party-Beginn"
-      },
-      "party_time_end": {
-        "name": "Party-Ende"
       },
       "programhc1_mo_0_start": {
         "name": "HK1 Programm Montag 1 Start"

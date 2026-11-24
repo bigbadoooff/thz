@@ -477,3 +477,16 @@ def test_flow_rate_sensor_is_disabled_by_default(fw):
     assert s_flow[5]["enabled_default"] is False
     (flow,) = [e for e in regs["pxxFB"] if e[0].startswith("flowRate")]
     assert flow[5].get("enabled_default", True) is True
+
+
+@pytest.mark.parametrize(
+    "fw", ["419", "439", "439technician", "509", "539", "539technician", "709", "759"]
+)
+def test_party_time_is_read_only(fw):
+    # FHEM's 4.39/5.39 set list has party-time (0A05D1) commented out
+    # (docs/legacy/00_THZ.pm, %sets439539common); it is only in the gets.
+    # The controller answers a SET with 01 05.
+    params = RegisterMapManagerWrite(fw).params()
+    assert "party-time" not in params
+    assert all(p.command != "0A05D1" for p in params.values())
+    assert "pxx0A05D1" in RegisterMapManager(fw).get_all_registers()

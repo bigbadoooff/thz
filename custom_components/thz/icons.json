@@ -724,12 +724,6 @@
       },
       "holiday_end_time": {
         "default": "mdi:clock-outline"
-      },
-      "party_time": {
-        "default": "mdi:calendar-clock"
-      },
-      "party_time_end": {
-        "default": "mdi:calendar-clock"
       }
     },
     "climate": {
